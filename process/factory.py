@@ -737,25 +737,27 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          command=['sh', '-c',
           WithProperties('if [ -d '+self.branchName+' ]; then ' +
-                         'hg -R '+self.branchName+' pull -r tip ; ' +
+                         'hg -R '+self.branchName+' pull -r default ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.repoPath+' ; ' +
-                         'fi')],
-         descriptionDone="en-US's source",
+                         'fi ' +
+                         '&& hg -R '+self.branchName+' update -r %(en_revision)s')],
+         descriptionDone="en-US source",
          workdir='build/',
          timeout=30*60 # 30 minutes
         )
         self.addStep(ShellCommand,
          command=['sh', '-c',
           WithProperties('if [ -d %(locale)s ]; then ' +
-                         'hg -R %(locale)s pull -r tip ; ' +
+                         'hg -R %(locale)s pull -r default ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+l10nRepoPath+\
                            '/%(locale)s/ ; ' +
-                         'fi')],
-         descriptionDone="locale's source",
+                         'fi ' +
+                         '&& hg -R %(locale)s update -r %(l10n_revision)s')],
+         descriptionDone="locale source",
          workdir='build/' + l10nRepoPath
         )
 

@@ -41,7 +41,8 @@ class L10nMixin(object):
 
   def __init__(self, scheduler,
                repoPath    = None,
-               repoType    = 'cvs', baseTag = 'tip',
+               repoType    = 'cvs',
+               baseTag     = 'default',
                localesFile = None,
                cvsRoot     = ':pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot',
                locales     = None):
@@ -104,7 +105,9 @@ class L10nMixin(object):
         props = properties.Properties()
         props.updateFromProperties(self.scheduler.properties)
         #I do not know exactly what to pass as the source parameter
-        props.update(dict(locale=locale),'DependentL10n')
+        props.update(dict(locale=locale),"Scheduler")
+        props.setProperty("en_revision",self.baseTag,"Scheduler")
+        props.setProperty("l10n_revision",self.baseTag,"Scheduler")
         log.msg('Submitted '+locale+' locale')
         # let's submit the BuildSet for this locale
         self.scheduler.submitBuildSet(
@@ -203,7 +206,7 @@ class DependentL10n(Dependent):
 
   def __init__(self, name, upstream, builderNames,
                repoType, repoPath=None,
-               baseTag='tip', localesFile=None,
+               baseTag='default', localesFile=None,
                cvsRoot=None, locales=None):
       Dependent.__init__(self, name, upstream, builderNames)
       # The next two lines has been added because of:
