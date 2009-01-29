@@ -99,6 +99,8 @@ class L10nMixin(object):
       """
       log.msg("L10nMixin:: loaded locales' list")
       for locale in locales:
+        if locale == "en-US":
+          continue
         props = properties.Properties()
         props.updateFromProperties(self.scheduler.properties)
         #I do not know exactly what to pass as the source parameter
