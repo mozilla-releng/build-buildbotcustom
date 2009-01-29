@@ -1135,6 +1135,14 @@ class ReleaseTaggingFactory(ReleaseFactory):
         buildTag = '%s_BUILD%s' % (baseTag, str(buildNumber))
         releaseTag = '%s_RELEASE' % baseTag
 
+        # generate the release branch name, which is based on the
+        # version and the current date.
+        # looks like: GECKO191_20080728_RELBRANCH
+        # This can be overridden per-repository. This case is handled
+        # in the loop below
+        relbranchName = 'GECKO%s_%s_RELBRANCH' % (
+          milestone.replace('.', ''), datetime.now().strftime('%Y%m%d'))
+                
         for repoPath in sorted(repositories.keys()):
             repoName = self.getRepoName(repoPath)
             repo = self.getRepository(repoPath)
@@ -1145,20 +1153,10 @@ class ReleaseTaggingFactory(ReleaseFactory):
             repoRevision = repositories[repoPath]['revision']
             bumpFiles = repositories[repoPath]['bumpFiles']
 
-            relbranchName = ''
-            relbranchOverride = repositories[repoPath]['relbranchOverride']
-            # generally, this is specified for Firefox respins and non-Firefox
-            # builds (where mozilla-central has been bumped and branched
-            # but not, eg, comm-central).
-            if relbranchOverride:
-                relbranchName = relbranchOverride
-            else:
-                # generate the release branch name, which is based on the
-                # version and the current date.
-                # looks like: GECKO191_20080728_RELBRANCH
-                relbranchName = 'GECKO%s_%s_RELBRANCH' % (
-                  milestone.replace('.', ''), datetime.now().strftime('%Y%m%d'))
-                
+            relbranchOverride = False
+            if repositories[repoPath]['relbranchOverride']:
+                relbranchOverride = True
+                relbranchName = repositories[repoPath]['relbranchOverride']
 
             # For l10n we never bump any files, so this will never get
             # overridden. For source repos, we will do a version bump in build1
