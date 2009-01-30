@@ -366,7 +366,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(AliveTest,
                 env=self.env,
                 workdir='build/%s/_leaktest' % self.objdir,
-                extraArgs=args
+                extraArgs=args,
+                warnOnFailure=True
             )
         # we only want this variable for this test - this sucks
         bloatEnv = self.env.copy()
@@ -375,6 +376,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=bloatEnv,
          workdir='build/%s/_leaktest' % self.objdir,
          logfile='bloat.log',
+         warnOnFailure=True
         )
         self.addStep(ShellCommand,
          env=self.env,
@@ -411,7 +413,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='build/%s/_leaktest' % self.objdir,
          extraArgs=['--trace-malloc', 'malloc.log',
                     '--shutdown-leaks=sdleak.log'],
-         timeout=3600 # 1 hour, because this takes a long time on win32
+         timeout=3600, # 1 hour, because this takes a long time on win32
+         warnOnFailure=True
         )
         self.addStep(ShellCommand,
          env=self.env,
