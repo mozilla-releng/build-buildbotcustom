@@ -29,7 +29,10 @@ from buildbot.steps.shell import ShellCommand
 from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS
 from buildbot.process.buildstep import BuildStep
 
-import urllib #for conntacting the graph server
+from twisted.internet.defer import DeferredList
+from twisted.web.client import getPage
+
+from urllib import urlencode
 from time import strptime, strftime, localtime, mktime
 import re
 import os
@@ -334,30 +337,66 @@ class Codesighs(ShellCommand):
             self.addCompleteLog(slug, summary)
 
 class GraphServerPost(BuildStep):
-    def __init__(self, server, selector, branch, resultsname):
+    flunkOnFailure = True
+
+    def __init__(self, server, selector, branch, resultsname, timeout=10):
         BuildStep.__init__(self)
         self.server = server
         self.graphurl = "http://%s/%s/collect.cgi" % (server, selector,)
         self.branch = branch
         self.resultsname = resultsname.replace(' ', '_')
+        self.timeout = timeout
         self.name = 'graph server post'
+
+    def doTinderboxPrint(self, contents, testlongname, testname, prettyval):
+        # If there was no error, process the log
+        lines = contents.split('\n')
+        self.stdio.addStdout(contents + '\n')
+        for line in lines:
+            if "RETURN:" in line :
+                tboxPrint =  'TinderboxPrint: ' + \
+                  '<a title = "%s" href = "http://%s/%s">%s:%s</a>\n' % \
+                  (testlongname, self.server, line.rsplit(":")[3],
+                   testname, prettyval) 
+                self.stdio.addStdout(tboxPrint)
+        
+    def postFailed(self, testlongname):
+        # This function is called when getPage() fails and simply sets
+        # self.error = True so postFinished knows that something failed.
+        self.error = True
+        self.stdio.addStderr('Encountered error when trying to post %s\n' % \
+          testlongname)
 
     def start(self):
         self.changes = self.build.allChanges()
         self.timestamp = int(self.step_status.build.getTimes()[0])
         self.buildid = strftime("%Y%m%d%H%M", localtime(self.timestamp))
         self.testresults = self.getProperty('testresults')
-        summary = ''
+        self.stdio = self.addLog('stdio')
+        self.error = False
+        # Make a list of Deferreds so we can properly clean up once everything
+        # has posted.
+        deferreds = []
         for res in self.testresults:
             testname, testlongname, testval, prettyval = res
-            params = urllib.urlencode({'branchid': self.buildid, 'value': str(testval).strip(string.letters), 'testname': testlongname, 'tbox' : self.resultsname, 'type' : "continuous", 'time' : self.timestamp, 'branch' : self.branch})
-            request = urllib.urlopen(self.graphurl, params)
-            ret = request.read()
-            lines = ret.split('\n')
-            summary = summary + ret + '\n'
-            for line in lines:
-                 if line.find("RETURN:") > -1:
-                      summary = summary + 'TinderboxPrint: <a title = "%s" href = "http://%s/%s">%s:%s</a>\n' % (testlongname, self.server, line.rsplit(":")[3], testname, prettyval) 
+            params = urlencode({'branchid': self.buildid, 'value': str(testval).strip(string.letters), 'testname': testlongname, 'tbox' : self.resultsname, 'type' : "continuous", 'time' : self.timestamp, 'branch' : self.branch})
+            d = getPage(self.graphurl, timeout=self.timeout, method='POST',
+                        postdata=params)
+            d.addCallback(self.doTinderboxPrint, testlongname, testname,
+                          prettyval)
+            d.addErrback(lambda x: self.postFailed(testlongname))
+            deferreds.append(d)
 
-        self.addCompleteLog('stdio', summary)
-        self.finished(SUCCESS)
+        # Now, once *everything* has finished we need to tell Buildbot
+        # that this step is complete.
+        dl = DeferredList(deferreds)
+        dl.addCallback(self.postFinished)
+
+    def postFinished(self, results):
+        if self.error:
+            self.step_status.setColor("red")
+            self.step_status.setText(["failed", "graph", "server", "post"])
+            self.step_status.setText2(["failed", "graph", "server", "post"])
+            self.finished(FAILURE)
+        else:
+            self.finished(SUCCESS)
