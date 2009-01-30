@@ -29,7 +29,6 @@ from buildbotcustom.steps.misc import SetMozillaBuildProperties, TinderboxShellC
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
-from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
 
@@ -184,14 +183,14 @@ class MozillaBuildFactory(BuildFactory):
 
 class MercurialBuildFactory(MozillaBuildFactory):
     def __init__(self, env, objdir, platform, configRepoPath, configSubDir,
-                 profiledBuild, mozconfig, buildRevision=None, stageServer=None,
-                 stageUsername=None, stageGroup=None, stageSshKey=None,
-                 stageBasePath=None, ausBaseUploadDir=None, updatePlatform=None,
-                 downloadBaseURL=None, ausUser=None, ausHost=None,
-                 nightly=False, leakTest=False, codesighs=True,
+                 profiledBuild, mozconfig, productName=None, buildRevision=None,
+                 stageServer=None, stageUsername=None, stageGroup=None,
+                 stageSshKey=None, stageBasePath=None, ausBaseUploadDir=None,
+                 updatePlatform=None, downloadBaseURL=None, ausUser=None,
+                 ausHost=None, nightly=False, leakTest=False, codesighs=True,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
-                 dependToDated=True, createSnippet=False, doCleanup=True,
+                 createSnippet=False, doCleanup=True,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env
@@ -200,6 +199,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.configRepoPath = configRepoPath
         self.configSubDir = configSubDir
         self.profiledBuild = profiledBuild
+        self.productName = productName
         self.buildRevision = buildRevision
         self.stageServer = stageServer
         self.stageUsername = stageUsername
@@ -220,12 +220,11 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.baseName = baseName
         self.uploadPackages = uploadPackages
         self.uploadSymbols = uploadSymbols
-        self.dependToDated = dependToDated
         self.createSnippet = createSnippet
         self.doCleanup = doCleanup
 
         if self.uploadPackages:
-            assert stageServer and stageUsername and stageSshKey
+            assert productName and stageServer and stageUsername and stageSshKey
             assert stageBasePath
         if self.createSnippet:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
@@ -626,34 +625,39 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
 class NightlyBuildFactory(MercurialBuildFactory):
     def doUpload(self):
-        releaseToLatest = False
-        releaseToDated = False
-        if self.nightly:
-            releaseToLatest=True
-            releaseToDated=True
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1'})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
-        self.addStep(MozillaStageUpload,
-         objdir=self.objdir,
-         username=self.stageUsername,
-         milestone=self.branchName,
-         remoteHost=self.stageServer,
-         remoteBasePath=self.stageBasePath,
-         platform=self.platform,
-         group=self.stageGroup,
-         sshKey=self.stageSshKey,
-         uploadCompleteMar=self.createSnippet,
-         releaseToLatest=releaseToLatest,
-         releaseToDated=releaseToDated,
-         releaseToTinderboxBuilds=True,
-         tinderboxBuildsDir='%s-%s' % (self.branchName, self.platform),
-         dependToDated=self.dependToDated
+        # Always upload builds to the dated tinderbox builds directories
+        postUploadCmd = ['/home/ffxbld/bin/post_upload.py']
+        postUploadCmd += ['--tinderbox-builds-dir %s-%s' % (self.branchName,
+                                                            self.platform),
+                          '-i %(buildid)s',
+                          '-p %s' % self.productName,
+                          '--release-to-tinderbox-dated-builds']
+        if self.nightly:
+            # If this is a nightly build also place them in the latest and
+            # dated directories in nightly/
+            postUploadCmd += ['-b %s' % self.branchName,
+                              '--release-to-latest',
+                              '--release-to-dated']
+
+        uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+
+        self.addStep(ShellCommand,
+         command=['make', 'upload'],
+         env=uploadEnv,
+         workdir='build/%s' % self.objdir
         )
 
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
-    def __init__(self, productName, appVersion, buildNumber, **kwargs):
-        self.productName = productName
+    def __init__(self, appVersion, buildNumber, **kwargs):
         self.appVersion = appVersion
         self.buildNumber = buildNumber
 
