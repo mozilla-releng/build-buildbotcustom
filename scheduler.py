@@ -19,16 +19,16 @@ class MozScheduler(Scheduler):
     attention to a single branch. You you can provide a C{fileIsImportant}
     function which will evaluate each Change to decide whether or not it
     should trigger a new build. If no builds have occurred after
-    C{periodicBuildTimeout} seconds, then a build will be started. Set
-    C{periodicBuildTimeout} to None to disable this.
+    C{idleTimeout} seconds, then a build will be started. Set
+    C{idleTimeout} to None to disable this.
     """
 
     fileIsImportant = None
     compare_attrs = ('name', 'treeStableTimer', 'builderNames', 'branch',
-                     'fileIsImportant', 'properties', 'periodicBuildTimeout')
+                     'fileIsImportant', 'properties', 'idleTimeout')
     
     def __init__(self, name, branch, treeStableTimer, builderNames,
-                 periodicBuildTimeout=None, fileIsImportant=None, properties={}):
+                 idleTimeout=None, fileIsImportant=None, properties={}):
         """
         @param name: the name of this Scheduler
         @param branch: The branch name that the Scheduler should pay
@@ -39,11 +39,11 @@ class MozScheduler(Scheduler):
                                 must remain unchanged before a build will be
                                 triggered. This is intended to avoid builds
                                 of partially-committed fixes.
-        @param periodicBuildTimeout: the duration, in seconds, for which no
-                                     builds have occurred before a build will
-                                     be triggered. This is intended to
-                                     produce builds with some minimum frequency
-                                     even if the tree is not changing.
+        @param idleTimeout: the duration, in seconds, for which no
+                            builds have occurred before a build will
+                            be triggered. This is intended to produce builds
+                            with some minimum frequency even if the tree is not
+                            changing.
         @param builderNames: a list of Builder names. When this Scheduler
                              decides to start a set of builds, they will be
                              run on the Builders named by this list.
@@ -62,34 +62,34 @@ class MozScheduler(Scheduler):
         Scheduler.__init__(self, name, branch, treeStableTimer, builderNames,
                 fileIsImportant=None, properties={})
 
-        self.periodicBuildTimeout = periodicBuildTimeout
-        self.periodicTimer = None
-        self.setPeriodicTimer()
+        self.idleTimeout = idleTimeout
+        self.idleTimer = None
+        self.setIdleTimer()
 
-    def setPeriodicTimer(self):
-        if self.periodicBuildTimeout:
-            if self.periodicTimer:
-                self.periodicTimer.cancel()
-            self.periodicTimer = reactor.callLater(self.periodicBuildTimeout,
-                    self.doPeriodicBuild)
+    def setIdleTimer(self):
+        if self.idleTimeout:
+            if self.idleTimer:
+                self.idleTimer.cancel()
+            self.idleTimer = reactor.callLater(self.idleTimeout,
+                    self.doIdleBuild)
 
     def stopTimer(self):
         Scheduler.stopTimer(self)
-        if self.periodicTimer:
-            self.periodicTimer.cancel()
-            self.periodicTimer = None
+        if self.idleTimer:
+            self.idleTimer.cancel()
+            self.idleTimer = None
 
     def fireTimer(self):
         Scheduler.fireTimer(self)
-        self.setPeriodicTimer()
+        self.setIdleTimer()
 
-    def doPeriodicBuild(self):
-        self.periodicTimer = None
-        reason = ("The periodic timer on '%s' triggered this build at %s"
+    def doIdleBuild(self):
+        self.idleTimer = None
+        reason = ("The idle timer on '%s' triggered this build at %s"
                        % (self.name, time.strftime("%Y-%m-%d %H:%M:%S")))
         bs = buildset.BuildSet(self.builderNames,
                                SourceStamp(branch=self.branch),
                                reason,
                                properties=self.properties)
         self.submitBuildSet(bs)
-        self.setPeriodicTimer()
+        self.setIdleTimer()

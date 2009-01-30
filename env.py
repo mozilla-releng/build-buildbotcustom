@@ -191,3 +191,37 @@ MozillaEnvironments['win32-vc8-mozbuild-unittest'] = {
     "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
                'D:\\msvs8\\VC\\ATLMFC\\LIB'
 }
+
+# platform SDK location.  we can build both from one generic template.
+# modified from vc8 environment
+MozillaEnvironments['vc8-perf'] = {
+    "MOZ_CRASHREPORTER_NO_REPORT": '1',
+    "MOZ_NO_REMOTE": '1',
+    "NO_EM_RESTART": '1',
+    "XPCOM_DEBUG_BREAK": 'warn',
+    "CYGWINBASE": 'C:\\cygwin',
+    "PATH": 'C:\\Python24;' + \
+            'C:\\Python24\\Scripts;' + \
+            'C:\\cygwin\\bin;' + \
+            'C:\\WINDOWS\\System32;' + \
+            'C:\\program files\\gnuwin32\\bin;' + \
+            'C:\\WINDOWS;'
+}
+
+MozillaEnvironments['linux-perf'] = {
+    "MOZ_CRASHREPORTER_NO_REPORT": '1',
+    "MOZ_NO_REMOTE": '1',
+    "NO_EM_RESTART": '1',
+    "XPCOM_DEBUG_BREAK": 'warn',
+    "DISPLAY": ":0",
+}
+
+MozillaEnvironments['mac-perf'] = {
+    "MOZ_NO_REMOTE": '1',
+    "NO_EM_RESTART": '1',
+    "XPCOM_DEBUG_BREAK": 'warn',
+    "MOZ_CRASHREPORTER_NO_REPORT": '1',
+    # for extracting dmg's
+    "PAGER": '/bin/cat',
+}
+
