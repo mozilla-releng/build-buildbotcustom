@@ -29,6 +29,7 @@ from buildbotcustom.steps.misc import SetMozillaBuildProperties, TinderboxShellC
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
+from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
 
@@ -1982,3 +1983,278 @@ class L10nVerifyFactory(ReleaseFactory):
                      previousProduct=previousProduct,
                      workdir=verifyDirVersion,
                      )
+
+
+
+class MobileBuildFactory(MozillaBuildFactory):
+    def __init__(self, configRepoPath, mobileRepoPath, platform,
+                 configSubDir, mozconfig, objdir="objdir",
+                 stageUsername=None, stageSshKey=None, stageServer=None,
+                 stageBasePath=None, stageGroup=None,
+                 patchRepoPath=None, baseWorkDir='build',
+                 **kwargs):
+        """
+    mobileRepoPath: the path to the mobileRepo (mobile-browser)
+    platform: the mobile platform (linux-arm, wince-arm)
+    baseWorkDir: the path to the default slave workdir
+        """
+        MozillaBuildFactory.__init__(self, **kwargs)
+        self.platform = platform
+        self.configRepository = self.getRepository(configRepoPath)
+        self.mobileRepository = self.getRepository(mobileRepoPath)
+        self.mobileBranchName = self.getRepoName(self.mobileRepository)
+        self.configSubDir = configSubDir
+        self.mozconfig = mozconfig
+        self.stageUsername = stageUsername
+        self.stageSshKey = stageSshKey
+        self.stageServer = stageServer
+        self.stageBasePath = stageBasePath
+        self.stageGroup = stageGroup
+        self.baseWorkDir = baseWorkDir
+        self.objdir = objdir
+        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
+                                                      self.mozconfig)
+
+    def addHgPullSteps(self, repository=None, patchRepository=None,
+                       targetDirectory=None, workdir=None,
+                       cloneTimeout=60*20):
+        assert (repository and workdir)
+        if (targetDirectory == None):
+            targetDirectory = self.getRepoName(repository)
+
+        self.addStep(ShellCommand,
+            command=['bash', '-c',
+                     'if [ ! -d %s ]; then hg clone %s %s; fi' %
+                     (targetDirectory, repository, targetDirectory)],
+            workdir=workdir,
+            description=['checking', 'out', targetDirectory],
+            descriptionDone=['checked', 'out', targetDirectory],
+            timeout=cloneTimeout
+        )
+        # TODO: Remove when we no longer need mq
+        if patchRepository:
+            self.addStep(ShellCommand,
+                command=['hg', 'revert', 'nsprpub/configure'],
+                workdir='%s/%s' % (workdir, targetDirectory),
+                description=['reverting', 'nsprpub'],
+                descriptionDone=['reverted', 'nsprpub']
+            )
+            self.addStep(ShellCommand,
+                command=['hg', 'qpop', '-a'],
+                workdir='%s/%s' % (workdir, targetDirectory),
+                description=['backing', 'out', 'patches'],
+                descriptionDone=['backed', 'out', 'patches'],
+                haltOnFailure=True
+            )
+        self.addStep(ShellCommand,
+            command=['hg', 'pull', '-u'],
+            workdir="%s/%s" % (workdir, targetDirectory),
+            description=['updating', targetDirectory],
+            descriptionDone=['updated', targetDirectory],
+            haltOnFailure=True
+        )
+        # TODO: Remove when we no longer need mq
+        if patchRepository:
+            self.addHgPullSteps(repository=patchRepository,
+                                workdir='%s/%s/.hg' %
+                                (workdir, targetDirectory),
+                                targetDirectory='patches')
+            self.addStep(ShellCommand,
+                command=['hg', 'qpush', '-a'],
+                workdir='%s/%s' % (workdir, targetDirectory),
+                description=['applying', 'patches'],
+                descriptionDone=['applied', 'patches'],
+                haltOnFailure=True
+            )
+
+    def getMozconfig(self):
+        self.addHgPullSteps(repository=self.configRepository,
+                            workdir=self.baseWorkDir,
+                            targetDirectory='configs')
+        self.addStep(ShellCommand,
+            command=['cp', self.mozconfig,
+                     '%s/.mozconfig' % self.branchName],
+            workdir=self.baseWorkDir,
+            description=['copying', 'mozconfig'],
+            descriptionDone=['copied', 'mozconfig'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=['cat', '.mozconfig'],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['cat', 'mozconfig']
+        )
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(MozillaStageUpload,
+            objdir="%s/%s" % (self.branchName, self.objdir),
+            username=self.stageUsername,
+            milestone=self.mobileBranchName,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=True,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=True,
+            tinderboxBuildsDir='%s-%s' % (self.mobileBranchName,
+                                          self.platform),
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                        self.objdir)
+        )
+
+
+class MaemoBuildFactory(MobileBuildFactory):
+    def __init__(self, scratchboxPath="/scratchbox/moz_scratchbox",
+                 packageGlob="mobile/dist/*.tar.bz2 " +
+                 "xulrunner/xulrunner/*.deb mobile/mobile/*.deb",
+                 **kwargs):
+        MobileBuildFactory.__init__(self, **kwargs)
+        self.packageGlob = packageGlob
+        self.scratchboxPath = scratchboxPath
+
+        self.addPrecleanSteps()
+        self.addHgPullSteps(repository=self.repository,
+                            workdir=self.baseWorkDir,
+                            cloneTimeout=60*30)
+        self.addHgPullSteps(repository=self.mobileRepository,
+                            workdir='%s/%s' % (self.baseWorkDir,
+                                               self.branchName),
+                            targetDirectory='mobile')
+        self.getMozconfig()
+        self.addBuildSteps()
+        self.addPackageSteps()
+        self.addUploadSteps(platform='linux')
+
+    def addPrecleanSteps(self):
+        self.addStep(ShellCommand,
+            command = 'rm -f /tmp/*_cltbld.log',
+            description=['removing', 'logfile'],
+            descriptionDone=['removed', 'logfile']
+        )
+        self.addStep(ShellCommand,
+            command=['bash', '-c', 'rm -rf %s/%s/mobile/dist/fennec* ' %
+                     (self.branchName, self.objdir) +
+                     '%s/%s/xulrunner/xulrunner/*.deb ' %
+                     (self.branchName, self.objdir) +
+                     '%s/%s/mobile/mobile/*.deb' %
+                     (self.branchName, self.objdir)],
+            workdir=self.baseWorkDir,
+            description=['removing', 'old', 'builds'],
+            descriptionDone=['removed', 'old', 'builds']
+        )
+
+    def addBuildSteps(self):
+        self.addStep(Compile,
+            command=[self.scratchboxPath, '-p', '-d',
+                     'build/%s' % self.branchName,
+                     'make -f client.mk build'],
+            env={'PKG_CONFIG_PATH': '/usr/lib/pkgconfig:/usr/local/lib/pkgconfig'},
+            haltOnFailure=True
+        )
+
+    def addPackageSteps(self):
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     'build/%s/%s/mobile' % (self.branchName, self.objdir),
+                     'make package'],
+            description=['make', 'package'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     'build/%s/%s/mobile' % (self.branchName,
+                                                self.objdir),
+                     'make deb'],
+            description=['make', 'mobile', 'deb'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     'build/%s/%s/xulrunner' % (self.branchName,
+                                                self.objdir),
+                     'make deb'],
+            description=['make', 'xulrunner', 'deb'],
+            haltOnFailure=True
+        )
+
+class WinceBuildFactory(MobileBuildFactory):
+    def __init__(self, patchRepoPath=None,
+                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip",
+                 **kwargs):
+        MobileBuildFactory.__init__(self, **kwargs)
+        self.packageGlob = packageGlob
+        self.patchRepository = None
+        if patchRepoPath:
+            self.patchRepository = self.getRepository(patchRepoPath)
+
+        self.addPrecleanSteps()
+        self.addHgPullSteps(repository=self.repository,
+                            workdir=self.baseWorkDir,
+                            cloneTimeout=60*30,
+                            patchRepository=self.patchRepository)
+        self.addHgPullSteps(repository=self.mobileRepository,
+                            workdir='%s/%s' % (self.baseWorkDir,
+                                               self.branchName),
+                            targetDirectory='mobile')
+        self.getMozconfig()
+        self.addBuildSteps()
+        self.addPackageSteps()
+        self.addUploadSteps(platform='win32')
+
+    def addPrecleanSteps(self):
+        self.addStep(ShellCommand,
+            command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.zip ' %
+                       (self.branchName, self.objdir) +
+                       '%s/%sxulrunner/dist/*.zip' %
+                       (self.branchName, self.objdir)],
+            workdir=self.baseWorkDir,
+            description=['removing', 'old', 'builds'],
+            descriptionDone=['removed', 'old', 'builds']
+        )
+
+    def addBuildSteps(self):
+        self.addStep(SetProperty,
+            command=['bash', '-c', 'pwd'],
+            property='topsrcdir',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'pwd'],
+            descriptionDone=['got', 'pwd']
+        )
+        self.addStep(Compile,
+            command=['make', '-f', 'client.mk', 'build'],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            env={'TOPSRCDIR': WithProperties('%s', 'topsrcdir')},
+            haltOnFailure=True
+        )
+
+    def addPackageSteps(self):
+        self.addStep(ShellCommand,
+            command=['make', 'package'],
+            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
+                                         self.objdir),
+            env={'MOZ_PKG_FORMAT': 'ZIP'},
+            description=['make', 'mobile', 'package'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=['make', 'package'],
+            workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
+                                            self.branchName, self.objdir),
+            env={'MOZ_PKG_FORMAT': 'ZIP'},
+            description=['make', 'xulrunner', 'package'],
+            haltOnFailure=True
+        )
