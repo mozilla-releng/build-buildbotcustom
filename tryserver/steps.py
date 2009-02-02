@@ -92,6 +92,7 @@ class MozillaTryProcessing(BuildStep):
             self.setProperty(arg, args[arg])
 
         # 3) Add a header
+        self.step_status.setText(['identify', 'build'])
         buildNum = self.step_status.build.getNumber()
         who = changes[0].who
         comments = changes[0].comments
