@@ -121,7 +121,7 @@ class MozillaBuildFactory(BuildFactory):
             ]
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
-                 **kwargs):
+                 clobberURL=None, clobberTime=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -131,6 +131,8 @@ class MozillaBuildFactory(BuildFactory):
         self.buildToolsRepoPath = buildToolsRepoPath
         self.buildToolsRepo = self.getRepository(buildToolsRepoPath)
         self.buildSpace = buildSpace
+        self.clobberURL = clobberURL
+        self.clobberTime = clobberTime
 
         self.repository = self.getRepository(repoPath)
         self.branchName = self.getRepoName(self.repository)
@@ -139,16 +141,31 @@ class MozillaBuildFactory(BuildFactory):
 
     def addPreBuildCleanupSteps(self):
         self.addStep(ShellCommand,
+         command=['rm', '-rf', 'tools'],
+         description=['clobber', 'build tools'],
+         workdir='.'
+        )
+        self.addStep(ShellCommand,
          command=['bash', '-c',
           'if [ ! -d tools ]; then hg clone %s; fi' % self.buildToolsRepo],
          description=['clone', 'build tools'],
          workdir='.'
         )
-        self.addStep(ShellCommand,
-         command=['hg', 'pull', '-u'],
-         description=['update', 'build tools'],
-         workdir='tools',
-        )
+
+        if self.clobberURL is not None and self.clobberTime is not None:
+            command = ['python', 'tools/clobberer/clobberer.py',
+             '-t', str(self.clobberTime), '-s', 'tools',
+             self.clobberURL, self.branchName,
+             WithProperties("%(buildername)s"),
+             WithProperties("%(slavename)s")
+            ]
+            self.addStep(ShellCommand,
+             command=command,
+             description=['checking','clobber','times'],
+             workdir='.',
+             flunkOnFailure=False,
+             timeout=3600, # One hour, because Windows is slow
+            )
 
         if self.buildSpace > 0:
             command = ['python', 'tools/buildfarm/maintenance/purge_builds.py',
