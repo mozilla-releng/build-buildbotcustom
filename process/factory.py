@@ -121,7 +121,8 @@ class MozillaBuildFactory(BuildFactory):
             ]
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
-                 clobberURL=None, clobberTime=None, **kwargs):
+                 clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
+                 **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -133,6 +134,7 @@ class MozillaBuildFactory(BuildFactory):
         self.buildSpace = buildSpace
         self.clobberURL = clobberURL
         self.clobberTime = clobberTime
+        self.buildsBeforeReboot = buildsBeforeReboot
 
         self.repository = self.getRepository(repoPath)
         self.branchName = self.getRepoName(self.repository)
@@ -184,6 +186,19 @@ class MozillaBuildFactory(BuildFactory):
              workdir='.',
              timeout=3600, # One hour, because Windows is slow
             )
+
+    def addPeriodicRebootSteps(self):
+        self.addStep(ShellCommand,
+         command=['python', 'tools/buildfarm/maintenance/count_and_reboot.py',
+                  '-f', '../reboot_count.txt',
+                  '-n', str(self.buildsBeforeReboot),
+                  '-z'],
+         description=['maybe rebooting'],
+         warnOnFailure=False,
+         flunkOnFailure=False,
+         alwaysRun=True,
+         workdir='.'
+        )
 
     def getRepoName(self, repo):
         return repo.rstrip('/').split('/')[-1]
@@ -294,6 +309,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addUpdateSteps()
         if self.doCleanup:
             self.addCleanupSteps()
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def addBuildSteps(self):
         if self.nightly:
@@ -1877,6 +1894,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
             self.addStep(unittest_steps.MozillaA11YTest, warnOnWarnings=True,
              workdir="build\\objdir\\_tests\\testing\\mochitest"
             )
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def addPrintChangesetStep(self):
         changesetLink = ''.join(['<a href=http://hg.mozilla.org/',
