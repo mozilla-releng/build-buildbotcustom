@@ -123,6 +123,10 @@ class CompareBloatLogs(ShellCommand):
         bloatDiffPath = 'tools/rb/bloatdiff.pl'
         if 'bloatDiffPath' in kwargs:
             bloatDiffPath = kwargs['bloatDiffPath']
+        testnameprefix = ""
+        if 'testnameprefix' in kwargs:
+            testnameprefix = kwargs['testnameprefix'] + " "
+        self.testnameprefix=testnameprefix         
         self.name = "compare " + testname + "bloat logs"
         self.description = "compare " + testname + "bloat logs"
         self.descriptionDone = "compare " + testname + "bloat logs complete"
@@ -165,9 +169,9 @@ class CompareBloatLogs(ShellCommand):
         summary += "leaks = %d\n" % leaks
         summary += "bloat = %d\n" % bloat
 
-        leaksAbbr = "RLk";
-        leaksTestname = "refcnt_leaks"
-        leaksTestnameLabel = "refcnt Leaks"
+        leaksAbbr = "%sRLk" % self.testnameprefix
+        leaksTestname = ("%srefcnt_leaks" % self.testnameprefix).replace(' ', '_')
+        leaksTestnameLabel = "%srefcnt Leaks" % self.testnameprefix
 
         tinderLink = tinderboxPrint(leaksTestname,
                                     leaksTestnameLabel, 
@@ -180,8 +184,7 @@ class CompareBloatLogs(ShellCommand):
 
         self.setProperty('leaks',leaks)
         self.setProperty('bloat',bloat)
-        self.setProperty('testresults', [("RLk", "refcnt_leaks", leaks, formatBytes(leaks,3))])
-
+        self.setProperty('testresults', [(leaksAbbr, leaksTestname, leaks, formatBytes(leaks,3))])
         self.addCompleteLog(leaksAbbr + ":" + formatBytes(leaks,3),
                             summary)
 
@@ -199,6 +202,10 @@ class CompareLeakLogs(ShellCommand):
         platform = kwargs['platform']
         assert platform.startswith('win32') or platform.startswith('macosx') \
           or platform.startswith('linux')
+        if 'objdir' in kwargs:
+            self.objdir = kwargs['objdir']
+        else:
+            self.objdir = 'obj-firefox'
         if 'leakFailureThreshold' in kwargs:
             self.leakFailureThreshold = kwargs['leakFailureThreshold']
         if not 'mallocLog' in kwargs:
@@ -209,14 +216,18 @@ class CompareLeakLogs(ShellCommand):
         else:
             testname = ""
         self.testname = testname
+        if 'testnameprefix' in kwargs:
+            self.testnameprefix = kwargs['testnameprefix'] + " "
+        else:
+            self.testnameprefix = ""
         self.name = "compare " + testname + "leak logs"
         self.description = "compare " + testname + "leak logs"
         self.descriptionDone = "compare " + testname + "leak logs complete"
         if platform.startswith("win32"):
-            kwargs['command'] = ['obj-firefox\\dist\\bin\\leakstats.exe',
+            kwargs['command'] = ['%s\\dist\\bin\\leakstats.exe' % self.objdir,
                                  kwargs['mallocLog']]
         else:
-            kwargs['command'] = ['obj-firefox/dist/bin/leakstats',
+            kwargs['command'] = ['%s/dist/bin/leakstats' % self.objdir,
                                  kwargs['mallocLog']]
         ShellCommand.__init__(self, **kwargs)
 
@@ -239,6 +250,13 @@ class CompareLeakLogs(ShellCommand):
         leakStats['old'] = {}
         leakStats['new'] = {}
         summary = self.testname + " trace-malloc bloat test: leakstats\n"
+
+        lkAbbr = "%sLk" % self.testnameprefix
+        lkTestname = ("%strace_malloc_leaks" % self.testnameprefix).replace(' ','_')
+        mhAbbr = "%sMH" % self.testnameprefix
+        mhTestname = ("%strace_malloc_maxheap" % self.testnameprefix).replace(' ','_')
+        aAbbr  = "%sA"  % self.testnameprefix
+        aTestname = ("%strace_malloc_allocs" % self.testnameprefix).replace(' ','_')
 
         resultSet = 'new'
         for line in log.readlines():
@@ -263,20 +281,35 @@ class CompareLeakLogs(ShellCommand):
         a =  formatCount(leakStats['new']['allocs'],3)
 
         self.setProperty('testresults', [ \
-            ("Lk", "trace_malloc_leaks", leakStats['new']['leaks'], lk), \
-            ("MH", "trace_malloc_maxheap", leakStats['new']['mhs'], mh), \
-            ("A", "trace_malloc_allocs", leakStats['new']['allocs'], a)])
-        
+            (lkAbbr, lkTestname, leakStats['new']['leaks'], lk), \
+            (mhAbbr, mhTestname, leakStats['new']['mhs'], mh), \
+            (aAbbr, aTestname, leakStats['new']['allocs'], a)])
+
         self.setProperty('leakStats',leakStats)
 
-        slug = "Lk: %s, MH: %s, A: %s" % (lk, mh, a)
+        slug = "%s: %s, %s: %s, %s: %s" % (lkAbbr, lk, mhAbbr, mh, aAbbr, a)
         logText = ""
         if self.testname.startswith("current"):
-            logText += "TinderboxPrint: Lk:%s\n" % lk
-            logText += "TinderboxPrint: MH:%s\n" % mh
-            logText += "TinderboxPrint: A:%s\n" % a
+            logText += tinderboxPrint(lkTestname,
+                                      "Total Bytes malloc'ed and not free'd",
+                                      0,
+                                      "bytes",
+                                      lkAbbr,
+                                      lk)
+            logText += tinderboxPrint(mhTestname,
+                                      "Maximum Heap Size",
+                                      0,
+                                      "bytes",
+                                      mhAbbr,
+                                      mh)
+            logText += tinderboxPrint(aTestname,
+                                      "Allocations - number of calls to malloc and friends",
+                                      0,
+                                      "count",
+                                      aAbbr,
+                                      a)
         else:
-            logText += "Lk: %s\nMH: %s\nA: %s\n" % (lk, mh, a)
+            logText += "%s: %s\n%s: %s\n%s: %s\n" % (lkAbbr, lk, mhAbbr, mh, aAbbr, a)
 
         self.addCompleteLog(slug, logText)
 
