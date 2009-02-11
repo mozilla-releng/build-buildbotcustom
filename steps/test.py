@@ -44,6 +44,8 @@ class AliveTest(ShellCommand):
     name = "alive test"
     description = ["alive test"]
     haltOnFailure = True
+    flunkOnFailure = False
+    warnOnFailure = True
 
     def __init__(self, extraArgs=None, logfile=None, **kwargs):
         ShellCommand.__init__(self, **kwargs)
