@@ -293,9 +293,9 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         change_list = _parse_changes(query, self.lastChange)
         for change in change_list:
             adjustedChangeTime = change["updated"]
-            c = changes.Change(who = change["author"],
+            c = changes.Change(who = change["author"].encode("utf-8", "replace"),
                                files = [], # sucks
-                               revision = change["changeset"],
+                               revision = change["changeset"].encode("utf-8", "replace"),
                                comments = change["link"],
                                when = adjustedChangeTime,
                                branch = self.branch)
