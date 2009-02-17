@@ -301,8 +301,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addLeakTestSteps()
         if self.codesighs:
             self.addCodesighsSteps()
+        if self.uploadSymbols or self.uploadPackages:
+            self.addBuildSymbolsStep()
         if self.uploadSymbols:
-            self.addSymbolsSteps()
+            self.addUploadSymbolsStep()
         if self.uploadPackages:
             self.addUploadSteps()
         if self.createSnippet:
@@ -616,13 +618,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
 
-    def addSymbolsSteps(self):
+    def addBuildSymbolsStep(self):
         self.addStep(ShellCommand,
          command=['make', 'buildsymbols'],
          env=self.env,
          workdir='build/%s' % self.objdir,
          haltOnFailure=True
         )
+
+    def addUploadSymbolsStep(self):
         self.addStep(ShellCommand,
          command=['make', 'uploadsymbols'],
          env=self.env,
