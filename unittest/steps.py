@@ -68,8 +68,8 @@ class ShellCommandReportTimeout(ShellCommand):
                 self.addCompleteLog('timeout',
                                     'buildbot.slave.commands.TimeoutError: ' +
                                     line +
-                                    "TinderboxPrint: " + self.name + " " +
-                                    emphasizeFailureText("timeout") + "<br/>\n")
+                                    "TinderboxPrint: " + self.name + "<br/>" +
+                                    emphasizeFailureText("timeout") + "\n")
                 return WARNINGS
         return superResult
 
@@ -199,13 +199,13 @@ class MozillaClobberWin(ShellCommandReportTimeout):
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
 class MozillaCheck(ShellCommandReportTimeout):
-    name = "check"
+    name = "TUnit"
     warnOnFailure = True
-    description = ["checking"]
-    descriptionDone = ["check complete"]
     command = ["make", "-k", "check"]
 
     def __init__(self, **kwargs):
+        self.description = [self.name + " test"]
+        self.descriptionDone = [self.description[0] + " complete"]
 	self.super_class = ShellCommandReportTimeout
 	ShellCommandReportTimeout.__init__(self, **kwargs)
    
@@ -217,7 +217,8 @@ class MozillaCheck(ShellCommandReportTimeout):
                 passCount = passCount + 1
             if "TEST-UNEXPECTED-" in line:
                 failCount = failCount + 1
-        summary = "TinderboxPrint: TUnit<br/>" + summaryText(passCount,failCount) + "\n"
+        summary = "TinderboxPrint: %s<br/>" % self.name
+        summary += "%s\n" % summaryText(passCount, failCount)
         self.addCompleteLog('summary', summary)
     
     def evaluateCommand(self, cmd):
@@ -231,10 +232,10 @@ class MozillaCheck(ShellCommandReportTimeout):
 class MozillaReftest(ShellCommandReportTimeout):
     warnOnFailure = True
     name = "reftest"
-    description = ["reftest"]
-    descriptionDone = ["reftest complete"]
 
     def __init__(self, **kwargs):
+        self.description = [self.name + " test"]
+        self.descriptionDone = [self.description[0] + " complete"]
 	self.super_class = ShellCommandReportTimeout
 	ShellCommandReportTimeout.__init__(self, **kwargs)
    
@@ -299,8 +300,6 @@ class MozillaWin32Reftest(MozillaReftest):
 
 class MozillaCrashtest(MozillaReftest):
     name = "crashtest"
-    description = ["crashtest"]
-    descriptionDone = ["crashtest complete"]
 
 class MozillaUnixCrashtest(MozillaCrashtest):
     command = ["../../objdir/dist/bin/run-mozilla.sh",
