@@ -1708,7 +1708,7 @@ class ReleaseFinalVerification(ReleaseFactory):
 
 class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, brand_name, config_repo_path, config_dir,
-                 **kwargs):
+                 mochitest_leak_threshold=None, **kwargs):
         self.env = {}
         MozillaBuildFactory.__init__(self, **kwargs)
         self.config_repo_path = config_repo_path
@@ -1843,6 +1843,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
             )
             self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
              workdir="build/objdir/_tests/testing/mochitest",
+             leakThreshold=mochitest_leak_threshold,
              timeout=60*5
             )
             self.addStep(unittest_steps.MozillaMochichrome, warnOnWarnings=True,
@@ -1863,6 +1864,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
             )
             self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
              workdir="build/objdir/_tests/testing/mochitest",
+             leakThreshold=mochitest_leak_threshold,
              timeout=60*5
             )
             self.addStep(unittest_steps.MozillaMochichrome, warnOnWarnings=True,
@@ -1881,6 +1883,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
             )
             self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
              workdir="build\\objdir\\_tests\\testing\\mochitest",
+             leakThreshold=mochitest_leak_threshold,
              timeout=60*5
             )
             # Can use the regular build step here. Perl likes the PATHs that way anyway.
