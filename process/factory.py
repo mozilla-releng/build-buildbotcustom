@@ -139,6 +139,9 @@ class MozillaBuildFactory(BuildFactory):
         self.repository = self.getRepository(repoPath)
         self.branchName = self.getRepoName(self.repository)
 
+        self.addStep(ShellCommand,
+         command=['echo', WithProperties('Building on: %(slavename)s')]
+        )
         self.addPreBuildCleanupSteps()
 
     def addPreBuildCleanupSteps(self):
@@ -322,10 +325,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
              workdir='.',
              timeout=60*60 # 1 hour
             )
-        self.addStep(ShellCommand,
-         command=['echo', WithProperties('Building on: %(slavename)s')],
-         env=self.env
-        )
         self.addStep(ShellCommand,
          command="rm -rf %s/dist/firefox-* %s/dist/install/sea/*.exe " %
                   (self.objdir, self.objdir),
@@ -1755,10 +1754,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStep(ShellCommand,
-         command=['echo', WithProperties('Building on: %(slavename)s')],
-         env=self.env
-        )
         self.addStepNoEnv(Mercurial, mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath
