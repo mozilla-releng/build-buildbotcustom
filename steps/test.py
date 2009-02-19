@@ -277,7 +277,13 @@ class CompareLeakLogs(ShellCommand):
                 leakStats[resultSet]['bytes'] = m.group(1)
                 leakStats[resultSet]['allocs'] = m.group(2)
                 continue
-            
+
+        for key in ('leaks', 'leakedAllocs', 'mhs', 'bytes', 'allocs'):
+            if key not in leakStats['new']:
+                self.addCompleteLog('summary',
+                                    'Unable to parse leakstats output')
+                return
+
         lk =  formatBytes(leakStats['new']['leaks'],3)
         mh = formatBytes(leakStats['new']['mhs'],3)
         a =  formatCount(leakStats['new']['allocs'],3)
