@@ -2029,7 +2029,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  configSubDir, mozconfig, objdir="objdir",
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
-                 patchRepoPath=None, baseWorkDir='build',
+                 baseWorkDir='build', nightly=False, env=None,
                  **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -2037,23 +2037,24 @@ class MobileBuildFactory(MozillaBuildFactory):
     baseWorkDir: the path to the default slave workdir
         """
         MozillaBuildFactory.__init__(self, **kwargs)
-        self.platform = platform
         self.configRepository = self.getRepository(configRepoPath)
         self.mobileRepository = self.getRepository(mobileRepoPath)
         self.mobileBranchName = self.getRepoName(self.mobileRepository)
+        self.baseWorkDir = baseWorkDir
         self.configSubDir = configSubDir
-        self.mozconfig = mozconfig
+        self.env = env
+        self.nightly = nightly
+        self.objdir = objdir
+        self.platform = platform
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.stageServer = stageServer
         self.stageBasePath = stageBasePath
         self.stageGroup = stageGroup
-        self.baseWorkDir = baseWorkDir
-        self.objdir = objdir
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
-                                                      self.mozconfig)
+                                                      mozconfig)
 
-    def addHgPullSteps(self, repository=None, patchRepository=None,
+    def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
                        cloneTimeout=60*20):
         assert (repository and workdir)
@@ -2069,21 +2070,6 @@ class MobileBuildFactory(MozillaBuildFactory):
             descriptionDone=['checked', 'out', targetDirectory],
             timeout=cloneTimeout
         )
-        # TODO: Remove when we no longer need mq
-        if patchRepository:
-            self.addStep(ShellCommand,
-                command=['hg', 'revert', 'nsprpub/configure'],
-                workdir='%s/%s' % (workdir, targetDirectory),
-                description=['reverting', 'nsprpub'],
-                descriptionDone=['reverted', 'nsprpub']
-            )
-            self.addStep(ShellCommand,
-                command=['hg', 'qpop', '-a'],
-                workdir='%s/%s' % (workdir, targetDirectory),
-                description=['backing', 'out', 'patches'],
-                descriptionDone=['backed', 'out', 'patches'],
-                haltOnFailure=True
-            )
         self.addStep(ShellCommand,
             command=['hg', 'pull', '-u'],
             workdir="%s/%s" % (workdir, targetDirectory),
@@ -2091,19 +2077,6 @@ class MobileBuildFactory(MozillaBuildFactory):
             descriptionDone=['updated', targetDirectory],
             haltOnFailure=True
         )
-        # TODO: Remove when we no longer need mq
-        if patchRepository:
-            self.addHgPullSteps(repository=patchRepository,
-                                workdir='%s/%s/.hg' %
-                                (workdir, targetDirectory),
-                                targetDirectory='patches')
-            self.addStep(ShellCommand,
-                command=['hg', 'qpush', '-a'],
-                workdir='%s/%s' % (workdir, targetDirectory),
-                description=['applying', 'patches'],
-                descriptionDone=['applied', 'patches'],
-                haltOnFailure=True
-            )
 
     def getMozconfig(self):
         self.addHgPullSteps(repository=self.configRepository,
@@ -2144,7 +2117,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             packageGlob=self.packageGlob,
             sshKey=self.stageSshKey,
             uploadCompleteMar=False,
-            releaseToLatest=True,
+            releaseToLatest=self.nightly,
             releaseToDated=False,
             releaseToTinderboxBuilds=True,
             tinderboxBuildsDir='%s-%s' % (self.mobileBranchName,
@@ -2183,17 +2156,25 @@ class MaemoBuildFactory(MobileBuildFactory):
             description=['removing', 'logfile'],
             descriptionDone=['removed', 'logfile']
         )
-        self.addStep(ShellCommand,
-            command=['bash', '-c', 'rm -rf %s/%s/mobile/dist/fennec* ' %
-                     (self.branchName, self.objdir) +
-                     '%s/%s/xulrunner/xulrunner/*.deb ' %
-                     (self.branchName, self.objdir) +
-                     '%s/%s/mobile/mobile/*.deb' %
-                     (self.branchName, self.objdir)],
-            workdir=self.baseWorkDir,
-            description=['removing', 'old', 'builds'],
-            descriptionDone=['removed', 'old', 'builds']
-        )
+        if self.nightly:
+            self.addStep(ShellCommand,
+                command=['rm', '-rf', self.branchName],
+                env=self.env,
+                workdir=self.baseWorkDir,
+                timeout=60*60
+            )
+        else:
+            self.addStep(ShellCommand,
+                command=['bash', '-c', 'rm -rf %s/%s/mobile/dist/fennec* ' %
+                         (self.branchName, self.objdir) +
+                         '%s/%s/xulrunner/xulrunner/*.deb ' %
+                         (self.branchName, self.objdir) +
+                         '%s/%s/mobile/mobile/*.deb' %
+                         (self.branchName, self.objdir)],
+                workdir=self.baseWorkDir,
+                description=['removing', 'old', 'builds'],
+                descriptionDone=['removed', 'old', 'builds']
+            )
 
     def addBuildSteps(self):
         self.addStep(Compile,
@@ -2230,20 +2211,16 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
 class WinceBuildFactory(MobileBuildFactory):
-    def __init__(self, patchRepoPath=None,
-                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip",
+    def __init__(self,
+                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.cab",
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
-        self.patchRepository = None
-        if patchRepoPath:
-            self.patchRepository = self.getRepository(patchRepoPath)
 
         self.addPrecleanSteps()
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
-                            cloneTimeout=60*30,
-                            patchRepository=self.patchRepository)
+                            cloneTimeout=60*30)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
@@ -2254,28 +2231,31 @@ class WinceBuildFactory(MobileBuildFactory):
         self.addUploadSteps(platform='win32')
 
     def addPrecleanSteps(self):
-        self.addStep(ShellCommand,
-            command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.zip ' %
-                       (self.branchName, self.objdir) +
-                       '%s/%sxulrunner/dist/*.zip' %
-                       (self.branchName, self.objdir)],
-            workdir=self.baseWorkDir,
-            description=['removing', 'old', 'builds'],
-            descriptionDone=['removed', 'old', 'builds']
-        )
+        if self.nightly:
+            self.addStep(ShellCommand,
+                command=['rm', '-rf', self.branchName],
+                env=self.env,
+                workdir=self.baseWorkDir,
+                timeout=60*60
+            )
+        else:
+            self.addStep(ShellCommand,
+                command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.zip ' %
+                           (self.branchName, self.objdir) +
+                           '%s/%s/mobile/dist/*.cab ' %
+                           (self.branchName, self.objdir) +
+                           '%s/%s/xulrunner/dist/*.zip' %
+                           (self.branchName, self.objdir)],
+                workdir=self.baseWorkDir,
+                description=['removing', 'old', 'builds'],
+                descriptionDone=['removed', 'old', 'builds']
+            )
 
     def addBuildSteps(self):
-        self.addStep(SetProperty,
-            command=['bash', '-c', 'pwd'],
-            property='topsrcdir',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'pwd'],
-            descriptionDone=['got', 'pwd']
-        )
         self.addStep(Compile,
             command=['make', '-f', 'client.mk', 'build'],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            env={'TOPSRCDIR': WithProperties('%s', 'topsrcdir')},
+            env=self.env,
             haltOnFailure=True
         )
 
@@ -2284,8 +2264,15 @@ class WinceBuildFactory(MobileBuildFactory):
             command=['make', 'package'],
             workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
                                          self.objdir),
+            description=['make', 'mobile', 'cab'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=['make', 'package'],
+            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
+                                         self.objdir),
             env={'MOZ_PKG_FORMAT': 'ZIP'},
-            description=['make', 'mobile', 'package'],
+            description=['make', 'mobile', 'zip'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -2293,6 +2280,6 @@ class WinceBuildFactory(MobileBuildFactory):
             workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
                                             self.branchName, self.objdir),
             env={'MOZ_PKG_FORMAT': 'ZIP'},
-            description=['make', 'xulrunner', 'package'],
+            description=['make', 'xulrunner', 'zip'],
             haltOnFailure=True
         )
