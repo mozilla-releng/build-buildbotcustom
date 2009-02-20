@@ -93,3 +93,22 @@ class MozScheduler(Scheduler):
                                properties=self.properties)
         self.submitBuildSet(bs)
         self.setIdleTimer()
+
+
+class NoMergeSourceStamp(SourceStamp):
+    def canBeMergedWith(self, other):
+        return False
+
+class NoMergeScheduler(Scheduler):
+    """Disallow build requests to be merged"""
+    def fireTimer(self):
+        self.timer = None
+        self.nextBuildTime = None
+        changes = self.importantChanges + self.unimportantChanges
+        self.importantChanges = []
+        self.unimportantChanges = []
+
+        # submit
+        ss = NoMergeSourceStamp(changes=changes)
+        bs = buildset.BuildSet(self.builderNames, ss)
+        self.submitBuildSet(bs)
