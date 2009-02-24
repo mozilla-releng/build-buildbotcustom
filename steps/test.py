@@ -30,6 +30,7 @@ from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS
 from buildbot.process.buildstep import BuildStep
 
 from twisted.internet.defer import DeferredList
+from twisted.python import log
 from twisted.web.client import getPage
 
 from urllib import urlencode
