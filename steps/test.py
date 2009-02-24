@@ -381,7 +381,7 @@ class Codesighs(ShellCommand):
 class GraphServerPost(BuildStep):
     flunkOnFailure = True
 
-    def __init__(self, server, selector, branch, resultsname, timeout=10):
+    def __init__(self, server, selector, branch, resultsname, timeout=30):
         BuildStep.__init__(self)
         self.server = server
         self.graphurl = "http://%s/%s/collect.cgi" % (server, selector,)
