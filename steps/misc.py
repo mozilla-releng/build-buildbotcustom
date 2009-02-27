@@ -24,10 +24,14 @@
 #   Chris Cooper <ccooper@mozilla.com>
 # ***** END LICENSE BLOCK *****
 
+from twisted.python.failure import Failure
+
 import buildbot
-from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep
+from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep, \
+  BuildStep
 from buildbot.steps.shell import ShellCommand
 from buildbot.status.builder import FAILURE, SUCCESS
+from buildbot.clients.sendchange import Sender
 
 class CreateDir(ShellCommand):
     name = "create dir"
@@ -181,3 +185,59 @@ class SetMozillaBuildProperties(LoggingBuildStep):
         except:
             return FAILURE
         return SUCCESS
+
+class SendChangeStep(BuildStep):
+    warnOnFailure = True
+    def __init__(self, master, branch, files, revision=None, user=None,
+            comments="", **kwargs):
+        self.master = master
+        self.branch = branch
+        self.files = files
+        self.revision = revision
+        self.user = user
+        self.comments = comments
+
+        self.name = 'sendchange'
+
+        self.sender = Sender(master)
+
+        BuildStep.__init__(self, **kwargs)
+
+        self.addFactoryArguments(master=master, branch=branch, files=files,
+                revision=revision, user=user, comments=comments)
+
+    def start(self):
+        properties = self.build.getProperties()
+
+        master = self.master
+        try:
+            branch = properties.render(self.branch)
+            revision = properties.render(self.revision)
+            comments = properties.render(self.comments)
+            files = properties.render(self.files)
+            user = properties.render(self.user)
+
+            self.addCompleteLog("sendchange", """\
+    master: %(master)s
+    branch: %(branch)s
+    revision: %(revision)s
+    comments: %(comments)s
+    user: %(user)s
+    files: %(files)s""" % locals())
+        except KeyError:
+            return self.finished(Failure())
+
+        d = self.sender.send(branch, revision, comments, files, user)
+
+        d.addCallbacks(self.finished, self.finished)
+        return d
+
+    def finished(self, results):
+        if results is None:
+            self.step_status.setText(['sendchange to', self.master, 'ok'])
+            return BuildStep.finished(self, SUCCESS)
+        else:
+            self.step_status.setText(['sendchange to', self.master, 'failed'])
+            self.step_status.setText2(['sendchange'])
+            self.addCompleteLog("errors", str(results))
+            return BuildStep.finished(self, FAILURE)

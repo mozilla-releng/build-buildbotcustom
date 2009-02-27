@@ -24,7 +24,8 @@ reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.unittest.steps)
 reload(buildbotcustom.env)
 
-from buildbotcustom.steps.misc import SetMozillaBuildProperties, TinderboxShellCommand
+from buildbotcustom.steps.misc import SetMozillaBuildProperties, TinderboxShellCommand, \
+  SendChangeStep
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -676,6 +677,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
+    def __init__(self, talosMasters=None, **kwargs):
+        if talosMasters is None:
+            self.talosMasters = []
+        else:
+            self.talosMasters = talosMasters
+        MercurialBuildFactory.__init__(self, **kwargs)
+
     def doUpload(self):
         uploadEnv = self.env.copy()
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
@@ -700,11 +708,27 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
 
-        self.addStep(ShellCommand,
+        def get_url(rc, stdout, stderr):
+            m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
+            if m and not m.group(1).endswith("crashreporter-symbols.zip"):
+                return {'packageUrl': m.group(1)}
+            return {}
+
+        self.addStep(SetProperty,
          command=['make', 'upload'],
          env=uploadEnv,
-         workdir='build/%s' % self.objdir
+         workdir='build/%s' % self.objdir,
+         extract_fn = get_url,
         )
+
+        talosBranch = "%s-%s" % (self.branchName, self.platform)
+        for m in self.talosMasters:
+            self.addStep(SendChangeStep(
+             master=m,
+             branch=talosBranch,
+             files=[WithProperties('%(packageUrl)s')],
+             user="sendchange")
+            )
 
 
 
