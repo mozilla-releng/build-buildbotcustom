@@ -402,7 +402,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 env=self.env,
                 workdir='build/%s/_leaktest' % self.objdir,
                 extraArgs=args,
-                warnOnFailure=True
+                warnOnFailure=True,
+                haltOnFailure=True
             )
         # we only want this variable for this test - this sucks
         bloatEnv = self.env.copy()
@@ -411,7 +412,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=bloatEnv,
          workdir='build/%s/_leaktest' % self.objdir,
          logfile='bloat.log',
-         warnOnFailure=True
+         warnOnFailure=True,
+         haltOnFailure=True
         )
         self.addStep(ShellCommand,
          env=self.env,
@@ -436,6 +438,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(CompareBloatLogs,
          bloatLog='../bloat.log',
          env=self.env,
+         warnOnFailure=True,
+         haltOnFailure=True
         )
         self.addStep(GraphServerPost,
          server=self.graphServer,
@@ -449,7 +453,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          extraArgs=['--trace-malloc', 'malloc.log',
                     '--shutdown-leaks=sdleak.log'],
          timeout=3600, # 1 hour, because this takes a long time on win32
-         warnOnFailure=True
+         warnOnFailure=True,
+         haltOnFailure=True
         )
         self.addStep(ShellCommand,
          env=self.env,
@@ -481,7 +486,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          mallocLog='../malloc.log',
          platform=self.platform,
          env=self.env,
-         testname='current'
+         testname='current',
+         warnOnFailure=True,
+         haltOnFailure=True
         )
         self.addStep(GraphServerPost,
          server=self.graphServer,
@@ -501,7 +508,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['bash', '-c',
                   'perl build/tools/trace-malloc/diffbloatdump.pl '
                   '--depth=15 --use-address /dev/null sdleak.log '
-                  '> sdleak.tree']
+                  '> sdleak.tree'],
+         warnOnFailure=True,
+         haltOnFailure=True
         )
         if self.platform in ('macosx', 'linux'):
             self.addStep(ShellCommand,
@@ -516,7 +525,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                       'perl '
                       'build/tools/rb/fix-%s-stack.pl '
                       'sdleak.tree.raw '
-                      '> sdleak.tree' % self.platform]
+                      '> sdleak.tree' % self.platform],
+             warnOnFailure=True,
+             haltOnFailure=True
             )
         self.addStep(ShellCommand,
          env=self.env,
