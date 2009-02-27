@@ -5,8 +5,7 @@ from time import strftime
 from twisted.python import log
 
 from buildbot.process.factory import BuildFactory
-from buildbot.steps.shell import Compile, ShellCommand, WithProperties, \
-  SetProperty
+from buildbot.steps.shell import ShellCommand, WithProperties, SetProperty
 from buildbot.steps.source import CVS, Mercurial
 from buildbot.steps.transfer import FileDownload
 
@@ -387,7 +386,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         buildcmd = 'build'
         if self.profiledBuild:
             buildcmd = 'profiledbuild'
-        self.addStep(Compile,
+        self.addStep(ShellCommand,
          command=['make', '-f', 'client.mk', buildcmd],
          env=self.env,
          haltOnFailure=True,
@@ -822,7 +821,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          descriptionDone=['autoconf js/src'],
          workdir='build/'+self.branchName+'/js/src'
         )
-        self.addStep(Compile,
+        self.addStep(ShellCommand,
          command=['sh', '--',
                   './configure', '--enable-application=browser',
                   '--with-l10n-base=../%s' % l10nRepoPath],
@@ -1794,13 +1793,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         # TODO: Do we need this special windows rule?
         if self.platform == 'win32':
-            self.addStep(Compile,
+            self.addStep(ShellCommand,
              command=["make", "-f", "client.mk", "build"],
              timeout=60*20,
-             warningPattern=''
             )
         else:
-            self.addStep(Compile,
+            self.addStep(ShellCommand,
              warningPattern='',
              command=['make', '-f', 'client.mk', 'build']
             )
@@ -2177,7 +2175,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             )
 
     def addBuildSteps(self):
-        self.addStep(Compile,
+        self.addStep(ShellCommand,
             command=[self.scratchboxPath, '-p', '-d',
                      'build/%s' % self.branchName,
                      'make -f client.mk build'],
@@ -2252,7 +2250,7 @@ class WinceBuildFactory(MobileBuildFactory):
             )
 
     def addBuildSteps(self):
-        self.addStep(Compile,
+        self.addStep(ShellCommand,
             command=['make', '-f', 'client.mk', 'build'],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             env=self.env,
