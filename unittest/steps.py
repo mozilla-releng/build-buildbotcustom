@@ -70,7 +70,14 @@ class ShellCommandReportTimeout(ShellCommand):
                                     line +
                                     "TinderboxPrint: " + self.name + "<br/>" +
                                     emphasizeFailureText("timeout") + "\n")
+                # We don't need to print a second error if we timed out
                 return WARNINGS
+
+        if cmd.rc != 0:
+            self.addCompleteLog('error',
+              'Unknown Error: command finished with exit code: %d' % cmd.rc)
+            return WARNINGS
+
         return superResult
 
 class MozillaCheckoutClientMk(ShellCommandReportTimeout):

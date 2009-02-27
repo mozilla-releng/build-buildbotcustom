@@ -388,6 +388,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             buildcmd = 'profiledbuild'
         self.addStep(ShellCommand,
          command=['make', '-f', 'client.mk', buildcmd],
+         description=['compile'],
          env=self.env,
          haltOnFailure=True,
          timeout=5400 # 90 minutes, because windows PGO builds take a long time
@@ -1806,12 +1807,13 @@ class UnittestBuildFactory(MozillaBuildFactory):
         if self.platform == 'win32':
             self.addStep(ShellCommand,
              command=["make", "-f", "client.mk", "build"],
+             description=['compile'],
              timeout=60*20,
             )
         else:
             self.addStep(ShellCommand,
-             warningPattern='',
-             command=['make', '-f', 'client.mk', 'build']
+             command=['make', '-f', 'client.mk', 'build'],
+             description=['compile']
             )
 
         # TODO: Do we need this special windows rule?
@@ -2190,6 +2192,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             command=[self.scratchboxPath, '-p', '-d',
                      'build/%s' % self.branchName,
                      'make -f client.mk build'],
+            description=['compile'],
             env={'PKG_CONFIG_PATH': '/usr/lib/pkgconfig:/usr/local/lib/pkgconfig'},
             haltOnFailure=True
         )
@@ -2263,6 +2266,7 @@ class WinceBuildFactory(MobileBuildFactory):
     def addBuildSteps(self):
         self.addStep(ShellCommand,
             command=['make', '-f', 'client.mk', 'build'],
+            description=['compile'],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             env=self.env,
             haltOnFailure=True
