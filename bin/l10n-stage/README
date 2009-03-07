@@ -1,0 +1,31 @@
+The scripts
+
+create-stage,
+create-buildbot, and
+botmaster
+
+provide help in setting up and running a testing environment for how we
+schedule l10n builds.
+
+Use create-stage to create the required repos as well as one en-US and
+four l10n dummy repositories. Those will already have an initial push in
+the pushlog database. The repositories are in the repos directory.
+
+Clones to work on these and to then push changes are in the workdir directory
+tree. When pushing, you need to make sure that mozhghooks in 
+repos/hghooks is in your PYTHONPATH.
+
+create-buildbot sets up a master and a number of slaves for each of the
+three platforms. The master is set up to have en-US dep builds, nightlies,
+and l10n builds, with build properties depending on whether it's an en-US
+change-triggered build, l10n triggered or nightly.
+
+Last but not least, botmaster offers start and stop commands to start and
+stop the master and all slaves.
+
+All commands take the staging dir as argument.
+
+After creating the hg repositories, you want to set up a 
+hg serve -p 8080 --webdir-conf webdir.conf
+in the staging dir, that will offer the repositories on the localhost.
+Make sure to map the port here with what you specify in create-buildbot.

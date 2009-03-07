@@ -1,0 +1,251 @@
+#!/usr/bin/env python
+
+from optparse import OptionParser
+import os
+import subprocess
+
+master_cfg = '''c = BuildmasterConfig = {}
+from buildbot.buildslave import BuildSlave
+from buildbot import locks, manhole, scheduler
+from buildbot.process import factory
+from buildbot.steps.dummy import Dummy
+from buildbot.status import html
+
+from twisted.internet import reactor
+
+from buildbotcustom.l10n import Scheduler, NightlyL10n
+from buildbotcustom.changes.hgpoller import HgAllLocalesPoller, HgPoller
+
+from twisted.web.client import HTTPClientFactory
+HTTPClientFactory.noisy = False
+
+c['slaves'] = [
+%(slaves)s
+    ]
+
+c['slavePortnum'] = %(port)s
+
+hga = HgAllLocalesPoller('http://localhost:%(hg_port)s/',
+                         'l10n', pollInterval = 60)
+hga.parallelRequests = 1
+c['change_source'] = [
+    hga,
+    HgPoller('http://localhost:%(hg_port)s/', 'mozilla',
+             pollInterval = 90)
+]
+
+c['schedulers'] = [
+    Scheduler('l10n', 'l10nbuilds.ini'),
+    NightlyL10n('l10n nightly',
+                ['Firefox test linux', 'Firefox test mac',
+                 'Firefox test win'],
+                'hg',
+                repo='http://localhost:%(hg_port)s/',
+                branch='mozilla',
+                localesFile='browser/locales/all-locales',
+                minute=5),
+    scheduler.Scheduler('enUS dep', 'mozilla', 30,
+                        ['Linux mozilla build',
+                         'OS X 10.5.2 mozilla build',
+                         'WINNT 5.2 mozilla build']),
+    scheduler.Nightly('enUS nightly', 
+                      ['Linux mozilla nightly',
+                       'OS X 10.5.2 mozilla nightly',
+                       'WINNT 5.2 mozilla nightly'])
+]
+
+bigSlaveLock = locks.SlaveLock("bigSlaveLock")
+
+f = factory.BuildFactory()
+class L10nReporter(Dummy):
+    def start(self):
+        p = self.step_status.build.getProperties()
+        desc = [p['locale']]
+        if p.has_key('tree'):
+            desc += [p['tree'], p['app']]
+        self.desc = desc
+        if p.has_key('compareOnly'):
+            desc.append('compareOnly')
+        if p.has_key('nightly'):
+            desc.append('nightly')
+        desc.append('building')
+        desc.append('on %%s' %% p['slavename'])
+        self.step_status.setText(desc)
+        self.desc = desc[:]
+        timeout = self.timeout
+        if 'win' in p['buildername'].lower():
+            timeout *= 3
+        if 'mac' in p['buildername'].lower():
+            timeout *= 2
+        self.timer = reactor.callLater(timeout, self.done)
+    def done(self):
+        self.desc[-2] = 'built'
+        self.step_status.setText(self.desc)
+        Dummy.done(self)
+
+f.addStep(L10nReporter, timeout=2, name='l10nstep')
+
+enBuild = factory.BuildFactory()
+class EnBuildStep(Dummy):
+    def start(self):
+        p = self.step_status.build.getProperties()
+        desc = ['en-US', 'building',
+                'on %%s' %% p['slavename']]
+        self.desc = desc[:]
+        self.step_status.setText(desc)
+        timeout = self.timeout
+        if 'win' in p['buildername'].lower():
+            timeout *= 3
+        if 'os x' in p['buildername'].lower():
+            timeout *= 2
+        self.timer = reactor.callLater(timeout, self.done)
+    def done(self):
+        self.desc[1] = 'built'
+        self.step_status.setText(self.desc)
+        Dummy.done(self)
+
+enBuild.addStep(EnBuildStep, timeout=15, name='enstep')
+
+enNightly = factory.BuildFactory()
+enNightly.addStep(EnBuildStep, timeout=15, name='enstep')
+
+c['builders'] = [
+    {'name': 'Firefox test linux',
+     'slavenames': [%(slaves_linux)s],
+     'builddir': 'fx_test_linux',
+     'factory': f,
+     'category': 'l10n',
+     'locks': [bigSlaveLock]},
+    {'name': 'Linux mozilla build',
+     'slavenames': [%(slaves_linux)s],
+     'builddir': 'fx_en_linux',
+     'factory': enBuild,
+     'category': 'mozilla',
+     'locks': [bigSlaveLock]},
+    {'name': 'Linux mozilla nightly',
+     'slavenames': [%(slaves_linux)s],
+     'builddir': 'fx_en_nightly_linux',
+     'factory': enNightly,
+     'category': 'mozilla',
+     'locks': [bigSlaveLock]},
+    {'name': 'Firefox test mac',
+     'slavenames': [%(slaves_mac)s],
+     'builddir': 'fx_test_mac',
+     'factory': f,
+     'category': 'l10n',
+     'locks': [bigSlaveLock]},
+    {'name': 'OS X 10.5.2 mozilla build',
+     'slavenames': [%(slaves_mac)s],
+     'builddir': 'fx_en_mac',
+     'factory': enBuild,
+     'category': 'mozilla',
+     'locks': [bigSlaveLock]},
+    {'name': 'OS X 10.5.2 mozilla nightly',
+     'slavenames': [%(slaves_mac)s],
+     'builddir': 'fx_en_nightly_mac',
+     'factory': enNightly,
+     'category': 'mozilla',
+     'locks': [bigSlaveLock]},
+    {'name': 'Firefox test win',
+     'slavenames': [%(slaves_win)s],
+     'builddir': 'fx_test_win',
+     'factory': f,
+     'category': 'l10n',
+     'locks': [bigSlaveLock]},
+    {'name': 'WINNT 5.2 mozilla build',
+     'slavenames': [%(slaves_win)s],
+     'builddir': 'fx_en_win',
+     'factory': enBuild,
+     'category': 'mozilla',
+     'locks': [bigSlaveLock]},
+    {'name': 'WINNT 5.2 mozilla nightly',
+     'slavenames': [%(slaves_win)s],
+     'builddir': 'fx_en_nightly_win',
+     'factory': enNightly,
+     'category': 'mozilla',
+     'locks': [bigSlaveLock]},
+    ]
+
+c['manhole'] = manhole.TelnetManhole(%(telnet_port)s, "%(telnet_user)s",
+                                     "%(telnet_pass)s")
+
+c['status'] = []
+
+c['status'].append(html.WebStatus(http_port=%(http_port)s,
+                                  allowForce=True))
+c['buildbotURL'] = 'http://localhost:%(http_port)s/'
+c['projectName'] = 'l10n testbed'
+'''
+
+l10nini = '''[fx]
+app = browser
+type = hg
+locales = all
+mozilla = mozilla
+l10n = l10n
+repo = http://localhost:%(hgport)s/
+l10n.ini = browser/locales/l10n.ini
+builders = Firefox\ test\ linux Firefox\ test\ mac Firefox\ test\ win
+'''
+
+def createMaster(dest, opts):
+    if os.path.isdir(dest):
+        raise RuntimeError("Upgrading not supported")
+    os.makedirs(dest)
+    rv = subprocess.call(['buildbot', 'create-master', 'master'],
+                         cwd=dest)
+    if rv:
+        raise RuntimeError('creation of master failed')
+    l_s = ['"sl%d"' % i for i in xrange(opts.slaves)]
+    m_s = ['"sm%d"' % i for i in xrange(opts.slaves)]
+    w_s = ['"sw%d"' % i for i in xrange(opts.slaves)]
+    def formatSlave(s):
+        return '    BuildSlave(%s, "pwd"),\n' % s
+    open(os.path.join(dest, 'master', 'master.cfg'),
+         'w').write(master_cfg % {
+            'slaves': ''.join(map(formatSlave, l_s + m_s + w_s)),
+            'slaves_linux': ','.join(l_s),
+            'slaves_mac': ','.join(m_s),
+            'slaves_win': ','.join(w_s),
+            'port': options.port,
+            'http_port': options.http_port,
+            'hg_port': options.hg_port,
+            'telnet_port': options.telnet_port,
+            'telnet_user': options.telnet_user,
+            'telnet_pass': options.telnet_pass,
+            })
+    open(os.path.join(dest, 'master', 'l10nbuilds.ini'),
+         'w').write(l10nini % {'hgport': opts.hg_port})
+
+def createSlave(dest, name, opts):
+    if os.path.isdir(os.path.join(dest, name)):
+        return
+    rv = subprocess.call(['buildbot', 'create-slave', name,
+                          'localhost:%s' % opts.port,
+                          name, 'pwd'],
+                         cwd=dest)
+    if rv:
+        raise RuntimeError('creation of master failed')
+    
+
+if __name__ == "__main__":
+    p = OptionParser()
+    p.add_option('-v', dest='verbose', action='store_true')
+    p.add_option('-p', '--port', default='9876')
+    p.add_option('-q', '--http-port', dest='http_port',
+                 default='8010')
+    p.add_option('-g', '--hg-port', dest='hg_port',
+                 default='8000')
+    p.add_option('-n', '--slaves', type='int', default=3)
+    p.add_option('--telnet-port', dest='telnet_port', default='9875')
+    p.add_option('--telnet-user', dest='telnet_user', default='god')
+    p.add_option('--telnet-pass', dest='telnet_pass', default='knows')
+    (options, args) = p.parse_args()
+
+    dest = args[0]
+
+    createMaster(dest, options)
+    for i in xrange(options.slaves):
+        createSlave(dest, "sl%d" % i, options)
+        createSlave(dest, "sm%d" % i, options)
+        createSlave(dest, "sw%d" % i, options)

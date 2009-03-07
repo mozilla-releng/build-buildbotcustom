@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+from optparse import OptionParser
+import os
+import subprocess
+
+if __name__ == "__main__":
+    p = OptionParser()
+    (options, args) = p.parse_args()
+
+    dest = args[1]
+    command = args[0]
+
+    for d in sorted(os.listdir(dest)):
+        dir = os.path.join(dest, d)
+        pid = os.path.join(dir, 'twistd.pid')
+        if command == 'start':
+            if os.path.isfile(pid):
+                subprocess.call(['buildbot', 'restart', dir])
+            else:
+                subprocess.call(['buildbot', 'start', dir])
+        if command == 'stop':
+            if os.path.isfile(pid):
+                subprocess.call(['buildbot', 'stop', dir])

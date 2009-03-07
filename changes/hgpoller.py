@@ -1,6 +1,34 @@
+"""hgpoller provides Pollers to work on single hg repositories as well
+as on a group of hg repositories. It's polling the RSS feed of pushlog,
+which is XML of the form
+
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+ <id>http://hg.mozilla.org/l10n-central/repo/pushlog</id>
+ <link rel="self" href="http://hg.mozilla.org/l10n-central/repo/pushlog" />
+ <updated>2009-02-09T23:10:59Z</updated>
+ <title>repo Pushlog</title>
+ <entry>
+  <title>Changeset 3dd5e26f1334ad08a333a7acbe7649af7450feda</title>
+  <id>http://www.selenic.com/mercurial/#changeset-3dd5e26f1334ad08a333a7acbe7649af7450feda</id>
+  <link href="http://hg.mozilla.org/l10n-central/repo/rev/3dd5e26f1334ad08a333a7acbe7649af7450feda" />
+  <updated>2009-02-09T23:10:59Z</updated>
+  <author>
+   <name>ldap@domain.tld</name>
+  </author>
+  <content type="xhtml">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <ul class="filelist"><li class="file">some/file/path</li></ul>
+    </div>
+  </content>
+ </entry>
+</feed>
+"""
+
 import time
 from calendar import timegm
 from xml.dom import minidom, Node
+import operator
 
 from twisted.python import log, failure
 from twisted.internet import defer, reactor
@@ -180,7 +208,7 @@ def parse_date(datestring, default_timezone=UTC):
 def parse_date_string(dateString):
     return timegm(parse_date(dateString).utctimetuple())
 
-def _parse_changes(query, lastChange):
+def _parse_changes(query):
     dom = minidom.parseString(query)
 
     items = dom.getElementsByTagName("entry")
@@ -190,40 +218,171 @@ def _parse_changes(query, lastChange):
         for k in ["title", "updated"]:
             d[k] = i.getElementsByTagName(k)[0].firstChild.wholeText
         d["updated"] = parse_date_string(d["updated"])
-        d["changeset"] = d["title"].split(" ")[1]
+        _cs = d["title"].split(" ")[1]
+        assert _cs == str(_cs)
+        d["changeset"] = str(_cs)
         nameNode = i.getElementsByTagName("author")[0].childNodes[1]
         d["author"] = nameNode.firstChild.wholeText
         d["link"] = i.getElementsByTagName("link")[0].getAttribute("href")
-        if d["updated"] > lastChange:
-            changes.append(d)
+        # Get all <li class="file"> elements
+        files = filter(lambda e: 'file' in e.getAttribute('class').split(),
+                       i.getElementsByTagName('li'))
+        # For each <li class="file"> element, concat the data of all
+        # text node children.
+        # This way, we don't get confused if the DOM has split the file
+        # paths.
+        # We end up with a list of paths by using map()
+        d["files"] = map(lambda e: reduce(operator.add,
+                                          map(lambda t:t.data, e.childNodes),
+                                          ''),
+                         files)
+        changes.append(d)
     changes.reverse() # want them in chronological order
     return changes
-    
-class BaseHgPoller(object):
+
+class Pluggable(object):
+    '''The Pluggable class implements a forward for Deferred's that
+    can be thrown away.
+
+    This is in particular useful when a network request doesn't really
+    error in a reasonable time, and you want to make sure that if it
+    answers after you tried to give up on it, it's not confusing the 
+    rest of your app by calling back with data twice or something.
+    '''
+    def __init__(self, d):
+        self.d = defer.Deferred()
+        self.dead = False
+        d.addCallbacks(self.succeeded, self.failed)
+    def succeeded(self, result):
+        if self.dead:
+            log.msg("Dead pluggable got called")
+        else:
+            self.d.callback(result)
+    def failed(self, fail = None):
+        if self.dead:
+            log.msg("Dead pluggable got errbacked")
+        else:
+            self.d.errback(fail)
+
+class BasePoller(object):
+    attemptLimit = 3
+    def __init__(self):
+        self.attempts = 0
+        self.startLoad = 0
+        self.loadTime = None
+
+    def poll(self):
+        if self.attempts:
+            if self.attempts > self.attemptLimit:
+                self.plug.dead = True
+                self.attempts = 0
+                log.msg("dropping the ball on %s, starting new" % self)
+            else:
+                self.attempts += 1
+                log.msg("Not polling %s because last poll is still working" % self)
+                reactor.callLater(0, self.pollDone, None)
+                return
+        self.attempts = 1
+        self.startLoad = time.time()
+        self.loadTime = None
+        self.plug = Pluggable(self.getData())
+        d = self.plug.d
+        d.addCallback(self.stopLoad)
+        d.addCallback(self.processData)
+        d.addCallbacks(self.dataFinished, self.dataFailed)
+        d.addCallback(self.pollDone)
+
+    def stopLoad(self, res):
+        self.loadTime = time.time() - self.startLoad
+        return res
+
+    def dataFinished(self, res):
+        assert self.attempts
+        self.attempts = 0
+
+    def dataFailed(self, res):
+        assert self.attempts
+        self.attempts = 0
+        log.msg("%s: polling failed, result %s" % (self, res.value.message))
+        res.printTraceback()
+
+    def pollDone(self, res):
+        pass
+
+
+
+class BaseHgPoller(BasePoller):
     """Common base of HgPoller, HgLocalePoller, and HgAllLocalesPoller.
 
     Subclasses should implement getData, processData, and __str__"""
-    working = False
-    
-    def poll(self):
-        if self.working:
-            log.msg("Not polling %s because last poll is still working" % self)
+    verbose = True
+    timeout = 30
+
+    def __init__(self, hgURL, branch, pushlogUrlOverride=None,
+                 tipsOnly=False, tree = None):
+        BasePoller.__init__(self)
+        self.hgURL = hgURL
+        self.branch = branch
+        self.tree = tree
+        if hgURL.endswith("/"):
+            hgURL = hgURL[:-1]
+        fragments = [hgURL, branch]
+        if tree is not None:
+            fragments.append(tree)
+        self.baseURL = "/".join(fragments)
+        self.pushlogUrlOverride = pushlogUrlOverride
+        self.tipsOnly = tipsOnly
+        self.lastChange = time.time()
+        self.lastChangeset = None
+        self.startLoad = 0
+        self.loadTime = None
+
+    def getData(self):
+        url = self._make_url()
+        if self.verbose:
+            log.msg("Polling Hg server at %s" % url)
+        return getPage(url, timeout = self.timeout)
+
+    def _make_url(self):
+        url = None
+        if self.pushlogUrlOverride:
+            url = self.pushlogUrlOverride
         else:
-            self.working = True
-            d = self.getData()
-            d.addCallback(self.processData)
-            d.addCallbacks(self.dataFinished, self.dataFailed)
+            url = "/".join((self.baseURL, 'pushlog'))
 
-    def dataFinished(self, res):
-        assert self.working
-        self.working = False
-        return res
+        args = []
+        if self.lastChangeset is not None:
+            args.append('fromchange=' + self.lastChangeset)
+        if self.tipsOnly:
+            args.append('tipsonly=1')
+        if args:
+            url += '?' + '&'.join(args)
 
-    def dataFailed(self, res):
-        assert self.working
-        self.working = False
-        log.msg("%s: polling failed, result %s" % (self, res))
-        return None
+        return url
+
+    def processData(self, query):
+        change_list = _parse_changes(query)
+        if self.lastChangeset is not None:
+            for change in change_list:
+                adjustedChangeTime = change["updated"]
+                c = changes.Change(who = change["author"],
+                                   files = change["files"],
+                                   revision = change["changeset"],
+                                   comments = change["link"],
+                                   when = adjustedChangeTime,
+                                   branch = self.branch)
+                self.changeHook(c)
+                self.parent.addChange(c)
+        if len(change_list) > 0:
+            self.lastChange = max(self.lastChange, *[c["updated"]
+                                                     for c in change_list])
+            self.lastChangeset = change_list[-1]["changeset"]
+            if self.verbose:
+                log.msg("last changeset %s on %s" %
+                        (self.lastChangeset, self.baseURL))
+
+    def changeHook(self, change):
+        pass
 
 class HgPoller(base.ChangeSource, BaseHgPoller):
     """This source will poll a Mercurial server over HTTP using
@@ -252,12 +411,9 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
                                 as *one* changeset
         """
         
-        self.hgURL = hgURL
-        self.branch = branch
-        self.pushlogUrlOverride = pushlogUrlOverride
-        self.tipsOnly = tipsOnly
+        BaseHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
+                              tipsOnly)
         self.pollInterval = pollInterval
-        self.lastChange = time.time()
 
     def startService(self):
         self.loop = LoopingCall(self.poll)
@@ -270,39 +426,6 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
     
     def describe(self):
         return "Getting changes from: %s" % self._make_url()
-    
-    def _make_url(self):
-        url = None
-        if self.pushlogUrlOverride:
-            url = self.pushlogUrlOverride
-        else:
-            url = "%s%s/pushlog" % (self.hgURL, self.branch)
-
-        if self.tipsOnly:
-            url += '?tipsonly=1'
-
-        return url
-    
-
-    def getData(self):
-        url = self._make_url()
-        log.msg("Polling Hg server at %s" % url)
-        return pollThrottler.getPage(url)
-
-    def processData(self, query):
-        change_list = _parse_changes(query, self.lastChange)
-        for change in change_list:
-            adjustedChangeTime = change["updated"]
-            c = changes.Change(who = change["author"].encode("utf-8", "replace"),
-                               files = [], # sucks
-                               revision = change["changeset"].encode("utf-8", "replace"),
-                               comments = change["link"],
-                               when = adjustedChangeTime,
-                               branch = self.branch)
-            self.parent.addChange(c)
-        if len(change_list) > 0:
-            self.lastChange = max(self.lastChange, *[c["updated"]
-                                                     for c in change_list])
 
     def __str__(self):
         return "<HgPoller for %s%s>" % (self.hgURL, self.branch)
@@ -311,68 +434,59 @@ class HgLocalePoller(BaseHgPoller):
     """This helper class for HgAllLocalesPoller polls a single locale and
     submits changes if necessary."""
 
-    def __init__(self, locale, parent, branch, url):
+    timeout = 30
+    verbose = False
+
+    def __init__(self, locale, parent, branch, hgURL):
+        BaseHgPoller.__init__(self, hgURL, branch, tree = locale)
         self.locale = locale
         self.parent = parent
         self.branch = branch
-        self.url = url
-        self.lastChange = time.time()
 
-    def getData(self):
-        log.msg("Polling l10n Hg server at %s" % self.url)
-        return pollThrottler.getPage(self.url)
+    def changeHook(self, change):
+        change.locale = self.locale
 
-    def processData(self, query):
-        change_list = _parse_changes(query, self.lastChange)
-        for change in change_list:
-            adjustedChangeTime = change["updated"]
-            c = changes.Change(who = change["author"],
-                               files = [], # sucks
-                               revision = change["changeset"],
-                               comments = change["link"],
-                               when = adjustedChangeTime,
-                               branch = self.branch)
-            c.locale = self.locale
-            self.parent.addChange(c)
-        if len(change_list) > 0:
-            self.lastChange = max(self.lastChange, *[c["updated"]
-                                                     for c in change_list])
+    def pollDone(self, res):
+        self.parent.localeDone(self.locale)
 
     def __str__(self):
-        return "<HgLocalePoller for %s>" % self.url
+        return "<HgLocalePoller for %s>" % self.baseURL
 
-class HgAllLocalesPoller(base.ChangeSource, BaseHgPoller):
-    """Poll every locale from an all-locales file."""
+class HgAllLocalesPoller(base.ChangeSource, BasePoller):
+    """Poll all localization repositories from an index page.
 
-    compare_attrs = ['allLocalesURL', 'pollInterval',
-                     'localePushlogURL', 'branch']
+    For a index page like http://hg.mozilla.org/releases/l10n-mozilla-1.9.1/,
+    all links look like /releases/l10n-mozilla-1.9.1/af/, where the last
+    path step will be the locale code, and the others will be passed
+    as branch for the changes, i.e. 'releases/l10n-mozilla-1.9.1'.
+    """
+
+    compare_attrs = ['repositoryIndex', 'pollInterval']
     parent = None
     loop = None
     volatile = ['loop']
 
-    def __init__(self, allLocalesURL, localePushlogURL, branch=None,
-                 pollInterval=120):
+    timeout = 10
+    parallelRequests = 2
+    verboseChilds = False
+
+    def __init__(self, hgURL, repositoryIndex, pollInterval=120):
         """
-        @type  allLocalesURL:      string
-        @param allLocalesURL:      The URL of the all-locales file
-        @type  localePushlogURL:   string
-        @param localePushlogURL:   The URL of the localized pushlogs.
-                                   %(locale)s will be substituted.
+        @type  repositoryIndex:      string
+        @param repositoryIndex:      The URL listing all locale repos
         @type  pollInterval        int
         @param pollInterval        The time (in seconds) between queries for
                                    changes
-        @type  branch              string or None
-        @param branch              The name of the branch to report changes on.
-                                   This only affects the Change, it doesn't
-                                   affect the polling URLs at all!
         """
 
-        self.allLocalesURL = allLocalesURL
-        self.localePushlogURL = localePushlogURL
-        self.branch = branch
+        BasePoller.__init__(self)
+        self.hgURL = hgURL
+        self.repositoryIndex = repositoryIndex
         self.pollInterval = pollInterval
-        self.lastChange = time.time()
         self.localePollers = {}
+        self.locales = []
+        self.pendingLocales = []
+        self.activeRequests = 0
 
     def startService(self):
         self.loop = LoopingCall(self.poll)
@@ -383,25 +497,77 @@ class HgAllLocalesPoller(base.ChangeSource, BaseHgPoller):
         self.loop.stop()
         return base.ChangeSource.stopService(self)
 
+    def addChange(self, change):
+        self.parent.addChange(change)
+
     def describe(self):
-        return "Getting changes from all-locales at %s for repositories at %s" % (self.allLocalesURL, self.localePushlogURL)
+        return "Getting changes from all locales at %s" % self.repositoryIndex
 
     def getData(self):
-        log.msg("Polling all-locales at %s" % self.allLocalesURL)
-        return pollThrottler.getPage(self.allLocalesURL)
+        log.msg("Polling all locales at %s%s/" % (self.hgURL,
+                                                  self.repositoryIndex))
+        return getPage(self.hgURL + self.repositoryIndex + '/?style=raw',
+                       timeout = self.timeout)
 
-    def getLocalePoller(self, locale):
-        if locale not in self.localePollers:
-            self.localePollers[locale] = \
-                HgLocalePoller(locale, self.parent, self.branch,
-                               self.localePushlogURL % {'locale': locale})
-        return self.localePollers[locale]
+    def getLocalePoller(self, locale, branch):
+        if (locale, branch) not in self.localePollers:
+            lp = HgLocalePoller(locale, self, branch,
+                                self.hgURL)
+            lp.verbose = self.verboseChilds
+            self.localePollers[(locale, branch)] = lp
+        return self.localePollers[(locale, branch)]
 
     def processData(self, data):
-        for l in data.splitlines():
-            l = l.strip()
-            if l == '': continue
-            self.getLocalePoller(l).poll()
+        locales = filter(None, data.split())
+        # get locales and branches
+        def brancher(link):
+            steps = filter(None, link.split('/'))
+            loc = steps.pop()
+            branch = '/'.join(steps)
+            return (loc, branch)
+        # locales is now locale code / branch tuple
+        locales = map(brancher, locales)
+        if locales != self.locales:
+            log.msg("new locale list: " + " ".join(map(str, locales)))
+        self.locales = locales
+        self.pendingLocales = locales[:]
+        # prune removed locales from pollers
+        for oldLoc in self.localePollers.keys():
+            if oldLoc not in locales:
+                self.localePollers.pop(oldLoc)
+                log.msg("not polling %s on %s anymore, dropped from repositories" %
+                        oldLoc)
+        for i in xrange(self.parallelRequests):
+            self.activeRequests += 1
+            reactor.callLater(0, self.pollNextLocale)
+
+    def pollNextLocale(self):
+        if not self.pendingLocales:
+            self.activeRequests -= 1
+            if not self.activeRequests:
+                msg = "%s done with all locales" % str(self)
+                loadTimes = map(lambda p: p.loadTime, self.localePollers.values())
+                goodTimes = filter(lambda t: t is not None, loadTimes)
+                if not goodTimes:
+                    msg += ". All %d locale pollers failed" % len(loadTimes)
+                else:
+                    msg += ", min: %.1f, max: %.1f, mean: %.1f" % \
+                        (min(goodTimes), max(goodTimes), 
+                         sum(goodTimes) / len(goodTimes))
+                    if len(loadTimes) > len(goodTimes):
+                        msg += ", %d failed" % (len(loadTimes) - len(goodTimes))
+                log.msg(msg)
+                log.msg("Total time: %.1f" % (time.time() - self.startLoad))
+            return
+        loc, branch = self.pendingLocales.pop(0)
+        poller = self.getLocalePoller(loc, branch)
+        poller.poll()
+
+    def localeDone(self, loc):
+        if self.verboseChilds:
+            log.msg("done with " + loc)
+        reactor.callLater(0, self.pollNextLocale)        
 
     def __str__(self):
-        return "<HgAllLocalesPoller for %s>" % self.allLocalesURL
+        return "<HgAllLocalesPoller for %s%s/>" % (self.hgURL,
+                                                   self.repositoryIndex)

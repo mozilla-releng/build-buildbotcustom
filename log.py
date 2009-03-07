@@ -20,25 +20,42 @@
 #
 # Contributor(s):
 #   Axel Hecht <axel@mozilla.com>
-#   Armen Zambrano Gasparnian <armenzg@mozilla.com>
 # ***** END LICENSE BLOCK *****
+from twisted.python import log
+import logging
+from logging import DEBUG
 
-from buildbot.steps.shell import ShellCommand
-from buildbot import process
+class LogFwd(object):
+    @classmethod
+    def write(cls, msg):
+        log.msg(msg.rstrip())
+        pass
+    @classmethod
+    def flush(cls):
+        pass
 
-class BuildL10n(process.base.Build):
-  """
-  I subclass process.Build just to set some properties I get from
-  the scheduler in setupBuild when I call "getNextLocale".
-  """
-  # this is the scheduler, needs to be set on the class in master.cfg
-  buildQueue = None
+def init(**kw):
+    logging.basicConfig(stream = LogFwd,
+                        format = '%(name)s: (%(levelname)s) %(message)s')
+    for k, v in kw.iteritems():
+        logging.getLogger(k).setLevel(v)
 
-  def setupBuild(self, expectations):
-    #The L10n schedulers have a queue for each builder
-    bd = self.buildQueue.getNextLocale(self.builder.name)
-    if not bd:
-      raise Exception("No build found for %s on %s, bad mojo" % \
-                      (self.builder.name, self.slavename))
-    process.base.Build.setupBuild(self, expectations)
-    self.setProperty('locale', bd.locale, "Build")
+def critical(cat, msg):
+    logging.getLogger(cat).critical(msg)
+    pass
+
+def error(cat, msg):
+    logging.getLogger(cat).error(msg)
+    pass
+
+def warning(cat, msg):
+    logging.getLogger(cat).warning(msg)
+    pass
+
+def info(cat, msg):
+    logging.getLogger(cat).info(msg)
+    pass
+
+def debug(cat, msg):
+    logging.getLogger(cat).debug(msg)
+    pass

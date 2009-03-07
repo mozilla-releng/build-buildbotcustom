@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+
+from optparse import OptionParser
+import os
+import subprocess
+
+repos = (
+    'http://hg.mozilla.org/users/bsmedberg_mozilla.com/hghooks/',
+    'http://hg.mozilla.org/users/bsmedberg_mozilla.com/hgpoller/',
+    'http://hg.mozilla.org/hg_templates/',
+    )
+
+downstreams = (
+    'mozilla',
+    'l10n/ab',
+    'l10n/de',
+    'l10n/ja-JP-mac',
+    'l10n/x-testing',
+    )
+
+def ensureUpstreamRepo(r, dest):
+    base = os.path.join(dest, 'repos')
+    if not os.path.isdir(base):
+        os.makedirs(base)
+    leaf = r.rsplit('/', 2)[1]
+    if os.path.isdir(os.path.join(base, leaf, '.hg')):
+        return
+    rv = subprocess.call(['hg', 'clone', r], cwd = base)
+    if rv:
+        raise RuntimeError('hg failed to clone %s' % leaf)
+
+
+def ensureRepo(leaf, dest):
+    base = os.path.join(dest, 'repos')
+    if not os.path.isdir(base):
+        os.makedirs(base)
+    if os.path.isdir(os.path.join(base, leaf)):
+        return
+
+    os.makedirs(os.path.join(base, leaf))
+    rv = subprocess.call(['hg', 'init', leaf], cwd = base)
+    if rv:
+        raise RuntimeError('Couldnt hg init %s' % leaf)
+    tail = '''
+[hooks]
+pretxnchangegroup.a_singlehead = python:mozhghooks.single_head_per_branch.hook
+pretxnchangegroup.z_linearhistory = python:mozhghooks.pushlog.log
+
+[extensions]
+pushlog-feed = %(dest)s/repos/hgpoller/pushlog-feed.py
+buglink = %(dest)s/repos/hgpoller/buglink.py
+
+[web]
+style = gitweb_mozilla
+templates = %(dest)s/repos/hg_templates
+'''
+    hgrc = open(os.path.join(base, leaf, '.hg', 'hgrc'), 'a')
+    hgrc.write(tail % {'dest': os.path.abspath(dest)})
+    hgrc.close()
+
+    rv = subprocess.call(['hg', 'clone', leaf,
+                          os.path.join('..', 'workdir', leaf)],
+                         cwd=base)
+    if rv:
+        raise RuntimeError('clone for %s failed' % leaf)
+    browserdir = os.path.join(dest, 'workdir', leaf, 'browser')
+    if leaf.startswith('l10n'):
+        # create initial content for l10n
+        os.makedirs(browserdir)
+        open(os.path.join(browserdir, 'file.properties'),
+             'w').write('''k_e_y: %s value
+''' % leaf)
+    else:
+        # create initial content for mozilla
+        os.makedirs(os.path.join(browserdir, 'locales', 'en-US'))
+        open(os.path.join(browserdir, 'locales', 'en-US', 'file.properties'),
+             'w').write('''k_e_y: en-US value
+''')
+        open(os.path.join(browserdir, 'locales', 'all-locales'),
+             'w').write('''ab
+de
+ja-JP-mac
+x-testing
+''')
+        open(os.path.join(browserdir, 'locales', 'l10n.ini'),
+             'w').write('''[general]
+depth = ../..
+all = browser/locales/all-locales
+
+[compare]
+dirs = browser
+''')
+    env = dict(os.environ)
+    if 'PYTHONPATH' in env:
+        env['PYTHONPATH'] += ':%s/hghooks' % os.path.abspath(base)
+    else:
+        env['PYTHONPATH'] = '%s/hghooks' % os.path.abspath(base)
+    rv = subprocess.call(['hg', 'add', '.'], cwd=browserdir)
+    if rv:
+        raise RuntimeError('failed to add initial content')
+    rv = subprocess.call(['hg', 'ci', '-mInitial commit for %s' % leaf],
+                         cwd=browserdir)
+    if rv:
+        raise RuntimeError('failed to check in initian content to %s' %
+                           leaf)
+    rv = subprocess.call(['hg', 'push'], cwd=browserdir, env=env)
+    if rv:
+        raise RuntimeError('failed to push to %s' % leaf)
+
+
+def createWebDir(dest, port):
+    content = '''[collections]
+repos = repos
+'''
+    if not os.path.isfile(os.path.join(dest, 'webdir.conf')):
+        open(os.path.join(dest, 'webdir.conf'),
+             'w').write(content % {'port': port,
+                                   'dest': os.path.abspath(dest)})
+
+if __name__ == "__main__":
+    p = OptionParser()
+    p.add_option('-v', dest='verbose', action='store_true')
+    p.add_option('-p', '--port', default='8000')
+    (options, args) = p.parse_args()
+
+    dest = args[0]
+
+    if not os.path.isdir(os.path.join(dest, 'workdir', 'l10n')):
+        os.makedirs(os.path.join(dest, 'workdir', 'l10n'))
+
+    for r in repos:
+        ensureUpstreamRepo(r, dest)
+
+
+    for l in downstreams:
+        ensureRepo(l, dest)
+
+    createWebDir(dest, options.port)
