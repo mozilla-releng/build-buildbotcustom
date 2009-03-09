@@ -1840,6 +1840,25 @@ class UnittestBuildFactory(MozillaBuildFactory):
              description=['compile']
             )
 
+        self.addStep(ShellCommand,
+                     command=['make', 'buildsymbols'],
+                     workdir='build/objdir'
+                     )
+
+        self.addStep(SetProperty,
+         command=['bash', '-c', 'pwd'],
+         property='toolsdir',
+         workdir='tools'
+        )
+
+        platform_minidump_path = {
+            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+            }
+
+        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+
         # TODO: Do we need this special windows rule?
         if self.platform == 'win32':
             self.addStep(unittest_steps.MozillaCheck, warnOnWarnings=True,
