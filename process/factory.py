@@ -1334,6 +1334,15 @@ class ReleaseTaggingFactory(ReleaseFactory):
                 self.addStep(ShellCommand,
                  command=['hg', 'tag', '-u', hgUsername, '-f', '-r',
                           WithProperties('%s', '%s-revision' % repoName),
+                          '-m',
+                          # This part is pretty ugly. Because we need both
+                          # WithProperties interpolation (for repoName-revision)
+                          # and regular variables we need to piece it together
+                          # this way.
+                          WithProperties('Added tag ' + tag + \
+                            ' for changeset ' + \
+                            '%(' + repoName + '-revision' + ')s. ' + \
+                            'CLOSED TREE'),
                           tag],
                  workdir=repoName,
                  description=['tag %s' % repoName],
