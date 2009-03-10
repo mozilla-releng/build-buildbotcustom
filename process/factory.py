@@ -6,7 +6,7 @@ from twisted.python import log
 
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.shell import ShellCommand, WithProperties, SetProperty
-from buildbot.steps.source import CVS, Mercurial
+from buildbot.steps.source import Mercurial
 from buildbot.steps.transfer import FileDownload
 
 import buildbotcustom.steps.misc
@@ -1501,10 +1501,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         if useBetaChannel:
             snippetTypes.append('beta')
 
-        self.addStep(CVS,
-         cvsroot=cvsroot,
-         branch=patcherToolsTag,
-         cvsmodule='mozilla/tools/patcher'
+        self.addStep(ShellCommand,
+         command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
+                  '-d', 'build', 'mozilla/tools/patcher'],
+         description=['checkout', 'patcher'],
+         haltOnFailure=True
         )
         self.addStep(ShellCommand,
          command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
