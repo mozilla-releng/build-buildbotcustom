@@ -279,8 +279,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                                       mozconfig)
 
         # we don't need the extra cruft in 'platform' anymore
-        self.platform = platform.split('-')[0].replace('64', '')
-        assert self.platform in ('linux', 'win32', 'macosx')
+        self.platform = platform.split('-')[0]
+        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
@@ -1774,8 +1774,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 'win32': 'win32/%s/unittest' % self.branchName,
                 }
 
-        self.platform = platform.split('-')[0].replace('64', '')
-        assert self.platform in ('linux', 'win32', 'macosx')
+        self.platform = platform.split('-')[0]
+        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
         self.env = MozillaEnvironments[env_map[self.platform]]
 
