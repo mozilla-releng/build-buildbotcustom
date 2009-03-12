@@ -60,7 +60,8 @@ class MozScheduler(Scheduler):
                            scheduler
         """
         Scheduler.__init__(self, name, branch, treeStableTimer, builderNames,
-                fileIsImportant=None, properties={})
+                           fileIsImportant=fileIsImportant,
+                           properties=properties)
 
         self.idleTimeout = idleTimeout
         self.idleTimer = None
