@@ -2162,9 +2162,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             description=['cat', 'mozconfig']
         )
 
-    def addUploadSteps(self, platform, packageGlob=None):
-        if packageGlob is None:
-            packageGlob = self.packageGlob
+    def addUploadSteps(self, platform):
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
                      '%s/mobile/dist/bin/application.ini' % self.objdir,
@@ -2182,7 +2180,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             remoteBasePath=self.stageBasePath,
             platform=platform,
             group=self.stageGroup,
-            packageGlob=packageGlob,
+            packageGlob=self.packageGlob,
             sshKey=self.stageSshKey,
             uploadCompleteMar=False,
             releaseToLatest=self.nightly,
@@ -2200,13 +2198,9 @@ class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, scratchboxPath="/scratchbox/moz_scratchbox",
                  packageGlob="mobile/dist/*.tar.bz2 " +
                  "xulrunner/xulrunner/*.deb mobile/mobile/*.deb",
-                 sourcePackageGlob = "mobile/mobile/*.tar.gz " +
-                 "mobile/mobile/*_source.changes " +
-                 "xulrunner/xulrunner/*.tar.gz xulrunner/xulrunner/*_source.changes",
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
-        self.sourcePackageGlob = sourcePackageGlob
         self.scratchboxPath = scratchboxPath
 
         self.addPrecleanSteps()
@@ -2221,10 +2215,6 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform='linux')
-        if self.nightly:
-            self.addSourcePackageSteps()
-            self.addUploadSteps(platform='linux',
-                                packageGlob=self.sourcePackageGlob)
 
     def addPrecleanSteps(self):
         self.addStep(ShellCommand,
@@ -2245,15 +2235,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                          (self.branchName, self.objdir) +
                          '%s/%s/xulrunner/xulrunner/*.deb ' %
                          (self.branchName, self.objdir) +
-                         '%s/%s/xulrunner/xulrunner/*.tar.gz ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/xulrunner/xulrunner/*_source.changes ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/mobile/mobile/*.deb ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/mobile/mobile/*.tar.gz ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/mobile/mobile/*_source.changes ' %
+                         '%s/%s/mobile/mobile/*.deb' %
                          (self.branchName, self.objdir)],
                 workdir=self.baseWorkDir,
                 description=['removing', 'old', 'builds'],
@@ -2294,52 +2276,6 @@ class MaemoBuildFactory(MobileBuildFactory):
             description=['make', 'xulrunner', 'deb'],
             haltOnFailure=True
         )
-
-    def addSourcePackageSteps(self):
-        if self.nightly:
-            self.addStep(ShellCommand,
-                command="echo '#!/usr/bin/make -f' > rules",
-                workdir="%s/%s/%s/mobile/mobile/installer/debian" %
-                        (self.baseWorkDir, self.branchName, self.objdir),
-                haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-                command="cat ../Makefile >> rules",
-                workdir="%s/%s/%s/mobile/mobile/installer/debian" %
-                        (self.baseWorkDir, self.branchName, self.objdir),
-                description=['create', 'mobile', 'debian/build'],
-                haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-                command=[self.scratchboxPath, '-p', '-d',
-                         'build/%s/%s/mobile/mobile/installer' %
-                         (self.branchName, self.objdir),
-                         "dpkg-buildpackage -r'fakeroot' -sa -S"],
-                description=['make', 'mobile', 'source', 'package'],
-                haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-                command="echo '#!/usr/bin/make -f' > rules",
-                workdir="%s/%s/%s/xulrunner/xulrunner/installer/debian" %
-                        (self.baseWorkDir, self.branchName, self.objdir),
-                haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-                command="grep -v 'GARBAGE += debian/changelog' Makefile " +
-                        ">> debian/rules",
-                workdir="%s/%s/%s/xulrunner/xulrunner/installer" %
-                        (self.baseWorkDir, self.branchName, self.objdir),
-                description=['create', 'xulrunner', 'debian/build'],
-                haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-                command=[self.scratchboxPath, '-p', '-d',
-                         'build/%s/%s/xulrunner/xulrunner/installer' %
-                         (self.branchName, self.objdir),
-                         "dpkg-buildpackage -r'fakeroot' -sa -S"],
-                description=['make', 'xulrunner', 'source', 'package'],
-                haltOnFailure=True
-            )
 
 class WinceBuildFactory(MobileBuildFactory):
     def __init__(self,
