@@ -1843,11 +1843,13 @@ class UnittestBuildFactory(MozillaBuildFactory):
              command=["make", "-f", "client.mk", "build"],
              description=['compile'],
              timeout=60*20,
+             haltOnFailure=1
             )
         else:
             self.addStep(ShellCommand,
              command=['make', '-f', 'client.mk', 'build'],
-             description=['compile']
+             description=['compile'],
+             haltOnFailure=1
             )
 
         self.addStep(ShellCommand,
