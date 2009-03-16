@@ -73,6 +73,7 @@ MozillaEnvironments['linux-centos-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "CVS_RSH": 'ssh',
     "DISPLAY": ':2',
+    "NO_FAIL_ON_TEST_ERRORS": '1'   
 }
 
 MozillaEnvironments['mac-osx-unittest'] = {

@@ -1744,13 +1744,12 @@ class ReleaseFinalVerification(ReleaseFactory):
         )
 
 class UnittestBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, brand_name, config_repo_path, config_dir,
+    def __init__(self, platform, config_repo_path, config_dir,
                  mochitest_leak_threshold=None, **kwargs):
         self.env = {}
         MozillaBuildFactory.__init__(self, **kwargs)
         self.config_repo_path = config_repo_path
         self.config_dir = config_dir
-        self.brand_name = brand_name
 
         self.config_repo_url = self.getRepository(self.config_repo_path)
 
@@ -1891,69 +1890,34 @@ class UnittestBuildFactory(MozillaBuildFactory):
              clobber=True
             )
 
-        if self.platform == 'linux':
-            self.addStep(unittest_steps.MozillaUnixReftest, warnOnWarnings=True,
-             workdir="build/layout/reftests",
-             timeout=60*5
-            )
-            self.addStep(unittest_steps.MozillaUnixCrashtest, warnOnWarnings=True,
-             workdir="build/testing/crashtest"
-            )
-            self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest",
-             leakThreshold=mochitest_leak_threshold,
-             timeout=60*5
-            )
-            self.addStep(unittest_steps.MozillaMochichrome, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest"
-            )
-            self.addStep(unittest_steps.MozillaBrowserChromeTest, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest"
-            )
-            self.addStep(unittest_steps.MozillaA11YTest, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest"
-            )
-        elif self.platform == 'macosx':
-            self.addStep(unittest_steps.MozillaOSXReftest, brand_name=self.brand_name,
-             warnOnWarnings=True, workdir="build/layout/reftests", timeout=60*5
-            )
-            self.addStep(unittest_steps.MozillaOSXCrashtest, brand_name=self.brand_name,
-             warnOnWarnings=True, workdir="build/testing/crashtest"
-            )
-            self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest",
-             leakThreshold=mochitest_leak_threshold,
-             timeout=60*5
-            )
-            self.addStep(unittest_steps.MozillaMochichrome, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest"
-            )
-            self.addStep(unittest_steps.MozillaBrowserChromeTest, warnOnWarnings=True,
-             workdir="build/objdir/_tests/testing/mochitest"
-            )
-        elif self.platform == 'win32':
-            self.addStep(unittest_steps.MozillaWin32Reftest, warnOnWarnings=True,
-             workdir="build\\layout\\reftests",
-             timeout=60*5
-            )
-            self.addStep(unittest_steps.MozillaWin32Crashtest, warnOnWarnings=True,
-             workdir="build\\testing\\crashtest"
-            )
-            self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-             workdir="build\\objdir\\_tests\\testing\\mochitest",
-             leakThreshold=mochitest_leak_threshold,
-             timeout=60*5
-            )
-            # Can use the regular build step here. Perl likes the PATHs that way anyway.
-            self.addStep(unittest_steps.MozillaMochichrome, warnOnWarnings=True,
-             workdir="build\\objdir\\_tests\\testing\\mochitest"
-            )
-            self.addStep(unittest_steps.MozillaBrowserChromeTest, warnOnWarnings=True,
-             workdir="build\\objdir\\_tests\\testing\\mochitest"
-            )
-            self.addStep(unittest_steps.MozillaA11YTest, warnOnWarnings=True,
-             workdir="build\\objdir\\_tests\\testing\\mochitest"
-            )
+        self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
+         test_name="reftest",
+         workdir="build/objdir",
+         timeout=60*5
+        )
+        self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
+         test_name="crashtest",
+         workdir="build/objdir"
+        )
+        self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
+         test_name="mochitest-plain",
+         workdir="build/objdir",
+         leakThreshold=mochitest_leak_threshold,
+         timeout=60*5
+        )
+        self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
+         test_name="mochitest-chrome",
+         workdir="build/objdir"
+        )
+        self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
+         test_name="mochitest-browser-chrome",
+         workdir="build/objdir"
+        )
+        if not self.platform == 'macosx':
+          self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
+           test_name="mochitest-a11y",
+           workdir="build/objdir"
+          )
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 

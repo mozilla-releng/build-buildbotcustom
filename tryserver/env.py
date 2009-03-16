@@ -8,5 +8,6 @@ MozillaEnvironments['tryserver'] = {
     'SYMBOL_SERVER_HOST': 'build.mozilla.org',
     'SYMBOL_SERVER_USER': 'trybld',
     'SYMBOL_SERVER_PATH': '/symbols/windows',
-    'SYMBOL_SERVER_SSH_KEY': "$ENV{HOME}/.ssh/id_dsa"
+    'SYMBOL_SERVER_SSH_KEY': "$ENV{HOME}/.ssh/id_dsa",
+    'NO_FAIL_ON_TEST_ERRORS': '1'   
 }
