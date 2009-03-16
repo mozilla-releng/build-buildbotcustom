@@ -142,9 +142,9 @@ class MozillaBuildFactory(BuildFactory):
         self.addStep(ShellCommand,
          command=['echo', WithProperties('Building on: %(slavename)s')]
         )
-        self.addPreBuildCleanupSteps()
+        self.addPreBuildSteps()
 
-    def addPreBuildCleanupSteps(self):
+    def addPreBuildSteps(self):
         self.addStep(ShellCommand,
          command=['rm', '-rf', 'tools'],
          description=['clobber', 'build tools'],
@@ -284,21 +284,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
-        # now, generate the steps
-        #  regular dep builds (no clobber, no leaktest):
-        #   addBuildSteps()
-        #   addUploadSteps()
-        #   addCodesighsSteps()
-        #  leak test builds (no clobber, leaktest):
-        #   addBuildSteps()
-        #   addLeakTestSteps()
-        #  nightly builds (clobber)
-        #   addBuildSteps()
-        #   addSymbolSteps()
-        #   addUploadSteps()
-        #   addUpdateSteps()
-        #  for all dep and nightly builds (but not release builds):
-        #   addCleanupSteps()
         self.addBuildSteps()
         if self.leakTest:
             self.addLeakTestSteps()
@@ -313,11 +298,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.createSnippet:
             self.addUpdateSteps()
         if self.doCleanup:
-            self.addCleanupSteps()
+            self.addPostBuildCleanupSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
     def addBuildSteps(self):
+        self.addPreBuildCleanupSteps()
+        self.addSourceSteps()
+        self.addConfigSteps()
+        self.addDoBuildSteps()
+
+    def addPreBuildCleanupSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
              command=['rm', '-rf', 'build'],
@@ -326,8 +317,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=60*60 # 1 hour
             )
         self.addStep(ShellCommand,
-         command="rm -rf %s/dist/firefox-* %s/dist/install/sea/*.exe " %
-                  (self.objdir, self.objdir),
+         command="rm -rf %s/dist/%s-* %s/dist/install/sea/*.exe " %
+                  (self.objdir, self.productName, self.objdir),
          env=self.env,
          description=['deleting', 'old', 'package'],
          descriptionDone=['delete', 'old', 'package']
@@ -340,6 +331,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
              description=['cleanup', 'old', 'symbols'],
              flunkOnFailure=False
             )
+
+    def addSourceSteps(self):
         self.addStep(Mercurial,
          mode='update',
          baseURL='http://%s/' % self.hgHost,
@@ -361,6 +354,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
         )
+
+    def addConfigSteps(self):
         self.addStep(ShellCommand,
          command=['rm', '-rf', 'configs'],
          description=['removing', 'configs'],
@@ -384,6 +379,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['cat', '.mozconfig'],
         )
 
+    def addDoBuildSteps(self):
         buildcmd = 'build'
         if self.profiledBuild:
             buildcmd = 'profiledbuild'
@@ -421,8 +417,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env,
          workdir='.',
          command=['wget', '-O', 'bloat.log.old',
-                  'http://%s/pub/mozilla.org/firefox/%s/bloat.log' % \
-                    (self.stageServer, self.logUploadDir)]
+                  'http://%s/pub/mozilla.org/%s/%s/bloat.log' % \
+                    (self.stageServer, self.productName, self.logUploadDir)]
         )
         self.addStep(ShellCommand,
          env=self.env,
@@ -462,15 +458,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env,
          workdir='.',
          command=['wget', '-O', 'malloc.log.old',
-                  'http://%s/pub/mozilla.org/firefox/%s/malloc.log' % \
-                    (self.stageServer, self.logUploadDir)]
+                  'http://%s/pub/mozilla.org/%s/%s/malloc.log' % \
+                    (self.stageServer, self.productName, self.logUploadDir)]
         )
         self.addStep(ShellCommand,
          env=self.env,
          workdir='.',
          command=['wget', '-O', 'sdleak.tree.old',
-                  'http://%s/pub/mozilla.org/firefox/%s/sdleak.tree' % \
-                    (self.stageServer, self.logUploadDir)]
+                  'http://%s/pub/mozilla.org/%s/%s/sdleak.tree' % \
+                    (self.stageServer, self.productName, self.logUploadDir)]
         )
         self.addStep(ShellCommand,
          env=self.env,
@@ -580,8 +576,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         self.addStep(ShellCommand,
          command=['wget', '-O', 'codesize-auto-old.log',
-          'http://%s/pub/mozilla.org/firefox/%s/codesize-auto.log' % \
-           (self.stageServer, self.logUploadDir)],
+          'http://%s/pub/mozilla.org/%s/%s/codesize-auto.log' % \
+           (self.stageServer, self.productName, self.logUploadDir)],
          workdir='.',
          env=self.env
         )
@@ -645,7 +641,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
 
-    def addCleanupSteps(self):
+    def addPostBuildCleanupSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
              command=['rm', '-rf', 'build'],
@@ -655,24 +651,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             )
             # no need to clean-up temp files if we clobber the whole directory
             return
-
-        # OS X builds eat up a ton of space with -save-temps enabled
-        # until we have dwarf support we need to clean this up so we don't
-        # fill up the disk
-        if self.platform.startswith("macosx"):
-            # For regular OS X builds the "objdir" passed in is objdir/ppc
-            # For leak test builds the "objdir" passed in is objdir.
-            # To properly cleanup we need to make sure we're in 'objdir',
-            # otherwise we miss the entire i386 dir in the normal case
-            # We can't just run this in the srcdir because there are other files
-            # most notably hg metadata which have the same extensions
-            baseObjdir = self.objdir.split('/')[0]
-            self.addStep(ShellCommand,
-             command=['find', '-d', '-E', '.', '-iregex',
-                      '.*\.(mi|i|s|mii|ii)$',
-                      '-exec', 'rm', '-rf', '{}', ';'],
-             workdir='build/%s' % baseObjdir
-            )
 
 
 
@@ -693,7 +671,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
         # Always upload builds to the dated tinderbox builds directories
-        postUploadCmd = ['/home/ffxbld/bin/post_upload.py']
+        postUploadCmd =  ['post_upload.py']
         postUploadCmd += ['--tinderbox-builds-dir %s-%s' % (self.branchName,
                                                             self.platform),
                           '-i %(buildid)s',
@@ -733,10 +711,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
-    def __init__(self, appVersion, buildNumber, **kwargs):
+    def __init__(self, appVersion, buildNumber, brandName=None, **kwargs):
         self.appVersion = appVersion
         self.buildNumber = buildNumber
 
+        if brandName:
+            self.brandName = brandName
+        else:
+            self.brandName = kwargs['productName'].capitalize()
         # Make sure MOZ_PKG_PRETTYNAMES is on
         kwargs['env']['MOZ_PKG_PRETTYNAMES'] = '1'
         MercurialBuildFactory.__init__(self, **kwargs)
@@ -763,7 +745,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
         
-        uploadEnv['POST_UPLOAD_CMD'] = '/home/ffxbld/bin/post_upload.py ' + \
+        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
                                        '-p %s ' % self.productName + \
                                        '-v %s ' % self.appVersion + \
                                        '-n %s ' % self.buildNumber + \
@@ -788,11 +770,12 @@ class BaseRepackFactory(MozillaBuildFactory):
             'mozilla-1.9.1-win32-l10n-nightly',
     ]
 
-    def __init__(self, project, l10nRepoPath, stageServer, stageUsername,
-                 stageSshKey=None, **kwargs):
+    def __init__(self, project, appName, l10nRepoPath, stageServer,
+                 stageUsername, stageSshKey=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
+        self.appName = appName
         self.l10nRepoPath = l10nRepoPath
         self.stageServer = stageServer
         self.stageUsername = stageUsername
@@ -814,34 +797,9 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir='build',
          flunkOnFailure=False
         )
-        self.addStep(ShellCommand,
-         command=['sh', '-c',
-          WithProperties('if [ -d '+self.branchName+' ]; then ' +
-                         'hg -R '+self.branchName+' pull -r default ; ' +
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.repoPath+' ; ' +
-                         'fi ' +
-                         '&& hg -R '+self.branchName+' update -r %(en_revision)s')],
-         descriptionDone="en-US source",
-         workdir='build/',
-         timeout=30*60 # 30 minutes
-        )
-        self.addStep(ShellCommand,
-         command=['sh', '-c',
-          WithProperties('if [ -d %(locale)s ]; then ' +
-                         'hg -R %(locale)s pull -r default ; ' +
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+l10nRepoPath+\
-                           '/%(locale)s/ ; ' +
-                         'fi ' +
-                         '&& hg -R %(locale)s update -r %(l10n_revision)s')],
-         descriptionDone="locale source",
-         workdir='build/' + l10nRepoPath
-        )
 
-        # call out to subclass hooks to do any necessary setup
+        # call out to overridable functions
+        self.getSources()
         self.updateSources()
         self.getMozconfig()
 
@@ -859,7 +817,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
         self.addStep(ShellCommand,
          command=['sh', '--',
-                  './configure', '--enable-application=browser',
+                  './configure', '--enable-application=%s' % self.appName,
                   '--with-l10n-base=../%s' % l10nRepoPath],
          description='configure',
          descriptionDone='configure done',
@@ -890,8 +848,36 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          command=['make', WithProperties('l10n-upload-%(locale)s')],
          env=uploadEnv,
-         workdir='build/'+self.branchName+'/browser/locales',
+         workdir='build/'+self.branchName+'/'+self.appName+'/locales',
          flunkOnFailure=True
+        )
+
+    def getSources(self):
+        self.addStep(ShellCommand,
+         command=['sh', '-c',
+          WithProperties('if [ -d '+self.branchName+' ]; then ' +
+                         'hg -R '+self.branchName+' pull -r default ; ' +
+                         'else ' +
+                         'hg clone ' +
+                         'http://'+self.hgHost+'/'+self.repoPath+' ; ' +
+                         'fi ' +
+                         '&& hg -R '+self.branchName+' update -r %(en_revision)s')],
+         descriptionDone="en-US source",
+         workdir='build/',
+         timeout=30*60 # 30 minutes
+        )
+        self.addStep(ShellCommand,
+         command=['sh', '-c',
+          WithProperties('if [ -d %(locale)s ]; then ' +
+                         'hg -R %(locale)s pull -r default ; ' +
+                         'else ' +
+                         'hg clone ' +
+                         'http://'+self.hgHost+'/'+self.l10nRepoPath+\
+                           '/%(locale)s/ ; ' +
+                         'fi ' +
+                         '&& hg -R %(locale)s update -r %(l10n_revision)s')],
+         descriptionDone="locale source",
+         workdir='build/' + self.l10nRepoPath
         )
 
 
@@ -904,7 +890,7 @@ class NightlyRepackFactory(BaseRepackFactory):
         assert 'project' in kwargs
         assert 'repoPath' in kwargs
         uploadDir = '%s-l10n' % self.getRepoName(kwargs['repoPath'])
-        self.postUploadCmd = '/home/ffxbld/bin/post_upload.py ' + \
+        self.postUploadCmd = 'post_upload.py ' + \
                              '-p %s ' % kwargs['project'] + \
                              '-b %s ' % uploadDir + \
                              '--release-to-latest'
@@ -930,14 +916,14 @@ class NightlyRepackFactory(BaseRepackFactory):
          descriptionDone='wget en-US',
          env={'EN_US_BINARY_URL': self.enUSBinaryURL},
          haltOnFailure=True,
-         workdir='build/'+self.branchName+'/browser/locales'
+         workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
 
     def doRepack(self):
         self.addStep(ShellCommand,
          command=['make', WithProperties('installers-%(locale)s')],
          haltOnFailure=True,
-         workdir='build/'+self.branchName+'/browser/locales'
+         workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
 
 
@@ -982,7 +968,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
 
         assert 'project' in kwargs
         # TODO: better place to put this/call this
-        self.postUploadCmd = '/home/ffxbld/bin/post_upload.py ' + \
+        self.postUploadCmd = 'post_upload.py ' + \
                              '-p %s ' % kwargs['project'] + \
                              '-v %s ' % self.appVersion + \
                              '-n %s ' % self.buildNumber + \
@@ -1038,7 +1024,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         )
 
         candidatesDir = 'http://%s' % self.stageServer + \
-                        '/pub/mozilla.org/firefox/nightly' + \
+                        '/pub/mozilla.org/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.appVersion,
                                                     self.buildNumber)
         longAppVersion = self.makeLongVersion(self.appVersion)
@@ -1053,19 +1039,25 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         platformDir = None
         if self.platform.startswith('linux'):
             platformDir = 'linux-i686'
-            builds['firefox.tar.bz2'] = 'firefox-%s.tar.bz2' % self.appVersion
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/firefox.tar.bz2')
+            filename = '%s.tar.bz2' % self.project
+            builds[filename] = '%s-%s.tar.bz2' % (self.project, self.appVersion)
+            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + self.project)
         elif self.platform.startswith('macosx'):
             platformDir = 'mac'
-            builds['firefox.dmg'] = 'Firefox %s.dmg' % longAppVersion
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/firefox.dmg')
+            filename = '%s.dmg' % self.project
+            builds[filename] = '%s %s.dmg' % (self.project.capitalize(),
+                                              longAppVersion)
+            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('win32'):
             platformDir = 'unsigned/win32'
-            builds['firefox.zip'] = 'firefox-%s.zip' % self.appVersion
-            builds['firefox.exe'] = 'Firefox Setup %s.exe' % longAppVersion
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/firefox.zip')
+            filename = '%s.zip' % self.project
+            instname = '%s.exe' % self.project
+            builds[filename] = '%s-%s.zip' % (self.project, self.appVersion)
+            builds[instname] = '%s Setup %s.exe' % (self.project.capitalize(),
+                                                    longAppVersion)
+            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
-              WithProperties('%(srcdir)s/firefox.exe')
+              WithProperties('%(srcdir)s/' + instname)
         else:
             raise "Unsupported platform"
 
@@ -1094,7 +1086,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          command=['make', WithProperties('installers-%(locale)s')],
          env=self.env,
          haltOnFailure=True,
-         workdir='build/'+self.branchName+'/browser/locales'
+         workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
 
 
