@@ -54,6 +54,7 @@ import re
 import shlex
 from urlparse import urljoin, urlparse
 from urllib import pathname2url, url2pathname
+import subprocess
 
 
 # NOTE: The following class has been copied from compare-locales
@@ -803,7 +804,6 @@ class Scheduler(BaseUpstreamScheduler):
       return [self.nextBuildTime]
     return []
 
-DEFAULT_CVSROOT = ':pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot'
 
 class L10nMixin(object):
   """
@@ -815,14 +815,13 @@ class L10nMixin(object):
   inidividual locale to be built for that BuildSet.
   """
 
-  def __init__(self,
-               platform,
+  def __init__(self, 
                repo      = 'http://hg.mozilla.org/',
                branch    = None,
                repoType    = 'cvs',
                baseTag     = 'default',
                localesFile = None,
-               cvsRoot     = DEFAULT_CVSROOT,
+               cvsRoot     = ':pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot',
                locales     = None):
       self.repoType = repoType
       self.baseTag = baseTag
@@ -839,13 +838,10 @@ class L10nMixin(object):
         else:
           self.localesURL = localesFile
       # if the user wants to use something different than all locales
-      self.locales = locales
-      # Make sure a supported platform is passed. Allow variations, but make
-      # sure to convert them to the form the locales files ues.
-      assert platform in ('linux', 'win32', 'macosx', 'osx')
-      self.platform = platform
-      if self.platform == 'macosx':
-        self.platform = 'osx'
+      if locales:
+          self.locales = locales[:]
+      else:
+          self.locales = None
 
   class NoMergeStamp(SourceStamp):
       """
@@ -863,14 +859,8 @@ class L10nMixin(object):
       """
       log2.msg("L10nMixin:: loaded locales' list")
       for locale in locales:
-        # Ignore en-US. It appears in locales files but we do not repack it.
         if locale == "en-US":
           continue
-        # Some locales should only be built on certain platforms, make sure to
-        # obey those rules.
-        if len(locales[locale]) > 0:
-          if self.platform not in locales[locale]:
-            continue
         props = properties.Properties()
         props.updateFromProperties(self.properties)
         #I do not know exactly what to pass as the source parameter
@@ -900,15 +890,19 @@ class L10nMixin(object):
         # we expect that getPage will return the output of "all-locales"
         # or "shipped-locales" or any file that contains a locale per line
         # in the begining of the line e.g. "en-GB" or "ja linux win32"
+        # this code will only care about the first argument appearing in the line
         if self.repoType == 'cvs':
-           args = ['-q', '-d', self.cvsRoot, 'co', '-p', self.localesURL]
-           d = utils.getProcessOutput('cvs', args)
-           d.addCallback(lambda data: ParseLocalesFile(data))
-           return d
+           args = ['cvs', '-q', '-d', self.cvsRoot, 'co', '-p', self.localesURL]
+           # communicate() returns a tuple - stdout, stderr
+           # the output of cvs has a '\n' element at the end
+           # a last '' string is generated that we get rid of
+           return (lambda lines: [line.split(' ')[0] for line in lines]) \
+                    (subprocess.Popen(args, stdout=subprocess.PIPE).communicate()[0].split('\n')[0:-1])
         else: # the repoType is 'hg'
           # getPage returns a defered that will return a string
           d = getPage(self.localesURL, timeout = 5 * 60)
-          d.addCallback(lambda data: ParseLocalesFile(data))
+          d.addCallback(lambda data: [line.split(' ')[0]
+                                      for line in data.split("\n") if line])
           return d
 
   def createL10nBuilds(self):
@@ -920,18 +914,6 @@ class L10nMixin(object):
       d = defer.maybeDeferred(self.getLocales)
       d.addCallback(self._cbLoadedLocales)
       return d
-
-
-def ParseLocalesFile(data):
-    locales = {}
-    data = data.strip()
-    for line in data.split('\n'):
-        splitLine = line.split()
-        locale = splitLine[0]
-        buildPlatforms = splitLine[1:]
-        locales[locale] = buildPlatforms
-    return locales
-
 
 class NightlyL10n(Nightly, L10nMixin):
   """
@@ -945,17 +927,15 @@ class NightlyL10n(Nightly, L10nMixin):
                    'minute', 'hour', 'dayOfMonth', 'month',
                    'dayOfWeek', 'branch')
   
-  def __init__(self, name,  builderNames, repoType, platform,
-               minute=0, hour='*', dayOfMonth='*', month='*', dayOfWeek='*', 
-               repo = 'http://hg.mozilla.org/', branch=None, baseTag='default',
-               localesFile=None, cvsRoot=DEFAULT_CVSROOT, locales=None):
+  def __init__(self, name,  builderNames, repoType, minute=0, hour='*', dayOfMonth='*', month='*', dayOfWeek='*', 
+               repo = 'http://hg.mozilla.org/', branch=None, baseTag='default', localesFile=None,
+               cvsRoot=None, locales=None):
     
-    Nightly.__init__(self, name, builderNames, minute, hour, dayOfMonth, month,
-                     dayOfWeek, branch, properties={'nightly': True})
-    L10nMixin.__init__(self, platform = platform, repoType = repoType,
-                       repo = repo, branch = branch, baseTag = baseTag,
-                       localesFile = localesFile, cvsRoot = cvsRoot,
-                       locales = locales)
+    Nightly.__init__(self, name, builderNames, minute, hour, dayOfMonth, month, dayOfWeek, branch,
+                     properties={'nightly': True})
+    L10nMixin.__init__(self, repoType = repoType, repo = repo, branch = branch,
+                       baseTag = baseTag, localesFile = localesFile,
+                       cvsRoot = cvsRoot, locales = locales)
   
   def doPeriodicBuild(self):
     # Schedule the next run (as in Nightly's doPeriodicBuild)
@@ -970,19 +950,18 @@ class DependentL10n(Dependent, L10nMixin):
 
   compare_attrs = ('name', 'upstream', 'builders')
 
-  def __init__(self, name, upstream, builderNames, platform,
+  def __init__(self, name, upstream, builderNames,
                repoType, repo = 'http://hg.mozilla.org/', branch=None,
                baseTag='default', localesFile=None,
-               cvsRoot=DEFAULT_CVSROOT, locales=None):
+               cvsRoot=None, locales=None):
       Dependent.__init__(self, name, upstream, builderNames)
       # The next two lines has been added because of:
       # _cbLoadedLocales's BuildSet submit needs them
       self.branch = None 
       self.reason = None
-      L10nMixin.__init__(self, platform = platform, repoType = repoType,
-                         branch = branch, baseTag = baseTag,
-                         localesFile = localesFile, cvsRoot = cvsRoot,
-                         locales = locales)
+      L10nMixin.__init__(self, repoType = repoType, branch = branch,
+                         baseTag = baseTag, localesFile = localesFile,
+                         cvsRoot = cvsRoot, locales = locales)
 
   # ss is the source stamp that we don't use currently
   def upstreamBuilt(self, ss):
