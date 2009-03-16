@@ -437,8 +437,8 @@ class GraphServerPost(BuildStep):
     def postFinished(self, results):
         if self.error:
             self.step_status.setColor("red")
-            self.step_status.setText(["failed", "graph", "server", "post"])
-            self.step_status.setText2(["failed", "graph", "server", "post"])
+            self.step_status.setText(["Error:", "failed", "graph", "server", "post"])
+            self.step_status.setText2(["Error:", "failed", "graph", "server", "post"])
             self.finished(FAILURE)
         else:
             self.finished(SUCCESS)
