@@ -156,6 +156,13 @@ class MozillaBuildFactory(BuildFactory):
          description=['clone', 'build tools'],
          workdir='.'
         )
+        # We need the basename of the current working dir so we can
+        # ignore that dir when purging builds later.
+        self.addStep(SetProperty,
+         command=['bash', '-c', 'basename "$PWD"'],
+         property='builddir',
+         workdir='.'
+        )
 
         if self.clobberURL is not None and self.clobberTime is not None:
             command = ['python', 'tools/clobberer/clobberer.py',
@@ -178,6 +185,8 @@ class MozillaBuildFactory(BuildFactory):
 
             for i in self.ignore_dirs:
                 command.extend(["-n", i])
+            # Ignore the current dir also.
+            command.extend(["-n", WithProperties("%(builddir)s")])
             command.append("..")
 
             self.addStep(ShellCommand,
