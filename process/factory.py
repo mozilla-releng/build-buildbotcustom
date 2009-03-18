@@ -656,10 +656,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
              command=['rm', '-rf', 'build'],
              env=self.env,
              workdir='.',
-             timeout=60*60 # 1 hour
+             timeout=5400 # 1.5 hours
             )
-            # no need to clean-up temp files if we clobber the whole directory
-            return
 
 
 
@@ -1801,7 +1799,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.addStepNoEnv(Mercurial, mode='update',
          baseURL='http://%s/' % self.hgHost,
-         defaultBranch=self.repoPath
+         defaultBranch=self.repoPath,
+         timeout=60*60 # 1 hour
         )
 
         self.addPrintChangesetStep()
@@ -1837,21 +1836,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
              command=['cat', '.mozconfig']
             )
 
-        # TODO: Do we need this special windows rule?
-        if self.platform == 'win32':
-            self.addStep(ShellCommand,
-             command=["make", "-f", "client.mk", "build"],
-             description=['compile'],
-             timeout=60*20,
-             haltOnFailure=1
-            )
-        else:
-            self.addStep(ShellCommand,
-             command=['make', '-f', 'client.mk', 'build'],
-             description=['compile'],
-             haltOnFailure=1
-            )
-
+        self.addStep(ShellCommand,
+         command=["make", "-f", "client.mk", "build"],
+         description=['compile'],
+         timeout=60*60, # 1 hour
+         haltOnFailure=1
+        )
         self.addStep(ShellCommand,
                      command=['make', 'buildsymbols'],
                      workdir='build/objdir'
