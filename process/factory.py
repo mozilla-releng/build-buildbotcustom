@@ -707,9 +707,10 @@ class NightlyBuildFactory(MercurialBuildFactory):
         )
 
         talosBranch = "%s-%s" % (self.branchName, self.platform)
-        for m in self.talosMasters:
+        for master, warn in self.talosMasters:
             self.addStep(SendChangeStep(
-             master=m,
+             warnOnFailure=warn,
+             master=master,
              branch=talosBranch,
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")

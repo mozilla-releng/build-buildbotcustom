@@ -187,8 +187,7 @@ class SetMozillaBuildProperties(LoggingBuildStep):
         return SUCCESS
 
 class SendChangeStep(BuildStep):
-    # Temporarily disabled until we go live on production talos
-    #warnOnFailure = True
+    warnOnFailure = True
     def __init__(self, master, branch, files, revision=None, user=None,
             comments="", **kwargs):
         self.master = master
@@ -239,7 +238,7 @@ class SendChangeStep(BuildStep):
             return BuildStep.finished(self, SUCCESS)
         else:
             self.step_status.setText(['sendchange to', self.master, 'failed'])
-            # Re-enable when we want to know about sendchange errors
-            #self.step_status.setText2(['sendchange'])
+            if self.warnOnFailure:
+                self.step_status.setText2(['sendchange'])
             self.addCompleteLog("errors", str(results))
             return BuildStep.finished(self, FAILURE)
