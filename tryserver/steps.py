@@ -269,6 +269,7 @@ class MozillaUploadTryBuild(ShellCommand):
                                    % (changer, filename))
 
         self.setCommand(["scp", slavesrc, self.scpString])
+        self.setProperty('uploadpath', path.join(dir, "%s-%s" % (changer, filename)))
         ShellCommand.start(self)
 
 
