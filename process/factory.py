@@ -1505,6 +1505,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
                   '-d', 'build', 'mozilla/tools/patcher'],
          description=['checkout', 'patcher'],
+         workdir='.',
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -1591,6 +1592,18 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   '--config=%s' % patcherConfigFile],
          description=['patcher:', 'create patches'],
          haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['find', marDir, '-type', 'f',
+                  '-exec', 'chmod', '644', '{}', ';'],
+         workdir='.',
+         description=['chmod 644', 'partial mar files']
+        )
+        self.addStep(ShellCommand,
+         command=['find', marDir, '-type', 'd',
+                  '-exec', 'chmod', '755', '{}', ';'],
+         workdir='.',
+         description=['chmod 755', 'partial mar dirs']
         )
         self.addStep(ShellCommand,
          command=['rsync', '-av',
