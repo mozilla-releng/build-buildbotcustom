@@ -326,13 +326,14 @@ class repositories(object):
   l10n.repository = 'l10nbld@cvs.mozilla.org:/l10n'
 
 
-def configureDispatcher(config, section, scheduler):
+def configureDispatcher(config, section, scheduler, buildOnEnUS=True):
   """
   Add the Dispatchers for the given section of l10nbuilds.ini to the scheduler.
   
   section -- the name of the section inside of l10nbuilds.ini, aka the tree
   config -- the config parser that loaded l10nbuilds.ini
   scheduler -- scheduler to which we are adding dispatchers
+  buildOnEnUS -- optional argument to disable building on en-US landings
   
   Types of dispatchers:
   - AllLocalesWatcher:
@@ -389,9 +390,10 @@ def configureDispatcher(config, section, scheduler):
         revisions = map(None, config.get(section, 'revisions').split())
       props.update(dict.fromkeys((s+'_revision' for s in revisions), 'default'))
       for branch, endirs in dirs['hg'].iteritems():
-        log2.msg('adding EnDispatcher for %s on %s for %s' %
-                 (section, branch, ' '.join(endirs)))
-        scheduler.addDispatcher(EnDispatcher(endirs, branch, section))
+        if buildOnEnUS:
+          log2.msg('adding EnDispatcher for %s on %s for %s' %
+                   (section, branch, ' '.join(endirs)))
+          scheduler.addDispatcher(EnDispatcher(endirs, branch, section))
         alldirs += endirs
       for branch, endirs in dirs['single-module-hg'].iteritems():
         log2.msg('adding EnDispatcher for single module %s on %s for %s' %
@@ -400,7 +402,8 @@ def configureDispatcher(config, section, scheduler):
           log2.msg('WARNING: More than one dir for a single module?')
         # the EnDispatcher for a single module just listens to
         # 'locales/en-US/foo', i.e., has only a single empty dir
-        scheduler.addDispatcher(EnDispatcher([''], branch, section))
+        if buildOnEnUS:
+          scheduler.addDispatcher(EnDispatcher([''], branch, section))
         alldirs += endirs
         
 
@@ -706,7 +709,7 @@ class Scheduler(BaseUpstreamScheduler):
                    'builders', 'apps', 'locales', 'treeprops',
                    'properties')
   
-  def __init__(self, name, inipath, treeStableTimer = None):
+  def __init__(self, name, inipath, treeStableTimer = None, buildOnEnUS=True):
     """
     @param name: the name of this Scheduler
     @param treeStableTimer: the duration, in seconds, for which the tree
@@ -721,6 +724,7 @@ class Scheduler(BaseUpstreamScheduler):
     self.treeStableTimer = treeStableTimer
     self.nextBuildTime = None
     self.timer = None
+    self.buildOnEnUS = buildOnEnUS
 
     # will hold the dispatchers for each tree
     self.dispatchers = []
@@ -740,7 +744,7 @@ class Scheduler(BaseUpstreamScheduler):
     # Configure the dispatchers for our trees as soon as the reactor is running
     for tree in cp.sections():
       reactor.callWhenRunning(configureDispatcher,
-                              cp, tree, self)
+                              cp, tree, self, buildOnEnUS=self.buildOnEnUS)
 
   class NoMergeStamp(SourceStamp):
     """
