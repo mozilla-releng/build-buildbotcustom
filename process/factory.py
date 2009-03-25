@@ -765,6 +765,26 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         )
 
 
+def identToProperties(default_prop=None):
+    '''Create a method that is used in a SetProperty step to map the
+    output of make ident to build properties.
+
+    To be backwards compat, this allows for a property name to be specified
+    to be used for a single hg revision.
+    '''
+    def list2dict(rv, stdout, stderr):
+        props = {}
+        stdout = stdout.strip()
+        if default_prop is not None and re.match(r'[0-9a-f]{12}\+?', stdout):
+            # a single hg version
+            props[default_prop] = stdout
+        else:
+            for l in filter(None, stdout.split('\n')):
+                e = filter(None, l.split())
+                props[e[0]] = e[1]
+        return props
+    return list2dict
+
 
 class BaseRepackFactory(MozillaBuildFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
@@ -841,6 +861,7 @@ class BaseRepackFactory(MozillaBuildFactory):
             )
 
         self.downloadBuilds()
+        self.updateEnUS()
         self.doRepack()
 
         uploadEnv = self.env.copy() # pick up any env variables in our subclass
@@ -888,6 +909,13 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir='build/' + self.l10nRepoPath
         )
 
+    def updateEnUS(self):
+        '''Update the en-US source files to the revision used by
+        the repackaged build.
+
+        This is implemented in the subclasses.
+        '''
+        pass
 
 
 class NightlyRepackFactory(BaseRepackFactory):
@@ -926,6 +954,31 @@ class NightlyRepackFactory(BaseRepackFactory):
          haltOnFailure=True,
          workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
+
+    def updateEnUS(self):
+        '''Update en-US to the source stamp we get from make ident.
+
+        Requires that we run make unpack first.
+        '''
+        self.addStep(ShellCommand,
+                     command=['make', 'unpack'],
+                     descriptionDone='unpacked en-US',
+                     haltOnFailure=True,
+                     workdir='build/'+self.branchName+'/'+self.appName+
+                     '/locales'
+                     )
+        self.addStep(SetProperty,
+                     command=['make', 'ident'],
+                     haltOnFailure=True,
+                     workdir='build/'+self.branchName+'/'+self.appName+
+                     '/locales',
+                     extract_fn=identToProperties('fx_revision')
+                     )
+        self.addStep(ShellCommand,
+                     command=['hg', 'update', '-r',
+                              WithProperties('%(fx_revision)s')],
+                     haltOnFailure=True,
+                     workdir='build/' + self.branchName)
 
     def doRepack(self):
         self.addStep(ShellCommand,
