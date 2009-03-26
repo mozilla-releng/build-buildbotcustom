@@ -326,7 +326,7 @@ class repositories(object):
   l10n.repository = 'l10nbld@cvs.mozilla.org:/l10n'
 
 
-def configureDispatcher(config, section, scheduler, buildOnEnUS=True):
+def configureDispatcher(config, section, scheduler, buildOnEnUS=False):
   """
   Add the Dispatchers for the given section of l10nbuilds.ini to the scheduler.
   
@@ -709,7 +709,7 @@ class Scheduler(BaseUpstreamScheduler):
                    'builders', 'apps', 'locales', 'treeprops',
                    'properties')
   
-  def __init__(self, name, inipath, treeStableTimer = None, buildOnEnUS=True):
+  def __init__(self, name, inipath, treeStableTimer = None, buildOnEnUS=False):
     """
     @param name: the name of this Scheduler
     @param treeStableTimer: the duration, in seconds, for which the tree
