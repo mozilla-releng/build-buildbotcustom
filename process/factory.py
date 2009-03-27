@@ -1818,12 +1818,13 @@ class ReleaseFinalVerification(ReleaseFactory):
         )
 
 class UnittestBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, config_repo_path, config_dir,
-                 mochitest_leak_threshold=None, **kwargs):
+    def __init__(self, platform, config_repo_path, config_dir, objdir,
+            mochitest_leak_threshold=None, **kwargs):
         self.env = {}
         MozillaBuildFactory.__init__(self, **kwargs)
         self.config_repo_path = config_repo_path
         self.config_dir = config_dir
+        self.objdir = objdir
 
         self.config_repo_url = self.getRepository(self.config_repo_path)
 
@@ -1833,16 +1834,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 'win32': 'win32-vc8-mozbuild-unittest',
                 }
 
-        config_dir_map = {
-                'linux': 'linux/%s/unittest' % self.branchName,
-                'macosx': 'macosx/%s/unittest' % self.branchName,
-                'win32': 'win32/%s/unittest' % self.branchName,
-                }
-
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
         self.env = MozillaEnvironments[env_map[self.platform]]
+        self.env['MOZ_OBJDIR'] = self.objdir
 
         if self.platform == 'win32':
             self.addStep(TinderboxShellCommand, name="kill sh",
@@ -1884,14 +1880,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          workdir='.'
         )
 
-        self.addStep(ShellCommand, name="copy mozconfig",
-         command=['cp',
-                  'mozconfigs/%s/%s/mozconfig' % \
-                    (self.config_dir, config_dir_map[self.platform]),
-                  'build/.mozconfig'],
-         description=['copy mozconfig'],
-         workdir='.'
-        )
+        self.addCopyMozconfigStep()
 
         # TODO: Do we need this special windows rule?
         if self.platform == 'win32':
@@ -1911,7 +1900,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         )
         self.addStep(ShellCommand,
                      command=['make', 'buildsymbols'],
-                     workdir='build/objdir'
+                     workdir='build/%s' % self.objdir,
                      )
 
         self.addStep(SetProperty,
@@ -1928,62 +1917,60 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
 
-        # TODO: Do we need this special windows rule?
-        if self.platform == 'win32':
-            self.addStep(unittest_steps.MozillaCheck, warnOnWarnings=True,
-             workdir="build\\objdir",
-             timeout=60*5
-            )
-        else:
-            self.addStep(unittest_steps.MozillaCheck,
-             warnOnWarnings=True,
-             timeout=60*5,
-             workdir="build/objdir"
-            )
+        self.addPreTestSteps()
+
+        self.addStep(unittest_steps.MozillaCheck,
+         warnOnWarnings=True,
+         timeout=5*60,
+         workdir="build/%s" % self.objdir,
+        )
 
         if self.platform == 'win32':
             self.addStep(unittest_steps.CreateProfileWin,
              warnOnWarnings=True,
              workdir="build",
-             command = r'python testing\tools\profiles\createTestingProfile.py --clobber --binary objdir\dist\bin\firefox.exe',
+             command = r'python testing\tools\profiles\createTestingProfile.py --clobber --binary %s\dist\bin\firefox.exe' % self.objdir,
              clobber=True
             )
         else:
             self.addStep(unittest_steps.CreateProfile,
              warnOnWarnings=True,
              workdir="build",
-             command = r'python testing/tools/profiles/createTestingProfile.py --clobber --binary objdir/dist/bin/firefox',
+             command = r'python testing/tools/profiles/createTestingProfile.py --clobber --binary %s/dist/bin/firefox' % self.objdir,
              clobber=True
             )
 
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="reftest",
-         workdir="build/objdir",
-         timeout=60*5
+         workdir="build/%s" % self.objdir,
+         timeout=5*60,
         )
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="crashtest",
-         workdir="build/objdir"
+         workdir="build/%s" % self.objdir,
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
          test_name="mochitest-plain",
-         workdir="build/objdir",
+         workdir="build/%s" % self.objdir,
          leakThreshold=mochitest_leak_threshold,
-         timeout=60*5
+         timeout=5*60,
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
          test_name="mochitest-chrome",
-         workdir="build/objdir"
+         workdir="build/%s" % self.objdir,
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
          test_name="mochitest-browser-chrome",
-         workdir="build/objdir"
+         workdir="build/%s" % self.objdir,
         )
         if not self.platform == 'macosx':
           self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
            test_name="mochitest-a11y",
-           workdir="build/objdir"
+           workdir="build/%s" % self.objdir,
           )
+
+        self.addPostTestSteps()
+
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
@@ -2002,6 +1989,113 @@ class UnittestBuildFactory(MozillaBuildFactory):
     def addStepNoEnv(self, *args, **kw):
         return BuildFactory.addStep(self, *args, **kw)
 
+    def addCopyMozconfigStep(self):
+        config_dir_map = {
+                'linux': 'linux/%s/unittest' % self.branchName,
+                'macosx': 'macosx/%s/unittest' % self.branchName,
+                'win32': 'win32/%s/unittest' % self.branchName,
+                }
+        mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
+            (self.config_dir, config_dir_map[self.platform])
+
+        self.addStep(ShellCommand, name="copy mozconfig",
+         command=['cp', mozconfig, 'build/.mozconfig'],
+         description=['copy mozconfig'],
+         workdir='.'
+        )
+
+    def addPreTestSteps(self):
+        pass
+
+    def addPostTestSteps(self):
+        pass
+
+class CodeCoverageFactory(UnittestBuildFactory):
+    def __init__(self, stageUsername=None, stageServer=None, stageSshKey=None,
+            **kwargs):
+        self.stageServer = stageServer
+        self.stageUsername = stageUsername
+        self.stageSshKey = stageSshKey
+
+        UnittestBuildFactory.__init__(self, **kwargs)
+
+    def addCopyMozconfigStep(self):
+        config_dir_map = {
+                'linux': 'linux/%s/codecoverage' % self.branchName,
+                'macosx': 'macosx/%s/codecoverage' % self.branchName,
+                'win32': 'win32/%s/codecoverage' % self.branchName,
+                }
+        mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
+            (self.config_dir, config_dir_map[self.platform])
+
+        self.addStep(ShellCommand, name="copy mozconfig",
+         command=['cp', mozconfig, 'build/.mozconfig'],
+         description=['copy mozconfig'],
+         workdir='.'
+        )
+
+    def addPreBuildSteps(self):
+        # Always clobber code coverage builds
+        self.addStep(ShellCommand,
+         command=['rm', '-rf', 'build'],
+         workdir=".",
+         timeout=30*60,
+        )
+        UnittestBuildFactory.addPreBuildSteps(self)
+
+    def addPreTestSteps(self):
+        self.addStep(ShellCommand,
+         command=['mv','bin','bin-original'],
+         workdir="build/%s/dist" % self.objdir,
+        )
+        self.addStep(ShellCommand,
+         command=['jscoverage', '--mozilla',
+                  '--no-instrument=defaults',
+                  '--no-instrument=greprefs',
+                  '--no-instrument=chrome/browser/content/browser/places/treeView.js',
+                  'bin-original', 'bin'],
+         workdir="build/%s/dist" % self.objdir,
+        )
+
+    def addPostTestSteps(self):
+        self.addStep(ShellCommand,
+         command=['lcov', '-c', '-d', '.', '-o', 'app.info'],
+         workdir="build/%s" % self.objdir,
+        )
+        self.addStep(ShellCommand,
+         command=['rm', '-rf', 'codecoverage_html'],
+         workdir="build",
+        )
+        self.addStep(ShellCommand,
+         command=['mkdir', 'codecoverage_html'],
+         workdir="build",
+        )
+        self.addStep(ShellCommand,
+         command=['genhtml', '../%s/app.info' % self.objdir],
+         workdir="build/codecoverage_html",
+        )
+        self.addStep(ShellCommand,
+         command=['cp', '%s/dist/bin/application.ini' % self.objdir, 'codecoverage_html'],
+         workdir="build",
+        )
+        self.addStep(ShellCommand,
+         command=['tar', 'jcvf', 'codecoverage.tar.bz2', 'codecoverage_html'],
+         workdir="build",
+        )
+
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_PATH': '/home/ftp/pub/firefox/nightly/experimental/codecoverage'})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+        if 'POST_UPLOAD_CMD' in uploadEnv:
+            del uploadEnv['POST_UPLOAD_CMD']
+        self.addStep(ShellCommand,
+         env=uploadEnv,
+         command=['python', 'build/upload.py', 'codecoverage.tar.bz2'],
+         workdir="build",
+        )
 
 class L10nVerifyFactory(ReleaseFactory):
     def __init__(self, cvsroot, stagingServer, productName, appVersion,
