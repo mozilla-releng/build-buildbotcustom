@@ -38,18 +38,19 @@ def emphasizeFailureText(text):
     return '<em class="testfail">%s</em>' % text
 
 # Some test suites (like TUnit) may not (yet) have the |knownFailCount| feature.
-# Some test suites (like TUnit and Reftest) may not (yet) have the |leaked| feature.
+# Some test suites (like TUnit) may not (yet) have the |crashed| feature.
 # Expected values for |leaked|: False, no leak; True, leaked; None, report failure.
-def summaryText(passCount, failCount, knownFailCount = None, leaked = False):
+def summaryText(passCount, failCount, knownFailCount = None,
+        crashed = False, leaked = False):
     # Format the tests counts.
     if passCount < 0 or failCount < 0 or \
             (knownFailCount != None and knownFailCount < 0):
         # Explicit failure case.
-        summary = emphasizeFailureText("FAIL")
+        summary = emphasizeFailureText("T-FAIL")
     elif passCount == 0 and failCount == 0 and \
             (knownFailCount == None or knownFailCount == 0):
         # Implicit failure case.
-        summary = emphasizeFailureText("FAIL")
+        summary = emphasizeFailureText("T-FAIL")
     else:
         # Handle |failCount|.
         failCountStr = str(failCount)
@@ -60,9 +61,13 @@ def summaryText(passCount, failCount, knownFailCount = None, leaked = False):
         if knownFailCount != None:
             summary += "/%d" % knownFailCount
 
+    # Format the crash status.
+    if crashed:
+        summary += "&nbsp;%s" % emphasizeFailureText("CRASH")
+
     # Format the leak status.
     if leaked != False:
-        summary += "&nbsp;%s" % emphasizeFailureText((leaked and "LEAK") or "FAIL")
+        summary += "&nbsp;%s" % emphasizeFailureText((leaked and "LEAK") or "L-FAIL")
 
     return summary
 
@@ -230,16 +235,35 @@ class MozillaCheck(ShellCommandReportTimeout):
 	ShellCommandReportTimeout.__init__(self, **kwargs)
    
     def createSummary(self, log):
+        # Counts.
         passCount = 0
         failCount = 0
+        leaked = False
+
+        # Regular expression for crash and leak detections.
+        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)$")
+        # Process the log.
         for line in log.readlines():
             if "TEST-PASS" in line:
                 passCount = passCount + 1
+                continue
             if "TEST-UNEXPECTED-" in line:
-                failCount = failCount + 1
+                # Set the error flags.
+                # Or set the failure count.
+                m = harnessErrorsRe.match(line)
+                if m:
+                    r = m.group(1)
+                    if r == "missing output line for total leaks!":
+                        leaked = None
+                    else:
+                        leaked = True
+                else:
+                    failCount = failCount + 1
+                # continue
+
         # Add the summary.
         summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
-            summaryText(passCount, failCount))
+            summaryText(passCount, failCount, leaked = leaked))
         self.addCompleteLog('summary', summary)
     
     def evaluateCommand(self, cmd):
@@ -266,33 +290,53 @@ class MozillaReftest(ShellCommandReportTimeout):
         successfulCount = -1
         unexpectedCount = -1
         knownProblemsCount = -1
+        crashed = False
+        leaked = False
+
         # Regular expression for result summary details.
         infoRe = re.compile(r"REFTEST INFO \| (Successful|Unexpected|Known problems): (\d+) \(")
+        # Regular expression for crash and leak detections.
+        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)$")
         # Process the log.
         for line in log.readlines():
-            m = infoRe.match(line)
-            # Skip non-matching lines.
-            if m == None:
-                continue
             # Set the counts.
-            r = m.group(1)
-            if r == "Successful":
-                successfulCount = int(m.group(2))
-            elif r == "Unexpected":
-                unexpectedCount = int(m.group(2))
-            elif r == "Known problems":
-                knownProblemsCount = int(m.group(2))
+            m = infoRe.match(line)
+            if m:
+                r = m.group(1)
+                if r == "Successful":
+                    successfulCount = int(m.group(2))
+                elif r == "Unexpected":
+                    unexpectedCount = int(m.group(2))
+                elif r == "Known problems":
+                    knownProblemsCount = int(m.group(2))
+                continue
+            # Set the error flags.
+            m = harnessErrorsRe.match(line)
+            if m:
+                r = m.group(1)
+                if r == "Browser crashed (minidump found)":
+                    crashed = True
+                elif r == "missing output line for total leaks!":
+                    leaked = None
+                else:
+                    leaked = True
+                # continue
+
         # Add the summary.
         summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
-            summaryText(successfulCount, unexpectedCount, knownProblemsCount))
+            summaryText(successfulCount, unexpectedCount, knownProblemsCount, crashed, leaked))
         self.addCompleteLog('summary', summary)
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+
         # Assume that having the "Unexpected: 0" line means the tests run completed.
-        if SUCCESS != superResult or \
-           not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE):
+        # Also check for "^TEST-UNEXPECTED-" for harness errors.
+        if superResult != SUCCESS or \
+                not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
+                re.search(r"^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
+
         return SUCCESS
 
 class MozillaMochitest(ShellCommandReportTimeout):
@@ -309,9 +353,11 @@ class MozillaMochitest(ShellCommandReportTimeout):
 	self.super_class = ShellCommandReportTimeout
     
     def createSummary(self, log):
+        # Counts.
         passCount = 0
         failCount = 0
         todoCount = 0
+        crashed = False
         leaked = False
 
         passIdent = "INFO Passed:"
@@ -322,23 +368,34 @@ class MozillaMochitest(ShellCommandReportTimeout):
             passIdent = "Pass:"
             failIdent = "Fail:"
             todoIdent = "Todo:"
+        # Regular expression for crash and leak detections.
+        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)$")
+        # Process the log.
         for line in log.readlines():
             if passIdent in line:
                 passCount = int(line.split()[-1])
-            elif failIdent in line:
+                continue
+            if failIdent in line:
                 failCount = int(line.split()[-1])
-            elif todoIdent in line:
+                continue
+            if todoIdent in line:
                 todoCount = int(line.split()[-1])
-            elif "during test execution" in line and \
-              "runtests-leaks" in line and \
-              "TEST-UNEXPECTED-FAIL" in line:
-                match = re.search(r"leaked (\d+) bytes during test execution", line)
-                assert match is not None
-                leaked = int(match.group(1)) != 0
+                continue
+            # Set the error flags.
+            m = harnessErrorsRe.match(line)
+            if m:
+                r = m.group(1)
+                if r == "Browser crashed (minidump found)":
+                    crashed = True
+                elif r == "missing output line for total leaks!":
+                    leaked = None
+                else:
+                    leaked = True
+                # continue
 
         # Add the summary.
         summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
-            summaryText(passCount, failCount, todoCount, leaked))
+            summaryText(passCount, failCount, todoCount, crashed, leaked))
         self.addCompleteLog('summary', summary)
 
     def evaluateCommand(self, cmd):
