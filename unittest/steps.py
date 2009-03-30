@@ -42,15 +42,28 @@ def emphasizeFailureText(text):
 # Expected values for |leaked|: False, no leak; True, leaked; None, report failure.
 def summaryText(passCount, failCount, knownFailCount = None, leaked = False):
     # Format the tests counts.
-    summary = "%d/%d" % (passCount, failCount)
-    if knownFailCount != None:
-        summary += "/%d" % knownFailCount
-    # Check whether all tests succeeded.
-    if failCount > 0:
-        summary = emphasizeFailureText(summary)
+    if passCount < 0 or failCount < 0 or \
+            (knownFailCount != None and knownFailCount < 0):
+        # Explicit failure case.
+        summary = emphasizeFailureText("FAIL")
+    elif passCount == 0 and failCount == 0 and \
+            (knownFailCount == None or knownFailCount == 0):
+        # Implicit failure case.
+        summary = emphasizeFailureText("FAIL")
+    else:
+        # Handle |failCount|.
+        failCountStr = str(failCount)
+        if failCount > 0:
+            failCountStr = emphasizeFailureText(failCountStr)
+        # Format the counts.
+        summary = "%d/%s" % (passCount, failCountStr)
+        if knownFailCount != None:
+            summary += "/%d" % knownFailCount
+
     # Format the leak status.
     if leaked != False:
         summary += "&nbsp;%s" % emphasizeFailureText((leaked and "LEAK") or "FAIL")
+
     return summary
 
 class ShellCommandReportTimeout(ShellCommand):
@@ -224,8 +237,9 @@ class MozillaCheck(ShellCommandReportTimeout):
                 passCount = passCount + 1
             if "TEST-UNEXPECTED-" in line:
                 failCount = failCount + 1
-        summary = "TinderboxPrint: %s<br/>" % self.name
-        summary += "%s\n" % summaryText(passCount, failCount)
+        # Add the summary.
+        summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
+            summaryText(passCount, failCount))
         self.addCompleteLog('summary', summary)
     
     def evaluateCommand(self, cmd):
@@ -269,11 +283,8 @@ class MozillaReftest(ShellCommandReportTimeout):
             elif r == "Known problems":
                 knownProblemsCount = int(m.group(2))
         # Add the summary.
-        summary = "TinderboxPrint: %s<br/>" % self.name
-        if successfulCount < 0 or unexpectedCount < 0 or knownProblemsCount < 0:
-            summary += "%s\n" % emphasizeFailureText("FAIL")
-        else:
-            summary += "%s\n" % summaryText(successfulCount, unexpectedCount, knownProblemsCount)
+        summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
+            summaryText(successfulCount, unexpectedCount, knownProblemsCount))
         self.addCompleteLog('summary', summary)
 
     def evaluateCommand(self, cmd):
@@ -317,11 +328,9 @@ class MozillaMochitest(ShellCommandReportTimeout):
                     match = re.search(r"leaked (\d+) bytes during test execution", line)
                     assert match is not None
                     leaked = int(match.group(1)) != 0
-            summary = "TinderboxPrint: browser<br/>"
-            if not (passCount + failCount + todoCount):
-                summary += "%s\n" % emphasizeFailureText("FAIL")
-            else:
-                summary += summaryText(passCount, failCount, todoCount, leaked) + "\n"
+            # Add the summary.
+            summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
+                summaryText(passCount, failCount, todoCount, leaked))
             self.addCompleteLog('summary', summary)
         else:
             passCount = 0
@@ -341,11 +350,9 @@ class MozillaMochitest(ShellCommandReportTimeout):
                     match = re.search(r"leaked (\d+) bytes during test execution", line)
                     assert match is not None
                     leaked = int(match.group(1)) != 0
-            summary = "TinderboxPrint: %s<br/>" % self.name
-            if not (passCount + failCount + todoCount):
-                summary += "%s\n" % emphasizeFailureText("FAIL")
-            else:
-                summary += summaryText(passCount, failCount, todoCount, leaked) + "\n"
+            # Add the summary.
+            summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
+                summaryText(passCount, failCount, todoCount, leaked))
             self.addCompleteLog('summary', summary)
 
     def evaluateCommand(self, cmd):
