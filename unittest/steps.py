@@ -309,75 +309,54 @@ class MozillaMochitest(ShellCommandReportTimeout):
 	self.super_class = ShellCommandReportTimeout
     
     def createSummary(self, log):
+        passCount = 0
+        failCount = 0
+        todoCount = 0
+        leaked = False
+
+        passIdent = "INFO Passed:"
+        failIdent = "INFO Failed:"
+        todoIdent = "INFO Todo:"
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
-            passCount = 0
-            failCount = 0
-            todoCount = 0
-            leaked = False
-            for line in log.readlines():
-                if "Pass:" in line:
-                    passCount = int(line.split()[-1])
-                if "Fail:" in line:
-                    failCount = int(line.split()[-1])
-                if "Todo:" in line:
-                    todoCount = int(line.split()[-1])
-                if "during test execution" in line and \
-                  "runtests-leaks" in line and \
-                  "TEST-UNEXPECTED-FAIL" in line:
-                    match = re.search(r"leaked (\d+) bytes during test execution", line)
-                    assert match is not None
-                    leaked = int(match.group(1)) != 0
-            # Add the summary.
-            summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
-                summaryText(passCount, failCount, todoCount, leaked))
-            self.addCompleteLog('summary', summary)
-        else:
-            passCount = 0
-            failCount = 0
-            todoCount = 0
-            leaked = False
-            for line in log.readlines():
-                if "INFO Passed:" in line:
-                    passCount = int(line.split()[-1])
-                if "INFO Failed:" in line:
-                    failCount = int(line.split()[-1])
-                if "INFO Todo:" in line:
-                    todoCount = int(line.split()[-1])
-                if "during test execution" in line and \
-                  "runtests-leaks" in line and \
-                  "TEST-UNEXPECTED-FAIL" in line:
-                    match = re.search(r"leaked (\d+) bytes during test execution", line)
-                    assert match is not None
-                    leaked = int(match.group(1)) != 0
-            # Add the summary.
-            summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
-                summaryText(passCount, failCount, todoCount, leaked))
-            self.addCompleteLog('summary', summary)
+            passIdent = "Pass:"
+            failIdent = "Fail:"
+            todoIdent = "Todo:"
+        for line in log.readlines():
+            if passIdent in line:
+                passCount = int(line.split()[-1])
+            elif failIdent in line:
+                failCount = int(line.split()[-1])
+            elif todoIdent in line:
+                todoCount = int(line.split()[-1])
+            elif "during test execution" in line and \
+              "runtests-leaks" in line and \
+              "TEST-UNEXPECTED-FAIL" in line:
+                match = re.search(r"leaked (\d+) bytes during test execution", line)
+                assert match is not None
+                leaked = int(match.group(1)) != 0
+
+        # Add the summary.
+        summary = "TinderboxPrint: %s<br/>%s\n" % (self.name,
+            summaryText(passCount, failCount, todoCount, leaked))
+        self.addCompleteLog('summary', summary)
 
     def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+
+        if SUCCESS != superResult:
+            return WARNINGS
+        if re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
+            return WARNINGS
+        if re.search('FAIL Exited', cmd.logs['stdio'].getText()):
+            return WARNINGS
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
-        if self.name == 'mochitest-browser-chrome':
-            superResult = self.super_class.evaluateCommand(self, cmd)
-            if SUCCESS != superResult:
-                return WARNINGS
-            if re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
-                return WARNINGS
-            if re.search('FAIL Exited', cmd.logs['stdio'].getText()):
-                return WARNINGS
-            return SUCCESS
-        else:
-            superResult = self.super_class.evaluateCommand(self, cmd)
-            if SUCCESS != superResult:
-                return WARNINGS
-            if re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
-                return WARNINGS
-            if re.search('FAIL Exited', cmd.logs['stdio'].getText()):
-                return WARNINGS
+        if self.name != 'mochitest-browser-chrome':
             if not re.search('TEST-PASS', cmd.logs['stdio'].getText()):
                 return WARNINGS
-            return SUCCESS
-                
+
+        return SUCCESS
+
 class CreateProfile(ShellCommandReportTimeout):
     name = "create profile"
     warnOnFailure = True
