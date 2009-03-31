@@ -714,12 +714,20 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 return {'packageUrl': m.group(1)}
             return {}
 
-        self.addStep(SetProperty,
-         command=['make', '-f', 'client.mk', 'upload'],
-         env=uploadEnv,
-         workdir='build',
-         extract_fn = get_url,
-        )
+        if self.productName == 'xulrunner':
+            self.addStep(SetProperty,
+             command=['make', '-f', 'client.mk', 'upload'],
+             env=uploadEnv,
+             workdir='build',
+             extract_fn = get_url,
+            )
+        else:
+            self.addStep(SetProperty,
+             command=['make', 'upload'],
+             env=uploadEnv,
+             workdir='build/%s' % self.objdir,
+             extract_fn = get_url,
+            )
 
         talosBranch = "%s-%s" % (self.branchName, self.platform)
         for master, warn in self.talosMasters:
