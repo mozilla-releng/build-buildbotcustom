@@ -25,7 +25,7 @@ reload(buildbotcustom.unittest.steps)
 reload(buildbotcustom.env)
 
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, TinderboxShellCommand, \
-  SendChangeStep
+  SendChangeStep, GetBuildID
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -235,7 +235,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  ausHost=None, nightly=False, leakTest=False, codesighs=True,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
-                 createSnippet=False, doCleanup=True,
+                 createSnippet=False, doCleanup=True, packageSDK=False,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env
@@ -267,6 +267,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.uploadSymbols = uploadSymbols
         self.createSnippet = createSnippet
         self.doCleanup = doCleanup
+        self.packageSDK = packageSDK
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername and stageSshKey
@@ -551,6 +552,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addUploadSteps(self):
+        if self.packageSDK:
+            self.addStep(ShellCommand,
+             command=['make', '-f', 'client.mk', 'sdk'],
+             env=self.env,
+             workdir='build/',
+             haltOnFailure=True
+            )
         self.addStep(ShellCommand,
          command=['make', 'package'],
          env=self.env,
@@ -571,9 +579,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
              env=self.env,
              haltOnFailure=True
          )
-        self.addStep(SetMozillaBuildProperties,
-         objdir='build/%s' % self.objdir
-        )
+        if self.productName == 'xulrunner':
+            self.addStep(GetBuildID,
+             objdir=self.objdir,
+             inifile='platform.ini',
+             section='Build',
+            )
+        else:
+            self.addStep(SetMozillaBuildProperties,
+             objdir='build/%s' % self.objdir
+            )
 
         # Call out to a subclass to do the actual uploading
         self.doUpload()
@@ -700,9 +715,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
             return {}
 
         self.addStep(SetProperty,
-         command=['make', 'upload'],
+         command=['make', '-f', 'client.mk', 'upload'],
          env=uploadEnv,
-         workdir='build/%s' % self.objdir,
+         workdir='build',
          extract_fn = get_url,
         )
 

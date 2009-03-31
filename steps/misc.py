@@ -108,17 +108,20 @@ class GetBuildID(ShellCommand):
     descriptionDone=['get buildid']
     haltOnFailure=True
 
-    def __init__(self, objdir="", **kwargs):
+    def __init__(self, objdir="", inifile="application.ini", section="App",
+            **kwargs):
         ShellCommand.__init__(self, **kwargs)
         major, minor, point = buildbot.version.split(".", 3)
         # Buildbot 0.7.5 and below do not require this
         if int(minor) >= 7 and int(point) >= 6:
-            self.addFactoryArguments(objdir=objdir)
+            self.addFactoryArguments(objdir=objdir,
+                    inifile=inifile,
+                    section=section)
 
         self.objdir = objdir
         self.command = ['python', 'config/printconfigsetting.py',
-                        '%s/dist/bin/application.ini' % self.objdir,
-                        'App', 'BuildID']
+                        '%s/dist/bin/%s' % (self.objdir, inifile),
+                        section, 'BuildID']
 
     def commandComplete(self, cmd):
         buildid = ""
