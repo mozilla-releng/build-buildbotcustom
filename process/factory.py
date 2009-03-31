@@ -2078,8 +2078,9 @@ class CodeCoverageFactory(UnittestBuildFactory):
          command=['cp', '%s/dist/bin/application.ini' % self.objdir, 'codecoverage_html'],
          workdir="build",
         )
+        tarfile = "codecoverage-%s.tar.bz2" % self.branchName
         self.addStep(ShellCommand,
-         command=['tar', 'jcvf', 'codecoverage.tar.bz2', 'codecoverage_html'],
+         command=['tar', 'jcvf', tarfile, 'codecoverage_html'],
          workdir="build",
         )
 
@@ -2093,8 +2094,14 @@ class CodeCoverageFactory(UnittestBuildFactory):
             del uploadEnv['POST_UPLOAD_CMD']
         self.addStep(ShellCommand,
          env=uploadEnv,
-         command=['python', 'build/upload.py', 'codecoverage.tar.bz2'],
+         command=['python', 'build/upload.py', tarfile],
          workdir="build",
+        )
+        # Clean up after ourselves
+        self.addStep(ShellCommand,
+         command=['rm', '-rf', 'build'],
+         workdir=".",
+         timeout=30*60,
         )
 
 class L10nVerifyFactory(ReleaseFactory):
