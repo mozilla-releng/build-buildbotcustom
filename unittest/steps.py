@@ -241,7 +241,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         leaked = False
 
         # Regular expression for crash and leak detections.
-        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)$")
+        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
         # Process the log.
         for line in log.readlines():
             if "TEST-PASS" in line:
@@ -296,7 +296,7 @@ class MozillaReftest(ShellCommandReportTimeout):
         # Regular expression for result summary details.
         infoRe = re.compile(r"REFTEST INFO \| (Successful|Unexpected|Known problems): (\d+) \(")
         # Regular expression for crash and leak detections.
-        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)$")
+        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
         # Process the log.
         for line in log.readlines():
             # Set the counts.
@@ -369,7 +369,7 @@ class MozillaMochitest(ShellCommandReportTimeout):
             failIdent = "Fail:"
             todoIdent = "Todo:"
         # Regular expression for crash and leak detections.
-        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)$")
+        harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
         # Process the log.
         for line in log.readlines():
             if passIdent in line:
