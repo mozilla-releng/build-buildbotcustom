@@ -709,7 +709,8 @@ class Scheduler(BaseUpstreamScheduler):
                    'builders', 'apps', 'locales', 'treeprops',
                    'properties')
   
-  def __init__(self, name, inipath, treeStableTimer = None, buildOnEnUS=False):
+  def __init__(self, name, inipath, treeStableTimer = None, buildOnEnUS=False,
+               nomerge=True):
     """
     @param name: the name of this Scheduler
     @param treeStableTimer: the duration, in seconds, for which the tree
@@ -736,6 +737,8 @@ class Scheduler(BaseUpstreamScheduler):
     self.apps = {}
     # properties per tree
     self.treeprops = {}
+    # use NoMergeStamp or regular stamp
+    self.nomerge = nomerge
 
   def startService(self):
     log2.msg("starting l10n scheduler")
@@ -783,8 +786,11 @@ class Scheduler(BaseUpstreamScheduler):
                       needsCheckout = True), 'Scheduler')
     if misc_props:
       props.update(misc_props, 'Scheduler')
-    bs = buildset.BuildSet(self.builders[tree],
-                           Scheduler.NoMergeStamp(changes=_changes),
+    if self.nomerge:
+      ss = Scheduler.NoMergeStamp(changes=_changes)
+    else:
+      ss = SourceStamp(changes=_changes)
+    bs = buildset.BuildSet(self.builders[tree], ss,
                            reason = "%s %s" % (tree, locale),
                            properties = props)
     self.submitBuildSet(bs)
