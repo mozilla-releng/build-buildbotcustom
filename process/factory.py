@@ -1837,8 +1837,6 @@ class UpdateVerifyFactory(ReleaseFactory):
          description=['./verify.sh', verifyConfig]
         )
 
-
-
 class ReleaseFinalVerification(ReleaseFactory):
     def __init__(self, linuxConfig, macConfig, win32Config, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
@@ -1851,8 +1849,9 @@ class ReleaseFinalVerification(ReleaseFactory):
         )
 
 class UnittestBuildFactory(MozillaBuildFactory):
+    # mochitest_leak_threshold applies to test_name="mochitest-plain" only.
     def __init__(self, platform, config_repo_path, config_dir, objdir,
-            mochitest_leak_threshold=None, **kwargs):
+                 mochitest_leak_threshold=None, **kwargs):
         self.env = {}
         MozillaBuildFactory.__init__(self, **kwargs)
         self.config_repo_path = config_repo_path
@@ -1954,8 +1953,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.addStep(unittest_steps.MozillaCheck,
          warnOnWarnings=True,
-         timeout=5*60,
          workdir="build/%s" % self.objdir,
+         timeout=5*60, # 5 minutes.
         )
 
         if self.platform == 'win32':
@@ -1976,7 +1975,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="reftest",
          workdir="build/%s" % self.objdir,
-         timeout=5*60,
+         timeout=5*60, # 5 minutes.
         )
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="crashtest",
@@ -1986,7 +1985,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          test_name="mochitest-plain",
          workdir="build/%s" % self.objdir,
          leakThreshold=mochitest_leak_threshold,
-         timeout=5*60,
+         timeout=5*60, # 5 minutes.
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
          test_name="mochitest-chrome",
@@ -1996,6 +1995,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          test_name="mochitest-browser-chrome",
          workdir="build/%s" % self.objdir,
         )
+        # Don't run the a11y tests on MacOSX. (Bug 482598)
         if not self.platform == 'macosx':
           self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
            test_name="mochitest-a11y",
