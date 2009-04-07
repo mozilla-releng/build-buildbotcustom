@@ -47,6 +47,7 @@ from twisted.internet import protocol, utils, reactor, error, defer
 from twisted.web.client import HTTPClientFactory, getPage
 from itertools import izip
 from ConfigParser import ConfigParser, NoSectionError, NoOptionError
+from collections import defaultdict
 from cStringIO import StringIO
 import os
 import os.path
@@ -417,7 +418,7 @@ def configureDispatcher(config, section, scheduler, buildOnEnUS=False):
                                              section))
       log2.msg('l10n cvs dispatchers added for ' + section)
 
-    scheduler.treeprops[section] = props
+    scheduler.treeprops[section].update(props)
 
     # This adds in the builder's column a "%(section)s set up" message to
     # indicate that all loading has been complete for that section
@@ -736,7 +737,7 @@ class Scheduler(BaseUpstreamScheduler):
     # app per tree
     self.apps = {}
     # properties per tree
-    self.treeprops = {}
+    self.treeprops = defaultdict(dict)
     # use NoMergeStamp or regular stamp
     self.nomerge = nomerge
 
