@@ -1952,6 +1952,14 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.addPreTestSteps()
 
         self.addStep(unittest_steps.MozillaCheck,
+         test_name="check",
+         warnOnWarnings=True,
+         workdir="build/%s" % self.objdir,
+         timeout=5*60, # 5 minutes.
+        )
+
+        self.addStep(unittest_steps.MozillaCheck,
+         test_name="xpcshell-tests",
          warnOnWarnings=True,
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.

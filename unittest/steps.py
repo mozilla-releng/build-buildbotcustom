@@ -224,12 +224,18 @@ class MozillaClobberWin(ShellCommandReportTimeout):
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
 class MozillaCheck(ShellCommandReportTimeout):
-    name = "TUnit"
     warnOnFailure = True
-    command = ["make", "-k", "check"]
 
-    def __init__(self, **kwargs):
-        self.description = [self.name + " test"]
+    # test_name defaults to "check" until all the callers are converted.
+    def __init__(self, test_name="check", **kwargs):
+        self.name = test_name
+        if test_name == "check":
+            # Target executing recursively in all (sub)directories.
+            self.command = ["make", "-k", test_name]
+        else:
+            # Target calling a python script.
+            self.command = ["make", test_name]
+        self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
 	self.super_class = ShellCommandReportTimeout
 	ShellCommandReportTimeout.__init__(self, **kwargs)
