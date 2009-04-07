@@ -765,8 +765,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
-         command=WithProperties('echo buildID=%(buildid)s > ' + \
-                                '%s_info.txt' % self.platform),
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                '%s_info.txt' % self.platform)],
          workdir='build/%s/dist' % self.objdir
         )
 
