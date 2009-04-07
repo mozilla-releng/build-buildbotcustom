@@ -37,9 +37,9 @@ buildbotClobberCvsCoLog = "buildbot-CLOBBER-cvsco.log"
 def emphasizeFailureText(text):
     return '<em class="testfail">%s</em>' % text
 
-# Some test suites (like TUnit) may not (yet) have the |knownFailCount| feature.
-# Some test suites (like TUnit) may not (yet) have the |crashed| feature.
-# Expected values for |leaked|: False, no leak; True, leaked; None, report failure.
+# Some test suites (like TUnit) may not (yet) have the knownFailCount feature.
+# Some test suites (like TUnit) may not (yet) have the crashed feature.
+# Expected values for leaked: False, no leak; True, leaked; None, report failure.
 def summaryText(passCount, failCount, knownFailCount = None,
         crashed = False, leaked = False):
     # Format the tests counts.
@@ -52,7 +52,7 @@ def summaryText(passCount, failCount, knownFailCount = None,
         # Implicit failure case.
         summary = emphasizeFailureText("T-FAIL")
     else:
-        # Handle |failCount|.
+        # Handle failCount.
         failCountStr = str(failCount)
         if failCount > 0:
             failCountStr = emphasizeFailureText(failCountStr)
@@ -125,11 +125,11 @@ class MozillaClientMkPull(ShellCommandReportTimeout):
             kwargs['workdir'] = "mozilla"
         if not 'command' in kwargs:
             kwargs['command'] = ["make", "-f", "client.mk", "pull_all"]
-        env = {}
-        if 'env' in kwargs:
-            env = kwargs['env'].copy()
-        env['MOZ_CO_PROJECT'] = self.project
-        kwargs['env'] = env
+        # MOZ_CO_PROJECT: "used in the try server cvs trunk builders,
+        #   not used by the unittests on tryserver though".
+        if not "env" in kwargs:
+            kwargs["env"] = {}
+        kwargs["env"]["MOZ_CO_PROJECT"] = self.project
         ShellCommandReportTimeout.__init__(self, **kwargs)
     
     def describe(self, done=False):
@@ -341,14 +341,17 @@ class MozillaReftest(ShellCommandReportTimeout):
 
 class MozillaMochitest(ShellCommandReportTimeout):
     warnOnFailure = True
-    
+
     def __init__(self, test_name, leakThreshold=None, **kwargs):
         self.name = test_name
         self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         if leakThreshold:
-            self.command.append("--leak-threshold=" + str(leakThreshold))
+            if not "env" in kwargs:
+                kwargs["env"] = {}
+            kwargs["env"]["EXTRA_TEST_ARGS"] = \
+                "--leak-threshold=%d" % leakThreshold
         ShellCommandReportTimeout.__init__(self, **kwargs)    
 	self.super_class = ShellCommandReportTimeout
     
