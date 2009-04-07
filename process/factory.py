@@ -1612,7 +1612,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=['cvs', '-d', cvsroot, 'co', '-d' 'patcher-configs',
                   'mozilla/tools/patcher-configs'],
          description=['checkout', 'patcher-configs'],
-         haltonFailure=True
+         haltOnFailure=True
         )
         self.addStep(ShellCommand,
          command=['hg', 'up', '-r', patcherToolsTag],
