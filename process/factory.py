@@ -742,16 +742,18 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
-    def __init__(self, appVersion, buildNumber, brandName=None, **kwargs):
-        self.appVersion = appVersion
+    def __init__(self, version, buildNumber, brandName=None, **kwargs):
+        self.version = version
         self.buildNumber = buildNumber
 
         if brandName:
             self.brandName = brandName
         else:
             self.brandName = kwargs['productName'].capitalize()
-        # Make sure MOZ_PKG_PRETTYNAMES is on
+        # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
+        # The latter is only strictly necessary for RCs.
         kwargs['env']['MOZ_PKG_PRETTYNAMES'] = '1'
+        kwargs['env']['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def doUpload(self):
@@ -778,7 +780,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         
         uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
                                        '-p %s ' % self.productName + \
-                                       '-v %s ' % self.appVersion + \
+                                       '-v %s ' % self.version + \
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
         self.addStep(ShellCommand,
@@ -1036,12 +1038,12 @@ class ReleaseFactory(MozillaBuildFactory):
 
 class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
     def __init__(self, configRepoPath, configSubDir, mozconfig, platform,
-                 buildRevision, appVersion, buildNumber, **kwargs):
+                 buildRevision, version, buildNumber, **kwargs):
         self.configRepoPath = configRepoPath
         self.configSubDir = configSubDir
         self.platform = platform
         self.buildRevision = buildRevision
-        self.appVersion = appVersion
+        self.version = version
         self.buildNumber = buildNumber
         self.env = {'MOZ_PKG_PRETTYNAMES': '1'} # filled out in downloadBuilds
 
@@ -1054,7 +1056,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         # TODO: better place to put this/call this
         self.postUploadCmd = 'post_upload.py ' + \
                              '-p %s ' % kwargs['project'] + \
-                             '-v %s ' % self.appVersion + \
+                             '-v %s ' % self.version + \
                              '-n %s ' % self.buildNumber + \
                              '--release-to-candidates-dir'
         BaseRepackFactory.__init__(self, **kwargs)
@@ -1109,9 +1111,9 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
 
         candidatesDir = 'http://%s' % self.stageServer + \
                         '/pub/mozilla.org/%s/nightly' % self.project + \
-                        '/%s-candidates/build%s' % (self.appVersion,
+                        '/%s-candidates/build%s' % (self.version,
                                                     self.buildNumber)
-        longAppVersion = self.makeLongVersion(self.appVersion)
+        longVersion = self.makeLongVersion(self.version)
 
         # This block sets platform specific data that our wget command needs.
         #  build is mapping between the local and remote filenames
@@ -1124,21 +1126,21 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         if self.platform.startswith('linux'):
             platformDir = 'linux-i686'
             filename = '%s.tar.bz2' % self.project
-            builds[filename] = '%s-%s.tar.bz2' % (self.project, self.appVersion)
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + self.project)
+            builds[filename] = '%s-%s.tar.bz2' % (self.project, self.version)
+            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('macosx'):
             platformDir = 'mac'
             filename = '%s.dmg' % self.project
             builds[filename] = '%s %s.dmg' % (self.project.capitalize(),
-                                              longAppVersion)
+                                              longVersion)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('win32'):
             platformDir = 'unsigned/win32'
             filename = '%s.zip' % self.project
             instname = '%s.exe' % self.project
-            builds[filename] = '%s-%s.zip' % (self.project, self.appVersion)
+            builds[filename] = '%s-%s.zip' % (self.project, self.version)
             builds[instname] = '%s Setup %s.exe' % (self.project.capitalize(),
-                                                    longAppVersion)
+                                                    longVersion)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
@@ -1165,7 +1167,8 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              haltOnFailure=True
             )
 
-        self.env.update({'MOZ_MAKE_COMPLETE_MAR': '1'})
+        self.env.update({'MOZ_MAKE_COMPLETE_MAR': '1',
+                         'MOZ_PKG_VERSION': self.version})
         self.addStep(ShellCommand,
          command=['make', WithProperties('installers-%(locale)s')],
          env=self.env,
@@ -1212,7 +1215,7 @@ class StagingRepositorySetupFactory(ReleaseFactory):
 
 
 class ReleaseTaggingFactory(ReleaseFactory):
-    def __init__(self, repositories, productName, appName, appVersion,
+    def __init__(self, repositories, productName, appName, version, appVersion,
                  milestone, baseTag, buildNumber, hgUsername, hgSshKey=None,
                  buildSpace=1.5, **kwargs):
         """Repositories looks like this:
@@ -1249,9 +1252,17 @@ class ReleaseTaggingFactory(ReleaseFactory):
                     'browser', which is a subdirectory of 'mozilla-central'.
                     For Thunderbird, it would be 'mailnews', a subdirectory
                     of 'comm-central'.
+           version: What this build is actually called. I most cases this is
+                    the version number of the application, eg, 3.0.6, 3.1b2.
+                    During the RC phase we "call" builds, eg, 3.1 RC1, but the
+                    version of the application is still 3.1. In these cases,
+                    version should be set to, eg, 3.1rc1.
            appVersion: The current version number of the application being
                        built. Eg, 3.0.2 for Firefox, 2.0 for Seamonkey, etc.
                        This is different than the platform version. See below.
+                       This is usually the same as 'version', except during the
+                       RC phase. Eg, when version is 3.1rc1 appVersion is still
+                       3.1.
            milestone: The current version of *Gecko*. This is generally
                       along the lines of: 1.8.1.14, 1.9.0.2, etc.
            baseTag: The prefix to use for BUILD/RELEASE tags. It will be 
@@ -1276,7 +1287,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
           'You must provide at least one repository.'
         assert productName, 'You must provide a product name (eg. firefox).'
         assert appName, 'You must provide an application name (eg. browser).'
-        assert appVersion, \
+        assert version, \
           'You must provide an application version (eg. 3.0.2).'
         assert milestone, 'You must provide a milestone (eg. 1.9.0.2).'
         assert baseTag, 'You must provide a baseTag (eg. FIREFOX_3_0_2).'
@@ -1394,7 +1405,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  command=['hg', 'commit', '-u', hgUsername, '-m',
                           'Automated checkin: version bump remove "pre" ' + \
                           ' from version number for ' + productName + ' ' + \
-                          appVersion + ' release on ' + relbranchName + ' ' + \
+                          version + ' release on ' + relbranchName + ' ' + \
                           'CLOSED TREE'],
                  workdir=repoName,
                  description=['commit %s' % repoName],
@@ -1443,17 +1454,17 @@ class ReleaseTaggingFactory(ReleaseFactory):
 
 
 class SingleSourceFactory(ReleaseFactory):
-    def __init__(self, productName, appVersion, baseTag, stagingServer,
+    def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
                  buildSpace=1, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
         releaseTag = '%s_RELEASE' % (baseTag)
-        bundleFile = 'source/%s-%s.bundle' % (productName, appVersion)
+        bundleFile = 'source/%s-%s.bundle' % (productName, version)
         sourceTarball = 'source/%s-%s-source.tar.bz2' % (productName,
-                                                         appVersion)
+                                                         version)
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'python ~/bin/post_upload.py -p %s -v %s -n %s -c' % \
-          (productName, appVersion, buildNumber)
+          (productName, version, buildNumber)
         uploadEnv = {'UPLOAD_HOST': stagingServer,
                      'UPLOAD_USER': stageUsername,
                      'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
@@ -1537,9 +1548,9 @@ class SingleSourceFactory(ReleaseFactory):
 
 class ReleaseUpdatesFactory(ReleaseFactory):
     def __init__(self, cvsroot, patcherToolsTag, patcherConfig, baseTag,
-                 appName, productName, appVersion, oldVersion, buildNumber,
-                 ftpServer, bouncerServer, stagingServer, useBetaChannel,
-                 stageUsername, stageSshKey, ausUser, ausHost,
+                 appName, productName, version, appVersion, oldVersion,
+                 buildNumber, ftpServer, bouncerServer, stagingServer,
+                 useBetaChannel, stageUsername, stageSshKey, ausUser, ausHost,
                  commitPatcherConfig=True, buildSpace=13, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
@@ -1562,12 +1573,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         shippedLocales = self.getShippedLocales(self.repository, baseTag,
                                                 appName)
-        candidatesDir = self.getCandidatesDir(productName, appVersion,
-                                              buildNumber)
-        updateDir = 'build/temp/%s/%s-%s' % \
-          (productName, oldVersion, appVersion)
+        candidatesDir = self.getCandidatesDir(productName, version, buildNumber)
+        updateDir = 'build/temp/%s/%s-%s' % (productName, oldVersion, version)
         marDir = '%s/ftp/%s/nightly/%s-candidates/build%s' % \
-          (updateDir, productName, appVersion, buildNumber)
+          (updateDir, productName, version, buildNumber)
 
         # If useBetaChannel is False the unnamed snippet type will be
         # 'beta' channel snippets (and 'release' if we're into stable releases).
@@ -1617,7 +1626,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         )
 
         bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
-                       '-p', productName, '-v', appVersion, '-a', appVersion,
+                       '-p', productName, '-v', version, '-a', appVersion,
                        '-o', oldVersion, '-b', str(buildNumber),
                        '-c', patcherConfigFile, '-t', stagingServer,
                        '-f', ftpServer, '-d', bouncerServer,
@@ -1639,7 +1648,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              command=['cvs', 'commit', '-m',
                       'Automated configuration bump: ' + \
                       '%s, from %s to %s build %s' % \
-                        (patcherConfig, oldVersion, appVersion, buildNumber)
+                        (patcherConfig, oldVersion, version, buildNumber)
                      ],
              workdir='build/patcher-configs',
              description=['commit', patcherConfig],
@@ -1700,7 +1709,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             localDir = 'aus2'
             # On the AUS server we store each type of snippet in a directory
             # named thusly, with the snippet type appended to it
-            remoteDir = '%s-%s-%s' % (date, productName.title(), appVersion)
+            remoteDir = '%s-%s-%s' % (date, productName.title(), version)
             if type != '':
                 localDir = localDir + '.%s' % type
                 remoteDir = remoteDir + '-%s' % type
@@ -2128,16 +2137,13 @@ class CodeCoverageFactory(UnittestBuildFactory):
         )
 
 class L10nVerifyFactory(ReleaseFactory):
-    def __init__(self, cvsroot, stagingServer, productName, appVersion,
-                 buildNumber, oldAppVersion, oldBuildNumber, verifyDir='verify',
+    def __init__(self, cvsroot, stagingServer, productName, version,
+                 buildNumber, oldVersion, oldBuildNumber, verifyDir='verify',
                  linuxExtension='bz2', buildSpace=14, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
                                 **kwargs)
 
-        productDir = 'build/%s/%s-%s' % (verifyDir, 
-                                         productName,
-                                         appVersion)
         verifyDirVersion = 'tools/release/l10n'
 
         # Remove existing verify dir 
@@ -2145,6 +2151,7 @@ class L10nVerifyFactory(ReleaseFactory):
          description=['remove', 'verify', 'dir'],
          descriptionDone=['removed', 'verify', 'dir'],
          command=['rm', '-rf', verifyDir],
+         workdir='.',
          haltOnFailure=True,
         )
 
@@ -2152,6 +2159,7 @@ class L10nVerifyFactory(ReleaseFactory):
          description=['(re)create', 'verify', 'dir'],
          descriptionDone=['(re)created', 'verify', 'dir'],
          command=['bash', '-c', 'mkdir -p ' + verifyDirVersion], 
+         workdir='.',
          haltOnFailure=True,
         )
         
@@ -2168,9 +2176,9 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=unsigned',
                   '--exclude=update',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
-                   (stagingServer, productName, appVersion, str(buildNumber)),
+                   (stagingServer, productName, version, str(buildNumber)),
                   '%s-%s-build%s/' % (productName, 
-                                      appVersion, 
+                                      version, 
                                       str(buildNumber))
                   ],
          workdir=verifyDirVersion,
@@ -2193,10 +2201,10 @@ class L10nVerifyFactory(ReleaseFactory):
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer, 
                     productName, 
-                    oldAppVersion,
+                    oldVersion,
                     str(oldBuildNumber)),
                   '%s-%s-build%s/' % (productName, 
-                                      oldAppVersion,
+                                      oldVersion,
                                       str(oldBuildNumber))
                   ],
          workdir=verifyDirVersion,
@@ -2205,10 +2213,10 @@ class L10nVerifyFactory(ReleaseFactory):
         )
 
         currentProduct = '%s-%s-build%s' % (productName, 
-                                            appVersion,
+                                            version,
                                             str(buildNumber))
         previousProduct = '%s-%s-build%s' % (productName, 
-                                             oldAppVersion,
+                                             oldVersion,
                                              str(oldBuildNumber))
 
         for product in [currentProduct, previousProduct]:
