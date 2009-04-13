@@ -2492,25 +2492,9 @@ class WinceBuildFactory(MobileBuildFactory):
 
     def addPackageSteps(self):
         self.addStep(ShellCommand,
-            command=['make', 'package'],
+            command=['make', 'installer'],
             workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
                                          self.objdir),
-            description=['make', 'mobile', 'cab'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            command=['make', 'package'],
-            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
-                                         self.objdir),
-            env={'MOZ_PKG_FORMAT': 'ZIP'},
-            description=['make', 'mobile', 'zip'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            command=['make', 'package'],
-            workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
-                                            self.branchName, self.objdir),
-            env={'MOZ_PKG_FORMAT': 'ZIP'},
-            description=['make', 'xulrunner', 'zip'],
+            description=['package'],
             haltOnFailure=True
         )
