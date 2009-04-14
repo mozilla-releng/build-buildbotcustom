@@ -27,9 +27,10 @@
 from twisted.python.failure import Failure
 
 import buildbot
+import re
 from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep, \
   BuildStep
-from buildbot.steps.shell import ShellCommand
+from buildbot.steps.shell import ShellCommand, WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS
 from buildbot.clients.sendchange import Sender
 
@@ -245,3 +246,48 @@ class SendChangeStep(BuildStep):
                 self.step_status.setText2(['sendchange'])
             self.addCompleteLog("errors", str(results))
             return BuildStep.finished(self, FAILURE)
+
+
+
+class MozillaClobberer(ShellCommand):
+    flunkOnFailure = False
+    description=['checking', 'clobber', 'times']
+
+    def __init__(self, branch, clobber_url, clobberer_path, clobberTime=None,
+                 timeout=3600, workdir='.', **kwargs):
+        command = ['python', clobberer_path, '-s', 'tools']
+        if clobberTime:
+            command.extend(['-t', str(clobberTime)])
+        command.extend([clobber_url, branch, WithProperties("%(buildername)s"),
+                        WithProperties("%(slavename)s")])
+
+        ShellCommand.__init__(self, command=command, timeout=timeout,
+                              workdir=workdir, **kwargs)
+        self.addFactoryArguments(branch=branch, clobber_url=clobber_url,
+                                 clobberer_path=clobberer_path,
+                                 clobberTime=clobberTime)
+
+    def createSummary(self, log):
+
+        # Server is forcing a clobber
+        forcedClobberRe = re.compile('Server is forcing a clobber')
+        # We are looking for something like :
+        #  More than 7 days, 0:00:00 have passed since our last clobber
+        periodicClobberRe = re.compile('More than \d+ days, [0-9:]+ have passed since our last clobber')
+
+        self.setProperty('forced_clobber', False, 'MozillaClobberer')
+        self.setProperty('periodic_clobber', False, 'MozillaClobberer')
+
+        clobberType = None
+        for line in log.readlines():
+            if forcedClobberRe.search(line):
+                self.setProperty('forced_clobber', True, 'MozillaClobberer')
+                clobberType = "forced"
+            if periodicClobberRe.search(line):
+                self.setProperty('periodic_clobber', True, 'MozillaClobberer')
+                clobberType = "periodic"
+
+        if clobberType != None:
+            summary = "TinderboxPrint: %s clobber" % clobberType
+            self.addCompleteLog('clobberer', summary)
+
