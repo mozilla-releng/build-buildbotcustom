@@ -24,8 +24,8 @@ reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.unittest.steps)
 reload(buildbotcustom.env)
 
-from buildbotcustom.steps.misc import SetMozillaBuildProperties, TinderboxShellCommand, \
-  SendChangeStep, GetBuildID
+from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
+  TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -165,18 +165,11 @@ class MozillaBuildFactory(BuildFactory):
         )
 
         if self.clobberURL is not None and self.clobberTime is not None:
-            command = ['python', 'tools/clobberer/clobberer.py',
-             '-t', str(self.clobberTime), '-s', 'tools',
-             self.clobberURL, self.branchName,
-             WithProperties("%(buildername)s"),
-             WithProperties("%(slavename)s")
-            ]
-            self.addStep(ShellCommand,
-             command=command,
-             description=['checking','clobber','times'],
-             workdir='.',
-             flunkOnFailure=False,
-             timeout=3600, # One hour, because Windows is slow
+            self.addStep(MozillaClobberer,
+             branch=self.branchName,
+             clobber_url=self.clobberURL,
+             clobberer_path='tools/clobberer/clobberer.py',
+             clobberTime=self.clobberTime
             )
 
         if self.buildSpace > 0:
