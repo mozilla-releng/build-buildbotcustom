@@ -133,8 +133,7 @@ class CompareBloatLogs(ShellCommand):
             self.testnameprefix += " "
 
         self.name = "compare " + testname + "bloat logs"
-        self.description = "compare " + testname + "bloat logs"
-        self.descriptionDone = "compare " + testname + "bloat logs complete"
+        self.description = ["compare " + testname, "bloat logs"]
         self.command = ["perl", bloatDiffPath, self.bloatLog + '.old',
                         self.bloatLog]
 
@@ -212,8 +211,7 @@ class CompareLeakLogs(ShellCommand):
         self.testnameprefix = testnameprefix
         self.objdir = objdir
         self.name = "compare " + testname + "leak logs"
-        self.description = "compare " + testname + "leak logs"
-        self.descriptionDone = "compare " + testname + "leak logs complete"
+        self.description = ["compare " + testname, "leak logs"]
 
         if len(self.testname) > 0:
             self.testname += " "
