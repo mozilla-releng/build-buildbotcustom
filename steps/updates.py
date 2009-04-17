@@ -13,15 +13,12 @@ class CreateCompleteUpdateSnippet(BuildStep):
     def __init__(self, objdir, milestone, baseurl, appendDatedDir=True):
         BuildStep.__init__(self)
 
-        major, minor, point = buildbot.version.split(".", 3)
-        # Buildbot 0.7.5 and below do not require this
-        if int(minor) >= 7 and int(point) >= 6:
-            self.addFactoryArguments(
-              objdir=objdir,
-              milestone=milestone,
-              baseurl=baseurl,
-              appendDatedDir=appendDatedDir
-            )
+        self.addFactoryArguments(
+          objdir=objdir,
+          milestone=milestone,
+          baseurl=baseurl,
+          appendDatedDir=appendDatedDir
+        )
 
         # This seems like a reasonable place to store snippets
         self.updateDir = path.join(objdir, 'dist', 'update')

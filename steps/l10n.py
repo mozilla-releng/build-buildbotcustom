@@ -10,8 +10,8 @@ class SetLocalesStep(BuildStep):
 
     def __init__(self, locales):
         BuildStep.__init__(self)
-        self.locales = locales
         self.addFactoryArguments(locales=locales)
+        self.locales = locales
 
     def setBuild(self, build):
         BuildStep.setBuild(self, build)
@@ -28,8 +28,8 @@ class LocaleCompile(Compile):
 
     def __init__(self, locale, **kwargs):
         Compile.__init__(self, **kwargs)
-        self.locale = locale
         self.addFactoryArguments(locale=locale)
+        self.locale = locale
 
     def describe(self, done=False):
         d = Compile.describe(self, done)
@@ -46,10 +46,10 @@ class LocaleCompile(Compile):
 class NonLocaleMercurial(Mercurial):
     """Subclass of Mercurial pull step for the main tree of a l10n build."""
 
-    def __init__(self, repourl, mainBranch, **kwargs):
-        Mercurial.__init__(self, repourl=repourl, **kwargs)
-        self.mainBranch = mainBranch
+    def __init__(self, mainBranch, **kwargs):
+        Mercurial.__init__(self, **kwargs)
         self.addFactoryArguments(mainBranch=mainBranch)
+        self.mainBranch = mainBranch
 
     def startVC(self, branch, revision, patch):
         # strip out the "branch" which is fake... we always use a repourl
@@ -75,14 +75,15 @@ class LocaleMercurial(Mercurial):
     haltOnFailure = False
     warnOnWarnings = False
 
-    def __init__(self, locale, repourl, localesBranch, baseURL=None, **kwargs):
+    def __init__(self, locale, localesBranch, baseURL=None, **kwargs):
         if baseURL is not None:
             raise ValueError("baseURL must not be used with MercurialLocale")
-        Mercurial.__init__(self, repourl=repourl, **kwargs)
+        Mercurial.__init__(self, **kwargs)
+        self.addFactoryArguments(locale=locale,
+                                 localesBranch=localesBranch,
+                                 baseURL=baseURL)
         self.locale = locale
         self.localesBranch = localesBranch
-        self.addFactoryArguments(locale=locale,
-                                 localesBranch=localesBranch)
 
     def startVC(self, branch, revision, patch):
         # if we're running a main tree and locales in the same tree,

@@ -102,12 +102,14 @@ class MozillaCheckoutClientMk(ShellCommandReportTimeout):
     haltOnFailure = True
     cvsroot = ":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"
     
-    def __init__(self, **kwargs):
-        if 'cvsroot' in kwargs:
-            self.cvsroot = kwargs['cvsroot']
+    def __init__(self,
+                 cvsroot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot",
+                 **kwargs):
+        self.cvsroot = cvsroot
         if not 'command' in kwargs:
             kwargs['command'] = ["cvs", "-d", self.cvsroot, "co", "mozilla/client.mk"]
         ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(cvsroot=cvsroot)
     
     def describe(self, done=False):
         return ["client.mk update"]
@@ -115,22 +117,18 @@ class MozillaCheckoutClientMk(ShellCommandReportTimeout):
  
 class MozillaClientMkPull(ShellCommandReportTimeout):
     haltOnFailure = True
-    def __init__(self, **kwargs):
-        if not 'project' in kwargs or kwargs['project'] is None:
-            self.project = "browser"
-        else:
-            self.project = kwargs['project']
-            del kwargs['project']
-        if not 'workdir' in kwargs:
-            kwargs['workdir'] = "mozilla"
-        if not 'command' in kwargs:
-            kwargs['command'] = ["make", "-f", "client.mk", "pull_all"]
+    def __init__(self, project="browser", workdir="mozilla", env={},
+                 command=["make", "-f", "client.mk", "pull_all"], **kwargs):
+        self.project = project
+        self.workdir = workdir
         # MOZ_CO_PROJECT: "used in the try server cvs trunk builders,
         #   not used by the unittests on tryserver though".
-        if not "env" in kwargs:
-            kwargs["env"] = {}
-        kwargs["env"]["MOZ_CO_PROJECT"] = self.project
-        ShellCommandReportTimeout.__init__(self, **kwargs)
+        env = env.copy()
+        env["MOZ_CO_PROJECT"] = self.project
+        ShellCommandReportTimeout.__init__(self, command=command, env=env,
+                                           **kwargs)
+        self.addFactoryArguments(project=project, workdir=workdir, env=env,
+                                 command=command)
     
     def describe(self, done=False):
         if not done:
@@ -237,8 +235,8 @@ class MozillaCheck(ShellCommandReportTimeout):
             self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
-	self.super_class = ShellCommandReportTimeout
-	ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
    
     def createSummary(self, log):
         # Counts.
@@ -284,12 +282,14 @@ class MozillaReftest(ShellCommandReportTimeout):
     warnOnFailure = True
 
     def __init__(self, test_name, **kwargs):
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(test_name=test_name)
+
         self.name = test_name
         self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
-	self.super_class = ShellCommandReportTimeout
-	ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.super_class = ShellCommandReportTimeout
    
     def createSummary(self, log):
         # Counts.
@@ -348,18 +348,17 @@ class MozillaReftest(ShellCommandReportTimeout):
 class MozillaMochitest(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, leakThreshold=None, **kwargs):
+    def __init__(self, test_name, leakThreshold=None, env={}, **kwargs):
+        ShellCommandReportTimeout.__init__(self, env=env, **kwargs)
+        self.super_class = ShellCommandReportTimeout
+        self.addFactoryArguments(test_name=test_name,
+                                 leakThreshold=leakThreshold)
         self.name = test_name
         self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         if leakThreshold:
-            if not "env" in kwargs:
-                kwargs["env"] = {}
-            kwargs["env"]["EXTRA_TEST_ARGS"] = \
-                "--leak-threshold=%d" % leakThreshold
-        ShellCommandReportTimeout.__init__(self, **kwargs)    
-	self.super_class = ShellCommandReportTimeout
+            self.env["EXTRA_TEST_ARGS"] = "--leak-threshold=%d" % leakThreshold
     
     def createSummary(self, log):
         # Counts.

@@ -120,12 +120,11 @@ class MozillaDownloadMozconfig(FileDownload):
                             ie. /home/buildmaster/project
                             Defaults to '.'
         """
-        self.workdir = "mozilla/"
-        kwargs['workdir'] = "mozilla/"
-        self.patchDir = patchDir
-        # masterscr and slavedest get overridden in start()
+        # mastersrc and slavedest get overridden in start()
         FileDownload.__init__(self, mastersrc=mastersrc, slavedest=".mozconfig",
-                              **kwargs)
+                              workdir="mozilla/", **kwargs)
+        self.addFactoryArguments(patchDir=patchDir)
+        self.patchDir = patchDir
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -184,7 +183,8 @@ class MozillaPatchDownload(FileDownload):
 
     haltOnFailure = True
 
-    def __init__(self, isOptional=False, patchDir=".", **kwargs):
+    def __init__(self, isOptional=False, patchDir=".", workdir="build",
+                 **kwargs):
         """arguments:
         @type  patchDir:    string
         @param patchDir:    The directory on the master that holds the patches
@@ -196,13 +196,12 @@ class MozillaPatchDownload(FileDownload):
         anything else.
         'isOptional' is assumed to be False; if the patch is optional, pass True.
         """
+        FileDownload.__init__(self, mastersrc=".", slavedest=".", 
+                              workdir=workdir, **kwargs)
+        self.addFactoryArguments(isOptional=isOptional, patchDir=patchDir)
 
-        self.patchDir = patchDir
         self.isOptional = isOptional
-        # mastersrc and slavedest get overridden in start()
-        if not 'workdir' in kwargs:
-            kwargs['workdir'] = "build"
-        FileDownload.__init__(self, mastersrc=".", slavedest=".", **kwargs)
+        self.patchDir = patchDir
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -241,11 +240,12 @@ class MozillaUploadTryBuild(ShellCommand):
                            This user should have passwordless access to the
                            host.
         """
+        ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(slavedir=slavedir, baseFilename=baseFilename,
+                                 scpString=scpString)
         self.slavedir = slavedir
         self.baseFilename = baseFilename
         self.scpString = scpString
-
-        ShellCommand.__init__(self, **kwargs)
 
     def start(self):
         # we need to append some additional information to the package name
@@ -278,10 +278,7 @@ class MozillaTryServerHgClone(Mercurial):
     flunkOnFailure = True
     
     def __init__(self, baseURL="http://hg.mozilla.org/",
-                 defaultBranch='mozilla-central', **kwargs):
-        timeout = 3600
-        if 'timeout' in kwargs:
-            timeout = kwargs['timeout']
+                 defaultBranch='mozilla-central', timeout=3600, **kwargs):
         # repourl overridden in startVC
         Mercurial.__init__(self, baseURL=baseURL, defaultBranch=defaultBranch,
                            timeout=timeout, **kwargs)
@@ -303,13 +300,13 @@ class MozillaClientMk(ShellCommand):
     description = ["fetching client.mk"]
     descriptionDone = ["client.mk"]
 
-    def __init__(self, cvsroot, **kwargs):
-        self.cvsroot = cvsroot
-        self.workdir = "."
-        kwargs['workdir'] = "."
-        # command may be overridden in start()
-        kwargs['command'] = ["cvs", "-d", cvsroot, "co", "mozilla/client.mk"]
+    def __init__(self, cvsroot, workdir=".", **kwargs):
         ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(cvsroot=cvsroot)
+        self.cvsroot = cvsroot
+        self.workdir = workdir
+        # command may be overridden in start()
+        self.command = ["cvs", "-d", cvsroot, "co", "mozilla/client.mk"]
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -332,20 +329,15 @@ class MozillaCustomPatch(ShellCommand):
 
     haltOnFailure = True
 
-    def __init__(self, **kwargs):
+    def __init__(self, isOptional=False, workdir="build", **kwargs):
         """
         'workdir' is assumed to be 'build' and should be passed if it is
         anything else.
         'isOptional' is assumed to be False; if the patch is optional, pass True.
         """
-
-        if 'isOptional' in kwargs:
-            self.optional = kwargs['isOptional']
-        else:
-            self.optional = False
-        if not 'workdir' in kwargs:
-            kwargs['workdir'] = "build"
-        ShellCommand.__init__(self, **kwargs)
+        ShellCommand.__init__(self, workdir=workdir, **kwargs)
+        self.addFactoryArguments(isOptional=isOptional, workdir=workdir)
+        self.optional = isOptional
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -371,9 +363,9 @@ class MozillaCustomPatch(ShellCommand):
 
 class MozillaCreateUploadDirectory(ShellCommand):
     def __init__(self, scpString, **kwargs):
-        (self.sshHost, self.sshDir) = scpString.split(":")
-
         ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(scpString=scpString)
+        (self.sshHost, self.sshDir) = scpString.split(":")
 
     def start(self):
         changes = self.step_status.build.getChanges()

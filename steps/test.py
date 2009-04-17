@@ -115,31 +115,28 @@ def tinderboxPrint(testName,
 class CompareBloatLogs(ShellCommand):
     warnOnWarnings = True
     warnOnFailure = True
-    bloatLog = ""
     
-    def __init__(self, **kwargs):
-        if not 'bloatLog' in kwargs:
-            return FAILURE
-        testname = ""
-        if 'testname' in kwargs:
-            testname = kwargs['testname'] + " "
-        bloatDiffPath = 'tools/rb/bloatdiff.pl'
-        if 'bloatDiffPath' in kwargs:
-            bloatDiffPath = kwargs['bloatDiffPath']
-        testnameprefix = ""
-        if 'testnameprefix' in kwargs:
-            testnameprefix = kwargs['testnameprefix'] + " "
-        self.testnameprefix=testnameprefix         
+    def __init__(self, bloatLog, testname="", testnameprefix="",
+                       bloatDiffPath="tools/rb/bloatdiff.pl", **kwargs):
+        ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(bloatLog=bloatLog, testname=testname,
+                                 testnameprefix=testnameprefix,
+                                 bloatDiffPath=bloatDiffPath)
+        self.bloatLog = bloatLog
+        self.testname = testname
+        self.testnameprefix = testnameprefix
+        self.bloatDiffPatch = bloatDiffPath
+
+        if len(self.testname) > 0:
+            self.testname += " "
+        if len(self.testnameprefix) > 0:
+            self.testnameprefix += " "
+
         self.name = "compare " + testname + "bloat logs"
         self.description = "compare " + testname + "bloat logs"
         self.descriptionDone = "compare " + testname + "bloat logs complete"
-        self.bloatLog = kwargs['bloatLog']
-        kwargs['command'] = ["perl",
-                             bloatDiffPath,
-                             kwargs['bloatLog'] + '.old',
-                             kwargs['bloatLog']
-                             ]
-        ShellCommand.__init__(self, **kwargs)
+        self.command = ["perl", bloatDiffPath, self.bloatLog + '.old',
+                        self.bloatLog]
 
     def evaluateCommand(self, cmd):
         superResult = ShellCommand.evaluateCommand(self, cmd)
@@ -194,45 +191,41 @@ class CompareBloatLogs(ShellCommand):
 class CompareLeakLogs(ShellCommand):
     warnOnWarnings = True
     warnOnFailure = True
-    mallocLog = "" 
-    leakFailureThreshold = 7261838
     leaksAllocsRe = re.compile('Leaks: (\d+) bytes, (\d+) allocations')
     heapRe = re.compile('Maximum Heap Size: (\d+) bytes')
     bytesAllocsRe = re.compile('(\d+) bytes were allocated in (\d+) allocations')
 
-    def __init__(self, **kwargs):
-        assert 'platform' in kwargs
-        platform = kwargs['platform']
+    def __init__(self, platform, mallocLog, leakFailureThreshold=7261838,
+                 testname="", testnameprefix="", objdir='obj-firefox',
+                 **kwargs):
         assert platform.startswith('win32') or platform.startswith('macosx') \
           or platform.startswith('linux')
-        if 'objdir' in kwargs:
-            self.objdir = kwargs['objdir']
-        else:
-            self.objdir = 'obj-firefox'
-        if 'leakFailureThreshold' in kwargs:
-            self.leakFailureThreshold = kwargs['leakFailureThreshold']
-        if not 'mallocLog' in kwargs:
-            return FAILURE
-        self.mallocLog = kwargs['mallocLog']
-        if 'testname' in kwargs:
-            testname = kwargs['testname'] + " "
-        else:
-            testname = ""
+        ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(platform=platform, mallocLog=mallocLog,
+                                 leakFailureThreshold=leakFailureThreshold,
+                                 testname=testname,
+                                 testnameprefix=testnameprefix, objdir=objdir)
+        self.platform = platform
+        self.mallocLog = mallocLog
+        self.leakFailureThreshold = leakFailureThreshold
         self.testname = testname
-        if 'testnameprefix' in kwargs:
-            self.testnameprefix = kwargs['testnameprefix'] + " "
-        else:
-            self.testnameprefix = ""
+        self.testnameprefix = testnameprefix
+        self.objdir = objdir
         self.name = "compare " + testname + "leak logs"
         self.description = "compare " + testname + "leak logs"
         self.descriptionDone = "compare " + testname + "leak logs complete"
+
+        if len(self.testname) > 0:
+            self.testname += " "
+        if len(self.testnameprefix) > 0:
+            self.testnameprefix += " "
+
         if platform.startswith("win32"):
-            kwargs['command'] = ['%s\\dist\\bin\\leakstats.exe' % self.objdir,
-                                 kwargs['mallocLog']]
+            self.command = ['%s\\dist\\bin\\leakstats.exe' % self.objdir,
+                             self.mallocLog]
         else:
-            kwargs['command'] = ['%s/dist/bin/leakstats' % self.objdir,
-                                 kwargs['mallocLog']]
-        ShellCommand.__init__(self, **kwargs)
+            self.command = ['%s/dist/bin/leakstats' % self.objdir,
+                            self.mallocLog]
 
     def evaluateCommand(self, cmd):
         superResult = ShellCommand.evaluateCommand(self, cmd)
@@ -326,13 +319,10 @@ class CompareLeakLogs(ShellCommand):
 class Codesighs(ShellCommand):
     def __init__(self, objdir, platform, type='auto', **kwargs):
         ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(objdir=objdir, platform=platform, type=type)
 
         assert platform in ('win32', 'macosx', 'linux')
         assert type in ('auto', 'base')
-
-        self.addFactoryArguments(objdir=objdir,
-                                 platform=platform,
-                                 type=type)
 
         self.objdir = objdir
         self.platform = platform
@@ -383,6 +373,9 @@ class GraphServerPost(BuildStep):
 
     def __init__(self, server, selector, branch, resultsname, timeout=30):
         BuildStep.__init__(self)
+        self.addFactoryArguments(server=server, selector=selector,
+                                 branch=branch, resultsname=resultsname,
+                                 timeout=timeout)
         self.server = server
         self.graphurl = "http://%s/%s/collect.cgi" % (server, selector,)
         self.branch = branch

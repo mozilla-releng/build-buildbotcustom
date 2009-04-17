@@ -39,17 +39,18 @@ class CreateDir(ShellCommand):
     haltOnFailure = False
     warnOnFailure = True
 
-    def __init__(self, **kwargs):
-        if not 'platform' in kwargs:
-            return FAILURE
-        self.platform = kwargs['platform']
-        if 'dir' in kwargs:
-            self.dir = kwargs['dir']
-        if self.platform.startswith('win'):
-            self.command = r'if not exist ' + self.dir + r' mkdir ' + self.dir
-        else:
-            self.command = ['mkdir', '-p', self.dir]
+    def __init__(self, platform, dir=None, **kwargs):
         ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(platform=platform, dir=dir)
+        self.platform = platform
+        if dir:
+            self.dir = dir
+        else:
+            if self.platform.startswith('win'):
+                self.command = r'if not exist ' + self.dir + r' mkdir ' + \
+                               self.dir
+            else:
+                self.command = ['mkdir', '-p', self.dir]
 
 class TinderboxShellCommand(ShellCommand):
     haltOnFailure = False
@@ -61,8 +62,8 @@ class TinderboxShellCommand(ShellCommand):
     """
     def __init__(self, ignoreCodes=None, **kwargs):
        ShellCommand.__init__(self, **kwargs)
-       self.ignoreCodes = ignoreCodes
        self.addFactoryArguments(ignoreCodes=ignoreCodes)
+       self.ignoreCodes = ignoreCodes
     
     def evaluateCommand(self, cmd):
        # Ignore all return codes
@@ -112,12 +113,9 @@ class GetBuildID(ShellCommand):
     def __init__(self, objdir="", inifile="application.ini", section="App",
             **kwargs):
         ShellCommand.__init__(self, **kwargs)
-        major, minor, point = buildbot.version.split(".", 3)
-        # Buildbot 0.7.5 and below do not require this
-        if int(minor) >= 7 and int(point) >= 6:
-            self.addFactoryArguments(objdir=objdir,
-                    inifile=inifile,
-                    section=section)
+        self.addFactoryArguments(objdir=objdir,
+                                 inifile=inifile,
+                                 section=section)
 
         self.objdir = objdir
         self.command = ['python', 'config/printconfigsetting.py',
@@ -194,6 +192,9 @@ class SendChangeStep(BuildStep):
     warnOnFailure = True
     def __init__(self, master, branch, files, revision=None, user=None,
             comments="", **kwargs):
+        BuildStep.__init__(self, **kwargs)
+        self.addFactoryArguments(master=master, branch=branch, files=files,
+                revision=revision, user=user, comments=comments)
         self.master = master
         self.branch = branch
         self.files = files
@@ -204,11 +205,6 @@ class SendChangeStep(BuildStep):
         self.name = 'sendchange'
 
         self.sender = Sender(master)
-
-        BuildStep.__init__(self, **kwargs)
-
-        self.addFactoryArguments(master=master, branch=branch, files=files,
-                revision=revision, user=user, comments=comments)
 
     def start(self):
         properties = self.build.getProperties()

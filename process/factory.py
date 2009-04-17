@@ -1963,14 +1963,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
              warnOnWarnings=True,
              workdir="build",
              command = r'python testing\tools\profiles\createTestingProfile.py --clobber --binary %s\dist\bin\firefox.exe' % self.objdir,
-             clobber=True
             )
         else:
             self.addStep(unittest_steps.CreateProfile,
              warnOnWarnings=True,
              workdir="build",
              command = r'python testing/tools/profiles/createTestingProfile.py --clobber --binary %s/dist/bin/firefox' % self.objdir,
-             clobber=True
             )
 
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,

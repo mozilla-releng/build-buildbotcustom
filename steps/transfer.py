@@ -106,26 +106,23 @@ class MozillaStageUpload(ShellCommand):
         """
 
         ShellCommand.__init__(self, **kwargs)
-        major, minor, point = buildbot.version.split(".", 3)
-        # Buildbot 0.7.5 and below do not require this
-        if int(minor) >= 7 and int(point) >= 6:
-            self.addFactoryArguments(objdir=objdir,
-                                     username=username,
-                                     milestone=milestone,
-                                     platform=platform,
-                                     remoteHost=remoteHost,
-                                     remoteBasePath=remoteBasePath,
-                                     packageGlob=packageGlob,
-                                     group=group,
-                                     chmodMode=chmodMode,
-                                     sshKey=sshKey,
-                                     releaseToDated=releaseToDated,
-                                     releaseToLatest=releaseToLatest,
-                                     releaseToTinderboxBuilds=releaseToTinderboxBuilds,
-                                     tinderboxBuildsDir=tinderboxBuildsDir,
-                                     dependToDated=dependToDated,
-                                     uploadCompleteMar=uploadCompleteMar,
-                                     uploadLangPacks=uploadLangPacks)
+        self.addFactoryArguments(objdir=objdir,
+                                 username=username,
+                                 milestone=milestone,
+                                 platform=platform,
+                                 remoteHost=remoteHost,
+                                 remoteBasePath=remoteBasePath,
+                                 packageGlob=packageGlob,
+                                 group=group,
+                                 chmodMode=chmodMode,
+                                 sshKey=sshKey,
+                                 releaseToDated=releaseToDated,
+                                 releaseToLatest=releaseToLatest,
+                                 releaseToTinderboxBuilds=releaseToTinderboxBuilds,
+                                 tinderboxBuildsDir=tinderboxBuildsDir,
+                                 dependToDated=dependToDated,
+                                 uploadCompleteMar=uploadCompleteMar,
+                                 uploadLangPacks=uploadLangPacks)
 
         assert platform in ('win32', 'linux', 'macosx')
         self.objdir = objdir

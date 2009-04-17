@@ -25,6 +25,9 @@ class L10nVerifyMetaDiff(TinderboxShellCommand):
                  currentProduct=None, 
                  previousProduct=None,
                  **kwargs):
+        TinderboxShellCommand.__init__(self, ignoreCodes=[0,1], **kwargs)
+        self.addFactoryArguments(currentProduct=currentProduct,
+                                 previousProduct=previousProduct)
         if not 'command' in kwargs:
             if currentProduct is None:
                 return FAILURE
@@ -33,7 +36,6 @@ class L10nVerifyMetaDiff(TinderboxShellCommand):
             self.command=['diff', '-r',
                           '%s/diffs' % currentProduct,
                           '%s/diffs' % previousProduct]
-        TinderboxShellCommand.__init__(self, ignoreCodes=[0,1], **kwargs)
     
     def evaluateCommand(self, cmd):
         fileWarnings = self.getProperty('fileWarnings')
