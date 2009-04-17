@@ -913,7 +913,8 @@ class L10nMixin(object):
         # in the begining of the line e.g. "en-GB" or "ja linux win32"
         if self.repoType == 'cvs':
            args = ['-q', '-d', self.cvsRoot, 'co', '-p', self.localesURL]
-           d = utils.getProcessOutput('cvs', args)
+           env = {'CVS_RSH': 'ssh'}
+           d = utils.getProcessOutput('cvs', args, env)
            d.addCallback(lambda data: ParseLocalesFile(data))
            return d
         else: # the repoType is 'hg'
