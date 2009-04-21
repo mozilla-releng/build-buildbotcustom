@@ -1,3 +1,44 @@
+# ***** BEGIN LICENSE BLOCK *****
+# Version: MPL 1.1/GPL 2.0/LGPL 2.1
+#
+# The contents of this file are subject to the Mozilla Public License Version
+# 1.1 (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+# http://www.mozilla.org/MPL/
+#
+# Software distributed under the License is distributed on an "AS IS" basis,
+# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+# for the specific language governing rights and limitations under the
+# License.
+#
+# The Original Code is Mozilla-specific Buildbot steps.
+#
+# The Initial Developer of the Original Code is
+# Mozilla Foundation.
+# Portions created by the Initial Developer are Copyright (C) 2009
+# the Initial Developer. All Rights Reserved.
+#
+# Contributor(s):
+#   Axel Hecht <l10n@mozilla.com>
+#   Ben Hearsum <bhearsum@mozilla.com>
+#   Benjamin Smedberg <benjamin@smedbergs.us>
+#   Chris AtLee <catlee@mozilla.com>
+#   Chris Cooper <ccooper@deadsquid.com>
+#
+# Alternatively, the contents of this file may be used under the terms of
+# either the GNU General Public License Version 2 or later (the "GPL"), or
+# the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+# in which case the provisions of the GPL or the LGPL are applicable instead
+# of those above. If you wish to allow use of your version of this file only
+# under the terms of either the GPL or the LGPL, and not to allow others to
+# use your version of this file under the terms of the MPL, indicate your
+# decision by deleting the provisions above and replace them with the notice
+# and other provisions required by the GPL or the LGPL. If you do not delete
+# the provisions above, a recipient may use your version of this file under
+# the terms of any one of the MPL, the GPL or the LGPL.
+#
+# ***** END LICENSE BLOCK *****
+
 """hgpoller provides Pollers to work on single hg repositories as well
 as on a group of hg repositories. It's polling the RSS feed of pushlog,
 which is XML of the form
@@ -36,42 +77,6 @@ from twisted.internet.task import LoopingCall
 from twisted.web.client import getPage
 
 from buildbot.changes import base, changes
-
-class ThrottleGetPage(object):
-    """A helper class which can limit the number of simultaneous calls to
-    getPage"""
-
-    def __init__(self, limit, timeout=120):
-        """
-        @param limit   The number of simultaneous connections allowed
-        @param timeout A timeout passed to the underlying getPage method
-        """
-        self.limit = limit
-        self.timeout = timeout
-
-        # This will be a list of (url, deferred)
-        self.list = []
-
-    def getPage(self, url):
-        d = defer.Deferred()
-        d.addBoth(self._finish)
-        self.list.append((url, d))
-        self._go()
-        return d
-
-    def _finish(self, r):
-        self.limit += 1
-        self._go()
-        return r
-
-    def _go(self):
-        if len(self.list) and self.limit > 0:
-            url, d = self.list.pop(0)
-            getd = getPage(url, timeout=self.timeout)
-            getd.chainDeferred(d)
-            self.limit -= 1
-
-pollThrottler = ThrottleGetPage(4)
 
 # From pyiso8601 module,
 #  http://code.google.com/p/pyiso8601/source/browse/trunk/iso8601/iso8601.py
@@ -113,7 +118,10 @@ datetime.datetime(2007, 1, 25, 12, 0, tzinfo=<iso8601.iso8601.Utc ...>)
 from datetime import datetime, timedelta, tzinfo
 import re
 
-__all__ = ["parse_date", "ParseError"]
+__all__ = ["parse_timezone", "parse_date", "parse_date_string",
+           "ParseError", "Utc", "FixedOffset", 
+           "Pluggable", "BasePoller", "BaseHgPoller", "HgPoller",
+           "HgLocalePoller", "HgAllLocalesPoller"]
 
 # Adapted from http://delete.me.uk/2005/03/iso8601.html
 ISO8601_REGEX = re.compile(r"(?P<year>[0-9]{4})(-(?P<month>[0-9]{1,2})(-(?P<day>[0-9]{1,2})"
