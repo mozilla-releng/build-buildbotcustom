@@ -237,6 +237,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(test_name=test_name)
    
     def createSummary(self, log):
         # Counts.
@@ -348,17 +349,21 @@ class MozillaReftest(ShellCommandReportTimeout):
 class MozillaMochitest(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, leakThreshold=None, env={}, **kwargs):
-        ShellCommandReportTimeout.__init__(self, env=env, **kwargs)
-        self.super_class = ShellCommandReportTimeout
-        self.addFactoryArguments(test_name=test_name,
-                                 leakThreshold=leakThreshold)
+    def __init__(self, test_name, leakThreshold=None, **kwargs):
         self.name = test_name
         self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
+        self.super_class = ShellCommandReportTimeout
+
         if leakThreshold:
-            self.env["EXTRA_TEST_ARGS"] = "--leak-threshold=%d" % leakThreshold
+            if not "env" in kwargs:
+                kwargs["env"] = {}
+            kwargs["env"]["EXTRA_TEST_ARGS"] = \
+              "--leak-threshold=%d" % leakThreshold
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(test_name=test_name,
+                                 leakThreshold=leakThreshold)
     
     def createSummary(self, log):
         # Counts.
