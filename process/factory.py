@@ -817,8 +817,11 @@ class BaseRepackFactory(MozillaBuildFactory):
             'mozilla-1.9.1-win32-l10n-nightly',
     ]
 
+    extraConfigureArgs = []
+
     def __init__(self, project, appName, l10nRepoPath, stageServer,
-                 stageUsername, stageSshKey=None, **kwargs):
+                 stageUsername, stageSshKey=None, baseWorkDir='build',
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
@@ -828,20 +831,34 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
 
+        # Needed for scratchbox
+        self.baseWorkDir = baseWorkDir
+
+        self.uploadEnv = self.env.copy() # pick up any env variables in our subclass
+        self.uploadEnv.update({
+            'AB_CD': WithProperties('%(locale)s'),
+            'UPLOAD_HOST': stageServer,
+            'UPLOAD_USER': stageUsername,
+            'UPLOAD_TO_TEMP': '1',
+            'POST_UPLOAD_CMD': self.postUploadCmd # defined in subclasses
+        })
+        if stageSshKey:
+            self.uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % stageSshKey
+
         self.addStep(ShellCommand,
          command=['sh', '-c',
                   'if [ -d '+self.branchName+'/dist/upload ]; then ' +
                   'rm -rf '+self.branchName+'/dist/upload; ' +
                   'fi'],
          description="rm dist/upload",
-         workdir='build',
+         workdir=self.baseWorkDir,
          haltOnFailure=True
         )
 
         self.addStep(ShellCommand,
          command=['sh', '-c', 'mkdir -p %s' % l10nRepoPath],
          descriptionDone='mkdir '+ l10nRepoPath,
-         workdir='build',
+         workdir=self.baseWorkDir,
          flunkOnFailure=False
         )
 
@@ -854,49 +871,43 @@ class BaseRepackFactory(MozillaBuildFactory):
          command=['bash', '-c', 'autoconf-2.13'],
          haltOnFailure=True,
          descriptionDone=['autoconf'],
-         workdir='build/'+self.branchName
+         workdir='%s/%s' % (self.baseWorkDir, self.branchName)
         )
         self.addStep(ShellCommand,
          command=['bash', '-c', 'autoconf-2.13'],
          haltOnFailure=True,
          descriptionDone=['autoconf js/src'],
-         workdir='build/'+self.branchName+'/js/src'
+         workdir='%s/%s/js/src' % (self.baseWorkDir, self.branchName)
         )
         self.addStep(ShellCommand,
          command=['sh', '--',
                   './configure', '--enable-application=%s' % self.appName,
-                  '--with-l10n-base=../%s' % l10nRepoPath],
+                  '--with-l10n-base=../%s' % l10nRepoPath ] +
+                  self.extraConfigureArgs,
          description='configure',
          descriptionDone='configure done',
          haltOnFailure=True,
-         workdir='build/'+self.branchName
+         workdir='%s/%s' % (self.baseWorkDir, self.branchName)
         )
         for dir in ('nsprpub', 'config'):
             self.addStep(ShellCommand,
              command=['make'],
-             workdir='build/'+self.branchName+'/'+dir,
-             description=['make ' + dir],
+             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, dir),
+             description=['make', dir],
              haltOnFailure=True
             )
 
         self.downloadBuilds()
         self.updateEnUS()
         self.doRepack()
+        self.doUpload()
 
-        uploadEnv = self.env.copy() # pick up any env variables in our subclass
-        uploadEnv.update({
-            'AB_CD': WithProperties('%(locale)s'),
-            'UPLOAD_HOST': stageServer,
-            'UPLOAD_USER': stageUsername,
-            'UPLOAD_TO_TEMP': '1',
-            'POST_UPLOAD_CMD': self.postUploadCmd # defined in subclasses
-        })
-        if stageSshKey:
-            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % stageSshKey
+    def doUpload(self):
         self.addStep(ShellCommand,
          command=['make', WithProperties('l10n-upload-%(locale)s')],
-         env=uploadEnv,
-         workdir='build/'+self.branchName+'/'+self.appName+'/locales',
+         env=self.uploadEnv,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+                                       self.appName),
          flunkOnFailure=True
         )
 
@@ -911,7 +922,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                          'fi ' +
                          '&& hg -R '+self.branchName+' update -r %(en_revision)s')],
          descriptionDone="en-US source",
-         workdir='build/',
+         workdir=self.baseWorkDir,
          timeout=30*60 # 30 minutes
         )
         self.addStep(ShellCommand,
@@ -925,7 +936,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                          'fi ' +
                          '&& hg -R %(locale)s update -r %(l10n_revision)s')],
          descriptionDone="locale source",
-         workdir='build/' + self.l10nRepoPath
+         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
         )
 
     def updateEnUS(self):
@@ -2587,7 +2598,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             sshKey=self.stageSshKey,
             uploadCompleteMar=False,
             releaseToLatest=self.nightly,
-            releaseToDated=False,
+            releaseToDated=self.nightly,
             releaseToTinderboxBuilds=True,
             tinderboxBuildsDir='%s-%s' % (self.mobileBranchName,
                                           self.platform),
@@ -2732,9 +2743,176 @@ class WinceBuildFactory(MobileBuildFactory):
 
     def addPackageSteps(self):
         self.addStep(ShellCommand,
+            command=['make', 'package'],
+            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
+                                         self.objdir),
+            description=['make', 'package'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
             command=['make', 'installer'],
             workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
                                          self.objdir),
-            description=['package'],
+            description=['make', 'installer'],
             haltOnFailure=True
         )
+
+class MobileNightlyRepackFactory(BaseRepackFactory):
+    extraConfigureArgs = []
+
+    def __init__(self, hgHost=None, enUSBinaryURL=None,
+                 mobileRepoPath='mobile-browser',
+                 project='fennec', baseWorkDir='build',
+                 repoPath='mozilla-central', appName='mobile',
+                 l10nRepoPath='l10n-central',
+                 stageServer=None, stageUsername=None, stageGroup=None,
+                 stageSshKey=None, stageBasePath=None,
+                 packageGlob=None, platform=None,
+                 **kwargs):
+
+        self.hgHost = hgHost
+        self.mobileRepoPath = mobileRepoPath
+        self.mobileRepository = self.getRepository(mobileRepoPath)
+        self.mobileBranchName = self.getRepoName(self.mobileRepository)
+        self.enUSBinaryURL = enUSBinaryURL
+
+        self.platform = platform
+        self.hgHost = hgHost
+        self.stageServer = stageServer
+        self.stageUsername = stageUsername
+        self.stageGroup = stageGroup
+        self.stageSshKey = stageSshKey
+        self.stageBasePath = stageBasePath
+        self.packageGlob = packageGlob
+
+        # unused here but needed by BaseRepackFactory
+        self.postUploadCmd = None
+
+        self.env = {}
+
+        BaseRepackFactory.__init__(self,
+                                   project=project,
+                                   appName=appName,
+                                   repoPath=repoPath,
+                                   l10nRepoPath=l10nRepoPath,
+                                   stageServer=stageServer,
+                                   stageUsername=stageUsername,
+                                   stageSshKey=stageSshKey,
+                                   baseWorkDir=baseWorkDir,
+                                   hgHost=hgHost,
+                                   **kwargs)
+
+    def getSources(self):
+        BaseRepackFactory.getSources(self)
+        self.addStep(ShellCommand,
+         command=['sh', '-c', 'if [ -d mobile ]; then ' +
+                  'hg -R mobile pull -r default ; else ' +
+                  'hg clone http://' + self.hgHost + '/' + self.mobileRepoPath +
+                  ' mobile ; ' +
+                  'fi && hg -R mobile update -r default'],
+         descriptionDone=['en-US', 'mobile', 'source'],
+         workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+         timeout=30*60 # 30 minutes
+        )
+
+    def updateSources(self):
+        self.addStep(ShellCommand,
+         command=['hg', 'up', '-C', '-r', 'default'],
+         description='update workdir',
+         workdir=WithProperties(self.baseWorkDir + '/' + self.l10nRepoPath + \
+                                '/%(locale)s'),
+         haltOnFailure=True
+        )
+
+    def getMozconfig(self):
+        pass
+
+    def downloadBuilds(self):
+        self.addStep(ShellCommand,
+         command=['make', 'wget-en-US'],
+         descriptionDone='wget en-US',
+         env={'EN_US_BINARY_URL': self.enUSBinaryURL},
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+                                       self.appName)
+        )
+
+    def updateEnUS(self):
+        self.addStep(ShellCommand,
+         command=['make', 'unpack'],
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+                                       self.appName)
+        )
+        self.addStep(SetProperty,
+         command=['make', 'ident'],
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+                                       self.appName),
+         extract_fn=identToProperties()
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'update', '-r', WithProperties('%(gecko_revision)s')],
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'update', '-r', WithProperties('%(fennec_revision)s')],
+         haltOnFailure=True,
+         workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.appName)
+        )
+
+    def doRepack(self):
+        self.addStep(ShellCommand,
+         command=['make', WithProperties('installers-%(locale)s')],
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+                                       self.appName)
+        )
+
+    # Upload targets aren't defined in mobile/locales/Makefile,
+    # so use MozillaStageUpload for now.
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            command=['python', 'config/printconfigsetting.py',
+                     'dist/l10n-stage/%s/application.ini' % self.project,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(MozillaStageUpload,
+            objdir="%s/dist" % (self.branchName),
+            username=self.stageUsername,
+            milestone='%s-l10n' % self.mobileBranchName,
+            platform=platform,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            group=self.stageGroup,
+            packageGlob=WithProperties('%s' % self.packageGlob),
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            uploadLangPacks=False,
+            releaseToLatest=True,
+            releaseToDated=True,
+            releaseToTinderboxBuilds=True,
+            tinderboxBuildsDir='%s-%s-l10n' % (self.mobileBranchName,
+                                               self.platform),
+            dependToDated=True,
+            workdir='%s/%s/dist' % (self.baseWorkDir, self.branchName)
+        )
+
+    def doUpload(self):
+        pass
+
+
+
+class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
+    extraConfigureArgs = ['--target=arm-linux']
+
+    def __init__(self, **kwargs):
+        MobileNightlyRepackFactory.__init__(self, **kwargs)
+
+    def doUpload(self):
+        self.addUploadSteps(platform='linux')

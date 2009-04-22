@@ -178,6 +178,10 @@ class MozillaStageUpload(ShellCommand):
 
     def getPackageGlob(self):
         if self.packageGlob:
+            # allow a WithProperties packageGlob
+            if str(self.packageGlob) is not self.packageGlob:
+                properties = self.build.getProperties()
+                self.packageGlob = properties.render(self.packageGlob)
             return self.packageGlob
         # i can't find a better way to do this.
         if self.platform == "win32":
