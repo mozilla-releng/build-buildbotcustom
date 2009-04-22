@@ -301,7 +301,7 @@ class MozillaClientMk(ShellCommand):
     descriptionDone = ["client.mk"]
 
     def __init__(self, cvsroot, workdir=".", **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        ShellCommand.__init__(self, workdir=workdir, **kwargs)
         self.addFactoryArguments(cvsroot=cvsroot)
         self.cvsroot = cvsroot
         self.workdir = workdir
