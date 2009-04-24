@@ -14,6 +14,7 @@ import buildbotcustom.steps.release
 import buildbotcustom.steps.test
 import buildbotcustom.steps.transfer
 import buildbotcustom.steps.updates
+import buildbotcustom.steps.talos
 import buildbotcustom.unittest.steps
 import buildbotcustom.env
 reload(buildbotcustom.steps.misc)
@@ -21,11 +22,13 @@ reload(buildbotcustom.steps.release)
 reload(buildbotcustom.steps.test)
 reload(buildbotcustom.steps.transfer)
 reload(buildbotcustom.steps.updates)
+reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.unittest.steps)
 reload(buildbotcustom.env)
 
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
-  TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer
+  TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
+  FindFile, DownloadFile, UnpackFile
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -35,6 +38,7 @@ from buildbotcustom.env import MozillaEnvironments
 
 import buildbotcustom.unittest.steps as unittest_steps
 
+import buildbotcustom.steps.talos as talos_steps
 
 class BootstrapFactory(BuildFactory):
     def __init__(self, automation_tag, logdir, bootstrap_config, 
@@ -2765,6 +2769,170 @@ class WinceBuildFactory(MobileBuildFactory):
             description=['make', 'installer'],
             haltOnFailure=True
         )
+
+class TalosFactory(BuildFactory):
+    """Create working talos build factory"""
+
+    winClean   = ["touch temp.zip &", "rm", "-rf", "*.zip", "talos/",
+                  "firefox/", "symbols/"]
+    macClean   = "rm -vrf *"
+    linuxClean = "rm -vrf *"
+
+    def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
+            configOptions, talosCmd, customManifest='', customTalos=None,
+            workdirBase=None, fetchSymbols=False,
+            cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
+        BuildFactory.__init__(self)
+        if OS in ('linux', 'linuxbranch',):
+            cleanCmd = self.linuxClean
+        elif OS in ('win',):
+            cleanCmd = self.winClean
+        else:
+            cleanCmd = self.macClean
+        if workdirBase is None:
+            workdirBase = "."
+        self.addStep(ShellCommand(
+         workdir=workdirBase,
+         description="Cleanup",
+         command=cleanCmd,
+         env=MozillaEnvironments[envName])
+        )
+        if OS in ('leopard', 'tiger'):
+            self.addStep(FileDownload(
+             mastersrc="%s/buildfarm/utils/installdmg.ex" % toolsDir,
+             slavedest="installdmg.ex",
+             workdir=workdirBase,
+            ))
+
+        self.addStep(FileDownload(
+         mastersrc="%s/buildfarm/maintenance/count_and_reboot.py" % toolsDir,
+         slavedest="count_and_reboot.py",
+         workdir=workdirBase,
+        ))
+
+        if customManifest != '':
+            self.addStep(FileDownload(
+             mastersrc=customManifest,
+             slavedest="manifest.txt",
+             workdir=os.path.join(workdirBase, "talos/page_load_test"))
+            )
+
+        if customTalos is None:
+            self.addStep(ShellCommand(
+             command=["cvs", "-d", cvsRoot, "co", "-d", "talos",
+                      "mozilla/testing/performance/talos"],
+             workdir=workdirBase,
+             description="checking out talos",
+             haltOnFailure=True,
+             flunkOnFailure=True,
+             env=MozillaEnvironments[envName])
+            )
+            self.addStep(FileDownload(
+             mastersrc="%s/buildfarm/utils/generate-tpcomponent.py" % toolsDir,
+             slavedest="generate-tpcomponent.py",
+             workdir=os.path.join(workdirBase, "talos/page_load_test"))
+            )
+            self.addStep(ShellCommand(
+             command=["python", "generate-tpcomponent.py"],
+             workdir=os.path.join(workdirBase, "talos/page_load_test"),
+             description="setting up pageloader",
+             haltOnFailure=True,
+             flunkOnFailure=True,
+             env=MozillaEnvironments[envName])
+            )
+        else:
+            self.addStep(FileDownload(
+             mastersrc=customTalos,
+             slavedest=customTalos,
+             workdir=workdirBase,
+            ))
+            self.addStep(UnpackFile(
+             filename=customTalos,
+             workdir=workdirBase,
+            ))
+
+        def get_url(build):
+            return build.source.changes[-1].files[0]
+        self.addStep(DownloadFile(
+         url_fn=get_url,
+         url_property="fileURL",
+         filename_property="filename",
+         workdir=workdirBase,
+         name="Download build",
+        ))
+        if fetchSymbols:
+            def get_symbols_url(build):
+                suffixes = ('.tar.bz2', '.dmg', '.zip')
+                buildURL = build.getProperty('fileURL')
+
+                for suffix in suffixes:
+                    if buildURL.endswith(suffix):
+                        return buildURL[:-len(suffix)] + '.crashreporter-symbols.zip'
+
+            self.addStep(DownloadFile(
+             url_fn=get_symbols_url,
+             filename_property="symbolsFile",
+             workdir=workdirBase,
+             name="Download symbols",
+            ))
+            self.addStep(UnpackFile(
+             filename=WithProperties("%(symbolsFile)s"),
+             workdir=workdirBase,
+             name="Unpack symbols",
+            ))
+        self.addStep(UnpackFile(
+         filename=WithProperties("%(filename)s"),
+         workdir=workdirBase,
+         name="Unpack build",
+        ))
+        if OS == 'win':
+            self.addStep(ShellCommand(
+             workdir=os.path.join(workdirBase, "firefox/"),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="chmod files (see msys bug)",
+             command=["chmod", "-v", "-R", "a+x", "."],
+             env=MozillaEnvironments[envName])
+            )
+        if OS in ('tiger', 'leopard'):
+            self.addStep(FindFile(
+             workdir=os.path.join(workdirBase, "talos"),
+             filename="firefox",
+             directory="..",
+             max_depth=4,
+             property_name="exepath",
+             name="Find executable",
+            ))
+            exepath = WithProperties('%(exepath)s')
+        else:
+            exepath = '../firefox/firefox'
+        self.addStep(talos_steps.MozillaUpdateConfig(
+         workdir=os.path.join(workdirBase, "talos/"),
+         branch=buildBranch,
+         branchName=branchName,
+         haltOnFailure=True,
+         executablePath=exepath,
+         addOptions=configOptions,
+         env=MozillaEnvironments[envName],
+         useSymbols=fetchSymbols)
+        )
+        self.addStep(talos_steps.MozillaRunPerfTests(
+         warnOnWarnings=True,
+         workdir=os.path.join(workdirBase, "talos/"),
+         timeout=21600,
+         haltOnFailure=False,
+         command=talosCmd,
+         env=MozillaEnvironments[envName])
+        )
+        self.addStep(ShellCommand(
+         flunkOnFailure=False,
+         warnOnFailure=False,
+         alwaysRun=True,
+         workdir=workdirBase,
+         description="reboot after 1 test run",
+         command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
+         env=MozillaEnvironments[envName],
+        ))
 
 class MobileNightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []

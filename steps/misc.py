@@ -26,6 +26,7 @@
 
 from twisted.python.failure import Failure
 
+import os
 import buildbot
 import re
 from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep, \
@@ -243,7 +244,98 @@ class SendChangeStep(BuildStep):
             self.addCompleteLog("errors", str(results))
             return BuildStep.finished(self, FAILURE)
 
+class DownloadFile(ShellCommand):
+    haltOnFailure = True
+    name = "download"
+    
+    def __init__(self, url_fn, url_property=None, filename_property=None,
+            ignore_certs=False, **kwargs):
+        self.url_fn = url_fn
+        self.url_property = url_property
+        self.filename_property = filename_property
+        self.ignore_certs = ignore_certs
+        ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(url_fn=url_fn, url_property=url_property,
+                filename_property=filename_property, ignore_certs=ignore_certs)
 
+    def start(self):
+        url = self.url_fn(self.build)
+        if self.url_property:
+            self.setProperty(self.url_property, url)
+        if self.filename_property:
+            self.setProperty(self.filename_property, os.path.basename(url))
+        if self.ignore_certs:
+            self.setCommand(["wget", "-nv", "-N", "--no-check-certificate", url])
+        else:
+            self.setCommand(["wget", "-nv", "-N", url])
+        ShellCommand.start(self)
+    
+    def evaluateCommand(self, cmd):
+        superResult = ShellCommand.evaluateCommand(self, cmd)
+        if SUCCESS != superResult:
+            return FAILURE
+        if None != re.search('ERROR', cmd.logs['stdio'].getText()):
+            return FAILURE
+        return SUCCESS
+
+class UnpackFile(ShellCommand):
+    def __init__(self, filename, scripts_dir=".", **kwargs):
+        self.filename = filename
+        self.scripts_dir = scripts_dir
+        ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(filename=filename, scripts_dir=scripts_dir)
+
+    def start(self):
+        filename = self.build.getProperties().render(self.filename)
+        self.filename = filename
+        if filename.endswith(".zip"):
+            self.setCommand(['unzip', '-o', filename])
+        elif filename.endswith(".tar.gz"):
+            self.setCommand(['tar', '-zxvf', filename])
+        elif filename.endswith(".tar.bz2"):
+            self.setCommand(['tar', '-jxvf', filename])
+        elif filename.endswith(".dmg"):
+            self.setCommand(['expect',
+             '%s/installdmg.ex' % self.scripts_dir,
+             filename]
+            )
+        else:
+            raise ValueError("Don't know how to handle %s" % filename)
+        ShellCommand.start(self)
+
+    def evaluateCommand(self, cmd):
+        superResult = ShellCommand.evaluateCommand(self, cmd)
+        if superResult != SUCCESS:
+            return superResult
+
+        if self.filename.endswith(".zip"):
+            if None != re.search('ERROR', cmd.logs['stdio'].getText()):
+                return FAILURE
+        if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
+            return FAILURE
+
+        return SUCCESS
+
+class FindFile(ShellCommand):
+    def __init__(self, filename, directory, max_depth, property_name, **kwargs):
+        ShellCommand.__init__(self, **kwargs)
+
+        self.addFactoryArguments(filename=filename, directory=directory,
+                max_depth=max_depth, property_name=property_name)
+
+        self.property_name = property_name
+
+        self.setCommand(['bash', '-c', 'find %(directory)s -maxdepth %(max_depth)s -name %(filename)s' % locals()])
+
+    def evaluateCommand(self, cmd):
+        try:
+            output = cmd.logs['stdio'].getText().strip()
+            if output:
+                self.setProperty(self.property_name, output)
+                return SUCCESS
+        except:
+            pass
+        return FAILURE
 
 class MozillaClobberer(ShellCommand):
     flunkOnFailure = False

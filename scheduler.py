@@ -95,6 +95,23 @@ class MozScheduler(Scheduler):
         self.submitBuildSet(bs)
         self.setIdleTimer()
 
+class MultiScheduler(Scheduler):
+    """Trigger N (default three) build requests based upon the same change request"""
+    def __init__(self, numberOfBuildsToTrigger=3, **kwargs):
+        self.numberOfBuildsToTrigger = numberOfBuildsToTrigger
+        Scheduler.__init__(self, **kwargs)
+
+    def fireTimer(self):
+        self.timer = None
+        self.nextBuildTime = None
+        changes = self.importantChanges + self.unimportantChanges
+        self.importantChanges = []
+        self.unimportantChanges = []
+
+        # submit
+        for i in range(0, self.numberOfBuildsToTrigger):
+            bs = buildset.BuildSet(self.builderNames, SourceStamp(changes=changes))
+            self.submitBuildSet(bs)
 
 class NoMergeSourceStamp(SourceStamp):
     def canBeMergedWith(self, other):
@@ -105,11 +122,38 @@ class NoMergeScheduler(Scheduler):
     def fireTimer(self):
         self.timer = None
         self.nextBuildTime = None
-        changes = self.importantChanges + self.unimportantChanges
-        self.importantChanges = []
-        self.unimportantChanges = []
 
-        # submit
-        ss = NoMergeSourceStamp(changes=changes)
-        bs = buildset.BuildSet(self.builderNames, ss)
-        self.submitBuildSet(bs)
+        for change in self.importantChanges:
+            changes = [change]
+            if self.unimportantChanges:
+                changes.extend(self.unimportantChanges)
+                self.unimportantChanges = []
+
+            # submit
+            ss = NoMergeSourceStamp(changes=changes)
+            bs = buildset.BuildSet(self.builderNames, ss)
+            self.submitBuildSet(bs)
+        self.importantChanges = []
+
+class NoMergeMultiScheduler(Scheduler):
+    """Disallow build requests to be merged"""
+    def __init__(self, numberOfBuildsToTrigger=1, **kwargs):
+        self.numberOfBuildsToTrigger = numberOfBuildsToTrigger
+        Scheduler.__init__(self, **kwargs)
+
+    def fireTimer(self):
+        self.timer = None
+        self.nextBuildTime = None
+
+        for change in self.importantChanges:
+            changes = [change]
+            if self.unimportantChanges:
+                changes.extend(self.unimportantChanges)
+                self.unimportantChanges = []
+
+            # submit
+            for i in range(self.numberOfBuildsToTrigger):
+                ss = NoMergeSourceStamp(changes=changes)
+                bs = buildset.BuildSet(self.builderNames, ss)
+                self.submitBuildSet(bs)
+        self.importantChanges = []

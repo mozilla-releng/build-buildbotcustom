@@ -193,9 +193,10 @@ MozillaEnvironments['win32-vc8-mozbuild-unittest'] = {
                'D:\\msvs8\\VC\\ATLMFC\\LIB'
 }
 
+### Talos environments
 # platform SDK location.  we can build both from one generic template.
 # modified from vc8 environment
-MozillaEnvironments['vc8-perf'] = {
+MozillaEnvironments['win32-perf'] = {
     "MOZ_CRASHREPORTER_NO_REPORT": '1',
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',
@@ -225,4 +226,3 @@ MozillaEnvironments['mac-perf'] = {
     # for extracting dmg's
     "PAGER": '/bin/cat',
 }
-
