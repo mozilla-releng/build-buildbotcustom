@@ -1181,7 +1181,16 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
 
-
+    def doUpload(self):
+        # upload the complete mar too
+        self.uploadEnv.update({'MOZ_MAKE_COMPLETE_MAR': '1'})
+        self.addStep(ShellCommand,
+         command=['make', WithProperties('l10n-upload-%(locale)s')],
+         env=self.uploadEnv,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+                                       self.appName),
+         flunkOnFailure=True
+        )
 
 class StagingRepositorySetupFactory(ReleaseFactory):
     """This Factory should be run at the start of a staging release run. It
