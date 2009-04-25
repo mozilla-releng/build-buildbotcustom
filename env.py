@@ -69,65 +69,21 @@ MozillaEnvironments['win32-ref-platform'] = {
 
 ### unittest environments
 
-MozillaEnvironments['linux-centos-unittest'] = {
+MozillaEnvironments['linux-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "CVS_RSH": 'ssh',
     "DISPLAY": ':2',
     "NO_FAIL_ON_TEST_ERRORS": '1'   
 }
 
-MozillaEnvironments['mac-osx-unittest'] = {
+MozillaEnvironments['macosx-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
     "CVS_RSH": 'ssh'
 }
 
-MozillaEnvironments['win32-vc8-cygwin-unittest'] = {
-    "MOZ_NO_REMOTE": '1',
-    "NO_EM_RESTART": '1',
-    "XPCOM_DEBUG_BREAK": 'warn',
-    "VCVARS": 'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\bin\\vcvars32.bat',
-    "MOZ_TOOLS": 'C:\\moztools',
-    "CYGWINBASE": 'C:\\cygwin',
-    "CVS_RSH": 'ssh',
-    "VSINSTALLDIR": 'C:\\Program Files\\Microsoft Visual Studio 8',
-    "VCINSTALLDIR": 'C:\\Program Files\\Microsoft Visual Studio 8\\VC',
-    "FrameworkDir": 'C:\\WINDOWS\\Microsoft.NET\\Framework',
-    "FrameworkVersion": 'v2.0.50727',
-    "FrameworkSDKDir": 'C:\\Program Files\\Microsoft Visual Studio 8\\SDK\\v2.0',
-    "MSVCDir": 'C:\\Program Files\\Microsoft Visual Studio 8\\VC',
-    "DevEnvDir": "C:\\Program Files\\Microsoft Visual Studio 8\\Common7\\IDE",
-    "PATH": 'C:\\Python24;' + \
-            'C:\\Python24\\Scripts;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\Common7\\IDE;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\BIN;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\Common7\\Tools;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\Common7\\Tools\\bin;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\PlatformSDK\\bin;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\SDK\\v2.0\\bin;' + \
-            'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
-            'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\VCPackages;' + \
-            'C:\\cygwin\\bin;' + \
-            'C:\\WINDOWS\\System32;' + \
-            'C:\\WINDOWS;' + \
-            'C:\\WINDOWS\System32\Wbem;' + \
-            'C:\\moztools\\bin;' + \
-            'C:\\Utilities;',
-    "INCLUDE": 'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\ATLMFC\\INCLUDE;' + \
-               'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\INCLUDE;' + \
-               'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\PlatformSDK\\include;' + \
-               'C:\\Program Files\\Microsoft Visual Studio 8\\SDK\\v2.0\\include;' + \
-               '%INCLUDE%',
-    "LIB": 'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\ATLMFC\\LIB;' + \
-           'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\LIB;' + \
-           'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\PlatformSDK\\lib;' + \
-           'C:\\Program Files\\Microsoft Visual Studio 8\\SDK\\v2.0\\lib;',
-    "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
-               'C:\\Program Files\\Microsoft Visual Studio 8\\VC\\ATLMFC\\LIB'
-}
-
-MozillaEnvironments['win32-vc8-mozbuild-unittest'] = {
+MozillaEnvironments['win32-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',
     "MOZ_AIRBAG": '1',

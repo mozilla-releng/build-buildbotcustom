@@ -15,7 +15,7 @@ import buildbotcustom.steps.test
 import buildbotcustom.steps.transfer
 import buildbotcustom.steps.updates
 import buildbotcustom.steps.talos
-import buildbotcustom.unittest.steps
+import buildbotcustom.steps.unittest
 import buildbotcustom.env
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.release)
@@ -23,12 +23,12 @@ reload(buildbotcustom.steps.test)
 reload(buildbotcustom.steps.transfer)
 reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
-reload(buildbotcustom.unittest.steps)
+reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
   TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
-  FindFile, DownloadFile, UnpackFile
+  FindFile, DownloadFile, UnpackFile, SetBuildProperty
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -36,7 +36,7 @@ from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
 
-import buildbotcustom.unittest.steps as unittest_steps
+import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
 
@@ -233,9 +233,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, doCleanup=True, packageSDK=False,
-                 **kwargs):
+                 packageTests=False, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
-        self.env = env
+        self.env = env.copy()
         self.objdir = objdir
         self.platform = platform
         self.configRepoPath = configRepoPath
@@ -265,6 +265,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.createSnippet = createSnippet
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
+        self.packageTests = packageTests
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername and stageSshKey
@@ -292,16 +293,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
         self.addBuildSteps()
-        if self.leakTest:
-            self.addLeakTestSteps()
-        if self.codesighs:
-            self.addCodesighsSteps()
         if self.uploadSymbols or self.uploadPackages:
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
         if self.uploadPackages:
             self.addUploadSteps()
+        if self.leakTest:
+            self.addLeakTestSteps()
+        if self.codesighs:
+            self.addCodesighsSteps()
         if self.createSnippet:
             self.addUpdateSteps()
         if self.doCleanup:
@@ -556,6 +557,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
              workdir='build/',
              haltOnFailure=True
             )
+        if self.packageTests:
+            self.addStep(ShellCommand,
+             command=['make', 'package-tests'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True,
+            )
         self.addStep(ShellCommand,
          command=['make', 'package'],
          env=self.env,
@@ -674,11 +682,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
-    def __init__(self, talosMasters=None, **kwargs):
+    def __init__(self, talosMasters=None, unittestMasters=None, **kwargs):
         if talosMasters is None:
             self.talosMasters = []
         else:
             self.talosMasters = talosMasters
+
+        if unittestMasters is None:
+            self.unittestMasters = []
+        else:
+            self.unittestMasters = unittestMasters
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def doUpload(self):
@@ -706,9 +719,12 @@ class NightlyBuildFactory(MercurialBuildFactory):
         uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
 
         def get_url(rc, stdout, stderr):
-            m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
-            if m and not m.group(1).endswith("crashreporter-symbols.zip"):
-                return {'packageUrl': m.group(1)}
+            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
+                if m.endswith("crashreporter-symbols.zip"):
+                    continue
+                if m.endswith("tests.tar.bz2"):
+                    continue
+                return {'packageUrl': m}
             return {}
 
         if self.productName == 'xulrunner':
@@ -734,6 +750,15 @@ class NightlyBuildFactory(MercurialBuildFactory):
              branch=talosBranch,
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")
+            )
+        unittestBranch = "%s-%s-unittest" % (self.branchName, self.platform)
+        for master, warn in self.unittestMasters:
+            self.addStep(SendChangeStep(
+             warnOnFailure=warn,
+             master=master,
+             branch=unittestBranch,
+             files=[WithProperties('%(packageUrl)s')],
+             user="sendchange-unittest")
             )
 
 
@@ -1867,26 +1892,39 @@ class ReleaseFinalVerification(ReleaseFactory):
 
 class UnittestBuildFactory(MozillaBuildFactory):
     # mochitest_leak_threshold applies to test_name="mochitest-plain" only.
-    def __init__(self, platform, config_repo_path, config_dir, objdir,
-                 mochitest_leak_threshold=None, **kwargs):
+    def __init__(self, platform, productName, config_repo_path, config_dir,
+            objdir, mochitest_leak_threshold=None, uploadPackages=False,
+            unittestMasters=None, stageUsername=None, stageServer=None,
+            stageSshKey=None, **kwargs):
         self.env = {}
+
         MozillaBuildFactory.__init__(self, **kwargs)
+
+        self.productName = productName
+        self.stageServer = stageServer
+        self.stageUsername = stageUsername
+        self.stageSshKey = stageSshKey
+        self.uploadPackages = uploadPackages
         self.config_repo_path = config_repo_path
         self.config_dir = config_dir
         self.objdir = objdir
+        if unittestMasters is None:
+            self.unittestMasters = []
+        else:
+            self.unittestMasters = unittestMasters
 
         self.config_repo_url = self.getRepository(self.config_repo_path)
 
         env_map = {
-                'linux': 'linux-centos-unittest',
-                'macosx': 'mac-osx-unittest',
-                'win32': 'win32-vc8-mozbuild-unittest',
+                'linux': 'linux-unittest',
+                'macosx': 'macosx-unittest',
+                'win32': 'win32-unittest',
                 }
 
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
-        self.env = MozillaEnvironments[env_map[self.platform]]
+        self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
 
         if self.platform == 'win32':
@@ -1947,10 +1985,66 @@ class UnittestBuildFactory(MozillaBuildFactory):
          timeout=60*60, # 1 hour
          haltOnFailure=1
         )
+
         self.addStep(ShellCommand,
-                     command=['make', 'buildsymbols'],
-                     workdir='build/%s' % self.objdir,
-                     )
+         command=['make', 'buildsymbols'],
+         workdir='build/%s' % self.objdir,
+        )
+
+        if self.uploadPackages:
+            self.addStep(ShellCommand,
+             command=['make', 'package'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             command=['make', 'package-tests'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+            )
+            self.addStep(GetBuildID,
+             objdir=self.objdir,
+            )
+
+            uploadEnv = self.env.copy()
+            uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                              'UPLOAD_USER': self.stageUsername,
+                              'UPLOAD_TO_TEMP': '1'})
+            if self.stageSshKey:
+                uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+            # Always upload builds to the dated tinderbox builds directories
+            postUploadCmd =  ['post_upload.py']
+            postUploadCmd += ['--tinderbox-builds-dir %s-%s' % (self.branchName,
+                                                                self.platform),
+                              '-i %(buildid)s',
+                              '-p %s' % self.productName,
+                              '--release-to-tinderbox-dated-builds']
+
+            uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+            def get_url(rc, stdout, stderr):
+                m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
+                if m:
+                    return {'packageUrl': m.group(1)}
+                return {}
+            self.addStep(SetProperty,
+             command=['make', 'upload'],
+             env=uploadEnv,
+             workdir='build/%s' % self.objdir,
+             extract_fn = get_url,
+            )
+
+            branch = "%s-%s-unittest" % (self.branchName, self.platform)
+            for master, warn in self.unittestMasters:
+                self.addStep(SendChangeStep(
+                 warnOnFailure=warn,
+                 master=master,
+                 branch=branch,
+                 files=[WithProperties('%(packageUrl)s')],
+                 user="sendchange-unittest")
+                )
 
         self.addStep(SetProperty,
          command=['bash', '-c', 'pwd'],
@@ -2091,15 +2185,15 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.config_repo_url = self.getRepository(self.config_repo_path)
 
         env_map = {
-                'linux': 'linux-centos-unittest',
-                'macosx': 'mac-osx-unittest',
-                'win32': 'win32-vc8-mozbuild-unittest',
+                'linux': 'linux-unittest',
+                'macosx': 'macosx-unittest',
+                'win32': 'win32-unittest',
                 }
 
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
-        self.env = MozillaEnvironments[env_map[self.platform]]
+        self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
 
         if self.platform == 'win32':
@@ -2316,14 +2410,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         pass
 
 class CodeCoverageFactory(UnittestBuildFactory):
-    def __init__(self, stageUsername=None, stageServer=None, stageSshKey=None,
-            **kwargs):
-        self.stageServer = stageServer
-        self.stageUsername = stageUsername
-        self.stageSshKey = stageSshKey
-
-        UnittestBuildFactory.__init__(self, **kwargs)
-
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/codecoverage' % self.branchName,
@@ -2769,6 +2855,199 @@ class WinceBuildFactory(MobileBuildFactory):
             description=['make', 'installer'],
             haltOnFailure=True
         )
+
+packagedUnittestSuites = ['reftest', 'crashtest', 'xpcshell', 'mochitest-plain',
+                          'mochitest-chrome', 'mochitest-browser-chrome',
+                          'mochitest-a11y']
+class UnittestPackagedBuildFactory(MozillaBuildFactory):
+    def __init__(self, platform, env=None, test_suites=None, **kwargs):
+        if env is None:
+            self.env = MozillaEnvironments['%s-unittest' % platform].copy()
+        else:
+            self.env = env
+
+        self.platform = platform.split('-')[0]
+        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
+
+        MozillaBuildFactory.__init__(self, **kwargs)
+
+        if test_suites is None:
+            self.test_suites = packagedUnittestSuites
+        else:
+            self.test_suites = test_suites
+
+        # Download the build
+        def get_fileURL(build):
+            fileURL = build.source.changes[-1].files[0]
+            build.setProperty('fileURL', fileURL, 'DownloadFile')
+            return fileURL
+        self.addStep(DownloadFile(
+         url_fn=get_fileURL,
+         filename_property='build_filename',
+         haltOnFailure=True,
+         name="download build",
+        ))
+
+        # Download the tests
+        def get_testURL(build):
+            # If there is a second file in the changes object,
+            # use that as the test harness to download
+            if len(build.source.changes[-1].files) > 1:
+                testURL = build.source.changes[-1].files[1]
+                return testURL
+            else:
+                fileURL = build.getProperty('fileURL')
+                suffixes = ('.tar.bz2', '.dmg', '.zip')
+                testsURL = None
+                for suffix in suffixes:
+                    if fileURL.endswith(suffix):
+                        testsURL = fileURL[:-len(suffix)] + '.tests.tar.bz2'
+                        return testsURL
+                if testsURL is None:
+                    raise ValueError("Couldn't determine tests URL")
+        self.addStep(DownloadFile(
+         url_fn=get_testURL,
+         filename_property='tests_filename',
+         haltOnFailure=True,
+         name='download tests',
+        ))
+
+        # Download the crash symbols
+        def get_symbolsURL(build):
+            fileURL = build.getProperty('fileURL')
+            suffixes = ('.tar.bz2', '.dmg', '.zip')
+            symbolsURL = None
+            for suffix in suffixes:
+                if fileURL.endswith(suffix):
+                    symbolsURL = fileURL[:-len(suffix)] + '.crashreporter-symbols.zip'
+                    return symbolsURL
+            raise ValueError("Couldn't determine symbols URL")
+        self.addStep(DownloadFile(
+         url_fn=get_symbolsURL,
+         filename_property='symbols_filename',
+         name='download symbols',
+         workdir='symbols',
+        ))
+
+        # Unpack the build
+        self.addStep(UnpackFile(
+         filename=WithProperties('%(build_filename)s'),
+         scripts_dir='../tools/buildfarm/utils',
+         haltOnFailure=True,
+         name='unpack build',
+        ))
+
+        # Unpack the tests
+        self.addStep(UnpackFile(
+         filename=WithProperties('%(tests_filename)s'),
+         haltOnFailure=True,
+         name='unpack tests',
+        ))
+
+        # Unpack the symbols
+        self.addStep(UnpackFile(
+         filename=WithProperties('%(symbols_filename)s'),
+         name='unpack symbols',
+         workdir='symbols',
+        ))
+
+        # Find firefox!
+        if platform == "macosx":
+            self.addStep(FindFile(
+             filename="firefox",
+             directory=".",
+             max_depth=4,
+             property_name="exepath",
+             name="Find executable",
+            ))
+        elif platform == "win32":
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="firefox/firefox.exe",
+            ))
+        else:
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="firefox/firefox",
+            ))
+
+        def get_exedir(build):
+            return os.path.dirname(build.getProperty('exepath'))
+        self.addStep(SetBuildProperty(
+         property_name="exedir",
+         value=get_exedir,
+        ))
+
+        # Set up the stack walker
+        self.addStep(SetProperty,
+         command=['bash', '-c', 'pwd'],
+         property='toolsdir',
+         workdir='tools'
+        )
+
+        platform_minidump_path = {
+            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+            }
+
+        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+
+        # Figure out which revision we're running
+        def get_build_info(rc, stdout, stderr):
+            retval = {}
+            stdout = "\n".join([stdout, stderr])
+            m = re.search("^BuildID=(\w+)", stdout, re.M)
+            if m:
+                retval['buildid'] = m.group(1)
+            m = re.search("^SourceStamp=(\w+)", stdout, re.M)
+            if m:
+                retval['got_revision'] = m.group(1)
+            m = re.search("^SourceRepository=(\S+)", stdout, re.M)
+            if m:
+                retval['repo_path'] = m.group(1)
+            return retval
+        self.addStep(SetProperty,
+         command=['cat', WithProperties('%(exedir)s/application.ini')],
+         workdir='build',
+         extract_fn=get_build_info,
+         name='get build info',
+        )
+
+        changesetLink = '<a href="%(repo_path)s/rev/%(got_revision)s"' + \
+                ' title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
+        self.addStep(ShellCommand,
+         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
+        )
+
+        # Run them!
+        for suite in self.test_suites:
+            if suite.startswith('mochitest'):
+                variant = suite.split('-', 1)[1]
+                self.addStep(unittest_steps.MozillaPackagedMochitests(
+                 variant=variant,
+                 env=self.env,
+                 platform=platform,
+                 symbols_path='symbols',
+                ))
+            elif suite == 'xpcshell':
+                self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
+                 env=self.env,
+                 platform=platform,
+                 symbols_path='symbols',
+                ))
+            elif suite in ('reftest', 'crashtest'):
+                crashtest = (suite == "crashtest")
+                self.addStep(unittest_steps.MozillaPackagedReftests(
+                 crashtest=crashtest,
+                 env=self.env,
+                 platform=platform,
+                 symbols_path='symbols',
+                ))
+
+    def addPreBuildSteps(self):
+        self.addStep(ShellCommand(command=['rm', '-rf', 'build'], workdir='.'))
+        MozillaBuildFactory.addPreBuildSteps(self)
 
 class TalosFactory(BuildFactory):
     """Create working talos build factory"""
