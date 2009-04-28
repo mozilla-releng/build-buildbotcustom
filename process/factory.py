@@ -28,7 +28,7 @@ reload(buildbotcustom.env)
 
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
   TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
-  FindFile, DownloadFile, UnpackFile, SetBuildProperty
+  FindFile, DownloadFile, UnpackFile, SetBuildProperty, GetHgRevision
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -2632,10 +2632,15 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageGroup = stageGroup
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
+        self.mozChangesetLink = '<a href=%s/rev' % (self.repository)
+        self.mozChangesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
+        self.mobileChangesetLink = '<a href=%s/rev' % (self.mobileRepository)
+        self.mobileChangesetLink += '/%(hg_revision)s title="Built from Mobile revision %(hg_revision)s">mobile:%(hg_revision)s</a>'
 
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
-                       cloneTimeout=60*20):
+                       cloneTimeout=60*20,
+                       changesetLink=None):
         assert (repository and workdir)
         if (targetDirectory == None):
             targetDirectory = self.getRepoName(repository)
@@ -2656,6 +2661,13 @@ class MobileBuildFactory(MozillaBuildFactory):
             descriptionDone=['updated', targetDirectory],
             haltOnFailure=True
         )
+        if changesetLink:
+            self.addStep(GetHgRevision(
+                workdir='%s/%s' % (workdir, targetDirectory)
+            ))
+            self.addStep(ShellCommand(
+                command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
+            ))
 
     def getMozconfig(self):
         self.addHgPullSteps(repository=self.configRepository,
@@ -2719,10 +2731,12 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addPrecleanSteps()
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
+                            changesetLink=self.mozChangesetLink,
                             cloneTimeout=60*30)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
+                            changesetLink=self.mobileChangesetLink,
                             targetDirectory='mobile')
         self.getMozconfig()
         self.addBuildSteps()
@@ -2800,10 +2814,12 @@ class WinceBuildFactory(MobileBuildFactory):
         self.addPrecleanSteps()
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
+                            changesetLink=self.mozChangesetLink,
                             cloneTimeout=60*30)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
+                            changesetLink=self.mobileChangesetLink,
                             targetDirectory='mobile')
         self.getMozconfig()
         self.addBuildSteps()
