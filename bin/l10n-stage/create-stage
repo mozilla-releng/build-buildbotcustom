@@ -30,7 +30,7 @@ def ensureUpstreamRepo(r, dest):
         raise RuntimeError('hg failed to clone %s' % leaf)
 
 
-def ensureRepo(leaf, dest):
+def ensureRepo(leaf, dest, push_l10n=True):
     base = os.path.join(dest, 'repos')
     if not os.path.isdir(base):
         os.makedirs(base)
@@ -49,6 +49,7 @@ pretxnchangegroup.z_linearhistory = python:mozhghooks.pushlog.log
 [extensions]
 pushlog-feed = %(dest)s/repos/hgpoller/pushlog-feed.py
 buglink = %(dest)s/repos/hgpoller/buglink.py
+hgwebjson = %(dest)s/repos/hgpoller/hgwebjson.py
 
 [web]
 style = gitweb_mozilla
@@ -103,6 +104,8 @@ dirs = browser
     if rv:
         raise RuntimeError('failed to check in initian content to %s' %
                            leaf)
+    if leaf.startswith('l10n') and not push_l10n:
+        return
     rv = subprocess.call(['hg', 'push'], cwd=browserdir, env=env)
     if rv:
         raise RuntimeError('failed to push to %s' % leaf)
@@ -121,6 +124,7 @@ if __name__ == "__main__":
     p = OptionParser()
     p.add_option('-v', dest='verbose', action='store_true')
     p.add_option('-p', '--port', default='8000')
+    p.add_option('-l', '--no-locales', action='store_true', default=False)
     (options, args) = p.parse_args()
 
     dest = args[0]
@@ -133,6 +137,6 @@ if __name__ == "__main__":
 
 
     for l in downstreams:
-        ensureRepo(l, dest)
+        ensureRepo(l, dest, push_l10n=not options.no_locales)
 
     createWebDir(dest, options.port)
