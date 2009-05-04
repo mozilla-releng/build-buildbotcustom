@@ -374,7 +374,6 @@ class MozillaReftest(ShellCommandReportTimeout):
         env = env.copy()
         if leakThreshold:
             env["EXTRA_TEST_ARGS"] = "--leak-threshold=%d" % leakThreshold
-             "--leak-threshold=%d" % leakThreshold
         ShellCommandReportTimeout.__init__(self, env=env, **kwargs)
         self.addFactoryArguments(test_name=test_name,
                                  leakThreshold=leakThreshold)
