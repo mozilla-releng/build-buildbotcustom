@@ -343,7 +343,6 @@ class MozillaCustomPatch(ShellCommand):
         changes = self.step_status.build.getChanges()
         if len(changes) < 1:
             log.msg("No changes, not doing anything")
-            self.step_status.setColor("yellow")
             self.step_status.setText(["Skipped patch step:", "no patch"])
             self.finished(SKIPPED)
             return SKIPPED

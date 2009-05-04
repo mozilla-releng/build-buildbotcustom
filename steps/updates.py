@@ -76,7 +76,6 @@ class CreateCompleteUpdateSnippet(BuildStep):
             m = "slave is too old, does not know about downloadFile"
             raise BuildSlaveTooOldError(m)
 
-        self.step_status.setColor('yellow')
         self.step_status.setText(['creating', 'snippets'])
 
         self.stdio_log = self.addLog("stdio")
@@ -120,7 +119,5 @@ class CreateCompleteUpdateSnippet(BuildStep):
             self.setProperty('completeSnippetFilename',
               path.join(self.updateDir, self.completeSnippetFilename))
 
-            self.step_status.setColor('green')
             return BuildStep.finished(self, SUCCESS)
-        self.step_status.setColor('red')
         return BuildStep.finished(self, FAILURE)
