@@ -364,15 +364,20 @@ class MozillaCheck(ShellCommandReportTimeout):
 class MozillaReftest(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, **kwargs):
-        ShellCommandReportTimeout.__init__(self, **kwargs)
-        self.addFactoryArguments(test_name=test_name)
-
+    def __init__(self, test_name, leakThreshold=None, env={}, **kwargs):
         self.name = test_name
         self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
+
+        env = env.copy()
+        if leakThreshold:
+            env["EXTRA_TEST_ARGS"] = "--leak-threshold=%d" % leakThreshold
+             "--leak-threshold=%d" % leakThreshold
+        ShellCommandReportTimeout.__init__(self, env=env, **kwargs)
+        self.addFactoryArguments(test_name=test_name,
+                                 leakThreshold=leakThreshold)
    
     def createSummary(self, log):
         summary = summarizeReftest(self.name, log)
