@@ -398,19 +398,17 @@ class MozillaReftest(ShellCommandReportTimeout):
 class MozillaMochitest(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, leakThreshold=None, **kwargs):
+    def __init__(self, test_name, leakThreshold=None, env={}, **kwargs):
         self.name = test_name
         self.command = ["make", test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
 
+        env = env.copy()
         if leakThreshold:
-            if not "env" in kwargs:
-                kwargs["env"] = {}
-            kwargs["env"]["EXTRA_TEST_ARGS"] = \
-              "--leak-threshold=%d" % leakThreshold
-        ShellCommandReportTimeout.__init__(self, **kwargs)
+            env["EXTRA_TEST_ARGS"] = "--leak-threshold=%d" % leakThreshold
+        ShellCommandReportTimeout.__init__(self, env=env, **kwargs)
         self.addFactoryArguments(test_name=test_name,
                                  leakThreshold=leakThreshold)
     
