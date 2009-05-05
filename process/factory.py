@@ -1891,7 +1891,6 @@ class ReleaseFinalVerification(ReleaseFactory):
         )
 
 class UnittestBuildFactory(MozillaBuildFactory):
-    # mochitest_leak_threshold applies to test_name="mochitest-plain" only.
     def __init__(self, platform, productName, config_repo_path, config_dir,
             objdir, mochitest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, stageUsername=None, stageServer=None,
