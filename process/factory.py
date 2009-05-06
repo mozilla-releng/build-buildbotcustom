@@ -2607,8 +2607,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  configSubDir, mozconfig, objdir="objdir",
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
-                 baseWorkDir='build', nightly=False, env=None,
-                 **kwargs):
+                 baseUploadDir=None, baseWorkDir='build', nightly=False,
+                 env=None, **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm, wince-arm)
@@ -2631,6 +2631,11 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageGroup = stageGroup
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
+        if baseUploadDir is None:
+            self.baseUploadDir = self.mobileBranchName
+        else:
+            self.baseUploadDir = baseUploadDir
+
         self.mozChangesetLink = '<a href=%s/rev' % (self.repository)
         self.mozChangesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.mobileChangesetLink = '<a href=%s/rev' % (self.mobileRepository)
@@ -2699,7 +2704,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.addStep(MozillaStageUpload,
             objdir="%s/%s" % (self.branchName, self.objdir),
             username=self.stageUsername,
-            milestone=self.mobileBranchName,
+            milestone=self.baseUploadDir,
             remoteHost=self.stageServer,
             remoteBasePath=self.stageBasePath,
             platform=platform,
@@ -2710,8 +2715,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             releaseToLatest=self.nightly,
             releaseToDated=self.nightly,
             releaseToTinderboxBuilds=True,
-            tinderboxBuildsDir='%s-%s' % (self.mobileBranchName,
-                                          self.platform),
+            tinderboxBuildsDir=self.baseUploadDir,
             dependToDated=True,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
                                         self.objdir)
@@ -3239,6 +3243,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                  stageServer=None, stageUsername=None, stageGroup=None,
                  stageSshKey=None, stageBasePath=None,
                  packageGlob=None, platform=None,
+                 baseUploadDir=None,
                  **kwargs):
 
         self.hgHost = hgHost
@@ -3255,6 +3260,11 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         self.stageSshKey = stageSshKey
         self.stageBasePath = stageBasePath
         self.packageGlob = packageGlob
+
+        if baseUploadDir is None:
+            self.baseUploadDir = self.mobileBranchName
+        else:
+            self.baseUploadDir = baseUploadDir
 
         # unused here but needed by BaseRepackFactory
         self.postUploadCmd = None
@@ -3356,7 +3366,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         self.addStep(MozillaStageUpload,
             objdir="%s/dist" % (self.branchName),
             username=self.stageUsername,
-            milestone='%s-l10n' % self.mobileBranchName,
+            milestone=self.baseUploadDir,
             platform=platform,
             remoteHost=self.stageServer,
             remoteBasePath=self.stageBasePath,
@@ -3368,8 +3378,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
             releaseToLatest=True,
             releaseToDated=True,
             releaseToTinderboxBuilds=True,
-            tinderboxBuildsDir='%s-%s-l10n' % (self.mobileBranchName,
-                                               self.platform),
+            tinderboxBuildsDir=self.baseUploadDir,
             dependToDated=True,
             workdir='%s/%s/dist' % (self.baseWorkDir, self.branchName)
         )
