@@ -3046,13 +3046,11 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
                  env=self.env,
-                 platform=platform,
                  symbols_path='symbols',
                 ))
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
-                 platform=platform,
                  symbols_path='symbols',
                 ))
             elif suite in ('reftest', 'crashtest'):
@@ -3060,7 +3058,6 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  crashtest=crashtest,
                  env=self.env,
-                 platform=platform,
                  symbols_path='symbols',
                 ))
 
