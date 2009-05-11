@@ -1894,7 +1894,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
             objdir, mochitest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, stageUsername=None, stageServer=None,
-            stageSshKey=None, **kwargs):
+            stageSshKey=None, run_a11y=True, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -1907,6 +1907,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.config_repo_path = config_repo_path
         self.config_dir = config_dir
         self.objdir = objdir
+        self.run_a11y = run_a11y
         if unittestMasters is None:
             self.unittestMasters = []
         else:
@@ -2111,12 +2112,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
          test_name="mochitest-browser-chrome",
          workdir="build/%s" % self.objdir,
         )
-        # Don't run the a11y tests on MacOSX. (Bug 482598)
-        if not self.platform == 'macosx':
-          self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-           test_name="mochitest-a11y",
-           workdir="build/%s" % self.objdir,
-          )
+        if self.run_a11y:
+            self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
+             test_name="mochitest-a11y",
+             workdir="build/%s" % self.objdir,
+            )
 
         self.addPostTestSteps()
 
@@ -2163,13 +2163,15 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, config_repo_path, config_dir, objdir, mozRepoPath,
             productName=None, brandName=None, mochitest_leak_threshold=None,
             mochichrome_leak_threshold=None, mochibrowser_leak_threshold=None,
-            exec_reftest_suites=True, exec_mochi_suites=True, **kwargs):
+            exec_reftest_suites=True, exec_mochi_suites=True, run_a11y=True,
+            **kwargs):
         self.env = {}
         MozillaBuildFactory.__init__(self, **kwargs)
         self.config_repo_path = config_repo_path
         self.mozRepoPath = mozRepoPath
         self.config_dir = config_dir
         self.objdir = objdir
+        self.run_a11y = run_a11y
         self.productName = productName
         if brandName:
             self.brandName = brandName
@@ -2349,12 +2351,11 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir="build/%s" % self.objdir,
              leakThreshold=self.mochibrowser_leak_threshold,
             )
-            # Don't run the a11y tests on MacOSX. (Bug 482598)
-            if not self.platform == 'macosx':
-              self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-               test_name="mochitest-a11y",
-               workdir="build/%s" % self.objdir,
-              )
+            if self.run_a11y:
+                self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
+                 test_name="mochitest-a11y",
+                 workdir="build/%s" % self.objdir,
+                )
 
         self.addPostTestSteps()
 
