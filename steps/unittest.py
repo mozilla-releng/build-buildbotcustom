@@ -73,34 +73,44 @@ def summaryText(passCount, failCount, knownFailCount = None,
 
 def summarizeReftest(name, log):
     # Counts.
-    passCount = 0
-    failCount = 0
+    successfulCount = -1
+    unexpectedCount = -1
+    knownProblemsCount = -1
+    crashed = False
     leaked = False
 
+    # Regular expression for result summary details.
+    infoRe = re.compile(r"REFTEST INFO \| (Successful|Unexpected|Known problems): (\d+) \(")
     # Regular expression for crash and leak detections.
-    harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
+    harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
     # Process the log.
     for line in log.readlines():
-        if "TEST-PASS" in line:
-            passCount = passCount + 1
+        # Set the counts.
+        m = infoRe.match(line)
+        if m:
+            r = m.group(1)
+            if r == "Successful":
+                successfulCount = int(m.group(2))
+            elif r == "Unexpected":
+                unexpectedCount = int(m.group(2))
+            elif r == "Known problems":
+                knownProblemsCount = int(m.group(2))
             continue
-        if "TEST-UNEXPECTED-" in line:
-            # Set the error flags.
-            # Or set the failure count.
-            m = harnessErrorsRe.match(line)
-            if m:
-                r = m.group(1)
-                if r == "missing output line for total leaks!":
-                    leaked = None
-                else:
-                    leaked = True
+        # Set the error flags.
+        m = harnessErrorsRe.match(line)
+        if m:
+            r = m.group(1)
+            if r == "Browser crashed (minidump found)":
+                crashed = True
+            elif r == "missing output line for total leaks!":
+                leaked = None
             else:
-                failCount = failCount + 1
+                leaked = True
             # continue
 
     # Add the summary.
     summary = "TinderboxPrint: %s<br/>%s\n" % (name,
-        summaryText(passCount, failCount, leaked = leaked))
+        summaryText(successfulCount, unexpectedCount, knownProblemsCount, crashed, leaked))
     return summary
 
 def summarizeMochitest(name, log):
