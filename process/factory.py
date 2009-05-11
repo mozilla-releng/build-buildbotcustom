@@ -2726,7 +2726,8 @@ class MobileBuildFactory(MozillaBuildFactory):
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, scratchboxPath="/scratchbox/moz_scratchbox",
                  packageGlob="mobile/dist/*.tar.bz2 " +
-                 "xulrunner/xulrunner/*.deb mobile/mobile/*.deb",
+                 "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
+                 "xulrunner/dist/*.tar.bz2",
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
@@ -2766,6 +2767,8 @@ class MaemoBuildFactory(MobileBuildFactory):
                          (self.branchName, self.objdir) +
                          '%s/%s/xulrunner/xulrunner/*.deb ' %
                          (self.branchName, self.objdir) +
+                         '%s/%s/xulrunner/dist/*.tar.bz2 ' %
+                         (self.branchName, self.objdir) +
                          '%s/%s/mobile/mobile/*.deb' %
                          (self.branchName, self.objdir)],
                 workdir=self.baseWorkDir,
@@ -2789,6 +2792,13 @@ class MaemoBuildFactory(MobileBuildFactory):
                      'build/%s/%s/mobile' % (self.branchName, self.objdir),
                      'make package'],
             description=['make', 'package'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     'build/%s/%s/xulrunner' % (self.branchName, self.objdir),
+                     'make package-tests PYTHON=python2.5'],
+            description=['make', 'package-tests'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
