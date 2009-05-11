@@ -445,6 +445,7 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
     warnOnFailure = True
     warnOnWarnings = True
     name = "xpcshell"
+
     def __init__(self, symbols_path=None, **kwargs):
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.super_class = ShellCommandReportTimeout
@@ -472,21 +473,28 @@ python -u xpcshell/runxpcshelltests.py --manifest=xpcshell/tests/all-test-dirs.l
 class MozillaPackagedMochitests(ShellCommandReportTimeout):
     warnOnFailure = True
     warnOnWarnings = True
-    def __init__(self, variant='plain', symbols_path=None, **kwargs):
+
+    def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
+            **kwargs):
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.super_class = ShellCommandReportTimeout
 
-        self.addFactoryArguments(variant=variant, symbols_path=symbols_path)
+        self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
+                leakThreshold=leakThreshold)
 
         self.name = 'mochitest-%s' % variant
 
         self.command = ['python', 'mochitest/runtests.py',
                 WithProperties('--appname=%(exepath)s'), '--utility-path=bin',
-                WithProperties('--extra-profile-file=%(exedir)s/plugins'),
+                WithProperties('--extra-profile-file=bin/plugins'),
                 '--certificate-path=certs', '--autorun', '--close-when-done',
                 '--console-level=INFO']
+
         if symbols_path:
             self.command.append("--symbols-path=%s" % symbols_path)
+
+        if leakThreshold:
+            self.command.append('--leak-threshold=%d' % leakThreshold)
 
         if variant != 'plain':
             self.command.append("--%s" % variant)
@@ -514,10 +522,14 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
 class MozillaPackagedReftests(ShellCommandReportTimeout):
     warnOnFailure = True
     warnOnWarnings = True
-    def __init__(self, crashtest=False, symbols_path=None, **kwargs):
-        ShellCommandReportTimeout.__init__(self, **kwargs)
+
+    def __init__(self, crashtest=False, symbols_path=None, leakThreshold=None,
+            **kwargs):
         self.super_class = ShellCommandReportTimeout
-        self.addFactoryArguments(crashtest=crashtest, symbols_path=symbols_path)
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+
+        self.addFactoryArguments(crashtest=crashtest,
+                symbols_path=symbols_path, leakThreshold=leakThreshold)
 
         if crashtest:
             self.name = "crashtest"
@@ -529,6 +541,9 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
 
         if symbols_path:
             self.command.append("--symbols-path=%s" % symbols_path)
+
+        if leakThreshold:
+            self.command.append('--leak-threshold=%d' % leakThreshold)
 
         if crashtest:
             self.command.append('reftest/tests/testing/crashtest/crashtests.list')

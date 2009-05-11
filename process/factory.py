@@ -2890,7 +2890,8 @@ packagedUnittestSuites = ['reftest', 'crashtest', 'xpcshell', 'mochitest-plain',
                           'mochitest-chrome', 'mochitest-browser-chrome',
                           'mochitest-a11y']
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, env=None, test_suites=None, **kwargs):
+    def __init__(self, platform, env=None, test_suites=None,
+            mochitest_leak_threshold=None, **kwargs):
         if env is None:
             self.env = MozillaEnvironments['%s-unittest' % platform].copy()
         else:
@@ -3032,7 +3033,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                 retval['buildid'] = m.group(1)
             m = re.search("^SourceStamp=(\w+)", stdout, re.M)
             if m:
-                retval['got_revision'] = m.group(1)
+                retval['revision'] = m.group(1)
             m = re.search("^SourceRepository=(\S+)", stdout, re.M)
             if m:
                 retval['repo_path'] = m.group(1)
@@ -3044,8 +3045,8 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          name='get build info',
         )
 
-        changesetLink = '<a href="%(repo_path)s/rev/%(got_revision)s"' + \
-                ' title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
+        changesetLink = '<a href="%(repo_path)s/rev/%(revision)s"' + \
+                ' title="Built from revision %(revision)s">rev:%(revision)s</a>'
         self.addStep(ShellCommand,
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
         )
@@ -3058,6 +3059,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  variant=variant,
                  env=self.env,
                  symbols_path='symbols',
+                 leakThreshold=mochitest_leak_threshold,
                 ))
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
