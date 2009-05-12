@@ -457,12 +457,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
-        self.addStep(GraphServerPost,
-         server=self.graphServer,
-         selector=self.graphSelector,
-         branch=self.graphBranch,
-         resultsname=self.baseName
-        )
+        if self.graphServer:
+            self.addStep(GraphServerPost,
+             server=self.graphServer,
+             selector=self.graphSelector,
+             branch=self.graphBranch,
+             resultsname=self.baseName
+            )
         self.addStep(AliveTest,
          env=self.env,
          workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -507,12 +508,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
-        self.addStep(GraphServerPost,
-         server=self.graphServer,
-         selector=self.graphSelector,
-         branch=self.graphBranch,
-         resultsname=self.baseName
-        )
+        if self.graphServer:
+            self.addStep(GraphServerPost,
+             server=self.graphServer,
+             selector=self.graphSelector,
+             branch=self.graphBranch,
+             resultsname=self.baseName
+            )
         self.addStep(CompareLeakLogs,
          mallocLog='../malloc.log.old',
          platform=self.platform,
@@ -633,12 +635,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='build%s' % self.mozillaDir,
          env=self.env
         )
-        self.addStep(GraphServerPost,
-         server=self.graphServer,
-         selector=self.graphSelector,
-         branch=self.graphBranch,
-         resultsname=self.baseName
-        )
+        if self.graphServer:
+            self.addStep(GraphServerPost,
+             server=self.graphServer,
+             selector=self.graphSelector,
+             branch=self.graphBranch,
+             resultsname=self.baseName
+            )
         self.addStep(ShellCommand,
          command=['cat', '../codesize-auto-diff.log'],
          workdir='build%s' % self.mozillaDir
