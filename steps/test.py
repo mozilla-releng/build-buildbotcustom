@@ -122,7 +122,8 @@ class CompareBloatLogs(ShellCommand):
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(bloatLog=bloatLog, testname=testname,
                                  testnameprefix=testnameprefix,
-                                 bloatDiffPath=bloatDiffPath)
+                                 bloatDiffPath=bloatDiffPath,
+                                 mozillaDir=mozillaDir)
         self.bloatLog = bloatLog
         self.testname = testname
         self.testnameprefix = testnameprefix
