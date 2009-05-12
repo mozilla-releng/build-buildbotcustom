@@ -233,7 +233,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, doCleanup=True, packageSDK=False,
-                 packageTests=False, **kwargs):
+                 packageTests=False, mozillaDir=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -290,6 +290,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
+        # Mozilla subdir and objdir
+        if mozillaDir:
+            self.mozillaDir = '/%s' % mozillaDir
+            self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+        else:
+            self.mozillaDir = ''
+            self.mozillaObjdir = self.objdir
+
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
         self.addBuildSteps()
@@ -326,7 +334,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             )
         self.addStep(ShellCommand,
          command="rm -rf %s/dist/%s-* %s/dist/install/sea/*.exe " %
-                  (self.objdir, self.productName, self.objdir),
+                  (self.mozillaObjdir, self.productName, self.mozillaObjdir),
          env=self.env,
          description=['deleting', 'old', 'package'],
          descriptionDone=['delete', 'old', 'package']
@@ -406,7 +414,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                      ['-P', 'default']]:
             self.addStep(AliveTest,
                 env=self.env,
-                workdir='build/%s/_leaktest' % self.objdir,
+                workdir='build/%s/_leaktest' % self.mozillaObjdir,
                 extraArgs=args,
                 warnOnFailure=True,
                 haltOnFailure=True
@@ -416,7 +424,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1' 
         self.addStep(AliveTest,
          env=bloatEnv,
-         workdir='build/%s/_leaktest' % self.objdir,
+         workdir='build/%s/_leaktest' % self.mozillaObjdir,
          logfile='bloat.log',
          warnOnFailure=True,
          haltOnFailure=True
@@ -430,7 +438,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         self.addStep(ShellCommand,
          env=self.env,
-         command=['mv', '%s/_leaktest/bloat.log' % self.objdir,
+         command=['mv', '%s/_leaktest/bloat.log' % self.mozillaObjdir,
                   '../bloat.log'],
         )
         self.addStep(ShellCommand,
@@ -442,8 +450,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                 self.logUploadDir)]
         )
         self.addStep(CompareBloatLogs,
-         bloatLog='../bloat.log',
+         bloatLog='bloat.log',
          env=self.env,
+         workdir='.',
+         mozillaDir=self.mozillaDir,
          warnOnFailure=True,
          haltOnFailure=True
         )
@@ -455,7 +465,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         self.addStep(AliveTest,
          env=self.env,
-         workdir='build/%s/_leaktest' % self.objdir,
+         workdir='build/%s/_leaktest' % self.mozillaObjdir,
          extraArgs=['--trace-malloc', 'malloc.log',
                     '--shutdown-leaks=sdleak.log'],
          timeout=3600, # 1 hour, because this takes a long time on win32
@@ -479,19 +489,20 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          env=self.env,
          command=['mv',
-                  '%s/_leaktest/malloc.log' % self.objdir,
+                  '%s/_leaktest/malloc.log' % self.mozillaObjdir,
                   '../malloc.log'],
         )
         self.addStep(ShellCommand,
          env=self.env,
          command=['mv',
-                  '%s/_leaktest/sdleak.log' % self.objdir,
+                  '%s/_leaktest/sdleak.log' % self.mozillaObjdir,
                   '../sdleak.log'],
         )
         self.addStep(CompareLeakLogs,
          mallocLog='../malloc.log',
          platform=self.platform,
          env=self.env,
+         objdir=self.mozillaObjdir,
          testname='current',
          warnOnFailure=True,
          haltOnFailure=True
@@ -506,15 +517,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
          mallocLog='../malloc.log.old',
          platform=self.platform,
          env=self.env,
+         objdir=self.mozillaObjdir,
          testname='previous'
         )
         self.addStep(ShellCommand,
          env=self.env,
          workdir='.',
          command=['bash', '-c',
-                  'perl build/tools/trace-malloc/diffbloatdump.pl '
+                  'perl build%s/tools/trace-malloc/diffbloatdump.pl '
                   '--depth=15 --use-address /dev/null sdleak.log '
-                  '> sdleak.tree'],
+                  '> sdleak.tree' % self.mozillaDir],
          warnOnFailure=True,
          haltOnFailure=True
         )
@@ -529,9 +541,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
              workdir='.',
              command=['/bin/bash', '-c', 
                       'perl '
-                      'build/tools/rb/fix-%s-stack.pl '
+                      'build%s/tools/rb/fix-%s-stack.pl '
                       'sdleak.tree.raw '
-                      '> sdleak.tree' % self.platform],
+                      '> sdleak.tree' % (self.mozillaDir, self.platform)],
              warnOnFailure=True,
              haltOnFailure=True
             )
@@ -545,8 +557,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         self.addStep(ShellCommand,
          env=self.env,
-         command=['perl', 'tools/trace-malloc/diffbloatdump.pl',
-                  '--depth=15', '../sdleak.tree.old', '../sdleak.tree']
+         workdir='.',
+         command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
+                  '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
         )
 
     def addUploadSteps(self):
@@ -580,7 +593,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.createSnippet:
          self.addStep(ShellCommand,
              command=['make', '-C',
-                      '%s/tools/update-packaging' % self.objdir],
+                      '%s/tools/update-packaging' % self.mozillaObjdir],
              env=self.env,
              haltOnFailure=True
          )
@@ -592,7 +605,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             )
         else:
             self.addStep(SetMozillaBuildProperties,
-             objdir='build/%s' % self.objdir
+             objdir='build/%s' % self.mozillaObjdir
             )
 
         # Call out to a subclass to do the actual uploading
@@ -601,7 +614,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addCodesighsSteps(self):
         self.addStep(ShellCommand,
          command=['make'],
-         workdir='build/%s/tools/codesighs' % self.objdir
+         workdir='build/%s/tools/codesighs' % self.mozillaObjdir
         )
         self.addStep(ShellCommand,
          command=['wget', '-O', 'codesize-auto-old.log',
@@ -610,9 +623,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='.',
          env=self.env
         )
+        if self.mozillaDir == '':
+            codesighsObjdir = self.objdir
+        else:
+            codesighsObjdir = '../%s' % self.mozillaObjdir
         self.addStep(Codesighs,
-         objdir=self.objdir,
+         objdir=codesighsObjdir,
          platform=self.platform,
+         workdir='build%s' % self.mozillaDir,
          env=self.env
         )
         self.addStep(GraphServerPost,
@@ -622,19 +640,21 @@ class MercurialBuildFactory(MozillaBuildFactory):
          resultsname=self.baseName
         )
         self.addStep(ShellCommand,
-         command=['cat', '../codesize-auto-diff.log']
+         command=['cat', '../codesize-auto-diff.log'],
+         workdir='build%s' % self.mozillaDir
         )
         self.addStep(ShellCommand,
          command=['scp', '-o', 'User=%s' % self.stageUsername,
           '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
           '../codesize-auto.log',
           '%s:%s/%s' % (self.stageServer, self.stageBasePath,
-                        self.logUploadDir)]
+                        self.logUploadDir)],
+         workdir='build%s' % self.mozillaDir
         )
 
     def addUpdateSteps(self):
         self.addStep(CreateCompleteUpdateSnippet,
-         objdir='build/%s' % self.objdir,
+         objdir='build/%s' % self.mozillaObjdir,
          milestone=self.branchName,
          baseurl='%s/nightly' % self.downloadBaseURL
         )
@@ -649,7 +669,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                   'dist/update/complete.update.snippet',
                   WithProperties('%s:%s/complete.txt' % \
                     (self.ausHost, self.ausFullUploadDir))],
-         workdir='build/%s' % self.objdir,
+         workdir='build/%s' % self.mozillaObjdir,
          description=['upload', 'complete', 'snippet'],
          haltOnFailure=True
         )
@@ -782,7 +802,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         # Make sure the complete MAR has been generated
         self.addStep(ShellCommand,
             command=['make', '-C',
-                     '%s/tools/update-packaging' % self.objdir],
+                     '%s/tools/update-packaging' % self.mozillaObjdir],
             env=self.env,
             haltOnFailure=True
         )
@@ -790,7 +810,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
                                 '%s_info.txt' % self.platform)],
-         workdir='build/%s/dist' % self.objdir
+         workdir='build/%s/dist' % self.mozillaObjdir
         )
 
         uploadEnv = self.env.copy()

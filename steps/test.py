@@ -117,7 +117,8 @@ class CompareBloatLogs(ShellCommand):
     warnOnFailure = True
     
     def __init__(self, bloatLog, testname="", testnameprefix="",
-                       bloatDiffPath="tools/rb/bloatdiff.pl", **kwargs):
+                       bloatDiffPath="tools/rb/bloatdiff.pl",
+                       mozillaDir="", **kwargs):
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(bloatLog=bloatLog, testname=testname,
                                  testnameprefix=testnameprefix,
@@ -125,16 +126,16 @@ class CompareBloatLogs(ShellCommand):
         self.bloatLog = bloatLog
         self.testname = testname
         self.testnameprefix = testnameprefix
-        self.bloatDiffPatch = bloatDiffPath
+        self.bloatDiffPath = "build%s/%s" % (mozillaDir, bloatDiffPath)
 
         if len(self.testname) > 0:
             self.testname += " "
         if len(self.testnameprefix) > 0:
             self.testnameprefix += " "
 
-        self.name = "compare " + testname + "bloat logs"
-        self.description = ["compare " + testname, "bloat logs"]
-        self.command = ["perl", bloatDiffPath, self.bloatLog + '.old',
+        self.name = "compare " + self.testname + "bloat logs"
+        self.description = ["compare " + self.testname, "bloat logs"]
+        self.command = ["perl", self.bloatDiffPath, self.bloatLog + '.old',
                         self.bloatLog]
 
     def evaluateCommand(self, cmd):
