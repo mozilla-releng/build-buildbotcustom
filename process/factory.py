@@ -705,6 +705,49 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=5400 # 1.5 hours
             )
 
+class CCMercurialBuildFactory(MercurialBuildFactory):
+    def __init__(self, mozRepoPath, **kwargs):
+        self.mozRepoPath = mozRepoPath
+        MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+
+    def addSourceSteps(self):
+        self.addStep(Mercurial, mode='update',
+         baseURL='http://%s/' % self.hgHost,
+         defaultBranch=self.repoPath,
+         alwaysUseLatest=True,
+         timeout=60*60 # 1 hour
+        )
+
+        if self.buildRevision:
+            self.addStep(ShellCommand,
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             haltOnFailure=True
+            )
+            self.addStep(SetProperty,
+             command=['hg', 'identify', '-i'],
+             property='got_revision'
+            )
+        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
+        changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
+        self.addStep(ShellCommand,
+         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
+        )
+        self.addStep(ShellCommand,
+         name="client.py checkout",
+         command=['python', 'client.py', 'checkout']
+        )
+
+        self.addStep(SetProperty,
+         command=['hg', 'identify', '-i'],
+         workdir='build/mozilla',
+         property='hg_revision'
+        )
+        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
+        changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
+        self.addStep(ShellCommand,
+         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
+        )
+
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
@@ -786,6 +829,11 @@ class NightlyBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange-unittest")
             )
+
+class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
+    def __init__(self, mozRepoPath, **kwargs):
+        self.mozRepoPath = mozRepoPath
+        NightlyBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
 
 
