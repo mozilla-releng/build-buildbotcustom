@@ -111,7 +111,8 @@ class MozillaDownloadMozconfig(FileDownload):
     flunkOnFailure = False
     warnOnFailure = False
 
-    def __init__(self, mastersrc=None, patchDir=".", **kwargs):
+    def __init__(self, mastersrc=None, patchDir=".", workdir="mozilla",
+                 **kwargs):
         """arguments:
         @type  patchDir:   string
         @param patchDir:   The directory on the master that holds the mozconfig
@@ -122,7 +123,7 @@ class MozillaDownloadMozconfig(FileDownload):
         """
         # mastersrc and slavedest get overridden in start()
         FileDownload.__init__(self, mastersrc=mastersrc, slavedest=".mozconfig",
-                              workdir="mozilla/", **kwargs)
+                              workdir=workdir, **kwargs)
         self.addFactoryArguments(patchDir=patchDir)
         self.patchDir = patchDir
 

@@ -146,9 +146,9 @@ class MozillaBuildFactory(BuildFactory):
         self.addStep(ShellCommand,
          command=['echo', WithProperties('Building on: %(slavename)s')]
         )
-        self.addPreBuildSteps()
+        self.addInitialSteps()
 
-    def addPreBuildSteps(self):
+    def addInitialSteps(self):
         self.addStep(ShellCommand,
          command=['rm', '-rf', 'tools'],
          description=['clobber', 'build tools'],
@@ -268,7 +268,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.packageTests = packageTests
 
         if self.uploadPackages:
-            assert productName and stageServer and stageUsername and stageSshKey
+            assert productName and stageServer and stageUsername
             assert stageBasePath
         if self.createSnippet:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
@@ -280,11 +280,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             # /opt/aus2/build/0/Firefox/mozilla2/WINNT_x86-msvc/2008010103/en-US
             self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
               (self.ausBaseUploadDir, self.updatePlatform)
-
-        self.configRepo = self.getRepository(self.configRepoPath)
-
-        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
-                                                      mozconfig)
 
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
@@ -319,12 +314,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addPeriodicRebootSteps()
 
     def addBuildSteps(self):
-        self.addPreBuildCleanupSteps()
+        self.addPreBuildSteps()
         self.addSourceSteps()
         self.addConfigSteps()
         self.addDoBuildSteps()
 
-    def addPreBuildCleanupSteps(self):
+    def addPreBuildSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
              command=['rm', '-rf', 'build'],
@@ -372,6 +367,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addConfigSteps(self):
+        assert configRepoPath is not None
+        assert configSubDir is not None
+        assert self.mozconfig is not None
+        configRepo = self.getRepository(self.configRepoPath)
+
+        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
+                                                      self.mozconfig)
         self.addStep(ShellCommand,
          command=['rm', '-rf', 'configs'],
          description=['removing', 'configs'],
@@ -564,7 +566,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                   '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
         )
 
-    def addUploadSteps(self):
+    def addUploadSteps(self, pkgArgs=None):
+        pkgArgs = pkgArgs or []
         if self.packageSDK:
             self.addStep(ShellCommand,
              command=['make', '-f', 'client.mk', 'sdk'],
@@ -580,14 +583,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
              haltOnFailure=True,
             )
         self.addStep(ShellCommand,
-         command=['make', 'package'],
+         command=['make', 'package'] + pkgArgs,
          env=self.env,
          workdir='build/%s' % self.objdir,
          haltOnFailure=True
         )
         if self.platform.startswith("win32"):
          self.addStep(ShellCommand,
-             command=['make', 'installer'],
+             command=['make', 'installer'] + pkgArgs,
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
@@ -2448,14 +2451,14 @@ class CodeCoverageFactory(UnittestBuildFactory):
          workdir='.'
         )
 
-    def addPreBuildSteps(self):
+    def addInitialSteps(self):
         # Always clobber code coverage builds
         self.addStep(ShellCommand,
          command=['rm', '-rf', 'build'],
          workdir=".",
          timeout=30*60,
         )
-        UnittestBuildFactory.addPreBuildSteps(self)
+        UnittestBuildFactory.addInitialSteps(self)
 
     def addPreTestSteps(self):
         self.addStep(ShellCommand,
@@ -3097,9 +3100,9 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  symbols_path='symbols',
                 ))
 
-    def addPreBuildSteps(self):
+    def addInitialSteps(self):
         self.addStep(ShellCommand(command=['rm', '-rf', 'build'], workdir='.'))
-        MozillaBuildFactory.addPreBuildSteps(self)
+        MozillaBuildFactory.addInitialSteps(self)
 
 class TalosFactory(BuildFactory):
     """Create working talos build factory"""
