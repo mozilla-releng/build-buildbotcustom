@@ -2087,8 +2087,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
             # Always upload builds to the dated tinderbox builds directories
             postUploadCmd =  ['post_upload.py']
-            postUploadCmd += ['--tinderbox-builds-dir %s-%s' % (self.branchName,
-                                                                self.platform),
+            postUploadCmd += ['--tinderbox-builds-dir %s-%s-unittest' %
+                                    (self.branchName, self.platform),
                               '-i %(buildid)s',
                               '-p %s' % self.productName,
                               '--release-to-tinderbox-dated-builds']
