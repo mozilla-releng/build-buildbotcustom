@@ -1150,7 +1150,10 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
-        self.env = {'MOZ_PKG_PRETTYNAMES': '1'} # filled out in downloadBuilds
+        # more vars are added in downloadBuilds
+        self.env = {'MOZ_PKG_PRETTYNAMES': '1', 
+                    'MOZ_PKG_VERSION': self.version,
+                    'MOZ_MAKE_COMPLETE_MAR': '1'}
 
         self.configRepo = self.getRepository(self.configRepoPath,
                                              kwargs['hgHost'])
@@ -1261,7 +1264,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              haltOnFailure=True
             )
         
-
     def doRepack(self):
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'config', 'modules/libmar'):
@@ -1272,24 +1274,11 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              haltOnFailure=True
             )
 
-        self.env.update({'MOZ_MAKE_COMPLETE_MAR': '1',
-                         'MOZ_PKG_VERSION': self.version})
         self.addStep(ShellCommand,
          command=['make', WithProperties('installers-%(locale)s')],
          env=self.env,
          haltOnFailure=True,
          workdir='build/'+self.branchName+'/'+self.appName+'/locales'
-        )
-
-    def doUpload(self):
-        # upload the complete mar too
-        self.uploadEnv.update({'MOZ_MAKE_COMPLETE_MAR': '1'})
-        self.addStep(ShellCommand,
-         command=['make', WithProperties('l10n-upload-%(locale)s')],
-         env=self.uploadEnv,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
-                                       self.appName),
-         flunkOnFailure=True
         )
 
 class StagingRepositorySetupFactory(ReleaseFactory):
