@@ -2924,9 +2924,9 @@ class WinceBuildFactory(MobileBuildFactory):
             haltOnFailure=True
         )
 
-packagedUnittestSuites = ['reftest', 'crashtest', 'xpcshell', 'mochitest-plain',
+packagedUnittestSuites = ['reftest', 'crashtest', 'mochitest-plain',
                           'mochitest-chrome', 'mochitest-browser-chrome',
-                          'mochitest-a11y']
+                          'mochitest-a11y', 'xpcshell']
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, env=None, test_suites=None,
             mochitest_leak_threshold=None, **kwargs):
