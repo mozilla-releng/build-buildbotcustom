@@ -323,6 +323,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addConfigSteps()
         self.addDoBuildSteps()
 
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
+
     def addPreBuildSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
@@ -2992,7 +2995,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          url_fn=get_symbolsURL,
          filename_property='symbols_filename',
          name='download symbols',
-         workdir='symbols',
+         workdir='build/symbols',
         ))
 
         # Unpack the build
@@ -3014,14 +3017,15 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         self.addStep(UnpackFile(
          filename=WithProperties('%(symbols_filename)s'),
          name='unpack symbols',
-         workdir='symbols',
+         workdir='build/symbols',
         ))
 
         # Find firefox!
         if platform == "macosx":
             self.addStep(FindFile(
-             filename="firefox",
+             filename="firefox-bin",
              directory=".",
+             filetype="file",
              max_depth=4,
              property_name="exepath",
              name="Find executable",
@@ -3034,7 +3038,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         else:
             self.addStep(SetBuildProperty(
              property_name="exepath",
-             value="firefox/firefox",
+             value="firefox/firefox-bin",
             ))
 
         def get_exedir(build):

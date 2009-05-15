@@ -317,15 +317,23 @@ class UnpackFile(ShellCommand):
         return SUCCESS
 
 class FindFile(ShellCommand):
-    def __init__(self, filename, directory, max_depth, property_name, **kwargs):
+    def __init__(self, filename, directory, max_depth, property_name, filetype=None, **kwargs):
         ShellCommand.__init__(self, **kwargs)
 
         self.addFactoryArguments(filename=filename, directory=directory,
-                max_depth=max_depth, property_name=property_name)
+                max_depth=max_depth, property_name=property_name,
+                filetype=filetype)
 
         self.property_name = property_name
 
-        self.setCommand(['bash', '-c', 'find %(directory)s -maxdepth %(max_depth)s -name %(filename)s' % locals()])
+        if filetype == "file":
+            filetype = "-type f"
+        elif filetype == "dir":
+            filetype = "-type d"
+        else:
+            filetype = ""
+
+        self.setCommand(['bash', '-c', 'find %(directory)s -maxdepth %(max_depth)s %(filetype)s -name %(filename)s' % locals()])
 
     def evaluateCommand(self, cmd):
         try:
