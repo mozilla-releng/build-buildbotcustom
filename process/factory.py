@@ -2924,11 +2924,8 @@ class WinceBuildFactory(MobileBuildFactory):
             haltOnFailure=True
         )
 
-packagedUnittestSuites = ['reftest', 'crashtest', 'mochitest-plain',
-                          'mochitest-chrome', 'mochitest-browser-chrome',
-                          'mochitest-a11y', 'xpcshell']
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, env=None, test_suites=None,
+    def __init__(self, platform, test_suites, env=None,
             mochitest_leak_threshold=None, **kwargs):
         if env is None:
             self.env = MozillaEnvironments['%s-unittest' % platform].copy()
@@ -2940,10 +2937,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
         MozillaBuildFactory.__init__(self, **kwargs)
 
-        if test_suites is None:
-            self.test_suites = packagedUnittestSuites
-        else:
-            self.test_suites = test_suites
+        self.test_suites = test_suites
 
         # Download the build
         def get_fileURL(build):
