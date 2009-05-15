@@ -126,7 +126,7 @@ class MozillaBuildFactory(BuildFactory):
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-                 **kwargs):
+                 branchName=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -141,7 +141,10 @@ class MozillaBuildFactory(BuildFactory):
         self.buildsBeforeReboot = buildsBeforeReboot
 
         self.repository = self.getRepository(repoPath)
-        self.branchName = self.getRepoName(self.repository)
+        if branchName:
+          self.branchName = branchName
+        else:
+          self.branchName = self.getRepoName(self.repository)
 
         self.addStep(ShellCommand,
          command=['echo', WithProperties('Building on: %(slavename)s')]
