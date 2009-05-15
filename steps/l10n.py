@@ -15,7 +15,7 @@ class SetLocalesStep(BuildStep):
 
     def setBuild(self, build):
         BuildStep.setBuild(self, build)
-        build.setProperty('locales', self.locales)
+        build.setProperty('locales', self.locales, 'SetLocalesStep')
 
     def start(self):
         return SKIPPED
