@@ -2143,19 +2143,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
          timeout=5*60, # 5 minutes.
         )
 
-        if self.platform == 'win32':
-            self.addStep(unittest_steps.CreateProfileWin,
-             warnOnWarnings=True,
-             workdir="build",
-             command = r'python testing\tools\profiles\createTestingProfile.py --clobber --binary %s\dist\bin\firefox.exe' % self.objdir,
-            )
-        else:
-            self.addStep(unittest_steps.CreateProfile,
-             warnOnWarnings=True,
-             workdir="build",
-             command = r'python testing/tools/profiles/createTestingProfile.py --clobber --binary %s/dist/bin/firefox' % self.objdir,
-            )
-
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="reftest",
          workdir="build/%s" % self.objdir,
@@ -2370,25 +2357,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.
         )
-
-        if platform == 'win32':
-            self.addStep(unittest_steps.CreateProfileWin,
-             warnOnWarnings=True,
-             workdir="build",
-             command = r'python mozilla\testing\tools\profiles\createTestingProfile.py --clobber --binary %s\mozilla\dist\bin\%s.exe' %
-                          (self.objdir, self.productName),
-            )
-        else:
-            if platform == 'macosx':
-                app_run = '%s.app/Contents/MacOS/%s-bin' % (self.brandName, self.productName)
-            else:
-                app_run = 'bin/%s' % self.productName
-            self.addStep(unittest_steps.CreateProfile,
-             warnOnWarnings=True,
-             workdir="build",
-             command = r'python mozilla/testing/tools/profiles/createTestingProfile.py --clobber --binary %s/mozilla/dist/%s' %
-                          (self.objdir, app_run),
-            )
 
         if self.exec_reftest_suites:
             self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
