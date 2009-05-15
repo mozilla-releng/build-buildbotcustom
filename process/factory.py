@@ -241,6 +241,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.configRepoPath = configRepoPath
         self.configSubDir = configSubDir
         self.profiledBuild = profiledBuild
+        self.mozconfig = mozconfig
         self.productName = productName
         self.buildRevision = buildRevision
         self.stageServer = stageServer
@@ -367,8 +368,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addConfigSteps(self):
-        assert configRepoPath is not None
-        assert configSubDir is not None
+        assert self.configRepoPath is not None
+        assert self.configSubDir is not None
         assert self.mozconfig is not None
         configRepo = self.getRepository(self.configRepoPath)
 
@@ -381,7 +382,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
-         command=['hg', 'clone', self.configRepo, 'configs'],
+         command=['hg', 'clone', configRepo, 'configs'],
          description=['checking', 'out', 'configs'],
          descriptionDone=['checkout', 'configs'],
          haltOnFailure=True

@@ -90,11 +90,12 @@ class MozillaTryProcessing(BuildStep):
             args['identifier'] = '%s-%s' % (branch, changes[0].revision[0:11])
         for arg in args:
             self.setProperty(arg, args[arg])
+        who = changes[0].who
+        self.setProperty('who', who)
 
         # 3) Add a header
         self.step_status.setText(['identify', 'build'])
         buildNum = self.step_status.build.getNumber()
-        who = changes[0].who
         comments = changes[0].comments
         msg = "TinderboxPrint: %s\n" % who
         if 'identifier' in args:
@@ -126,6 +127,7 @@ class MozillaDownloadMozconfig(FileDownload):
                               workdir=workdir, **kwargs)
         self.addFactoryArguments(patchDir=patchDir)
         self.patchDir = patchDir
+        self.super_class = FileDownload
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -174,7 +176,7 @@ class MozillaDownloadMozconfig(FileDownload):
                 return SKIPPED
 
         # everything is set up, download the file
-        FileDownload.start(self)
+        self.super_class.start(self)
 
 
 class MozillaPatchDownload(FileDownload):
@@ -203,6 +205,7 @@ class MozillaPatchDownload(FileDownload):
 
         self.isOptional = isOptional
         self.patchDir = patchDir
+        self.super_class = FileDownload
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -219,7 +222,7 @@ class MozillaPatchDownload(FileDownload):
         self.slavedest = "%s" % (args['patchFile'])
 
         # now that everything is set-up, download the file
-        FileDownload.start(self)
+        self.super_class.start(self)
 
 
 
@@ -247,6 +250,7 @@ class MozillaUploadTryBuild(ShellCommand):
         self.slavedir = slavedir
         self.baseFilename = baseFilename
         self.scpString = scpString
+        self.super_class = ShellCommand
 
     def start(self):
         # we need to append some additional information to the package name
@@ -271,7 +275,7 @@ class MozillaUploadTryBuild(ShellCommand):
 
         self.setCommand(["scp", slavesrc, self.scpString])
         self.setProperty('uploadpath', path.join(dir, "%s-%s" % (changer, filename)))
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
 
 class MozillaTryServerHgClone(Mercurial):
@@ -283,6 +287,7 @@ class MozillaTryServerHgClone(Mercurial):
         # repourl overridden in startVC
         Mercurial.__init__(self, baseURL=baseURL, defaultBranch=defaultBranch,
                            timeout=timeout, **kwargs)
+        self.super_class = Mercurial
 
     def startVC(self, branch, revision, patch):
         branch = self.getProperty('branch')
@@ -291,7 +296,7 @@ class MozillaTryServerHgClone(Mercurial):
         else:
             self.repourl = self.getProperty('mozillaRepoPath')
 
-        Mercurial.startVC(self, None, revision, patch)
+        self.super_class.startVC(self, None, revision, patch)
 
 
 class MozillaClientMk(ShellCommand):
@@ -308,6 +313,7 @@ class MozillaClientMk(ShellCommand):
         self.workdir = workdir
         # command may be overridden in start()
         self.command = ["cvs", "-d", cvsroot, "co", "mozilla/client.mk"]
+        self.super_class = ShellCommand
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -318,7 +324,7 @@ class MozillaClientMk(ShellCommand):
             self.command.extend(["-r", args['branch']])
         self.command.append("mozilla/client.mk")
 
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
 
 class MozillaCustomPatch(ShellCommand):
@@ -339,6 +345,7 @@ class MozillaCustomPatch(ShellCommand):
         ShellCommand.__init__(self, workdir=workdir, **kwargs)
         self.addFactoryArguments(isOptional=isOptional, workdir=workdir)
         self.optional = isOptional
+        self.super_class = ShellCommand
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -358,7 +365,7 @@ class MozillaCustomPatch(ShellCommand):
 
         self.setCommand(["patch", "-f", "-p%d" % int(args['patchLevel']), "-i",
                          args['patchFile']])
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
 
 class MozillaCreateUploadDirectory(ShellCommand):
@@ -366,6 +373,7 @@ class MozillaCreateUploadDirectory(ShellCommand):
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(scpString=scpString)
         (self.sshHost, self.sshDir) = scpString.split(":")
+        self.super_class = ShellCommand
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -376,10 +384,10 @@ class MozillaCreateUploadDirectory(ShellCommand):
         fullDir = path.join(self.sshDir, dir)
         self.setCommand(['ssh', self.sshHost, 'mkdir', fullDir])
 
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
     def evaluateCommand(self, cmd):
-        result = ShellCommand.evaluateCommand(self, cmd)
+        result = self.super_class.evaluateCommand(self, cmd)
         if None != re.search('File exists', cmd.logs['stdio'].getText()):
             result = SUCCESS
         return result
