@@ -149,6 +149,9 @@ class MozillaBuildFactory(BuildFactory):
         self.addStep(ShellCommand,
          command=['echo', WithProperties('Building on: %(slavename)s')]
         )
+        self.addStep(ShellCommand,
+          command=['echo', WithProperties('TinderboxPrint: s: %(slavename)s')]
+        )
         self.addInitialSteps()
 
     def addInitialSteps(self):
