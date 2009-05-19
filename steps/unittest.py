@@ -441,16 +441,6 @@ class MozillaMochitest(ShellCommandReportTimeout):
 
         return SUCCESS
 
-class CreateProfile(ShellCommandReportTimeout):
-    name = "create profile"
-    warnOnFailure = True
-    description = ["create profile"]
-    descriptionDone = ["create profile complete"]
-    command = r'python mozilla/testing/tools/profiles/createTestingProfile.py --binary mozilla/objdir/dist/bin/firefox'
-
-class CreateProfileWin(CreateProfile):
-    command = r'python mozilla\testing\tools\profiles\createTestingProfile.py --binary mozilla\objdir\dist\bin\firefox.exe'
-
 class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
     warnOnFailure = True
     warnOnWarnings = True
