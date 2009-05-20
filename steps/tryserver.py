@@ -26,7 +26,7 @@ import os
 from os import path, chmod
 from time import localtime, strftime
 import re
-from urlparse import urljoin
+from urlparse import urljoin, urlparse
 
 from twisted.python import log
 from twisted.internet import reactor
@@ -282,21 +282,21 @@ class MozillaTryServerHgClone(Mercurial):
     haltOnFailure = True
     flunkOnFailure = True
     
-    def __init__(self, baseURL="http://hg.mozilla.org/",
+    def __init__(self, baseURL="http://hg.mozilla.org/", mode='clobber',
                  defaultBranch='mozilla-central', timeout=3600, **kwargs):
         # repourl overridden in startVC
-        Mercurial.__init__(self, baseURL=baseURL, defaultBranch=defaultBranch,
-                           timeout=timeout, **kwargs)
+        Mercurial.__init__(self, baseURL=baseURL, mode=mode,
+                           defaultBranch=defaultBranch, timeout=timeout,
+                           **kwargs)
         self.super_class = Mercurial
 
     def startVC(self, branch, revision, patch):
-        branch = self.getProperty('branch')
-        if branch != 'PATCH_TRY' and branch != 'HG_TRY':
-            self.repourl = urljoin(self.baseURL, branch)
-        else:
-            self.repourl = self.getProperty('mozillaRepoPath')
+        if branch == 'PATCH_TRY' or branch == 'HG_TRY':
+            url = urlparse(self.getProperty('mozillaRepoPath'))
+            self.baseURL = '://'.join(url[0:2])
+            branch = url[2]
 
-        self.super_class.startVC(self, None, revision, patch)
+        self.super_class.startVC(self, branch, revision, patch)
 
 
 class MozillaClientMk(ShellCommand):
