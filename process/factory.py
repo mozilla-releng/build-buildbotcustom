@@ -1345,7 +1345,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
               GECKO191_20080828_RELBRANCH
             repositories['http://hg.mozilla.org/mozilla-central']['bumpFiles']:
               ['client.mk', 'browser/config/version.txt',
-               'browser/app/module.ver', 'config/milestone.txt']
+               'js/src/config/milestone.txt', 'config/milestone.txt']
             relbranchOverride is typically used in two situations:
              1) During a respin (buildNumber > 1) when the "release" branch has
                 already been created (during build1). In cases like this all
