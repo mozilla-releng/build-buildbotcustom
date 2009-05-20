@@ -3116,29 +3116,17 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
 class TalosFactory(BuildFactory):
     """Create working talos build factory"""
-
-    winClean   = ["touch temp.zip &", "rm", "-rf", "*.zip", "talos/",
-                  "firefox/", "symbols/"]
-    macClean   = "rm -vrf *"
-    linuxClean = "rm -vrf *"
-
     def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest='', customTalos=None,
             workdirBase=None, fetchSymbols=False,
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
         BuildFactory.__init__(self)
-        if OS in ('linux', 'linuxbranch',):
-            cleanCmd = self.linuxClean
-        elif OS in ('win',):
-            cleanCmd = self.winClean
-        else:
-            cleanCmd = self.macClean
         if workdirBase is None:
             workdirBase = "."
         self.addStep(ShellCommand(
          workdir=workdirBase,
          description="Cleanup",
-         command=cleanCmd,
+         command='rm -vrf *',
          env=MozillaEnvironments[envName])
         )
         if OS in ('leopard', 'tiger'):
@@ -3196,7 +3184,15 @@ class TalosFactory(BuildFactory):
             ))
 
         def get_url(build):
-            return build.source.changes[-1].files[0]
+            url = build.source.changes[-1].files[0]
+            # Lies!!!
+            try:
+                timestamp = int(os.path.basename(os.path.dirname(url)))
+                build.setProperty('orig_changetime', build.source.changes[-1].when, 'get_url')
+                build.source.changes[-1].when = timestamp
+            except:
+                pass
+            return url
         self.addStep(DownloadFile(
          url_fn=get_url,
          url_property="fileURL",
@@ -3229,7 +3225,7 @@ class TalosFactory(BuildFactory):
          workdir=workdirBase,
          name="Unpack build",
         ))
-        if OS == 'win':
+        if OS in ('xp', 'vista'):
             self.addStep(ShellCommand(
              workdir=os.path.join(workdirBase, "firefox/"),
              flunkOnFailure=False,
@@ -3241,15 +3237,19 @@ class TalosFactory(BuildFactory):
         if OS in ('tiger', 'leopard'):
             self.addStep(FindFile(
              workdir=os.path.join(workdirBase, "talos"),
-             filename="firefox",
+             filename="firefox-bin",
              directory="..",
              max_depth=4,
              property_name="exepath",
              name="Find executable",
+             filetype="file",
             ))
             exepath = WithProperties('%(exepath)s')
-        else:
+        elif OS in ('xp', 'vista'):
             exepath = '../firefox/firefox'
+	else:
+            exepath = '../firefox/firefox-bin'
+		
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(workdirBase, "talos/"),
          branch=buildBranch,
