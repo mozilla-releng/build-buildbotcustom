@@ -326,9 +326,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addConfigSteps()
         self.addDoBuildSteps()
 
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
-
     def addPreBuildSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
@@ -3109,6 +3106,9 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  env=self.env,
                  symbols_path='symbols',
                 ))
+
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def addInitialSteps(self):
         self.addStep(ShellCommand(command=['rm', '-rf', 'build'], workdir='.'))
