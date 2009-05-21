@@ -22,6 +22,7 @@
 #   Rob Campbell <rcampbell@mozilla.com>
 #   Chris Cooper <ccooper@mozilla.com>
 #   Ben Hearsum <bhearsum@mozilla.com>
+#   Serge Gautherie <sgautherie.bz@free.fr>
 # ***** END LICENSE BLOCK *****
 
 import re
@@ -44,11 +45,11 @@ def summaryText(passCount, failCount, knownFailCount = None,
         crashed = False, leaked = False):
     # Format the tests counts.
     if passCount < 0 or failCount < 0 or \
-            (knownFailCount != None and knownFailCount < 0):
+       (knownFailCount != None and knownFailCount < 0):
         # Explicit failure case.
         summary = emphasizeFailureText("T-FAIL")
     elif passCount == 0 and failCount == 0 and \
-            (knownFailCount == None or knownFailCount == 0):
+         (knownFailCount == None or knownFailCount == 0):
         # Implicit failure case.
         summary = emphasizeFailureText("T-FAIL")
     else:
@@ -71,16 +72,17 @@ def summaryText(passCount, failCount, knownFailCount = None,
 
     return summary
 
-def summarizeReftest(name, log):
-    # Counts.
-    successfulCount = -1
-    unexpectedCount = -1
-    knownProblemsCount = -1
+def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
+    # Counts and flags.
+    successCount = -1
+    failureCount = -1
+    otherCount = -1
     crashed = False
     leaked = False
 
     # Regular expression for result summary details.
-    infoRe = re.compile(r"REFTEST INFO \| (Successful|Unexpected|Known problems): (\d+) \(")
+    # Reuse 'infoRe'.
+    infoRe = re.compile(infoRe)
     # Regular expression for crash and leak detections.
     harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
     # Process the log.
@@ -89,12 +91,12 @@ def summarizeReftest(name, log):
         m = infoRe.match(line)
         if m:
             r = m.group(1)
-            if r == "Successful":
-                successfulCount = int(m.group(2))
-            elif r == "Unexpected":
-                unexpectedCount = int(m.group(2))
-            elif r == "Known problems":
-                knownProblemsCount = int(m.group(2))
+            if r == successIdent:
+                successCount = int(m.group(2))
+            elif r == failureIdent:
+                failureCount = int(m.group(2))
+            elif r == otherIdent:
+                otherCount = int(m.group(2))
             continue
         # Set the error flags.
         m = harnessErrorsRe.match(line)
@@ -108,56 +110,28 @@ def summarizeReftest(name, log):
                 leaked = True
             # continue
 
-    # Add the summary.
-    summary = "TinderboxPrint: %s<br/>%s\n" % (name,
-        summaryText(successfulCount, unexpectedCount, knownProblemsCount, crashed, leaked))
-    return summary
+    # Return the summary.
+    return "TinderboxPrint: %s<br/>%s\n" % (name,
+        summaryText(successCount, failureCount, otherCount, crashed, leaked))
 
-def summarizeMochitest(name, log):
-    # Counts.
-    passCount = 0
-    failCount = 0
-    todoCount = 0
-    crashed = False
-    leaked = False
-
-    passIdent = "INFO Passed:"
-    failIdent = "INFO Failed:"
-    todoIdent = "INFO Todo:"
+def summarizeLogMochitest(name, log):
+    passIdent = "Passed"
+    failIdent = "Failed"
+    infoRe = r"\d+ INFO (Passed|Failed|Todo):\ +(\d+)"
     # Support browser-chrome result summary format which differs from MozillaMochitest's.
     if name == 'mochitest-browser-chrome':
-        passIdent = "Pass:"
-        failIdent = "Fail:"
-        todoIdent = "Todo:"
-    # Regular expression for crash and leak detections.
-    harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|leaked \d+ bytes during test execution)")
-    # Process the log.
-    for line in log.readlines():
-        if passIdent in line:
-            passCount = int(line.split()[-1])
-            continue
-        if failIdent in line:
-            failCount = int(line.split()[-1])
-            continue
-        if todoIdent in line:
-            todoCount = int(line.split()[-1])
-            continue
-        # Set the error flags.
-        m = harnessErrorsRe.match(line)
-        if m:
-            r = m.group(1)
-            if r == "Browser crashed (minidump found)":
-                crashed = True
-            elif r == "missing output line for total leaks!":
-                leaked = None
-            else:
-                leaked = True
-            # continue
+        passIdent = "Pass"
+        failIdent = "Fail"
+        infoRe = r"\t(Pass|Fail|Todo): (\d+)"
 
-    # Add the summary.
-    summary = "TinderboxPrint: %s<br/>%s\n" % (name,
-        summaryText(passCount, failCount, todoCount, crashed, leaked))
-    return summary
+    return summarizeLog(
+        name, log, passIdent, failIdent, "Todo",
+        infoRe)
+
+def summarizeLogReftest(name, log):
+    return summarizeLog(
+        name, log, "Successful", "Unexpected", "Known problems",
+        r"REFTEST INFO \| (Successful|Unexpected|Known problems): (\d+) \(")
 
 def summarizeTUnit(name, log):
     # Counts.
@@ -186,10 +160,10 @@ def summarizeTUnit(name, log):
                 failCount = failCount + 1
             # continue
 
-    # Add the summary.
-    summary = "TinderboxPrint: %s<br/>%s\n" % (name,
+    # Return the summary.
+    return "TinderboxPrint: %s<br/>%s\n" % (name,
         summaryText(passCount, failCount, leaked = leaked))
-    return summary
+
 
 class ShellCommandReportTimeout(ShellCommand):
     """We subclass ShellCommand so that we can bubble up the timeout errors
@@ -360,8 +334,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.addFactoryArguments(test_name=test_name)
    
     def createSummary(self, log):
-        summary = summarizeTUnit(self.name, log)
-        self.addCompleteLog('summary', summary)
+        self.addCompleteLog('summary', summarizeTUnit(self.name, log))
     
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
@@ -370,6 +343,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         if None != re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
             return WARNINGS
         return SUCCESS
+
     
 class MozillaReftest(ShellCommandReportTimeout):
     warnOnFailure = True
@@ -389,8 +363,7 @@ class MozillaReftest(ShellCommandReportTimeout):
                                  leakThreshold=leakThreshold)
    
     def createSummary(self, log):
-        summary = summarizeReftest(self.name, log)
-        self.addCompleteLog('summary', summary)
+        self.addCompleteLog('summary', summarizeLogReftest(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
@@ -398,11 +371,12 @@ class MozillaReftest(ShellCommandReportTimeout):
         # Assume that having the "Unexpected: 0" line means the tests run completed.
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if superResult != SUCCESS or \
-                not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
-                re.search(r"^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+           not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 
         return SUCCESS
+
 
 class MozillaMochitest(ShellCommandReportTimeout):
     warnOnFailure = True
@@ -422,22 +396,24 @@ class MozillaMochitest(ShellCommandReportTimeout):
                                  leakThreshold=leakThreshold)
     
     def createSummary(self, log):
-        summary = summarizeMochitest(self.name, log)
-        self.addCompleteLog('summary', summary)
+        self.addCompleteLog('summary', summarizeLogMochitest(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
 
-        if SUCCESS != superResult:
+        failIdent = r"^\d+ INFO Failed: 0"                                    
+
+        # Support browser-chrome result summary format which differs 
+        # from MozillaMochitest's.
+        if self.name == 'mochitest-browser-chrome':
+            failIdent = r"^\tFail: 0"
+
+        # Assume that having the 'failIdent' line means the tests run 
+        # completed. Also check for "^TEST-UNEXPECTED-" for harness errors.
+        if superResult != SUCCESS or \
+           not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
-        if re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
-            return WARNINGS
-        if re.search('FAIL Exited', cmd.logs['stdio'].getText()):
-            return WARNINGS
-        # Support browser-chrome result summary format which differs from MozillaMochitest's.
-        if self.name != 'mochitest-browser-chrome':
-            if not re.search('TEST-PASS', cmd.logs['stdio'].getText()):
-                return WARNINGS
 
         return SUCCESS
 
@@ -447,8 +423,8 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
     name = "xpcshell"
 
     def __init__(self, symbols_path=None, **kwargs):
-        ShellCommandReportTimeout.__init__(self, **kwargs)
         self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
 
         self.addFactoryArguments(symbols_path=symbols_path)
         
@@ -459,12 +435,11 @@ cp -R bin/plugins/* %(exedir)s/plugins/
 python -u xpcshell/runxpcshelltests.py --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell""".replace("\n", " && "))]
 
     def createSummary(self, log):
-        summary = summarizeTUnit(self.name, log)
-        self.addCompleteLog('summary', summary)
+        self.addCompleteLog('summary', summarizeTUnit(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
-        if SUCCESS != superResult:
+        if superResult != SUCCESS:
             return superResult
         if None != re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
             return WARNINGS
@@ -476,8 +451,8 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
 
     def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
             **kwargs):
-        ShellCommandReportTimeout.__init__(self, **kwargs)
         self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
 
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
                 leakThreshold=leakThreshold)
@@ -500,24 +475,25 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
             self.command.append("--%s" % variant)
 
     def createSummary(self, log):
-        summary = summarizeMochitest(self.name, log)
-        self.addCompleteLog('summary', summary)
+        self.addCompleteLog('summary', summarizeLogMochitest(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
-
-        if SUCCESS != superResult:
+        if superResult != SUCCESS:
             return superResult
-        if re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
-            return WARNINGS
-        if re.search('FAIL Exited', cmd.logs['stdio'].getText()):
-            return WARNINGS
+
+        failIdent = r"^\d+ INFO Failed: 0"
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
-        if self.name != 'mochitest-browser-chrome':
-            if not re.search('TEST-PASS', cmd.logs['stdio'].getText()):
-                return WARNINGS
+        if self.name == 'mochitest-browser-chrome':
+            failIdent = r"^\tFail: 0"
+        # Assume that having the 'failIdent' line means the tests run completed.
+        # Also check for "^TEST-UNEXPECTED-" for harness errors.
+        if not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+            return WARNINGS
 
         return SUCCESS
+
 
 class MozillaPackagedReftests(ShellCommandReportTimeout):
     warnOnFailure = True
@@ -551,19 +527,17 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
             self.command.append('reftest/tests/layout/reftests/reftest.list')
 
     def createSummary(self, log):
-        summary = summarizeReftest(self.name, log)
-        self.addCompleteLog('summary', summary)
+        self.addCompleteLog('summary', summarizeLogReftest(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
-
-        # Assume that having the "Unexpected: 0" line means the tests run completed.
-        # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if superResult != SUCCESS:
             return superResult
 
+        # Assume that having the "Unexpected: 0" line means the tests run completed.
+        # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
-                re.search(r"^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 
         return SUCCESS
