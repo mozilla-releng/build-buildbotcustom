@@ -741,7 +741,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         )
         self.addStep(ShellCommand,
          name="client.py checkout",
-         command=['python', 'client.py', 'checkout']
+         command=['python', 'client.py', 'checkout',
+                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)]
         )
 
         self.addStep(SetProperty,
@@ -2297,7 +2298,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         self.addStepNoEnv(ShellCommand,
          name="client.py checkout",
-         command=['python', 'client.py', 'checkout']
+         command=['python', 'client.py', 'checkout',
+                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)]
         )
 
         self.addPrintMozillaChangesetStep()
