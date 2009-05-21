@@ -3246,11 +3246,48 @@ class TalosFactory(BuildFactory):
              name="Find executable",
              filetype="file",
             ))
-            exepath = WithProperties('%(exepath)s')
         elif OS in ('xp', 'vista'):
-            exepath = '../firefox/firefox'
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="../firefox/firefox"
+            ))
 	else:
-            exepath = '../firefox/firefox-bin'
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="../firefox/firefox-bin"
+            ))
+        exepath = WithProperties('%(exepath)s')
+
+        def get_exedir(build):
+            return os.path.dirname(build.getProperty('exepath'))
+        self.addStep(SetBuildProperty(
+         property_name="exedir",
+         value=get_exedir,
+        ))
+
+        # Figure out which revision we're running
+        def get_build_info(rc, stdout, stderr):
+            retval = {'repo_path': None,
+                      'revision': None,
+                      'buildid': None,
+                     }
+            stdout = "\n".join([stdout, stderr])
+            m = re.search("^BuildID\s*=\s*(\w+)", stdout, re.M)
+            if m:
+                retval['buildid'] = m.group(1)
+            m = re.search("^SourceStamp\s*=\s*(.*)", stdout, re.M)
+            if m:
+                retval['revision'] = m.group(1)
+            m = re.search("^SourceRepository\s*=\s*(\S+)", stdout, re.M)
+            if m:
+                retval['repo_path'] = m.group(1)
+            return retval
+        self.addStep(SetProperty,
+         command=['cat', WithProperties('%(exedir)s/application.ini')],
+         workdir=os.path.join(workdirBase, "talos"),
+         extract_fn=get_build_info,
+         name='get build info',
+        )
 		
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(workdirBase, "talos/"),
