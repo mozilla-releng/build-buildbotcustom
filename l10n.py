@@ -828,13 +828,14 @@ class L10nMixin(object):
 
   def __init__(self,
                platform,
-               repo      = 'http://hg.mozilla.org/',
-               branch    = None,
+               repo        = 'http://hg.mozilla.org/',
+               branch      = None,
                repoType    = 'cvs',
                baseTag     = 'default',
                localesFile = None,
                cvsRoot     = DEFAULT_CVSROOT,
-               locales     = None):
+               locales     = None,
+               tree        = None):
       self.repoType = repoType
       self.baseTag = baseTag
       self.cvsRoot = cvsRoot
@@ -851,6 +852,7 @@ class L10nMixin(object):
           self.localesURL = localesFile
       # if the user wants to use something different than all locales
       self.locales = locales
+      self.tree = tree
       # Make sure a supported platform is passed. Allow variations, but make
       # sure to convert them to the form the locales files ues.
       assert platform in ('linux', 'win32', 'macosx', 'osx')
@@ -957,17 +959,18 @@ class NightlyL10n(Nightly, L10nMixin):
                    'minute', 'hour', 'dayOfMonth', 'month',
                    'dayOfWeek', 'branch')
   
-  def __init__(self, name,  builderNames, repoType, platform,
+  def __init__(self, name,  builderNames, repoType, platform, 
                minute=0, hour='*', dayOfMonth='*', month='*', dayOfWeek='*', 
                repo = 'http://hg.mozilla.org/', branch=None, baseTag='default',
-               localesFile=None, cvsRoot=DEFAULT_CVSROOT, locales=None):
+               localesFile=None, cvsRoot=DEFAULT_CVSROOT, locales=None,
+               tree=None):
     
     Nightly.__init__(self, name, builderNames, minute, hour, dayOfMonth, month,
                      dayOfWeek, branch, properties={'nightly': True})
     L10nMixin.__init__(self, platform = platform, repoType = repoType,
                        repo = repo, branch = branch, baseTag = baseTag,
                        localesFile = localesFile, cvsRoot = cvsRoot,
-                       locales = locales)
+                       locales = locales, tree = tree)
   
   def doPeriodicBuild(self):
     # Schedule the next run (as in Nightly's doPeriodicBuild)
@@ -985,7 +988,7 @@ class DependentL10n(Dependent, L10nMixin):
   def __init__(self, name, upstream, builderNames, platform,
                repoType, repo = 'http://hg.mozilla.org/', branch=None,
                baseTag='default', localesFile=None,
-               cvsRoot=DEFAULT_CVSROOT, locales=None):
+               cvsRoot=DEFAULT_CVSROOT, locales=None, tree=None):
       Dependent.__init__(self, name, upstream, builderNames)
       # The next two lines has been added because of:
       # _cbLoadedLocales's BuildSet submit needs them
@@ -994,7 +997,7 @@ class DependentL10n(Dependent, L10nMixin):
       L10nMixin.__init__(self, platform = platform, repoType = repoType,
                          branch = branch, baseTag = baseTag,
                          localesFile = localesFile, cvsRoot = cvsRoot,
-                         locales = locales)
+                         locales = locales, tree = tree)
 
   # ss is the source stamp that we don't use currently
   def upstreamBuilt(self, ss):

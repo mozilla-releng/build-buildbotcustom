@@ -932,7 +932,7 @@ class BaseRepackFactory(MozillaBuildFactory):
 
     def __init__(self, project, appName, l10nRepoPath, stageServer,
                  stageUsername, stageSshKey=None, baseWorkDir='build',
-                 **kwargs):
+                 tree=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
@@ -941,6 +941,14 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageServer = stageServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
+        self.tree = tree
+ 
+        self.addStep(SetProperty,
+                     command=['echo', self.tree],
+                     property='tree',
+                     workdir='.',
+                     haltOnFailure=True
+                     )
 
         # Needed for scratchbox
         self.baseWorkDir = baseWorkDir
@@ -1008,10 +1016,26 @@ class BaseRepackFactory(MozillaBuildFactory):
              haltOnFailure=True
             )
 
+        self.tinderboxPrintBuildInfo()
         self.downloadBuilds()
         self.updateEnUS()
+        self.tinderboxPrintRevisions()
         self.doRepack()
         self.doUpload()
+
+    def tinderboxPrint(self, propName, propValue):
+        self.addStep(ShellCommand,
+                     command=['echo',
+                              'TinderboxPrint:',
+                              '%s:' % propName,
+                              propValue]
+        )
+    def tinderboxPrintBuildInfo(self):
+        '''Display some build properties for scraping in Tinderbox. 
+        '''
+        self.tinderboxPrint('locale',WithProperties('%(locale)s'))
+        self.tinderboxPrint('tree',self.tree)
+        self.tinderboxPrint('buildnumber',WithProperties('%(buildnumber)s'))
 
     def doUpload(self):
         self.addStep(ShellCommand,
@@ -1053,6 +1077,14 @@ class BaseRepackFactory(MozillaBuildFactory):
     def updateEnUS(self):
         '''Update the en-US source files to the revision used by
         the repackaged build.
+
+        This is implemented in the subclasses.
+        '''
+        pass
+    
+    def tinderboxPrintRevisions(self):
+        '''Display the various revisions used in building for
+        scraping in Tinderbox. 
 
         This is implemented in the subclasses.
         '''
@@ -1120,6 +1152,10 @@ class NightlyRepackFactory(BaseRepackFactory):
                               WithProperties('%(fx_revision)s')],
                      haltOnFailure=True,
                      workdir='build/' + self.branchName)
+
+    def tinderboxPrintRevisions(self):
+        self.tinderboxPrint('fx_revision',WithProperties('%(fx_revision)s'))
+        self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
 
     def doRepack(self):
         self.addStep(ShellCommand,
@@ -3427,6 +3463,11 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          haltOnFailure=True,
          workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.appName)
         )
+
+    def tinderboxPrintRevisions(self):
+        self.tinderboxPrint('fennec_revision',WithProperties('%(fennec_revision)s'))
+        self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
+        self.tinderboxPrint('toolkit_revision',WithProperties('%(toolkit_revision)s'))
 
     def doRepack(self):
         self.addStep(ShellCommand,
