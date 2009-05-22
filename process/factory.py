@@ -1168,7 +1168,9 @@ class NightlyRepackFactory(BaseRepackFactory):
 
 class ReleaseFactory(MozillaBuildFactory):
     def getCandidatesDir(self, product, version, buildNumber):
-        return '/home/ftp/pub/' + product + '/nightly/' + str(version) + \
+        # can be used with rsync, eg host + ':' + getCandidatesDir()
+        # and "http://' + host + getCandidatesDir()
+        return '/pub/mozilla.org/' + product + '/nightly/' + str(version) + \
                '-candidates/build' + str(buildNumber) + '/'
 
     def getShippedLocales(self, sourceRepo, baseTag, appName):
@@ -1697,19 +1699,21 @@ class SingleSourceFactory(ReleaseFactory):
 
 
 class ReleaseUpdatesFactory(ReleaseFactory):
-    def __init__(self, cvsroot, patcherToolsTag, patcherConfig, baseTag,
-                 appName, productName, version, appVersion, oldVersion,
-                 buildNumber, ftpServer, bouncerServer, stagingServer,
-                 useBetaChannel, stageUsername, stageSshKey, ausUser, ausHost,
-                 commitPatcherConfig=True, buildSpace=13, **kwargs):
+    def __init__(self, cvsroot, patcherToolsTag, patcherConfig, verifyConfigs,
+                 appName, productName,
+                 version, appVersion, baseTag, buildNumber,
+                 oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
+                 ftpServer, bouncerServer, stagingServer, useBetaChannel,
+                 stageUsername, stageSshKey, ausUser, ausHost, ausServerUrl,
+                 hgSshKey, hgUsername, commitPatcherConfig=True, buildSpace=13,
+                 **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
                     write permission to the repository if commitPatcherConfig
                     is True.
            patcherToolsTag: A tag that has been applied to all of:
-                              sourceRepo, buildTools, patcher,
-                              MozBuild, Bootstrap.
+                              sourceRepo, patcher, MozBuild, Bootstrap.
                             This version of all of the above tools will be
                             used - NOT tip.
            patcherConfig: The filename of the patcher config file to bump,
@@ -1736,6 +1740,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         if useBetaChannel:
             snippetTypes.append('beta')
 
+        # General setup
         self.addStep(ShellCommand,
          command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
                   '-d', 'build', 'mozilla/tools/patcher'],
@@ -1763,12 +1768,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['checkout', 'patcher-configs'],
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
-         command=['hg', 'up', '-r', patcherToolsTag],
-         description=['update', 'build tools to', patcherToolsTag],
-         workdir='tools',
-         haltOnFailure=True
-        )
+
+        # Bump the patcher config
         self.addStep(ShellCommand,
          command=['wget', '-O', 'shipped-locales', shippedLocales],
          description=['get', 'shipped-locales'],
@@ -1804,6 +1805,58 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              description=['commit', patcherConfig],
              haltOnFailure=True
             )
+
+        # Bump the update verify config
+        oldLongVersion = self.makeLongVersion(oldVersion)
+        longVersion = self.makeLongVersion(version)
+        oldCandidatesDir = self.getCandidatesDir(productName, oldVersion,
+                                                 oldBuildNumber)
+
+        oldShippedLocales = self.getShippedLocales(self.repository, oldBaseTag,
+                                                appName)
+        pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
+        sshKeyOption = self.getSshKeyOption(hgSshKey)
+
+        self.addStep(ShellCommand,
+         command=['wget', '-O', 'old-shipped-locales', oldShippedLocales],
+         description=['get', 'old-shipped-locales'],
+         haltOnFailure=True
+        )
+        for platform in sorted(verifyConfigs.keys()):
+            verifyConfigPath = '../tools/release/updates/%s' % \
+                                verifyConfigs[platform]
+            self.addStep(ShellCommand,
+             command=['perl', '../tools/release/update-verify-bump.pl',
+                      '-o', platform, '-p', productName,
+                      '--old-version=%s' % oldVersion,
+                      '--old-app-version=%s' % oldAppVersion,
+                      '--old-long-version=%s' % oldLongVersion,
+                      '-v', version, '--app-version=%s' % appVersion,
+                      '--long-version=%s' % longVersion,
+                      '-n', str(buildNumber), '-a', ausServerUrl,
+                      '-s', stagingServer, '-c', verifyConfigPath,
+                      '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
+                      '--pretty-candidates-dir'],
+             description=['bump', verifyConfigs[platform]],
+            )
+        self.addStep(ShellCommand,
+         command=['hg', 'commit', '-m',
+                  'Automated configuration bump: update verify configs ' + \
+                  'for %s build %s' % (version, buildNumber)],
+         description=['commit verify configs'],
+         workdir='tools',
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'push', '-e',
+                  'ssh -l %s %s' % (hgUsername, sshKeyOption),
+                  '-f', pushRepo],
+         description=['push verify configs'],
+         workdir='tools',
+         haltOnFailure=True
+        )
+
+        # Generate updates from here
         self.addStep(ShellCommand,
          command=['perl', 'patcher2.pl', '--build-tools-hg', 
                   '--tools-revision=%s' % patcherToolsTag,
@@ -1899,87 +1952,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
 
 class UpdateVerifyFactory(ReleaseFactory):
-    def __init__(self, cvsroot, patcherToolsTag, hgUsername, baseTag, appName,
-                 platform, productName, oldVersion, oldBuildNumber, version,
-                 buildNumber, ausServerUrl, stagingServer, verifyConfig,
-                 oldAppVersion=None, appVersion=None, hgSshKey=None,
-                 buildSpace=.3, **kwargs):
-        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
-
-        if not oldAppVersion:
-            oldAppVersion = oldVersion
-        if not appVersion:
-            appVersion = version
-
-        oldLongVersion = self.makeLongVersion(oldVersion)
-        longVersion = self.makeLongVersion(version)
-        # Unfortunately we can't use the getCandidatesDir() function here
-        # because that returns it as a file path on the server and we need
-        # an http:// compatible path
-        oldCandidatesDir = \
-          '/pub/mozilla.org/%s/nightly/%s-candidates/build%s' % \
-            (productName, oldVersion, oldBuildNumber)
-
-        verifyConfigPath = 'release/updates/%s' % verifyConfig
-        shippedLocales = self.getShippedLocales(self.repository, baseTag,
-                                                appName)
-        pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
-        sshKeyOption = self.getSshKeyOption(hgSshKey)
-
-        self.addStep(ShellCommand,
-         command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
-                  '-d', 'MozBuild',
-                  'mozilla/tools/release/MozBuild'],
-         description=['checkout', 'MozBuild'],
-         workdir='tools',
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
-                  '-d', 'Bootstrap',
-                  'mozilla/tools/release/Bootstrap/Util.pm'],
-         description=['checkout', 'Bootstrap/Util.pm'],
-         workdir='tools',
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         command=['wget', '-O', 'shipped-locales', shippedLocales],
-         description=['get', 'shipped-locales'],
-         workdir='tools',
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         command=['perl', 'release/update-verify-bump.pl',
-                  '-o', platform, '-p', productName,
-                  '--old-version=%s' % oldVersion,
-                  '--old-app-version=%s' % oldAppVersion,
-                  '--old-long-version=%s' % oldLongVersion,
-                  '-v', version, '--app-version=%s' % appVersion,
-                  '--long-version=%s' % longVersion,
-                  '-n', str(buildNumber), '-a', ausServerUrl,
-                  '-s', stagingServer, '-c', verifyConfigPath,
-                  '-d', oldCandidatesDir, '-l', 'shipped-locales',
-                  '--pretty-candidates-dir'],
-         description=['bump', verifyConfig],
-         workdir='tools'
-        )
-        self.addStep(ShellCommand,
-         command=['hg', 'commit', '-m',
-                  'Automated configuration bump: ' + \
-                  '%s, from %s to %s build %s' % \
-                    (verifyConfig, oldVersion, version, buildNumber)],
-         description=['commit', verifyConfig],
-         workdir='tools',
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         command=['hg', 'push', '-e',
-                  'ssh -l %s %s' % (hgUsername, sshKeyOption),
-                  '-f', pushRepo],
-         description=['push updated', 'config'],
-         workdir='tools',
-         haltOnFailure=True
-        )
+    def __init__(self, verifyConfig, buildSpace=.3, **kwargs):
+        ReleaseFactory.__init__(self, repoPath='nothing',
+                                buildSpace=buildSpace, **kwargs)
         self.addStep(UpdateVerify,
          command=['bash', 'verify.sh', '-c', verifyConfig],
          workdir='tools/release/updates',
@@ -1987,12 +1962,14 @@ class UpdateVerifyFactory(ReleaseFactory):
         )
 
 class ReleaseFinalVerification(ReleaseFactory):
-    def __init__(self, linuxConfig, macConfig, win32Config, **kwargs):
+    def __init__(self, verifyConfigs, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
+        verifyCommand = ['bash', 'final-verification.sh']
+        for platform in sorted(verifyConfigs.keys()):
+            verifyCommand.append(verifyConfigs[platform])
         self.addStep(ShellCommand,
-         command=['bash', 'final-verification.sh',
-                  linuxConfig, macConfig, win32Config],
+         command=verifyCommand,
          description=['final-verification.sh'],
          workdir='tools/release'
         )
