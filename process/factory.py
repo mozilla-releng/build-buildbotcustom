@@ -3444,7 +3444,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
     def tinderboxPrintRevisions(self):
         self.tinderboxPrint('fennec_revision',WithProperties('%(fennec_revision)s'))
         self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
-        self.tinderboxPrint('toolkit_revision',WithProperties('%(toolkit_revision)s'))
+        self.tinderboxPrint('gecko_revision',WithProperties('%(gecko_revision)s'))
 
     def doRepack(self):
         self.addStep(ShellCommand,
