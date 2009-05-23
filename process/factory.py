@@ -3492,7 +3492,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
 
 
 class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
-    extraConfigureArgs = ['--target=arm-linux']
+    extraConfigureArgs = ['--target=arm-linux-gnueabi']
 
     def __init__(self, **kwargs):
         MobileNightlyRepackFactory.__init__(self, **kwargs)
