@@ -366,8 +366,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
              command=['hg', 'identify', '-i'],
              property='got_revision'
             )
-        changesetLink = '<a href=http://%s/%s/index.cgi/rev' % (self.hgHost,
-                                                                self.repoPath)
+        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+                                                      self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(ShellCommand,
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
@@ -2197,7 +2197,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
     def addPrintChangesetStep(self):
         changesetLink = ''.join(['<a href=http://hg.mozilla.org/',
             self.repoPath,
-            '/index.cgi/rev/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'])
+            '/rev/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'])
         self.addStep(ShellCommand,
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
         )
