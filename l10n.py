@@ -963,7 +963,7 @@ class NightlyL10n(Nightly, L10nMixin):
                minute=0, hour='*', dayOfMonth='*', month='*', dayOfWeek='*', 
                repo = 'http://hg.mozilla.org/', branch=None, baseTag='default',
                localesFile=None, cvsRoot=DEFAULT_CVSROOT, locales=None,
-               tree=None):
+               tree="notset"):
     
     Nightly.__init__(self, name, builderNames, minute, hour, dayOfMonth, month,
                      dayOfWeek, branch, properties={'nightly': True})
@@ -988,7 +988,7 @@ class DependentL10n(Dependent, L10nMixin):
   def __init__(self, name, upstream, builderNames, platform,
                repoType, repo = 'http://hg.mozilla.org/', branch=None,
                baseTag='default', localesFile=None,
-               cvsRoot=DEFAULT_CVSROOT, locales=None, tree=None):
+               cvsRoot=DEFAULT_CVSROOT, locales=None, tree="notset"):
       Dependent.__init__(self, name, upstream, builderNames)
       # The next two lines has been added because of:
       # _cbLoadedLocales's BuildSet submit needs them
