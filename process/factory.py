@@ -747,7 +747,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
         self.addStep(SetProperty,
          command=['hg', 'identify', '-i'],
-         workdir='build/mozilla',
+         workdir='build%s' % self.mozillaDir,
          property='hg_revision'
         )
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
@@ -2231,19 +2231,30 @@ class UnittestBuildFactory(MozillaBuildFactory):
         pass
 
 class CCUnittestBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, config_repo_path, config_dir, objdir, mozRepoPath,
-            productName=None, brandName=None, mochitest_leak_threshold=None,
+    def __init__(self, platform, productName, config_repo_path, config_dir,
+            objdir, mozRepoPath, brandName=None, mochitest_leak_threshold=None,
             mochichrome_leak_threshold=None, mochibrowser_leak_threshold=None,
-            exec_reftest_suites=True, exec_mochi_suites=True, run_a11y=True,
-            **kwargs):
+            uploadPackages=False, unittestMasters=None, stageUsername=None,
+            stageServer=None, stageSshKey=None, exec_reftest_suites=True,
+            exec_mochi_suites=True, run_a11y=True, **kwargs):
         self.env = {}
+
         MozillaBuildFactory.__init__(self, **kwargs)
+
+        self.productName = productName
+        self.stageServer = stageServer
+        self.stageUsername = stageUsername
+        self.stageSshKey = stageSshKey
+        self.uploadPackages = uploadPackages
         self.config_repo_path = config_repo_path
         self.mozRepoPath = mozRepoPath
         self.config_dir = config_dir
         self.objdir = objdir
         self.run_a11y = run_a11y
-        self.productName = productName
+        if unittestMasters is None:
+            self.unittestMasters = []
+        else:
+            self.unittestMasters = unittestMasters
         if brandName:
             self.brandName = brandName
         else:
@@ -2264,6 +2275,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
+
+        # Mozilla subdir and objdir
+        self.mozillaDir = '/mozilla'
+        self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
 
         self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
@@ -2341,10 +2356,67 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          timeout=60*60, # 1 hour
          haltOnFailure=1
         )
+
         self.addStep(ShellCommand,
-                     command=['make', 'buildsymbols'],
-                     workdir='build/%s' % self.objdir,
-                     )
+         command=['make', 'buildsymbols'],
+         workdir='build/%s' % self.objdir,
+         )
+
+        if self.uploadPackages:
+            self.addStep(ShellCommand,
+             command=['make', 'package'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             command=['make', 'package-tests'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+            )
+            self.addStep(GetBuildID,
+             objdir=self.mozillaObjdir,
+             workdir='build%s' % self.mozillaDir,
+            )
+
+            uploadEnv = self.env.copy()
+            uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                              'UPLOAD_USER': self.stageUsername,
+                              'UPLOAD_TO_TEMP': '1'})
+            if self.stageSshKey:
+                uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+            # Always upload builds to the dated tinderbox builds directories
+            postUploadCmd =  ['post_upload.py']
+            postUploadCmd += ['--tinderbox-builds-dir %s-%s-unittest' %
+                                    (self.branchName, self.platform),
+                              '-i %(buildid)s',
+                              '-p %s' % self.productName,
+                              '--release-to-tinderbox-dated-builds']
+
+            uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+            def get_url(rc, stdout, stderr):
+                m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
+                if m:
+                    return {'packageUrl': m.group(1)}
+                return {}
+            self.addStep(SetProperty,
+             command=['make', 'upload'],
+             env=uploadEnv,
+             workdir='build/%s' % self.objdir,
+             extract_fn = get_url,
+            )
+
+            branch = "%s-%s-unittest" % (self.branchName, self.platform)
+            for master, warn in self.unittestMasters:
+                self.addStep(SendChangeStep(
+                 warnOnFailure=warn,
+                 master=master,
+                 branch=branch,
+                 files=[WithProperties('%(packageUrl)s')],
+                 user="sendchange-unittest")
+                )
 
         self.addStep(SetProperty,
          command=['bash', '-c', 'pwd'],
@@ -2425,7 +2497,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
     def addPrintMozillaChangesetStep(self):
         self.addStep(SetProperty,
          command=['hg', 'identify', '-i'],
-         workdir='build/mozilla',
+         workdir='build%s' % self.mozillaDir,
          property='hg_revision'
         )
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
