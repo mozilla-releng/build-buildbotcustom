@@ -2734,7 +2734,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
-                 env=None, **kwargs):
+                 clobber=False, env=None, **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm, wince-arm)
@@ -2757,6 +2757,12 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageGroup = stageGroup
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
+        
+        if nightly:
+            self.clobber = clobber = True
+        else:
+            self.clobber = clobber
+        
         if baseUploadDir is None:
             self.baseUploadDir = self.mobileBranchName
         else:
@@ -2799,7 +2805,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
             ))
 
-    def getMozconfig(self):
+    def addPreCleanSteps(self):
         self.addHgPullSteps(repository=self.configRepository,
                             workdir=self.baseWorkDir,
                             targetDirectory='configs')
@@ -2816,6 +2822,18 @@ class MobileBuildFactory(MozillaBuildFactory):
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             description=['cat', 'mozconfig']
         )
+        
+    def addPreBuildSteps(self):
+        pass
+    
+    def addBaseRepoSteps(self):
+        self.addHgPullSteps(repository=self.repository,
+                            workdir=self.baseWorkDir,
+                            cloneTimeout=60*30)
+        self.addHgPullSteps(repository=self.mobileRepository,
+                            workdir='%s/%s' % (self.baseWorkDir,
+                                               self.branchName),
+                            targetDirectory='mobile')
 
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
@@ -2858,28 +2876,20 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.packageGlob = packageGlob
         self.scratchboxPath = scratchboxPath
 
-        self.addPrecleanSteps()
-        self.addHgPullSteps(repository=self.repository,
-                            workdir=self.baseWorkDir,
-                            changesetLink=self.mozChangesetLink,
-                            cloneTimeout=60*30)
-        self.addHgPullSteps(repository=self.mobileRepository,
-                            workdir='%s/%s' % (self.baseWorkDir,
-                                               self.branchName),
-                            changesetLink=self.mobileChangesetLink,
-                            targetDirectory='mobile')
-        self.getMozconfig()
+        self.addPreCleanSteps()
+        self.addBaseRepoSteps()
+        self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform='linux')
 
-    def addPrecleanSteps(self):
+    def addPreCleanSteps(self):
         self.addStep(ShellCommand,
             command = 'rm -f /tmp/*_cltbld.log',
             description=['removing', 'logfile'],
             descriptionDone=['removed', 'logfile']
         )
-        if self.nightly:
+        if self.clobber:
             self.addStep(ShellCommand,
                 command=['rm', '-rf', self.branchName],
                 env=self.env,
@@ -2900,6 +2910,18 @@ class MaemoBuildFactory(MobileBuildFactory):
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
             )
+        MobileBuildFactory.addPreCleanSteps(self)
+            
+    def addBaseRepoSteps(self):
+        self.addHgPullSteps(repository=self.repository,
+                            workdir=self.baseWorkDir,
+                            changesetLink=self.mozChangesetLink,
+                            cloneTimeout=60*30)
+        self.addHgPullSteps(repository=self.mobileRepository,
+                            workdir='%s/%s' % (self.baseWorkDir,
+                                               self.branchName),
+                            changesetLink=self.mobileChangesetLink,
+                            targetDirectory='mobile')
 
     def addBuildSteps(self):
         self.addStep(ShellCommand,
@@ -2949,24 +2971,15 @@ class WinceBuildFactory(MobileBuildFactory):
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
-
-        self.addPrecleanSteps()
-        self.addHgPullSteps(repository=self.repository,
-                            workdir=self.baseWorkDir,
-                            changesetLink=self.mozChangesetLink,
-                            cloneTimeout=60*30)
-        self.addHgPullSteps(repository=self.mobileRepository,
-                            workdir='%s/%s' % (self.baseWorkDir,
-                                               self.branchName),
-                            changesetLink=self.mobileChangesetLink,
-                            targetDirectory='mobile')
-        self.getMozconfig()
+        self.addPreCleanSteps()
+        self.addBaseRepoSteps()
+        self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform='win32')
-
-    def addPrecleanSteps(self):
-        if self.nightly:
+        
+    def addPreCleanSteps(self):
+        if self.clobber:
             self.addStep(ShellCommand,
                 command=['rm', '-rf', self.branchName],
                 env=self.env,
@@ -2985,6 +2998,7 @@ class WinceBuildFactory(MobileBuildFactory):
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
             )
+        MobileBuildFactory.addPreCleanSteps(self)
 
     def addBuildSteps(self):
         self.addStep(ShellCommand,

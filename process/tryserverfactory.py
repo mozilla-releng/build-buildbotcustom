@@ -13,11 +13,12 @@ reload(buildbotcustom.process.factory)
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.tryserver)
 
-from buildbotcustom.process.factory import MercurialBuildFactory
+from buildbotcustom.process.factory import MercurialBuildFactory, \
+  WinceBuildFactory, MaemoBuildFactory
 from buildbotcustom.steps.misc import SendChangeStep
 from buildbotcustom.steps.tryserver import MozillaTryProcessing, \
   MozillaDownloadMozconfig, MozillaPatchDownload, MozillaTryServerHgClone, \
-  MozillaCustomPatch
+  MozillaCustomPatch, MozillaCreateUploadDirectory, MozillaUploadTryBuild
 
 
 class TryBuildFactory(MercurialBuildFactory):
@@ -133,3 +134,225 @@ class TryBuildFactory(MercurialBuildFactory):
              files=[WithProperties(fullUploadPath)],
              user="sendchange-unittest"
             )
+
+
+class MaemoTryBuildFactory(MaemoBuildFactory):
+    def __init__(self, scp_string=None, targetSubDir='maemo', 
+                 slavesrcdir = 'upload', **kwargs):
+        self.scp_string = scp_string
+        self.targetSubDir = targetSubDir
+        self.slavesrcdir = slavesrcdir
+        MaemoBuildFactory.__init__(self, **kwargs)
+
+    def addPreCleanSteps(self):
+        self.addStep(MozillaTryProcessing)
+        self.addStep(ShellCommand,
+            name="remove source and obj dirs",
+            command=["rm", "-rf", self.baseWorkDir],
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            workdir=self.baseWorkDir,
+            timeout=60*60, # 1 hour
+        )
+
+    def addBaseRepoSteps(self):
+        self.addStep(MozillaTryServerHgClone, workdir=self.baseWorkDir)
+        self.addHgPullSteps(repository=self.mobileRepository,
+                            workdir=self.baseWorkDir,
+                            targetDirectory='mobile')
+
+    def addPreBuildSteps(self):
+        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-maemo",
+                     workdir=self.baseWorkDir, patchDir="patches/")
+        self.addStep(MozillaPatchDownload,
+            patchDir="patches/",
+            haltOnFailure=False,
+            flunkOnFailure=True,
+            workdir=self.baseWorkDir,
+            isOptional=True,
+        )
+        self.addStep(MozillaCustomPatch,
+            workdir=self.baseWorkDir,
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            isOptional=True
+        )
+        self.addStep(ShellCommand,
+            name="mozconfig contents",
+            command=["cat", ".mozconfig"],
+            workdir=self.baseWorkDir,
+            description=["mozconfig", "contents"]
+        )
+
+    def addBuildSteps(self):
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     self.baseWorkDir,
+                     'make -f client.mk build'],
+            description=['compile'],
+            env={'PKG_CONFIG_PATH' :
+                 '/usr/lib/pkgconfig:/usr/local/lib/pkgconfig'},
+            haltOnFailure=True
+        )
+        
+    def addUploadSteps(self, platform=None):
+        self.addStep(MozillaCreateUploadDirectory,
+            scpString=self.scp_string,
+            haltOnFailure=False,
+            flunkOnFailure=False,
+            targetSubDir=self.targetSubDir,
+            workdir='.'
+        )
+        
+        self.addStep(MozillaUploadTryBuild,
+            baseFilename="",
+            slavedir=self.baseWorkDir,
+            slavesrcdir="%s/%s/*" % (self.baseWorkDir, self.slavesrcdir),
+            scpString=self.scp_string,
+            targetSubDir=self.targetSubDir,
+            haltOnFailure=False,
+            flunkOnFailure=False,
+            workdir="%s/%s" % (self.baseWorkDir, self.objdir),
+        )
+
+    def addPackageSteps(self):
+        self.addStep(ShellCommand,
+            command='mkdir upload',
+            description=['create', 'upload', 'directory'],
+            haltOnFailure=True,
+            workdir=self.baseWorkDir)
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     '%s/%s/mobile' % (self.baseWorkDir, self.objdir),
+                     'make package'],
+            description=['make', 'package'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     '%s/%s/xulrunner' % (self.baseWorkDir, self.objdir),
+                     'make package-tests PYTHON=python2.5'],
+            description=['make', 'package-tests'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     '%s/%s/mobile' % (self.baseWorkDir,
+                                                self.objdir),
+                     'make deb'],
+            description=['make', 'mobile', 'deb'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=[self.scratchboxPath, '-p', '-d',
+                     '%s/%s/xulrunner' % (self.baseWorkDir,
+                                                self.objdir),
+                     'make deb'],
+            description=['make', 'xulrunner', 'deb'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command="cp %s %s/%s" % (self.packageGlob, 
+                                     self.baseWorkDir, self.slavesrcdir),
+            description=['move', 'globs', 'to', 'upload', 'directory'],
+            workdir="%s/%s" % (self.baseWorkDir, self.objdir))
+
+
+class WinceTryBuildFactory(WinceBuildFactory):
+    def __init__(self, scp_string=None, targetSubDir='wince',
+                 slavesrcdir='upload', **kwargs):
+        self.scp_string = scp_string
+        self.targetSubDir=targetSubDir
+        self.slavesrcdir=slavesrcdir
+        WinceBuildFactory.__init__(self, **kwargs)
+
+    def addPreCleanSteps(self):
+        self.addStep(MozillaTryProcessing)
+        self.addStep(ShellCommand,
+            name="remove source and obj dirs",
+            command=["rm", "-rf", "%s" % self.baseWorkDir],
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            workdir=".",
+            timeout=60*60, # 1 hour
+        )
+        
+    def addBaseRepoSteps(self):
+        self.addStep(MozillaTryServerHgClone, workdir=self.baseWorkDir)
+        self.addHgPullSteps(repository=self.mobileRepository,
+                            workdir=self.baseWorkDir,
+                            targetDirectory='mobile')
+
+    def addPreBuildSteps(self):
+        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-wince",
+                                               patchDir="patches/",
+                                               workdir=self.baseWorkDir)
+        self.addStep(MozillaPatchDownload,
+            patchDir="patches/",
+            haltOnFailure=False,
+            flunkOnFailure=True,
+            workdir=self.baseWorkDir,
+            isOptional=True,
+        )
+        self.addStep(MozillaCustomPatch,
+            workdir=self.baseWorkDir,
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            isOptional=True
+        )
+        self.addStep(ShellCommand,
+            name="mozconfig contents",
+            command=["cat", ".mozconfig"],
+            workdir=self.baseWorkDir,
+            description=["mozconfig", "contents"]
+        )
+
+    def addBuildSteps(self):
+        self.addStep(ShellCommand,
+            command=['make', '-f', 'client.mk', 'build'],
+            description=['compile'],
+            workdir=self.baseWorkDir,
+            env=self.env,
+            haltOnFailure=True
+        )
+        
+    def addUploadSteps(self, platform=None):
+        self.addStep(MozillaCreateUploadDirectory,
+            scpString=self.scp_string,
+            haltOnFailure=False,
+            flunkOnFailure=False,
+            targetSubDir=self.targetSubDir,
+            workdir='.'
+        )
+        
+        self.addStep(MozillaUploadTryBuild,
+            slavedir=self.baseWorkDir,
+            baseFilename="",
+            slavesrcdir=r"%s/*" % self.slavesrcdir,
+            scpString=self.scp_string,
+            targetSubDir=self.targetSubDir,
+            haltOnFailure=False,
+            flunkOnFailure=False,
+        )
+    def addPackageSteps(self):
+        self.addStep(ShellCommand,
+            command='mkdir upload',
+            description=['create', 'upload', 'directory'],
+            haltOnFailure=True,
+            workdir=self.baseWorkDir)
+        self.addStep(ShellCommand,
+            command=['make', 'package'],
+            workdir='%s\%s\mobile' % (self.baseWorkDir, self.objdir),
+            description=['make', 'package'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command=['make', 'installer'],
+            workdir='%s\%s\mobile' % (self.baseWorkDir, self.objdir),
+            description=['make', 'installer'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            command="cp %s ../%s" % (self.packageGlob, self.slavesrcdir),
+            description=['copy', 'globs', 'to', 'upload', 'directory'],
+            workdir="%s\%s" % (self.baseWorkDir, self.objdir))

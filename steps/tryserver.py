@@ -112,7 +112,7 @@ class MozillaDownloadMozconfig(FileDownload):
     flunkOnFailure = False
     warnOnFailure = False
 
-    def __init__(self, mastersrc=None, patchDir=".", workdir="mozilla",
+    def __init__(self, mastersrc=None, patchDir=".", workdir="mozilla", slavedest=".mozconfig",
                  **kwargs):
         """arguments:
         @type  patchDir:   string
@@ -123,8 +123,8 @@ class MozillaDownloadMozconfig(FileDownload):
                             Defaults to '.'
         """
         # mastersrc and slavedest get overridden in start()
-        FileDownload.__init__(self, mastersrc=mastersrc, slavedest=".mozconfig",
-                              workdir=workdir, **kwargs)
+        FileDownload.__init__(self, mastersrc=mastersrc,
+                              workdir=workdir, slavedest=slavedest, **kwargs)
         self.addFactoryArguments(patchDir=patchDir)
         self.patchDir = patchDir
         self.super_class = FileDownload
@@ -229,7 +229,8 @@ class MozillaPatchDownload(FileDownload):
 class MozillaUploadTryBuild(ShellCommand):
     warnOnFailure = True
 
-    def __init__(self, slavedir, baseFilename, scpString, **kwargs):
+    def __init__(self, slavedir, baseFilename, scpString, slavesrc=None,
+                 slavesrcdir=None, targetSubDir=None, **kwargs):
         """
         @type  slavedir:   string
         @param slavedir:   The directory that contains the file that will be
@@ -251,6 +252,9 @@ class MozillaUploadTryBuild(ShellCommand):
         self.baseFilename = baseFilename
         self.scpString = scpString
         self.super_class = ShellCommand
+        self.slavesrc = slavesrc
+        self.slavesrcdir = slavesrcdir
+        self.targetSubDir = targetSubDir
 
     def start(self):
         # we need to append some additional information to the package name
@@ -266,15 +270,25 @@ class MozillaUploadTryBuild(ShellCommand):
         # this is the filename of the package built on the slave
         filename = "%s-%s" % (self.getProperty('identifier'), self.baseFilename)
         # the path to the package + the filename
-        slavesrc = path.join(self.slavedir, filename)
-        # the full path + full filename to the package
-        # the filename is prepended with the submission time and submitter so
-        # it can be sorted by the server on the other end
-        self.scpString = path.join(self.scpString, dir, "%s-%s"
-                                   % (changer, filename))
-
-        self.setCommand(["scp", slavesrc, self.scpString])
-        self.setProperty('uploadpath', path.join(dir, "%s-%s" % (changer, filename)))
+        if self.slavesrc is None:
+            self.slavesrc = path.join(self.slavedir, filename)
+        
+        if self.slavesrcdir is not None:
+            #pass #Upload Directory
+            if self.targetSubDir:
+                self.scpString = path.join(self.scpString, dir, self.targetSubDir)
+            else:
+                self.scpString = path.join(self.scpString, dir)
+            self.setCommand("scp -r %s %s" % (self.slavesrcdir, self.scpString))
+            self.setProperty('uploaddir', path.join(dir, "%s" % changer))
+        else: 
+            # the full path + full filename to the package
+            # the filename is prepended with the submission time and submitter so
+            # it can be sorted by the server on the other end
+            self.scpString = path.join(self.scpString, dir, "%s-%s"
+                                       % (changer, filename))
+            self.setCommand("scp %s %s" % (self.slavesrc, self.scpString))
+            self.setProperty('uploadpath', path.join(dir, "%s-%s" % (changer, filename)))
         self.super_class.start(self)
 
 
@@ -369,11 +383,12 @@ class MozillaCustomPatch(ShellCommand):
 
 
 class MozillaCreateUploadDirectory(ShellCommand):
-    def __init__(self, scpString, **kwargs):
+    def __init__(self, scpString, targetSubDir=None, **kwargs):
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(scpString=scpString)
         (self.sshHost, self.sshDir) = scpString.split(":")
         self.super_class = ShellCommand
+        self.targetSubDir = targetSubDir
 
     def start(self):
         changes = self.step_status.build.getChanges()
@@ -381,8 +396,11 @@ class MozillaCreateUploadDirectory(ShellCommand):
         changer = changes[0].who
         args = parseSendchangeArguments(changes[0].files)
         dir = "%s-%s-%s" % (when, changer, self.getProperty('identifier'))
-        fullDir = path.join(self.sshDir, dir)
-        self.setCommand(['ssh', self.sshHost, 'mkdir', fullDir])
+        if self.targetSubDir:
+            fullDir = path.join(self.sshDir, dir, self.targetSubDir)
+        else:
+            fullDir = path.join(self.sshDir, dir)
+        self.setCommand(['ssh', self.sshHost, 'mkdir', '-p', fullDir])
 
         self.super_class.start(self)
 
