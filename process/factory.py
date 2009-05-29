@@ -930,14 +930,17 @@ class BaseRepackFactory(MozillaBuildFactory):
 
     extraConfigureArgs = []
 
-    def __init__(self, project, appName, l10nRepoPath, stageServer,
-                 stageUsername, stageSshKey=None, baseWorkDir='build',
-                 tree=None, **kwargs):
+    def __init__(self, project, appName, l10nRepoPath,
+                 compareLocalesRepoPath, compareLocalesTag,
+                 stageServer, stageUsername, stageSshKey=None,
+                 baseWorkDir='build', tree="notset", **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
         self.appName = appName
         self.l10nRepoPath = l10nRepoPath
+        self.compareLocalesRepoPath = compareLocalesRepoPath
+        self.compareLocalesTag = compareLocalesTag
         self.stageServer = stageServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
@@ -1020,6 +1023,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.downloadBuilds()
         self.updateEnUS()
         self.tinderboxPrintRevisions()
+        self.compareLocalesSetup()       
+        self.compareLocales()
         self.doRepack()
         self.doUpload()
 
@@ -1085,6 +1090,59 @@ class BaseRepackFactory(MozillaBuildFactory):
     def tinderboxPrintRevisions(self):
         '''Display the various revisions used in building for
         scraping in Tinderbox. 
+        This is implemented in the subclasses.
+        '''   
+        pass
+
+    def compareLocalesSetup(self):
+        compareLocalesRepo = self.getRepository(self.compareLocalesRepoPath)
+        self.addStep(ShellCommand,
+         command=['rm', '-rf', 'compare-locales'],
+         description=['remove', 'compare-locales'],
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'clone', compareLocalesRepo, 'compare-locales'],
+         description=['checkout', 'compare-locales'],
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )        
+        self.addStep(ShellCommand,
+         command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
+         description='update compare-locales',
+         workdir='%s/compare-locales' % self.baseWorkDir,
+         haltOnFailure=True
+        )
+        
+    def compareLocales(self):
+        self.addStep(ShellCommand,
+         command=['rm', '-rf', 'merged'],
+         description=['remove', 'merged'],
+         workdir=self.baseWorkDir,
+         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
+                                       self.branchName,
+                                       self.appName),
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['python',
+                  '../../../compare-locales/scripts/compare-locales',
+                  '-m', 'merged',
+                  "l10n.ini",
+                  "../../../%s" % self.l10nRepoPath,
+                  WithProperties('%(locale)s')],
+         description='comparing locale',
+         env={'PYTHONPATH': ['../../../compare-locales/lib']},
+         flunkOnFailure=False,
+         warnOnFailure=True,
+         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
+                                       self.branchName,
+                                       self.appName),
+        )
+            
+    def doRepack(self):
+        '''Perform the repackaging.
 
         This is implemented in the subclasses.
         '''
@@ -1159,11 +1217,11 @@ class NightlyRepackFactory(BaseRepackFactory):
 
     def doRepack(self):
         self.addStep(ShellCommand,
-         command=['make', WithProperties('installers-%(locale)s')],
+         command=['sh','-c',
+                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          haltOnFailure=True,
          workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
-
 
 
 class ReleaseFactory(MozillaBuildFactory):
@@ -1312,6 +1370,22 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              workdir='build/'+self.branchName,
              haltOnFailure=True
             )
+
+    def compareLocales(self):
+        self.addStep(ShellCommand,
+         command=['python',
+                  '../../../compare-locales/scripts/compare-locales',
+                  "l10n.ini",
+                  "../../../%s" % self.l10nRepoPath,
+                  WithProperties('%(locale)s')],
+         description='comparing locale',
+         env={'PYTHONPATH': ['../../../compare-locales/lib']},
+         flunkOnWarnings=True,
+         haltOnFailure=True,         
+         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
+                                       self.branchName,
+                                       self.appName),
+        )
         
     def doRepack(self):
         # Because we're generating updates we need to build the libmar tools
@@ -3525,7 +3599,8 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
 
     def doRepack(self):
         self.addStep(ShellCommand,
-         command=['make', WithProperties('installers-%(locale)s')],
+         command=['sh','-c',
+                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
                                        self.appName)
