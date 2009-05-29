@@ -2805,7 +2805,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
             ))
 
-    def addPreCleanSteps(self):
+    def getMozconfig(self):
         self.addHgPullSteps(repository=self.configRepository,
                             workdir=self.baseWorkDir,
                             targetDirectory='configs')
@@ -2878,6 +2878,7 @@ class MaemoBuildFactory(MobileBuildFactory):
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
+        self.getMozconfig()
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
@@ -2910,7 +2911,6 @@ class MaemoBuildFactory(MobileBuildFactory):
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
             )
-        MobileBuildFactory.addPreCleanSteps(self)
             
     def addBaseRepoSteps(self):
         self.addHgPullSteps(repository=self.repository,
@@ -2973,6 +2973,7 @@ class WinceBuildFactory(MobileBuildFactory):
         self.packageGlob = packageGlob
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
+        self.getMozconfig()
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
@@ -2998,7 +2999,6 @@ class WinceBuildFactory(MobileBuildFactory):
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
             )
-        MobileBuildFactory.addPreCleanSteps(self)
 
     def addBuildSteps(self):
         self.addStep(ShellCommand,

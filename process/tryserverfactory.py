@@ -144,6 +144,10 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
         self.slavesrcdir = slavesrcdir
         MaemoBuildFactory.__init__(self, **kwargs)
 
+    def getMozconfig(self):
+        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-maemo",
+                     workdir=self.baseWorkDir, patchDir="patches/")
+
     def addPreCleanSteps(self):
         self.addStep(MozillaTryProcessing)
         self.addStep(ShellCommand,
@@ -162,8 +166,6 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
                             targetDirectory='mobile')
 
     def addPreBuildSteps(self):
-        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-maemo",
-                     workdir=self.baseWorkDir, patchDir="patches/")
         self.addStep(MozillaPatchDownload,
             patchDir="patches/",
             haltOnFailure=False,
@@ -266,6 +268,11 @@ class WinceTryBuildFactory(WinceBuildFactory):
         self.slavesrcdir=slavesrcdir
         WinceBuildFactory.__init__(self, **kwargs)
 
+    def getMozconfig(self):
+        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-wince",
+                                               patchDir="patches/",
+                                               workdir=self.baseWorkDir)
+
     def addPreCleanSteps(self):
         self.addStep(MozillaTryProcessing)
         self.addStep(ShellCommand,
@@ -284,9 +291,6 @@ class WinceTryBuildFactory(WinceBuildFactory):
                             targetDirectory='mobile')
 
     def addPreBuildSteps(self):
-        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-wince",
-                                               patchDir="patches/",
-                                               workdir=self.baseWorkDir)
         self.addStep(MozillaPatchDownload,
             patchDir="patches/",
             haltOnFailure=False,
