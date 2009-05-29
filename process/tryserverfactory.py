@@ -163,6 +163,7 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
         self.addStep(MozillaTryServerHgClone, workdir=self.baseWorkDir)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir=self.baseWorkDir,
+                            changesetLink=self.mobileChangesetLink,
                             targetDirectory='mobile')
 
     def addPreBuildSteps(self):
@@ -288,6 +289,7 @@ class WinceTryBuildFactory(WinceBuildFactory):
         self.addStep(MozillaTryServerHgClone, workdir=self.baseWorkDir)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir=self.baseWorkDir,
+                            changesetLink=self.mobileChangesetLink,
                             targetDirectory='mobile')
 
     def addPreBuildSteps(self):

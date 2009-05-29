@@ -2829,10 +2829,12 @@ class MobileBuildFactory(MozillaBuildFactory):
     def addBaseRepoSteps(self):
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
+                            changesetLink=self.mozChangesetLink,
                             cloneTimeout=60*30)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
+                            changesetLink=self.mobileChangesetLink,
                             targetDirectory='mobile')
 
     def addUploadSteps(self, platform):
@@ -2912,17 +2914,6 @@ class MaemoBuildFactory(MobileBuildFactory):
                 descriptionDone=['removed', 'old', 'builds']
             )
             
-    def addBaseRepoSteps(self):
-        self.addHgPullSteps(repository=self.repository,
-                            workdir=self.baseWorkDir,
-                            changesetLink=self.mozChangesetLink,
-                            cloneTimeout=60*30)
-        self.addHgPullSteps(repository=self.mobileRepository,
-                            workdir='%s/%s' % (self.baseWorkDir,
-                                               self.branchName),
-                            changesetLink=self.mobileChangesetLink,
-                            targetDirectory='mobile')
-
     def addBuildSteps(self):
         self.addStep(ShellCommand,
             command=[self.scratchboxPath, '-p', '-d',
