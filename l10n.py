@@ -230,7 +230,7 @@ class AsyncLoader(L10nConfigParser):
       if type == 'cvs':
         cp = CVSAsyncLoader(orig_cp.get(details, 'l10n.ini'), branch)
       else:
-        l10n_ini_temp = '%(repo)s%(mozilla)s/raw-file/tip/%(l10n.ini)s'
+        l10n_ini_temp = '%(repo)s%(mozilla)s/raw-file/default/%(l10n.ini)s'
         cp = AsyncLoader(l10n_ini_temp % dict(orig_cp.items(details)), branch,
                          _type=type)
     else:
@@ -243,8 +243,11 @@ class AsyncLoader(L10nConfigParser):
     d.addCallbacks(self._loadDone, self.d.errback)
     self.children.append(cp)
 
-  def getAllLocales(self):
-    return self._getPage(self.all_url)
+  def getAllLocales(self, revision=None):
+    all_url = self.all_url
+    if revision is not None:
+      all_url = all_url.replace('/default/', '/%s/' % revision)
+    return self._getPage(all_url)
 
   def _getPage(self, path):
     return getPage(path, timeout = self.timeout)
@@ -360,7 +363,7 @@ def configureDispatcher(config, section, scheduler, buildOnEnUS=False):
     CVSAsyncLoader.CVSROOT = repositories.mozilla.repository
     cp = CVSAsyncLoader(config.get(section, 'l10n.ini'), en_branch)
   else:
-    l10n_ini_temp = '%(repo)s%(mozilla)s/raw-file/tip/%(l10n.ini)s'
+    l10n_ini_temp = '%(repo)s%(mozilla)s/raw-file/default/%(l10n.ini)s'
     # substitute "repo", "mozilla" and "l10n.ini" from the l10nbuilds.ini file 
     cp = AsyncLoader(l10n_ini_temp % dict(config.items(section)), en_branch,
                      _type = buildtype)
@@ -543,7 +546,10 @@ class AllLocalesWatcher(IBaseDispatcher):
       return
     # Let's get the contents of all-locales in the repo
     self.debug("update all-locales for %s" % self.tree)
-    d = self.loader.getAllLocales()
+    kwargs = {}
+    if change.revision:
+      kwargs['revision'] = change.revision
+    d = self.loader.getAllLocales(**kwargs)
     d.addCallbacks(self.callback, self.errback)
 
   def callback(self, locales):
