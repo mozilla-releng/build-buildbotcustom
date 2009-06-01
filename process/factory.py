@@ -1173,6 +1173,13 @@ class NightlyRepackFactory(BaseRepackFactory):
          workdir=WithProperties('build/' + self.l10nRepoPath + '/%(locale)s'),
          haltOnFailure=True
         )
+        self.addStep(SetProperty,
+                     command=['hg', 'ident', '-i'],
+                     haltOnFailure=True,
+                     property='l10n_revision',
+                     workdir=WithProperties('build/' + self.l10nRepoPath + 
+                                            '/%(locale)s')
+                     )
 
     def getMozconfig(self):
         pass
@@ -1289,6 +1296,13 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          workdir=WithProperties('build/' + self.l10nRepoPath + '/%(locale)s'),
          description=['update to', self.buildRevision]
         )
+        self.addStep(SetProperty,
+                     command=['hg', 'ident', '-i'],
+                     haltOnFailure=True,
+                     property='l10n_revision',
+                     workdir=WithProperties('build/' + self.l10nRepoPath + 
+                                            '/%(locale)s')
+                     )
 
     def getMozconfig(self):
         self.addStep(ShellCommand,
