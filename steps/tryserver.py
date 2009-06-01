@@ -265,8 +265,7 @@ class MozillaUploadTryBuild(ShellCommand):
         changer = changes[0].who
         # the time the change was processed, this should be the same for every
         # build in a set
-        when = strftime("%Y-%m-%d_%H:%M", localtime(changes[0].when))
-        dir = "%s-%s-%s" % (when, changer, self.getProperty('identifier'))
+        dir = "%s-%s" % (changer, self.getProperty('identifier'))
         # this is the filename of the package built on the slave
         filename = "%s-%s" % (self.getProperty('identifier'), self.baseFilename)
         # the path to the package + the filename
@@ -392,10 +391,9 @@ class MozillaCreateUploadDirectory(ShellCommand):
 
     def start(self):
         changes = self.step_status.build.getChanges()
-        when = strftime("%Y-%m-%d_%H:%M", localtime(changes[0].when))
         changer = changes[0].who
         args = parseSendchangeArguments(changes[0].files)
-        dir = "%s-%s-%s" % (when, changer, self.getProperty('identifier'))
+        dir = "%s-%s" % (changer, self.getProperty('identifier'))
         if self.targetSubDir:
             fullDir = path.join(self.sshDir, dir, self.targetSubDir)
         else:
