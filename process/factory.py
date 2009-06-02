@@ -41,8 +41,8 @@ import buildbotcustom.steps.unittest as unittest_steps
 import buildbotcustom.steps.talos as talos_steps
 
 class BootstrapFactory(BuildFactory):
-    def __init__(self, automation_tag, logdir, bootstrap_config, 
-                 cvsroot="pserver:anonymous@cvs-mirror.mozilla.org", 
+    def __init__(self, automation_tag, logdir, bootstrap_config,
+                 cvsroot="pserver:anonymous@cvs-mirror.mozilla.org",
                  cvsmodule="mozilla"):
         """
     @type  cvsroot: string
@@ -55,51 +55,51 @@ class BootstrapFactory(BuildFactory):
     @param automation_tag: The CVS Tag to use for checking out Bootstrap.
 
     @type  logdir: string
-    @param logdir: The log directory for Bootstrap to use. 
+    @param logdir: The log directory for Bootstrap to use.
                    Note - will be created if it does not already exist.
 
     @type  bootstrap_config: string
-    @param bootstrap_config: The location of the bootstrap.cfg file on the 
+    @param bootstrap_config: The location of the bootstrap.cfg file on the
                              slave. This will be copied to "bootstrap.cfg"
                              in the builddir on the slave.
         """
         BuildFactory.__init__(self)
-        self.addStep(ShellCommand, 
+        self.addStep(ShellCommand,
          description='clean checkout',
-         workdir='.', 
+         workdir='.',
          command=['rm', '-rf', 'build'],
          haltOnFailure=1)
-        self.addStep(ShellCommand, 
-         description='checkout', 
+        self.addStep(ShellCommand,
+         description='checkout',
          workdir='.',
          command=['cvs', '-d', cvsroot, 'co', '-r', automation_tag,
                   '-d', 'build', cvsmodule],
          haltOnFailure=1,
         )
-        self.addStep(ShellCommand, 
+        self.addStep(ShellCommand,
          description='copy bootstrap.cfg',
          command=['cp', bootstrap_config, 'bootstrap.cfg'],
          haltOnFailure=1,
         )
-        self.addStep(ShellCommand, 
+        self.addStep(ShellCommand,
          description='echo bootstrap.cfg',
          command=['cat', 'bootstrap.cfg'],
          haltOnFailure=1,
         )
-        self.addStep(ShellCommand, 
+        self.addStep(ShellCommand,
          description='(re)create logs area',
-         command=['bash', '-c', 'mkdir -p ' + logdir], 
+         command=['bash', '-c', 'mkdir -p ' + logdir],
          haltOnFailure=1,
         )
 
-        self.addStep(ShellCommand, 
+        self.addStep(ShellCommand,
          description='clean logs area',
-         command=['bash', '-c', 'rm -rf ' + logdir + '/*.log'], 
+         command=['bash', '-c', 'rm -rf ' + logdir + '/*.log'],
          haltOnFailure=1,
         )
-        self.addStep(ShellCommand, 
+        self.addStep(ShellCommand,
          description='unit tests',
-         command=['make', 'test'], 
+         command=['make', 'test'],
          haltOnFailure=1,
         )
 
@@ -430,7 +430,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             )
         # we only want this variable for this test - this sucks
         bloatEnv = self.env.copy()
-        bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1' 
+        bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1'
         self.addStep(AliveTest,
          env=bloatEnv,
          workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -550,7 +550,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(ShellCommand,
              env=self.env,
              workdir='.',
-             command=['/bin/bash', '-c', 
+             command=['/bin/bash', '-c',
                       'perl '
                       'build%s/tools/rb/fix-%s-stack.pl '
                       'sdleak.tree.raw '
@@ -622,7 +622,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # Call out to a subclass to do the actual uploading
         self.doUpload()
-        
+
     def addCodesighsSteps(self):
         self.addStep(ShellCommand,
          command=['make'],
@@ -882,7 +882,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                           'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
-        
+
         uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
                                        '-p %s ' % self.productName + \
                                        '-v %s ' % self.version + \
@@ -945,7 +945,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.tree = tree
- 
+
         self.addStep(SetProperty,
                      command=['echo', self.tree],
                      property='tree',
@@ -1023,7 +1023,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.downloadBuilds()
         self.updateEnUS()
         self.tinderboxPrintRevisions()
-        self.compareLocalesSetup()       
+        self.compareLocalesSetup()
         self.compareLocales()
         self.doRepack()
         self.doUpload()
@@ -1036,7 +1036,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                               propValue]
         )
     def tinderboxPrintBuildInfo(self):
-        '''Display some build properties for scraping in Tinderbox. 
+        '''Display some build properties for scraping in Tinderbox.
         '''
         self.tinderboxPrint('locale',WithProperties('%(locale)s'))
         self.tinderboxPrint('tree',self.tree)
@@ -1086,12 +1086,12 @@ class BaseRepackFactory(MozillaBuildFactory):
         This is implemented in the subclasses.
         '''
         pass
-    
+
     def tinderboxPrintRevisions(self):
         '''Display the various revisions used in building for
-        scraping in Tinderbox. 
+        scraping in Tinderbox.
         This is implemented in the subclasses.
-        '''   
+        '''  
         pass
 
     def compareLocalesSetup(self):
@@ -1107,14 +1107,14 @@ class BaseRepackFactory(MozillaBuildFactory):
          description=['checkout', 'compare-locales'],
          workdir=self.baseWorkDir,
          haltOnFailure=True
-        )        
+        )
         self.addStep(ShellCommand,
          command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
          description='update compare-locales',
          workdir='%s/compare-locales' % self.baseWorkDir,
          haltOnFailure=True
         )
-        
+
     def compareLocales(self):
         self.addStep(ShellCommand,
          command=['rm', '-rf', 'merged'],
@@ -1140,7 +1140,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                                        self.branchName,
                                        self.appName),
         )
-            
+
     def doRepack(self):
         '''Perform the repackaging.
 
@@ -1265,7 +1265,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         self.version = version
         self.buildNumber = buildNumber
         # more vars are added in downloadBuilds
-        self.env = {'MOZ_PKG_PRETTYNAMES': '1', 
+        self.env = {'MOZ_PKG_PRETTYNAMES': '1',
                     'MOZ_PKG_VERSION': self.version,
                     'MOZ_MAKE_COMPLETE_MAR': '1'}
 
@@ -1395,12 +1395,12 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          description='comparing locale',
          env={'PYTHONPATH': ['../../../compare-locales/lib']},
          flunkOnWarnings=True,
-         haltOnFailure=True,         
+         haltOnFailure=True,        
          workdir="%s/%s/%s/locales" % (self.baseWorkDir,
                                        self.branchName,
                                        self.appName),
         )
-        
+
     def doRepack(self):
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'config', 'modules/libmar'):
@@ -1505,7 +1505,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                        3.1.
            milestone: The current version of *Gecko*. This is generally
                       along the lines of: 1.8.1.14, 1.9.0.2, etc.
-           baseTag: The prefix to use for BUILD/RELEASE tags. It will be 
+           baseTag: The prefix to use for BUILD/RELEASE tags. It will be
                     post-fixed with _BUILD$buildNumber and _RELEASE. Generally,
                     this is something like: FIREFOX_3_0_2.
            buildNumber: The current build number. If this is the first time
@@ -1551,7 +1551,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
         # in the loop below
         relbranchName = 'GECKO%s_%s_RELBRANCH' % (
           milestone.replace('.', ''), datetime.now().strftime('%Y%m%d'))
-                
+
         for repoPath in sorted(repositories.keys()):
             repoName = self.getRepoName(repoPath)
             repo = self.getRepository(repoPath)
@@ -1639,7 +1639,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  # mozilla-central and other developer repositories have a
                  # 'CLOSED TREE' hook on them which rejects commits when the
                  # tree is declared closed. It is very common for us to tag
-                 # and branch when the tree is in this state. Adding the 
+                 # and branch when the tree is in this state. Adding the
                  # 'CLOSED TREE' string at the end will force the hook to
                  # let us commit regardless of the tree state.
                  command=['hg', 'commit', '-u', hgUsername, '-m',
@@ -1946,7 +1946,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
         # Generate updates from here
         self.addStep(ShellCommand,
-         command=['perl', 'patcher2.pl', '--build-tools-hg', 
+         command=['perl', 'patcher2.pl', '--build-tools-hg',
                   '--tools-revision=%s' % patcherToolsTag,
                   '--app=%s' % productName,
                   '--config=%s' % patcherConfigFile],
@@ -2718,7 +2718,7 @@ class L10nVerifyFactory(ReleaseFactory):
 
         verifyDirVersion = 'tools/release/l10n'
 
-        # Remove existing verify dir 
+        # Remove existing verify dir
         self.addStep(ShellCommand,
          description=['remove', 'verify', 'dir'],
          descriptionDone=['removed', 'verify', 'dir'],
@@ -2730,18 +2730,18 @@ class L10nVerifyFactory(ReleaseFactory):
         self.addStep(ShellCommand,
          description=['(re)create', 'verify', 'dir'],
          descriptionDone=['(re)created', 'verify', 'dir'],
-         command=['bash', '-c', 'mkdir -p ' + verifyDirVersion], 
+         command=['bash', '-c', 'mkdir -p ' + verifyDirVersion],
          workdir='.',
          haltOnFailure=True,
         )
-        
+
         # Download current release
         self.addStep(ShellCommand,
          description=['download', 'current', 'release'],
          descriptionDone=['downloaded', 'current', 'release'],
          command=['rsync',
-                  '-Lav', 
-                  '-e', 'ssh', 
+                  '-Lav',
+                  '-e', 'ssh',
                   '--exclude=*.asc',
                   '--exclude=source',
                   '--exclude=xpi',
@@ -2749,8 +2749,8 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=update',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer, productName, version, str(buildNumber)),
-                  '%s-%s-build%s/' % (productName, 
-                                      version, 
+                  '%s-%s-build%s/' % (productName,
+                                      version,
                                       str(buildNumber))
                   ],
          workdir=verifyDirVersion,
@@ -2763,19 +2763,19 @@ class L10nVerifyFactory(ReleaseFactory):
          description=['download', 'previous', 'release'],
          descriptionDone =['downloaded', 'previous', 'release'],
          command=['rsync',
-                  '-Lav', 
-                  '-e', 'ssh', 
+                  '-Lav',
+                  '-e', 'ssh',
                   '--exclude=*.asc',
                   '--exclude=source',
                   '--exclude=xpi',
                   '--exclude=unsigned',
                   '--exclude=update',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
-                   (stagingServer, 
-                    productName, 
+                   (stagingServer,
+                    productName,
                     oldVersion,
                     str(oldBuildNumber)),
-                  '%s-%s-build%s/' % (productName, 
+                  '%s-%s-build%s/' % (productName,
                                       oldVersion,
                                       str(oldBuildNumber))
                   ],
@@ -2784,10 +2784,10 @@ class L10nVerifyFactory(ReleaseFactory):
          timeout=60*60
         )
 
-        currentProduct = '%s-%s-build%s' % (productName, 
+        currentProduct = '%s-%s-build%s' % (productName,
                                             version,
                                             str(buildNumber))
-        previousProduct = '%s-%s-build%s' % (productName, 
+        previousProduct = '%s-%s-build%s' % (productName,
                                              oldVersion,
                                              str(oldBuildNumber))
 
@@ -2795,14 +2795,14 @@ class L10nVerifyFactory(ReleaseFactory):
             self.addStep(ShellCommand,
                          description=['(re)create', 'product', 'dir'],
                          descriptionDone=['(re)created', 'product', 'dir'],
-                         command=['bash', '-c', 'mkdir -p %s/%s' % (verifyDirVersion, product)], 
+                         command=['bash', '-c', 'mkdir -p %s/%s' % (verifyDirVersion, product)],
                          workdir='.',
                          haltOnFailure=True,
                         )
             self.addStep(ShellCommand,
                          description=['verify', 'l10n', product],
                          descriptionDone=['verified', 'l10n', product],
-                         command=["bash", "-c", 
+                         command=["bash", "-c",
                                   "./verify_l10n.sh " + product],
                          workdir=verifyDirVersion,
                          haltOnFailure=True,
@@ -2845,12 +2845,12 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageGroup = stageGroup
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
-        
+
         if nightly:
             self.clobber = clobber = True
         else:
             self.clobber = clobber
-        
+
         if baseUploadDir is None:
             self.baseUploadDir = self.mobileBranchName
         else:
@@ -2910,10 +2910,10 @@ class MobileBuildFactory(MozillaBuildFactory):
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             description=['cat', 'mozconfig']
         )
-        
+
     def addPreBuildSteps(self):
         pass
-    
+
     def addBaseRepoSteps(self):
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
@@ -3001,7 +3001,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
             )
-            
+
     def addBuildSteps(self):
         self.addStep(ShellCommand,
             command=[self.scratchboxPath, '-p', '-d',
@@ -3057,7 +3057,7 @@ class WinceBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform='win32')
-        
+
     def addPreCleanSteps(self):
         if self.clobber:
             self.addStep(ShellCommand,
@@ -3429,7 +3429,7 @@ class TalosFactory(BuildFactory):
              property_name="exepath",
              value="../firefox/firefox"
             ))
-	else:
+        else:
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../firefox/firefox-bin"
@@ -3466,7 +3466,7 @@ class TalosFactory(BuildFactory):
          extract_fn=get_build_info,
          name='get build info',
         )
-		
+
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(workdirBase, "talos/"),
          branch=buildBranch,
