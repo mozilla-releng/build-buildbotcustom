@@ -3311,8 +3311,8 @@ class TalosFactory(BuildFactory):
         )
         if OS in ('leopard', 'tiger'):
             self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/installdmg.ex" % toolsDir,
-             slavedest="installdmg.ex",
+             mastersrc="%s/buildfarm/utils/installdmg.sh" % toolsDir,
+             slavedest="installdmg.sh",
              workdir=workdirBase,
             ))
 

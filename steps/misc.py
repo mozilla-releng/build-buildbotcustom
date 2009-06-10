@@ -295,8 +295,8 @@ class UnpackFile(ShellCommand):
         elif filename.endswith(".tar.bz2"):
             self.setCommand(['tar', '-jxvf', filename])
         elif filename.endswith(".dmg"):
-            self.setCommand(['expect',
-             '%s/installdmg.ex' % self.scripts_dir,
+            self.setCommand(['bash',
+             '%s/installdmg.sh' % self.scripts_dir,
              filename]
             )
         else:
