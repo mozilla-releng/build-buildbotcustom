@@ -3366,10 +3366,26 @@ class TalosFactory(BuildFactory):
         def get_url(build):
             url = build.source.changes[-1].files[0]
             # Lies!!!
+            # Once we don't need to lie about our start time,
+            # the following code can go away
             try:
                 timestamp = int(os.path.basename(os.path.dirname(url)))
-                build.setProperty('orig_changetime', build.source.changes[-1].when, 'get_url')
-                build.source.changes[-1].when = timestamp
+                last_change = build.source.changes[-1]
+                # Since change objects are shared between builders, when we
+                # modify the 'when' attribute below, it affects all other
+                # builders that have this change as well. So we save the
+                # original 'when' attribute before we modify the change object.
+                # If we check for the 'orig_when' attribute instead of the
+                # 'when' attribute, we get the true original change time.
+                if hasattr(last_change, "orig_when"):
+                    orig_when = last_change.orig_when
+                else:
+                    orig_when = last_change.when
+                    last_change.orig_when = orig_when
+                # Now that we know what our original change time is, save that
+                # as a build property
+                build.setProperty('orig_changetime', orig_when, 'get_url')
+                last_change.when = timestamp
             except:
                 pass
             return url
