@@ -2064,7 +2064,8 @@ class ReleaseFinalVerification(ReleaseFactory):
 
 class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
-            objdir, mochitest_leak_threshold=None, uploadPackages=False,
+            objdir, mochitest_leak_threshold=None,
+            crashtest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, stageUsername=None, stageServer=None,
             stageSshKey=None, run_a11y=True, **kwargs):
         self.env = {}
@@ -2255,6 +2256,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         )
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="crashtest",
+         leakThreshold=crashtest_leak_threshold,
          workdir="build/%s" % self.objdir,
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
@@ -2322,9 +2324,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
             objdir, mozRepoPath, brandName=None, mochitest_leak_threshold=None,
             mochichrome_leak_threshold=None, mochibrowser_leak_threshold=None,
-            uploadPackages=False, unittestMasters=None, stageUsername=None,
-            stageServer=None, stageSshKey=None, exec_reftest_suites=True,
-            exec_mochi_suites=True, run_a11y=True, **kwargs):
+            crashtest_leak_threshold=None, uploadPackages=False,
+            unittestMasters=None, stageUsername=None, stageServer=None,
+            stageSshKey=None, exec_reftest_suites=True, exec_mochi_suites=True,
+            run_a11y=True, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -2544,6 +2547,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             )
             self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
              test_name="crashtest",
+             leakThreshold=crashtest_leak_threshold,
              workdir="build/%s" % self.objdir,
             )
 
@@ -3106,7 +3110,8 @@ class WinceBuildFactory(MobileBuildFactory):
 
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, test_suites, env=None,
-            mochitest_leak_threshold=None, **kwargs):
+            mochitest_leak_threshold=None, crashtest_leak_threshold=None,
+            **kwargs):
         if env is None:
             self.env = MozillaEnvironments['%s-unittest' % platform].copy()
         else:
@@ -3118,6 +3123,8 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.test_suites = test_suites
+        self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
+                                'crashtest': crashtest_leak_threshold}
 
         # Download the build
         def get_fileURL(build):
@@ -3266,13 +3273,14 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
         # Run them!
         for suite in self.test_suites:
+            leak_threshold = self.leak_thresholds.get(suite, None)
             if suite.startswith('mochitest'):
                 variant = suite.split('-', 1)[1]
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
                  env=self.env,
                  symbols_path='symbols',
-                 leakThreshold=mochitest_leak_threshold,
+                 leakThreshold=leak_threshold
                 ))
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
@@ -3284,6 +3292,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  crashtest=crashtest,
                  env=self.env,
+                 leakThreshold=leak_threshold,
                  symbols_path='symbols',
                 ))
 
