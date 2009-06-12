@@ -3265,7 +3265,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          name='get build info',
         )
 
-        changesetLink = '<a href="%(repo_path)s/rev/%(revision)s"' + \
+        changesetLink = '<a href=%(repo_path)s/rev/%(revision)s' + \
                 ' title="Built from revision %(revision)s">rev:%(revision)s</a>'
         self.addStep(ShellCommand,
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
