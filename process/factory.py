@@ -3420,9 +3420,13 @@ class TalosFactory(BuildFactory):
              workdir=workdirBase,
              name="Download symbols",
             ))
-            self.addStep(UnpackFile(
-             filename=WithProperties("%(symbolsFile)s"),
+            self.addStep(ShellCommand(
+             command=['mkdir', 'symbols'],
              workdir=workdirBase,
+            ))
+            self.addStep(UnpackFile(
+             filename=WithProperties("../%(symbolsFile)s"),
+             workdir="%s/symbols" % workdirBase,
              name="Unpack symbols",
             ))
         self.addStep(UnpackFile(
@@ -3480,7 +3484,7 @@ class TalosFactory(BuildFactory):
                 retval['buildid'] = m.group(1)
             m = re.search("^SourceStamp\s*=\s*(.*)", stdout, re.M)
             if m:
-                retval['revision'] = m.group(1)
+                retval['revision'] = m.group(1).strip()
             m = re.search("^SourceRepository\s*=\s*(\S+)", stdout, re.M)
             if m:
                 retval['repo_path'] = m.group(1)
