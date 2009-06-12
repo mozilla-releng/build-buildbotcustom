@@ -825,6 +825,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
              warnOnFailure=warn,
              master=master,
              branch=talosBranch,
+             revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")
             )
@@ -834,6 +835,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
              warnOnFailure=warn,
              master=master,
              branch=unittestBranch,
+             revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange-unittest")
             )
