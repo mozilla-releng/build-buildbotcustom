@@ -371,17 +371,24 @@ class MozillaClobberer(ShellCommand):
         #  More than 7 days, 0:00:00 have passed since our last clobber
         periodicClobberRe = re.compile('More than \d+ days, [0-9:]+ have passed since our last clobber')
 
+        # We don't have clobber data.  This usually means we've been purged before
+        purgedClobberRe = re.compile("Our last clobber date:.*None")
+
         self.setProperty('forced_clobber', False, 'MozillaClobberer')
         self.setProperty('periodic_clobber', False, 'MozillaClobberer')
+        self.setProperty('purged_clobber', False, 'MozillaClobberer')
 
         clobberType = None
         for line in log.readlines():
             if forcedClobberRe.search(line):
                 self.setProperty('forced_clobber', True, 'MozillaClobberer')
                 clobberType = "forced"
-            if periodicClobberRe.search(line):
+            elif periodicClobberRe.search(line):
                 self.setProperty('periodic_clobber', True, 'MozillaClobberer')
                 clobberType = "periodic"
+            elif purgedClobberRe.search(line):
+                self.setProperty('purged_clobber', True, 'MozillaClobberer')
+                clobberType = "free-space"
 
         if clobberType != None:
             summary = "TinderboxPrint: %s clobber" % clobberType
