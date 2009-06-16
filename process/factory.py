@@ -2961,6 +2961,53 @@ class MobileBuildFactory(MozillaBuildFactory):
                                         self.objdir)
         )
 
+class MobileDesktopBuildFactory(MobileBuildFactory):
+    def __init__(self, packageGlob="-r mobile/dist/*.tar.bz2 " +
+            "xulrunner/dist/*.tar.bz2", **kwargs):
+        """This class creates a desktop fennec build.  Only tested
+        to do Linux-i686 builds.  -r in package glob is to ensure that all
+        files are uploaded as this is the first option given to -r.  hack alert!"""
+        MobileBuildFactory.__init__(self, **kwargs)
+        self.packageGlob = packageGlob
+
+        self.addPreCleanSteps()
+        self.addBaseRepoSteps()
+        self.getMozconfig()
+        self.addPreBuildSteps()
+        self.addBuildSteps()
+        self.addPackageSteps()
+        self.addUploadSteps(platform='linux')
+
+    def addPreCleanSteps(self):
+        self.addStep(ShellCommand,
+                command='rm -f /tmp/*_cltbld.log',
+                description=['removing', 'log', 'file']
+            )
+        self.addStep(ShellCommand,
+                command=['rm', '-rf', self.branchName],
+                description=['clobber', 'build']
+            )
+
+    def addBuildSteps(self):
+        self.addStep(ShellCommand,
+                command=['make', '-f', 'client.mk', 'build'],
+                description=['compile'],
+                workdir=self.baseWorkDir + "/" +  self.branchName
+            )
+
+    def addPackageSteps(self):
+        self.addStep(ShellCommand,
+                command=['make', 'package'],
+                workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
+                    self.branchName, self.objdir),
+                description=['make', 'xr', 'package']
+                )
+        self.addStep(ShellCommand,
+                command=['make', 'package'],
+                workdir='%s/%s/%s/mobile' % (self.baseWorkDir,
+                    self.branchName, self.objdir),
+                description=['make', 'mobile', 'package']
+                )
 
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, scratchboxPath="/scratchbox/moz_scratchbox",
@@ -3687,12 +3734,16 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         pass
 
 
-
 class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     extraConfigureArgs = ['--target=arm-linux-gnueabi']
 
     def __init__(self, **kwargs):
         MobileNightlyRepackFactory.__init__(self, **kwargs)
 
+    def doUpload(self):
+        self.addUploadSteps(platform='linux')
+
+
+class MobileDesktopNightlyRepackFactory(MobileNightlyRepackFactory):
     def doUpload(self):
         self.addUploadSteps(platform='linux')
