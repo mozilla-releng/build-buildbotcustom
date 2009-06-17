@@ -1979,92 +1979,92 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          haltOnFailure=True
         )
 
-#        bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
-#                       '-p', productName, '-v', version, '-a', appVersion,
-#                       '-o', oldVersion, '-b', str(buildNumber),
-#                       '-c', patcherConfigFile, '-t', stagingServer,
-#                       '-f', ftpServer, '-d', bouncerServer,
-#                       '-l', 'shipped-locales']
-#        if useBetaChannel:
-#            bumpCommand.append('-u')
-#        self.addStep(ShellCommand,
-#         name='bump',
-#         command=bumpCommand,
-#         description=['bump', patcherConfig],
-#         haltOnFailure=True
-#        )
-#        self.addStep(TinderboxShellCommand,
-#         name='diff_patcher_config',
-#         command=['cvs', 'diff', '-u', patcherConfigFile],
-#         description=['diff', patcherConfig],
-#         ignoreCodes=[1]
-#        )
-#        if commitPatcherConfig:
-#            self.addStep(ShellCommand,
-#             name='commit_patcher_config',
-#             command=['cvs', 'commit', '-m',
-#                      'Automated configuration bump: ' + \
-#                      '%s, from %s to %s build %s' % \
-#                        (patcherConfig, oldVersion, version, buildNumber)
-#                     ],
-#             workdir='build/patcher-configs',
-#             description=['commit', patcherConfig],
-#             haltOnFailure=True
-#            )
-#
-#        # Bump the update verify config
-#        oldLongVersion = self.makeLongVersion(oldVersion)
-#        longVersion = self.makeLongVersion(version)
-#        oldCandidatesDir = self.getCandidatesDir(productName, oldVersion,
-#                                                 oldBuildNumber)
-#
-#        oldShippedLocales = self.getShippedLocales(self.repository, oldBaseTag,
-#                                                appName)
-#        pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
-#        sshKeyOption = self.getSshKeyOption(hgSshKey)
-#
-#        self.addStep(ShellCommand,
-#         name='get_old_shipped_locales',
-#         command=['wget', '-O', 'old-shipped-locales', oldShippedLocales],
-#         description=['get', 'old-shipped-locales'],
-#         haltOnFailure=True
-#        )
-#        for platform in sorted(verifyConfigs.keys()):
-#            verifyConfigPath = '../tools/release/updates/%s' % \
-#                                verifyConfigs[platform]
-#            self.addStep(ShellCommand,
-#             name='bump_verify_configs',
-#             command=['perl', '../tools/release/update-verify-bump.pl',
-#                      '-o', platform, '-p', productName,
-#                      '--old-version=%s' % oldVersion,
-#                      '--old-app-version=%s' % oldAppVersion,
-#                      '--old-long-version=%s' % oldLongVersion,
-#                      '-v', version, '--app-version=%s' % appVersion,
-#                      '--long-version=%s' % longVersion,
-#                      '-n', str(buildNumber), '-a', ausServerUrl,
-#                      '-s', stagingServer, '-c', verifyConfigPath,
-#                      '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
-#                      '--pretty-candidates-dir'],
-#             description=['bump', verifyConfigs[platform]],
-#            )
-#        self.addStep(ShellCommand,
-#         name='commit_verify_configs',
-#         command=['hg', 'commit', '-m',
-#                  'Automated configuration bump: update verify configs ' + \
-#                  'for %s build %s' % (version, buildNumber)],
-#         description=['commit verify configs'],
-#         workdir='tools',
-#         haltOnFailure=True
-#        )
-#        self.addStep(ShellCommand,
-#         name='push_verify_configs',
-#         command=['hg', 'push', '-e',
-#                  'ssh -l %s %s' % (hgUsername, sshKeyOption),
-#                  '-f', pushRepo],
-#         description=['push verify configs'],
-#         workdir='tools',
-#         haltOnFailure=True
-#        )
+        bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
+                       '-p', productName, '-v', version, '-a', appVersion,
+                       '-o', oldVersion, '-b', str(buildNumber),
+                       '-c', patcherConfigFile, '-t', stagingServer,
+                       '-f', ftpServer, '-d', bouncerServer,
+                       '-l', 'shipped-locales']
+        if useBetaChannel:
+            bumpCommand.append('-u')
+        self.addStep(ShellCommand,
+         name='bump',
+         command=bumpCommand,
+         description=['bump', patcherConfig],
+         haltOnFailure=True
+        )
+        self.addStep(TinderboxShellCommand,
+         name='diff_patcher_config',
+         command=['cvs', 'diff', '-u', patcherConfigFile],
+         description=['diff', patcherConfig],
+         ignoreCodes=[1]
+        )
+        if commitPatcherConfig:
+            self.addStep(ShellCommand,
+             name='commit_patcher_config',
+             command=['cvs', 'commit', '-m',
+                      'Automated configuration bump: ' + \
+                      '%s, from %s to %s build %s' % \
+                        (patcherConfig, oldVersion, version, buildNumber)
+                     ],
+             workdir='build/patcher-configs',
+             description=['commit', patcherConfig],
+             haltOnFailure=True
+            )
+
+        # Bump the update verify config
+        oldLongVersion = self.makeLongVersion(oldVersion)
+        longVersion = self.makeLongVersion(version)
+        oldCandidatesDir = self.getCandidatesDir(productName, oldVersion,
+                                                 oldBuildNumber)
+
+        oldShippedLocales = self.getShippedLocales(self.repository, oldBaseTag,
+                                                appName)
+        pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
+        sshKeyOption = self.getSshKeyOption(hgSshKey)
+
+        self.addStep(ShellCommand,
+         name='get_old_shipped_locales',
+         command=['wget', '-O', 'old-shipped-locales', oldShippedLocales],
+         description=['get', 'old-shipped-locales'],
+         haltOnFailure=True
+        )
+        for platform in sorted(verifyConfigs.keys()):
+            verifyConfigPath = '../tools/release/updates/%s' % \
+                                verifyConfigs[platform]
+            self.addStep(ShellCommand,
+             name='bump_verify_configs',
+             command=['perl', '../tools/release/update-verify-bump.pl',
+                      '-o', platform, '-p', productName,
+                      '--old-version=%s' % oldVersion,
+                      '--old-app-version=%s' % oldAppVersion,
+                      '--old-long-version=%s' % oldLongVersion,
+                      '-v', version, '--app-version=%s' % appVersion,
+                      '--long-version=%s' % longVersion,
+                      '-n', str(buildNumber), '-a', ausServerUrl,
+                      '-s', stagingServer, '-c', verifyConfigPath,
+                      '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
+                      '--pretty-candidates-dir'],
+             description=['bump', verifyConfigs[platform]],
+            )
+        self.addStep(ShellCommand,
+         name='commit_verify_configs',
+         command=['hg', 'commit', '-m',
+                  'Automated configuration bump: update verify configs ' + \
+                  'for %s build %s' % (version, buildNumber)],
+         description=['commit verify configs'],
+         workdir='tools',
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='push_verify_configs',
+         command=['hg', 'push', '-e',
+                  'ssh -l %s %s' % (hgUsername, sshKeyOption),
+                  '-f', pushRepo],
+         description=['push verify configs'],
+         workdir='tools',
+         haltOnFailure=True
+        )
 
         # Generate updates from here
         self.addStep(ShellCommand,
