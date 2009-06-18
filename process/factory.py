@@ -809,6 +809,13 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
         )
 
+    def addUploadSteps(self, pkgArgs=None):
+        MercurialBuildFactory.addUploadSteps(self, pkgArgs)
+        self.addStep(ShellCommand,
+         command=['make', 'package-compare'],
+         workdir='build/%s' % self.objdir,
+         haltOnFailure=False
+        )
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
