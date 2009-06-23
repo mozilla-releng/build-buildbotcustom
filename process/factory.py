@@ -2626,8 +2626,12 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
             )
+            if self.mozillaDir == '':
+                getpropsObjdir = self.objdir
+            else:
+                getpropsObjdir = '../%s' % self.mozillaObjdir
             self.addStep(GetBuildID,
-             objdir=self.mozillaObjdir,
+             objdir=getpropsObjdir,
              workdir='build%s' % self.mozillaDir,
             )
 
