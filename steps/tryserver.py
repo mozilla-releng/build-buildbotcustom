@@ -87,7 +87,7 @@ class MozillaTryProcessing(BuildStep):
         # PATCH_TRY or HG_TRY
         branch = self.getProperty('branch')
         if branch != 'PATCH_TRY' and branch != 'HG_TRY':
-            args['identifier'] = '%s-%s' % (branch, changes[0].revision[0:11])
+            args['identifier'] = '%s-%s' % (branch, changes[0].revision[0:12])
         for arg in args:
             self.setProperty(arg, args[arg])
         who = changes[0].who
