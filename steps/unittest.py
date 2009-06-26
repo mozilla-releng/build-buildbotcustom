@@ -411,8 +411,7 @@ class MozillaMochitest(ShellCommandReportTimeout):
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if superResult != SUCCESS or \
            not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
-            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULT
-ILINE):
+            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 
         return SUCCESS
