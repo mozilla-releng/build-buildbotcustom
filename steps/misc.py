@@ -25,10 +25,13 @@
 # ***** END LICENSE BLOCK *****
 
 from twisted.python.failure import Failure
+from twisted.internet import error
+from twisted.spread.pb import PBConnectionLost
 
 import os
 import buildbot
 import re
+
 from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep, \
   BuildStep
 from buildbot.steps.shell import ShellCommand, WithProperties
@@ -417,3 +420,59 @@ class SetBuildProperty(BuildStep):
         self.step_status.setText(['set props:', self.property_name])
         self.addCompleteLog("property changes", "%s: %s" % (self.property_name, value))
         return self.finished(SUCCESS)
+
+class DisconnectStep(ShellCommand):
+    """This step is used when a command is expected to cause the slave to
+    disconnect from the master.  It will handle connection lost errors as
+    expected.
+
+    Optionally it will also forcibly disconnect the slave from the master by
+    calling the remote 'shutdown' command, in effect doing a graceful
+    shutdown.  If force_disconnect is True, then the slave will always be
+    disconnected after the command completes.  If force_disconnect is a
+    function, it will be called with the command object, and the return value
+    will be used to determine if the slave should be disconnected."""
+    name = "disconnect"
+    def __init__(self, force_disconnect=None, **kwargs):
+        self.force_disconnect = force_disconnect
+        ShellCommand.__init__(self, **kwargs)
+        self.addFactoryArguments(force_disconnect=force_disconnect)
+
+        self._disconnected = False
+
+    def interrupt(self, reason):
+        # Called when the slave command is interrupted, e.g. by rebooting
+        # We assume this is expected
+        self._disconnected = True
+        return self.finished(SUCCESS)
+
+    def checkDisconnect(self, f):
+        # This is called if there's a problem executing the command because the connection was disconnected.
+        # Again, we assume this is the expected behaviour
+        f.trap(PBConnectionLost)
+        self._disconnected = True
+        return self.finished(SUCCESS)
+
+    def commandComplete(self, cmd):
+        # The command has completed normally.  If force_disconnect is set, then
+        # tell the slave to shutdown
+        if self.force_disconnect:
+            if not callable(self.force_disconnect) or self.force_disconnect(cmd):
+                try:
+                    d = self.remote.callRemote('shutdown')
+                    d.addErrback(self._disconnected_cb)
+                    d.addCallback(self._disconnected_cb)
+                    return d
+                except:
+                    log.err()
+
+    def _disconnected_cb(self, res):
+        # Successfully disconnected
+        self._disconnected = True
+        return True
+
+    def finished(self, res):
+        if self._disconnected:
+            self.step_status.setText(self.describe(True) + ["slave", "lost"])
+            self.step_status.setText2(['slave', 'lost'])
+        return ShellCommand.finished(self, res)

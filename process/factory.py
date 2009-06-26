@@ -28,7 +28,8 @@ reload(buildbotcustom.env)
 
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
   TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
-  FindFile, DownloadFile, UnpackFile, SetBuildProperty, GetHgRevision
+  FindFile, DownloadFile, UnpackFile, SetBuildProperty, GetHgRevision, \
+  DisconnectStep
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -3845,7 +3846,14 @@ class TalosFactory(BuildFactory):
          command=talosCmd,
          env=MozillaEnvironments[envName])
         )
-        self.addStep(ShellCommand(
+        def do_disconnect(cmd):
+            try:
+                if 'SCHEDULED REBOOT' in cmd.logs['stdio'].getText():
+                    return True
+            except:
+                pass
+            return False
+        self.addStep(DisconnectStep(
          name='reboot',
          flunkOnFailure=False,
          warnOnFailure=False,
@@ -3853,6 +3861,7 @@ class TalosFactory(BuildFactory):
          workdir=workdirBase,
          description="reboot after 1 test run",
          command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
+         force_disconnect=do_disconnect,
          env=MozillaEnvironments[envName],
         ))
 
