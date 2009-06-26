@@ -9,9 +9,10 @@ from twisted.internet import reactor
 from twisted.python import log
 from twisted.application import service
 
-from buildbot.scheduler import Scheduler
+from buildbot.scheduler import Scheduler, Nightly
 from buildbot import buildset, util
 from buildbot.sourcestamp import SourceStamp
+from buildbot.status.builder import SUCCESS, WARNINGS
 
 class MozScheduler(Scheduler):
     """The MozScheduler class will run a build after some period of time
@@ -157,3 +158,61 @@ class NoMergeMultiScheduler(Scheduler):
                 bs = buildset.BuildSet(self.builderNames, ss)
                 self.submitBuildSet(bs)
         self.importantChanges = []
+
+class NightlyRebuild(Nightly):
+    """The NightlyRebuild scheduler will rebuild previously run builds on a certain schedule.
+    It accepts the same parameters as the C{Nightly} scheduler, as well as
+    C{numberOfBuildsToTrigger}, C{mergeBuilds}, and C{statusList} parameters.
+
+    The scheduler will schedule C{numberOfBuildsToTrigger} builds on the
+    specified schedule.  If C{mergeBuilds} is set to False, then the rebuild
+    requests will not be merged together.  C{statusList}, if set, should be a
+    list of build statuses that are used to determine which past build to
+    rebuild.  If not set it defaults to [SUCCESS, WARNINGS] which means that
+    the previous build that completed with status of either SUCCESS or WARNINGS
+    will be rebuilt."""
+
+    compare_attrs = Nightly.compare_attrs + ('numberOfBuildsToTrigger', 'mergeBuilds', 'statusList')
+
+    def __init__(self, numberOfBuildsToTrigger=1, mergeBuilds=False, statusList=None, **kwargs):
+        self.numberOfBuildsToTrigger = numberOfBuildsToTrigger
+        self.mergeBuilds = mergeBuilds
+        self.statusList = statusList or [SUCCESS, WARNINGS]
+        Nightly.__init__(self, **kwargs)
+
+    def doPeriodicBuild(self):
+        # Schedule the next run
+        self.setTimer()
+
+        # For each of our builders, find the previous build that completed with
+        # one of the desired status results and then re-run it.
+        for builderName in self.builderNames:
+            builder = self.parent.status.getBuilder(builderName)
+            lastBuild = builder.getLastFinishedBuild()
+            while lastBuild is not None:
+                if lastBuild.isFinished() and lastBuild.getResults() in self.statusList:
+                    break
+                else:
+                    try:
+                        lastBuild = builder.getBuildByNumber(lastBuild.getNumber() - 1)
+                    except IndexError:
+                        lastBuild = None
+
+            if not lastBuild:
+                continue
+
+            for i in range(self.numberOfBuildsToTrigger):
+                reason = self.reason + "; rebuilding build %i" % lastBuild.getNumber()
+                if self.numberOfBuildsToTrigger > 1:
+                    reason += ", %i/%i" % (i+1, self.numberOfBuildsToTrigger)
+                ss = lastBuild.getSourceStamp(absolute=True)
+                if not self.mergeBuilds:
+                    ss = NoMergeSourceStamp(changes=ss.changes,
+                                            revision=ss.revision,
+                                            branch=ss.branch,
+                                            patch=ss.patch)
+                bs = buildset.BuildSet([builderName],
+                                       ss,
+                                       reason,
+                                       properties=self.properties)
+                self.submitBuildSet(bs)
