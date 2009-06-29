@@ -1761,7 +1761,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  workdir=repoName,
                  haltOnFailure=True
                 )
-            for tag in [releaseTag]:
+            for tag in (buildTag, releaseTag):
                 self.addStep(ShellCommand,
                  name='hg_tag',
                  command=['hg', 'tag', '-u', hgUsername, '-f', '-r',
