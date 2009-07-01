@@ -3563,7 +3563,7 @@ class TalosFactory(BuildFactory):
     """Create working talos build factory"""
     def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest='', customTalos=None,
-            workdirBase=None, fetchSymbols=False,
+            workdirBase=None, fetchSymbols=False, plugins='zips/plugins.zip', pageset='zips/pagesets.zip',
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
         BuildFactory.__init__(self)
         if workdirBase is None:
@@ -3591,7 +3591,7 @@ class TalosFactory(BuildFactory):
         if customManifest != '':
             self.addStep(FileDownload(
              mastersrc=customManifest,
-             slavedest="manifest.txt",
+             slavedest="tp3.manifest",
              workdir=os.path.join(workdirBase, "talos/page_load_test"))
             )
 
@@ -3629,6 +3629,30 @@ class TalosFactory(BuildFactory):
             self.addStep(UnpackFile(
              filename=customTalos,
              workdir=workdirBase,
+            ))
+
+        if plugins != '':
+            self.addStep(FileDownload(
+             mastersrc=plugins,
+             slavedest=os.path.basename(plugins),
+             workdir=os.path.join(workdirBase, "talos/base_profile"),
+             blocksize=640*1024,
+            ))
+            self.addStep(UnpackFile(
+             filename=os.path.basename(plugins),
+             workdir=os.path.join(workdirBase, "talos/base_profile"),
+            ))
+
+        if pageset != '':
+            self.addStep(FileDownload(
+             mastersrc=pageset,
+             slavedest=os.path.basename(pageset),
+             workdir=os.path.join(workdirBase, "talos/page_load_test"),
+             blocksize=640*1024,
+            ))
+            self.addStep(UnpackFile(
+             filename=os.path.basename(pageset),
+             workdir=os.path.join(workdirBase, "talos/page_load_test"),
             ))
 
         def get_url(build):
