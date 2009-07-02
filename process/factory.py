@@ -1250,7 +1250,7 @@ class NightlyRepackFactory(BaseRepackFactory):
     def __init__(self, enUSBinaryURL, nightly=False, createSnippet=False,
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausHost=None,
-                 l10nNightlyUpdate=False, datedDirs=False, **kwargs):
+                 l10nNightlyUpdate=False, l10nDatedDirs=False, **kwargs):
         self.enUSBinaryURL = enUSBinaryURL
         self.nightly = nightly
         self.createSnippet = createSnippet
@@ -1269,7 +1269,7 @@ class NightlyRepackFactory(BaseRepackFactory):
         postUploadCmd = ['post_upload.py', 
                          '-p %s ' % kwargs['project'],
                          '-b %s ' % uploadDir]
-        if datedDirs:
+        if l10nDatedDirs:
             postUploadCmd += ['-i %(buildid)s']
             if self.nightly:
                 postUploadCmd += ['--release-to-latest',
