@@ -857,6 +857,9 @@ class L10nMixin(object):
         else:
           self.localesURL = localesFile
       # if the user wants to use something different than all locales
+      # check ParseLocalesFile function to note that we now need a dictionary
+      # with the locale as the key and a list of platform as the value for
+      # each key to build a specific locale e.g. locales={'fr':['osx']}
       self.locales = locales
       self.tree = tree
       # Make sure a supported platform is passed. Allow variations, but make
@@ -943,6 +946,14 @@ class L10nMixin(object):
 
 
 def ParseLocalesFile(data):
+    """
+    @type  data: string
+    @param data: The contents of all-locales or shipped-locales files
+    
+    This function creates a dictionary that has locales as the keys
+    and the value associated can be a list of platforms for which the
+    locale should be repackaged on (think of ja and ja-JP-mac)
+    """
     locales = {}
     data = data.strip()
     for line in data.split('\n'):
