@@ -1045,17 +1045,6 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
         self.addStep(ShellCommand,
-         name='rm_dist_update',
-         command=['sh', '-c',
-                  'if [ -d '+self.branchName+'/dist/update ]; then ' +
-                  'rm -rf '+self.branchName+'/dist/update; ' +
-                  'fi'],
-         description="rm dist/update",
-         workdir=self.baseWorkDir,
-         haltOnFailure=True
-        )
-
-        self.addStep(ShellCommand,
          name='mkdir_l10nrepopath',
          command=['sh', '-c', 'mkdir -p %s' % l10nRepoPath],
          descriptionDone='mkdir '+ l10nRepoPath,
@@ -1149,7 +1138,6 @@ class BaseRepackFactory(MozillaBuildFactory):
                          '&& hg -R '+self.branchName+' update -r %(en_revision)s')],
          descriptionDone="en-US source",
          workdir=self.baseWorkDir,
-         haltOnFailure=True,
          timeout=30*60 # 30 minutes
         )
         self.addStep(ShellCommand,
@@ -1164,8 +1152,6 @@ class BaseRepackFactory(MozillaBuildFactory):
                          'fi ' +
                          '&& hg -R %(locale)s update -r %(l10n_revision)s')],
          descriptionDone="locale source",
-         timeout=5*60, # 5 minutes
-         haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
         )
 
@@ -1245,63 +1231,21 @@ class BaseRepackFactory(MozillaBuildFactory):
 
 
 class NightlyRepackFactory(BaseRepackFactory):
-    extraConfigureArgs = []
-    
-    def __init__(self, enUSBinaryURL, nightly=False, createSnippet=False,
-                 ausBaseUploadDir=None, updatePlatform=None,
-                 downloadBaseURL=None, ausUser=None, ausHost=None,
-                 l10nNightlyUpdate=False, l10nDatedDirs=False, **kwargs):
+    def __init__(self, enUSBinaryURL, **kwargs):
         self.enUSBinaryURL = enUSBinaryURL
-        self.nightly = nightly
-        self.createSnippet = createSnippet
-        self.ausBaseUploadDir = ausBaseUploadDir
-        self.updatePlatform = updatePlatform
-        self.downloadBaseURL = downloadBaseURL
-        self.ausUser = ausUser
-        self.ausHost = ausHost
-
         # Unfortunately, we can't call BaseRepackFactory.__init__() before this
         # because it needs self.postUploadCmd set
         assert 'project' in kwargs
         assert 'repoPath' in kwargs
         uploadDir = '%s-l10n' % self.getRepoName(kwargs['repoPath'])
-        self.env = {}
-        postUploadCmd = ['post_upload.py', 
-                         '-p %s ' % kwargs['project'],
-                         '-b %s ' % uploadDir]
-        if l10nDatedDirs:
-            postUploadCmd += ['-i %(buildid)s']
-            if self.nightly:
-                postUploadCmd += ['--release-to-latest',
-                                  '--release-to-dated']
-            else:
-                # For the repack-on-change scenario we just want to upload
-                # to tinderbox dated directories
-                postUploadCmd += ['--release-to-tinderbox-dated-builds']
-            self.postUploadCmd = WithProperties(' '.join(postUploadCmd))
-        else:
-            postUploadCmd += ['--release-to-latest']
-            self.postUploadCmd = ' '.join(postUploadCmd)
+        self.postUploadCmd = 'post_upload.py ' + \
+                             '-p %s ' % kwargs['project'] + \
+                             '-b %s ' % uploadDir + \
+                             '--release-to-latest'
 
-        if l10nNightlyUpdate and self.nightly:
-            self.env = {'MOZ_MAKE_COMPLETE_MAR': '1'}
-            self.extraConfigureArgs = ['--enable-update-packaging']
+        self.env = {}
 
         BaseRepackFactory.__init__(self, **kwargs)
-        # the other subclassing classes do not need to have self.createSnippet
-        if self.createSnippet and l10nNightlyUpdate:
-            assert ausBaseUploadDir and updatePlatform and downloadBaseURL
-            assert ausUser and ausHost
-
-            # needed to generate the snippet's URL
-            self.env = {'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL}
-            # this is a tad ugly because we need to python interpolation
-            # as well as WithProperties
-            # here's an example of what it translates to:
-            # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/fr
-            self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
-              (self.ausBaseUploadDir, self.updatePlatform)
-            self.uploadSnippet()
 
     def updateSources(self):
         self.addStep(ShellCommand,
@@ -1364,39 +1308,14 @@ class NightlyRepackFactory(BaseRepackFactory):
         self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
 
     def doRepack(self):
-        if self.nightly:
-            self.addStep(ShellCommand,
-             command=['make'],
-             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, 'modules/libmar'),
-             description=['make', 'modules/libmar'],
-             haltOnFailure=True
-            )
         self.addStep(ShellCommand,
          name='make_locale_installers',
          command=['sh','-c',
                   WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
-         env = self.env,
          haltOnFailure=True,
-         description=['make','installers'],
          workdir='build/'+self.branchName+'/'+self.appName+'/locales'
         )
 
-    def uploadSnippet(self):
-        self.addStep(ShellCommand,
-         command=['ssh', '-l', self.ausUser, self.ausHost,
-                  WithProperties('mkdir -p %s' % self.ausFullUploadDir)],
-         description=['create', 'aus', 'upload', 'dir'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         command=['scp', '-o', 'User=%s' % self.ausUser,
-                  'dist/update/complete.update.snippet',
-                  WithProperties('%s:%s/complete.txt' % \
-                    (self.ausHost, self.ausFullUploadDir))],
-         workdir='build/%s' % self.branchName,
-         description=['upload', 'complete', 'snippet'],
-         haltOnFailure=True
-        )
 
 class ReleaseFactory(MozillaBuildFactory):
     def getCandidatesDir(self, product, version, buildNumber):
