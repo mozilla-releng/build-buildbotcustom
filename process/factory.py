@@ -1284,7 +1284,8 @@ class NightlyRepackFactory(BaseRepackFactory):
             self.postUploadCmd = ' '.join(postUploadCmd)
 
         if l10nNightlyUpdate and self.nightly:
-            self.env = {'MOZ_MAKE_COMPLETE_MAR': '1'}
+            self.env = {'MOZ_MAKE_COMPLETE_MAR': '1', 
+                        'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL}
             self.extraConfigureArgs = ['--enable-update-packaging']
 
         BaseRepackFactory.__init__(self, **kwargs)
@@ -1293,8 +1294,6 @@ class NightlyRepackFactory(BaseRepackFactory):
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
             assert ausUser and ausHost
 
-            # needed to generate the snippet's URL
-            self.env = {'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL}
             # this is a tad ugly because we need to python interpolation
             # as well as WithProperties
             # here's an example of what it translates to:
