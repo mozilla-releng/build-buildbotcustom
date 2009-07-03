@@ -494,6 +494,24 @@ class MercurialBuildFactory(MozillaBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
+        self.addStep(SetProperty,
+          command=['python', 'build/config/printconfigsetting.py',
+          'build/%s/dist/bin/application.ini' % self.objdir,
+          'App', 'BuildID'],
+          property='buildid',
+          workdir='.',
+          description=['getting', 'buildid'],
+          descriptionDone=['got', 'buildid']
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build/config/printconfigsetting.py',
+          'build/%s/dist/bin/application.ini' % self.objdir,
+          'App', 'SourceStamp'],
+          property='sourcestamp',
+          workdir='.',
+          description=['getting', 'sourcestamp'],
+          descriptionDone=['got', 'sourcestamp']
+        )
         if self.graphServer:
             self.addStep(GraphServerPost,
              server=self.graphServer,
@@ -548,6 +566,24 @@ class MercurialBuildFactory(MozillaBuildFactory):
          testname='current',
          warnOnFailure=True,
          haltOnFailure=True
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build/config/printconfigsetting.py',
+          'build/%s/dist/bin/application.ini' % self.objdir,
+          'App', 'BuildID'],
+          property='buildid',
+          workdir='.',
+          description=['getting', 'buildid'],
+          descriptionDone=['got', 'buildid']
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build/config/printconfigsetting.py',
+          'build/%s/dist/bin/application.ini' % self.objdir,
+          'App', 'SourceStamp'],
+          property='sourcestamp',
+          workdir='.',
+          description=['getting', 'sourcestamp'],
+          descriptionDone=['got', 'sourcestamp']
         )
         if self.graphServer:
             self.addStep(GraphServerPost,
@@ -688,6 +724,24 @@ class MercurialBuildFactory(MozillaBuildFactory):
          platform=self.platform,
          workdir='build%s' % self.mozillaDir,
          env=self.env
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build/config/printconfigsetting.py',
+          'build/%s/dist/bin/application.ini' % self.objdir,
+          'App', 'BuildID'],
+          property='buildid',
+          workdir='.',
+          description=['getting', 'buildid'],
+          descriptionDone=['got', 'buildid']
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build/config/printconfigsetting.py',
+          'build/%s/dist/bin/application.ini' % self.objdir,
+          'App', 'SourceStamp'],
+          property='sourcestamp',
+          workdir='.',
+          description=['getting', 'sourcestamp'],
+          descriptionDone=['got', 'sourcestamp']
         )
         if self.graphServer:
             self.addStep(GraphServerPost,
