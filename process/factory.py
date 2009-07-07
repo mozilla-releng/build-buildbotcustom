@@ -4054,10 +4054,10 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
             uploadCompleteMar=False,
             uploadLangPacks=False,
             releaseToLatest=True,
-            releaseToDated=True,
-            releaseToTinderboxBuilds=True,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=False,
             tinderboxBuildsDir=self.baseUploadDir,
-            dependToDated=True,
+            dependToDated=False,
             workdir='%s/%s/dist' % (self.baseWorkDir, self.branchName)
         )
 
