@@ -764,8 +764,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
             )
 
 class CCMercurialBuildFactory(MercurialBuildFactory):
-    def __init__(self, mozRepoPath, **kwargs):
+    def __init__(self, skipBlankRepos=False, mozRepoPath='',
+                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
+                 **kwargs):
+        self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.cvsroot = cvsroot
         MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     def addSourceSteps(self):
@@ -792,11 +798,39 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         self.addStep(ShellCommand,
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
         )
+        # build up the checkout command with all options
+        co_command = ['python', 'client.py', 'checkout']
+        if self.mozRepoPath:
+            co_command.append('--mozilla-repo=%s' % self.getRepository(self.mozRepoPath))
+        if self.inspectorRepoPath:
+            co_command.append('--inspector-repo=%s' % self.getRepository(self.inspectorRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-inspector')
+        if self.venkmanRepoPath:
+            co_command.append('--venkman-repo=%s' % self.getRepository(self.venkmanRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-venkman')
+        if self.cvsroot:
+            co_command.append('--cvsroot=%s' % self.cvsroot)
+        elif self.skipBlankRepos:
+            co_command.append('--skip-chatzilla')
+        if self.buildRevision:
+            co_command.append('--comm-rev=%s' % self.buildRevision)
+            co_command.append('--mozilla-rev=%s' % self.buildRevision)
+            co_command.append('--inspector-rev=%s' % self.buildRevision)
+            co_command.append('--venkman-rev=%s' % self.buildRevision)
+        # execute the checkout
         self.addStep(ShellCommand,
-         name="client.py checkout",
-         command=['python', 'client.py', 'checkout',
-                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)]
+         command=co_command,
+         description=['client.py', 'checkout']
         )
+        if self.buildRevision and (self.cvsroot or not self.skipBlankRepos):
+            # Update ChatZilla to specified revision
+            self.addStep(ShellCommand,
+             command=['cvs', 'up', '-r', self.buildRevision],
+             workdir='build%s/extensions/irc' % self.mozillaDir,
+             description=['update ChatZilla']
+            )
 
         self.addStep(SetProperty,
          command=['hg', 'identify', '-i'],
@@ -902,8 +936,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
             )
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
-    def __init__(self, mozRepoPath, **kwargs):
+    def __init__(self, skipBlankRepos=False, mozRepoPath='',
+                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
+                 **kwargs):
+        self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.cvsroot = cvsroot
         NightlyBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
 
@@ -1278,18 +1318,45 @@ class CCBaseRepackFactory(BaseRepackFactory):
             'comm-1.9.1-win32-l10n-nightly',
     ]
 
-    def __init__(self, mozRepoPath, **kwargs):
+    def __init__(self, skipBlankRepos=False, mozRepoPath='',
+                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
+                 buildRevision='', **kwargs):
+        self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.cvsroot = cvsroot
+        self.buildRevision = buildRevision
         BaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     def getSources(self):
         BaseRepackFactory.getSources(self)
+        # build up the checkout command with all options
+        co_command = ['python', 'client.py', 'checkout',
+                      WithProperties('--comm-rev=%(en_revision)s')]
+        if self.mozRepoPath:
+            co_command.append('--mozilla-repo=%s' % self.getRepository(self.mozRepoPath))
+        if self.inspectorRepoPath:
+            co_command.append('--inspector-repo=%s' % self.getRepository(self.inspectorRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-inspector')
+        if self.venkmanRepoPath:
+            co_command.append('--venkman-repo=%s' % self.getRepository(self.venkmanRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-venkman')
+        if self.cvsroot:
+            co_command.append('--cvsroot=%s' % self.cvsroot)
+        elif self.skipBlankRepos:
+            co_command.append('--skip-chatzilla')
+        if self.buildRevision:
+            co_command.append('--comm-rev=%s' % self.buildRevision)
+            co_command.append('--mozilla-rev=%s' % self.buildRevision)
+            co_command.append('--inspector-rev=%s' % self.buildRevision)
+            co_command.append('--venkman-rev=%s' % self.buildRevision)
+        # execute the checkout
         self.addStep(ShellCommand,
-         name="client.py checkout",
-         command=['python', 'client.py', 'checkout',
-                  WithProperties('--comm-rev=%(en_revision)s'),
-                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath),
-                  '--mozilla-rev=default'],
+         command=co_command,
+         description=['client.py', 'checkout'],
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
 
@@ -1450,8 +1517,15 @@ class NightlyRepackFactory(BaseRepackFactory):
         )
 
 class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
-    def __init__(self, mozRepoPath, **kwargs):
+    def __init__(self, skipBlankRepos=False, mozRepoPath='',
+                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
+                 buildRevision='', **kwargs):
+        self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.cvsroot = cvsroot
+        self.buildRevision = buildRevision
         NightlyRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way
@@ -1522,13 +1596,17 @@ class ReleaseFactory(MozillaBuildFactory):
 
 class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
     def __init__(self, configRepoPath, configSubDir, mozconfig, platform,
-                 buildRevision, version, buildNumber, **kwargs):
+                 buildRevision, version, buildNumber, brandName=None, **kwargs):
         self.configRepoPath = configRepoPath
         self.configSubDir = configSubDir
         self.platform = platform
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
+        if brandName:
+            self.brandName = brandName
+        else:
+            self.brandName = kwargs['project'].capitalize()
         # more vars are added in downloadBuilds
         self.env = {'MOZ_PKG_PRETTYNAMES': '1',
                     'MOZ_PKG_VERSION': self.version,
@@ -1552,7 +1630,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         self.addStep(ShellCommand,
          name='update_sources',
          command=['hg', 'up', '-C', '-r', self.buildRevision],
-         workdir='build/'+self.branchName,
+         workdir='build/'+self.origSrcDir,
          description=['update %s' % self.branchName,
                       'to %s' % self.buildRevision],
          haltOnFailure=True
@@ -1576,14 +1654,14 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          name='rm_configs',
          command=['rm', '-rf', 'configs'],
          description=['remove', 'configs'],
-         workdir='build/'+self.branchName,
+         workdir='build/'+self.origSrcDir,
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
          name='checkout_configs',
          command=['hg', 'clone', self.configRepo, 'configs'],
          description=['checkout', 'configs'],
-         workdir='build/'+self.branchName,
+         workdir='build/'+self.origSrcDir,
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -1591,13 +1669,13 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          name='copy_mozconfig',
          command=['cp', self.mozconfig, '.mozconfig'],
          description=['copy mozconfig'],
-         workdir='build/'+self.branchName,
+         workdir='build/'+self.origSrcDir,
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
          name='cat_mozconfig',
          command=['cat', '.mozconfig'],
-         workdir='build/'+self.branchName
+         workdir='build/'+self.origSrcDir
         )
 
     def downloadBuilds(self):
@@ -1606,7 +1684,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         self.addStep(SetProperty,
          command=['bash', '-c', 'pwd'],
          property='srcdir',
-         workdir='build/'+self.branchName
+         workdir='build/'+self.origSrcDir
         )
 
         candidatesDir = 'http://%s' % self.stageServer + \
@@ -1631,7 +1709,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         elif self.platform.startswith('macosx'):
             platformDir = 'mac'
             filename = '%s.dmg' % self.project
-            builds[filename] = '%s %s.dmg' % (self.project.capitalize(),
+            builds[filename] = '%s %s.dmg' % (self.brandName,
                                               longVersion)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('win32'):
@@ -1639,7 +1717,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             filename = '%s.zip' % self.project
             instname = '%s.exe' % self.project
             builds[filename] = '%s-%s.zip' % (self.project, self.version)
-            builds[instname] = '%s Setup %s.exe' % (self.project.capitalize(),
+            builds[instname] = '%s Setup %s.exe' % (self.brandName,
                                                     longVersion)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
@@ -1653,7 +1731,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              command=['wget', '-O', name, '--no-check-certificate',
                       '%s/%s/en-US/%s' % (candidatesDir, platformDir,
                                           builds[name])],
-             workdir='build/'+self.branchName,
+             workdir='build/'+self.origSrcDir,
              haltOnFailure=True
             )
 
@@ -1668,9 +1746,9 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          description='comparing locale',
          env={'PYTHONPATH': ['../../../compare-locales/lib']},
          flunkOnWarnings=True,
-         haltOnFailure=True,        
+         haltOnFailure=True,
          workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.branchName,
+                                       self.origSrcDir,
                                        self.appName),
         )
 
@@ -1680,7 +1758,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             self.addStep(ShellCommand,
              name='make_%s' % dir,
              command=['make'],
-             workdir='build/'+self.branchName+'/'+dir,
+             workdir='build/'+self.mozillaSrcDir+'/'+dir,
              description=['make ' + dir],
              haltOnFailure=True
             )
@@ -1690,7 +1768,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          command=['make', WithProperties('installers-%(locale)s')],
          env=self.env,
          haltOnFailure=True,
-         workdir='build/'+self.branchName+'/'+self.appName+'/locales'
+         workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
         )
 
 class StagingRepositorySetupFactory(ReleaseFactory):
@@ -1733,7 +1811,7 @@ class StagingRepositorySetupFactory(ReleaseFactory):
 class ReleaseTaggingFactory(ReleaseFactory):
     def __init__(self, repositories, productName, appName, version, appVersion,
                  milestone, baseTag, buildNumber, hgUsername, hgSshKey=None,
-                 buildSpace=1.5, **kwargs):
+                 relbranchPrefix=None, buildSpace=1.5, **kwargs):
         """Repositories looks like this:
             repositories[name]['revision']: changeset# or tag
             repositories[name]['relbranchOverride']: branch name
@@ -1792,6 +1870,8 @@ class ReleaseTaggingFactory(ReleaseFactory):
                        repository.
            hgSshKey: The full path to the ssh key to use (if necessary) when
                      pushing changes to the remote repository.
+           relbranchPrefix: the prefix to start relelease branch names with
+                            (defaults to 'GECKO')
 
         """
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
@@ -1825,8 +1905,11 @@ class ReleaseTaggingFactory(ReleaseFactory):
         # looks like: GECKO191_20080728_RELBRANCH
         # This can be overridden per-repository. This case is handled
         # in the loop below
-        relbranchName = 'GECKO%s_%s_RELBRANCH' % (
-          milestone.replace('.', ''), datetime.now().strftime('%Y%m%d'))
+        if not relbranchPrefix:
+            relbranchPrefix = 'GECKO'
+        relbranchName = '%s%s_%s_RELBRANCH' % (
+          relbranchPrefix, milestone.replace('.', ''),
+          datetime.now().strftime('%Y%m%d'))
 
         for repoPath in sorted(repositories.keys()):
             repoName = self.getRepoName(repoPath)
@@ -1838,10 +1921,14 @@ class ReleaseTaggingFactory(ReleaseFactory):
             repoRevision = repositories[repoPath]['revision']
             bumpFiles = repositories[repoPath]['bumpFiles']
 
+            # use repo-specific variable so that a changed name doesn't
+            # propagate to later repos without an override
             relbranchOverride = False
             if repositories[repoPath]['relbranchOverride']:
                 relbranchOverride = True
-                relbranchName = repositories[repoPath]['relbranchOverride']
+                repoRelbranchName = repositories[repoPath]['relbranchOverride']
+            else:
+                repoRelbranchName = relbranchName
 
             # For l10n we never bump any files, so this will never get
             # overridden. For source repos, we will do a version bump in build1
@@ -1885,7 +1972,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                 )
                 self.addStep(ShellCommand,
                  name='hg_branch',
-                 command=['hg', 'branch', relbranchName],
+                 command=['hg', 'branch', repoRelbranchName],
                  workdir=repoName,
                  description=['branch %s' % repoName],
                  haltOnFailure=True
@@ -1894,9 +1981,9 @@ class ReleaseTaggingFactory(ReleaseFactory):
             else:
                 self.addStep(ShellCommand,
                  name='switch_branch',
-                 command=['hg', 'up', '-C', relbranchName],
+                 command=['hg', 'up', '-C', repoRelbranchName],
                  workdir=repoName,
-                 description=['switch to', relbranchName],
+                 description=['switch to', repoRelbranchName],
                  haltOnFailure=True
                 )
             # we don't need to do any version bumping if this is a respin
@@ -1928,7 +2015,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  command=['hg', 'commit', '-u', hgUsername, '-m',
                           'Automated checkin: version bump remove "pre" ' + \
                           ' from version number for ' + productName + ' ' + \
-                          version + ' release on ' + relbranchName + ' ' + \
+                          version + ' release on ' + repoRelbranchName + ' ' + \
                           'CLOSED TREE'],
                  workdir=repoName,
                  description=['commit %s' % repoName],
@@ -1989,7 +2076,7 @@ class SingleSourceFactory(ReleaseFactory):
         sourceTarball = 'source/%s-%s-source.tar.bz2' % (productName,
                                                          version)
         # '-c' is for "release to candidates dir"
-        postUploadCmd = 'python ~/bin/post_upload.py -p %s -v %s -n %s -c' % \
+        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
           (productName, version, buildNumber)
         uploadEnv = {'UPLOAD_HOST': stagingServer,
                      'UPLOAD_USER': stageUsername,
@@ -2090,8 +2177,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
                  ftpServer, bouncerServer, stagingServer, useBetaChannel,
                  stageUsername, stageSshKey, ausUser, ausHost, ausServerUrl,
-                 hgSshKey, hgUsername, commitPatcherConfig=True, buildSpace=13,
-                 **kwargs):
+                 hgSshKey, hgUsername, commitPatcherConfig=True, mozRepoPath=None,
+                 brandName=None, buildSpace=13, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -2106,6 +2193,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
            commitPatcherConfig: This flag simply controls whether or not
                                 the bumped patcher config file will be
                                 commited to the CVS repository.
+           mozRepoPath: The path for the Mozilla repo to hand patcher as the
+                        HGROOT (if omitted, the default repoPath is used).
+                        Apps not rooted in the Mozilla repo need this.
+           brandName: The brand name as used on the updates server. If omitted,
+                      the first letter of the brand name is uppercased.
         """
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
@@ -2116,6 +2208,14 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         updateDir = 'build/temp/%s/%s-%s' % (productName, oldVersion, version)
         marDir = '%s/ftp/%s/nightly/%s-candidates/build%s' % \
           (updateDir, productName, version, buildNumber)
+
+        if mozRepoPath:
+          self.mozRepository = self.getRepository(mozRepoPath)
+        else:
+          self.mozRepository = self.repository
+
+        if not brandName:
+            brandName = productName.capitalize()
 
         # If useBetaChannel is False the unnamed snippet type will be
         # 'beta' channel snippets (and 'release' if we're into stable releases).
@@ -2167,8 +2267,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         )
 
         bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
-                       '-p', productName, '-v', version, '-a', appVersion,
-                       '-o', oldVersion, '-b', str(buildNumber),
+                       '-p', productName, '-r', brandName, '-v', version,
+                       '-a', appVersion, '-o', oldVersion, '-b', str(buildNumber),
                        '-c', patcherConfigFile, '-t', stagingServer,
                        '-f', ftpServer, '-d', bouncerServer,
                        '-l', 'shipped-locales']
@@ -2222,7 +2322,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             self.addStep(ShellCommand,
              name='bump_verify_configs',
              command=['perl', '../tools/release/update-verify-bump.pl',
-                      '-o', platform, '-p', productName,
+                      '-o', platform, '-p', productName, '-r', brandName,
                       '--old-version=%s' % oldVersion,
                       '--old-app-version=%s' % oldAppVersion,
                       '--old-long-version=%s' % oldLongVersion,
@@ -2259,15 +2359,17 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=['perl', 'patcher2.pl', '--build-tools-hg',
                   '--tools-revision=%s' % patcherToolsTag,
                   '--app=%s' % productName,
+                  '--brand=%s' % brandName,
                   '--config=%s' % patcherConfigFile],
          description=['patcher:', 'build tools'],
-         env={'HGROOT': self.repository},
+         env={'HGROOT': self.mozRepository},
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
          name='patcher_download_builds',
          command=['perl', 'patcher2.pl', '--download',
                   '--app=%s' % productName,
+                  '--brand=%s' % brandName,
                   '--config=%s' % patcherConfigFile],
          description=['patcher:', 'download builds'],
          haltOnFailure=True
@@ -2277,6 +2379,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=['perl', 'patcher2.pl', '--create-patches',
                   '--partial-patchlist-file=patchlist.cfg',
                   '--app=%s' % productName,
+                  '--brand=%s' % brandName,
                   '--config=%s' % patcherConfigFile],
          description=['patcher:', 'create patches'],
          haltOnFailure=True
@@ -2315,7 +2418,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             localDir = 'aus2'
             # On the AUS server we store each type of snippet in a directory
             # named thusly, with the snippet type appended to it
-            remoteDir = '%s-%s-%s' % (date, productName.title(), version)
+            remoteDir = '%s-%s-%s' % (date, brandName, version)
             if type != '':
                 localDir = localDir + '.%s' % type
                 remoteDir = remoteDir + '-%s' % type
