@@ -3194,7 +3194,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  clobber=False, env=None, **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
-    platform: the mobile platform (linux-arm, wince-arm)
+    platform: the mobile platform (linux-arm, winmo-arm)
     baseWorkDir: the path to the default slave workdir
         """
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -3473,7 +3473,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             haltOnFailure=True
         )
 
-class WinceBuildFactory(MobileBuildFactory):
+class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
                  packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.cab",
                  **kwargs):

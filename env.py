@@ -151,7 +151,7 @@ MozillaEnvironments['win32-unittest'] = {
                'D:\\msvs8\\VC\\ATLMFC\\LIB'
 }
 
-MozillaEnvironments['wince-arm'] = {
+MozillaEnvironments['winmo-arm'] = {
     "DEVENVDIR": 'd:\\msvs9\\Common7\\IDE',
     "FRAMEWORK35VERSION": 'v3.5',
     "FRAMEWORKDIR": 'C:\\WINDOWS\\Microsoft.NET\\Framework',

@@ -14,7 +14,7 @@ reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.tryserver)
 
 from buildbotcustom.process.factory import MercurialBuildFactory, \
-  WinceBuildFactory, MaemoBuildFactory
+  WinmoBuildFactory, MaemoBuildFactory
 from buildbotcustom.steps.misc import SendChangeStep
 from buildbotcustom.steps.tryserver import MozillaTryProcessing, \
   MozillaDownloadMozconfig, MozillaPatchDownload, MozillaTryServerHgClone, \
@@ -137,7 +137,7 @@ class TryBuildFactory(MercurialBuildFactory):
 
 
 class MaemoTryBuildFactory(MaemoBuildFactory):
-    def __init__(self, scp_string=None, targetSubDir='maemo', 
+    def __init__(self, scp_string=None, targetSubDir='maemo',
                  slavesrcdir = 'upload', **kwargs):
         self.scp_string = scp_string
         self.targetSubDir = targetSubDir
@@ -261,16 +261,16 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
             workdir="%s/%s" % (self.baseWorkDir, self.objdir))
 
 
-class WinceTryBuildFactory(WinceBuildFactory):
-    def __init__(self, scp_string=None, targetSubDir='wince',
+class WinmoTryBuildFactory(WinmoBuildFactory):
+    def __init__(self, scp_string=None, targetSubDir='winmo',
                  slavesrcdir='upload', **kwargs):
         self.scp_string = scp_string
         self.targetSubDir=targetSubDir
         self.slavesrcdir=slavesrcdir
-        WinceBuildFactory.__init__(self, **kwargs)
+        WinmoBuildFactory.__init__(self, **kwargs)
 
     def getMozconfig(self):
-        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-wince",
+        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-winmo",
                                                patchDir="patches/",
                                                workdir=self.baseWorkDir)
 
