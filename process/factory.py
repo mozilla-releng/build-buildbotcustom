@@ -999,7 +999,8 @@ class BaseRepackFactory(MozillaBuildFactory):
     def __init__(self, project, appName, l10nRepoPath,
                  compareLocalesRepoPath, compareLocalesTag,
                  stageServer, stageUsername, stageSshKey=None,
-                 baseWorkDir='build', tree="notset", **kwargs):
+                 baseWorkDir='build', tree="notset", mozillaDir=None,
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
@@ -1022,6 +1023,16 @@ class BaseRepackFactory(MozillaBuildFactory):
         # Needed for scratchbox
         self.baseWorkDir = baseWorkDir
 
+        self.origSrcDir = self.branchName
+
+        # Mozilla subdir and objdir
+        if mozillaDir:
+            self.mozillaDir = '/%s' % mozillaDir
+            self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
+        else:
+            self.mozillaDir = ''
+            self.mozillaSrcDir = self.origSrcDir
+
         self.uploadEnv = self.env.copy() # pick up any env variables in our subclass
         self.uploadEnv.update({
             'AB_CD': WithProperties('%(locale)s'),
@@ -1036,8 +1047,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='rm_dist_upload',
          command=['sh', '-c',
-                  'if [ -d '+self.branchName+'/dist/upload ]; then ' +
-                  'rm -rf '+self.branchName+'/dist/upload; ' +
+                  'if [ -d '+self.mozillaSrcDir+'/dist/upload ]; then ' +
+                  'rm -rf '+self.mozillaSrcDir+'/dist/upload; ' +
                   'fi'],
          description="rm dist/upload",
          workdir=self.baseWorkDir,
@@ -1073,14 +1084,22 @@ class BaseRepackFactory(MozillaBuildFactory):
          command=['bash', '-c', 'autoconf-2.13'],
          haltOnFailure=True,
          descriptionDone=['autoconf'],
-         workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
+        if (self.mozillaDir):
+            self.addStep(ShellCommand,
+             name='autoconf_mozilla',
+             command=['bash', '-c', 'autoconf-2.13'],
+             haltOnFailure=True,
+             descriptionDone=['autoconf mozilla'],
+             workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
+            )
         self.addStep(ShellCommand,
          name='autoconf_js_src',
          command=['bash', '-c', 'autoconf-2.13'],
          haltOnFailure=True,
          descriptionDone=['autoconf js/src'],
-         workdir='%s/%s/js/src' % (self.baseWorkDir, self.branchName)
+         workdir='%s/%s/js/src' % (self.baseWorkDir, self.mozillaSrcDir)
         )
         self.addStep(ShellCommand,
          name='configure',
@@ -1091,13 +1110,13 @@ class BaseRepackFactory(MozillaBuildFactory):
          description='configure',
          descriptionDone='configure done',
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
         for dir in ('nsprpub', 'config'):
             self.addStep(ShellCommand,
              name='make %s' % dir,
              command=['make'],
-             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, dir),
+             workdir='%s/%s/%s' % (self.baseWorkDir, self.mozillaSrcDir, dir),
              description=['make', dir],
              haltOnFailure=True
             )
@@ -1131,7 +1150,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='make_l10n_upload',
          command=['make', WithProperties('l10n-upload-%(locale)s')],
          env=self.uploadEnv,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
          flunkOnFailure=True
         )
@@ -1140,13 +1159,14 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='get_enUS_src',
          command=['sh', '-c',
-          WithProperties('if [ -d '+self.branchName+' ]; then ' +
-                         'hg -R '+self.branchName+' pull -r default ; ' +
+          WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
+                         'hg -R '+self.origSrcDir+' pull -r default ; ' +
                          'else ' +
                          'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.repoPath+' ; ' +
+                         'http://'+self.hgHost+'/'+self.repoPath+' ' +
+                         self.origSrcDir+' ; ' +
                          'fi ' +
-                         '&& hg -R '+self.branchName+' update -r %(en_revision)s')],
+                         '&& hg -R '+self.origSrcDir+' update -r %(en_revision)s')],
          descriptionDone="en-US source",
          workdir=self.baseWorkDir,
          haltOnFailure=True,
@@ -1215,7 +1235,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          description=['remove', 'merged'],
          workdir=self.baseWorkDir,
          workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.branchName,
+                                       self.origSrcDir,
                                        self.appName),
          haltOnFailure=True
         )
@@ -1232,7 +1252,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          flunkOnFailure=False,
          warnOnFailure=True,
          workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.branchName,
+                                       self.origSrcDir,
                                        self.appName),
         )
 
@@ -1264,7 +1284,10 @@ class NightlyRepackFactory(BaseRepackFactory):
         # because it needs self.postUploadCmd set
         assert 'project' in kwargs
         assert 'repoPath' in kwargs
-        uploadDir = '%s-l10n' % self.getRepoName(kwargs['repoPath'])
+        if 'branchName' in kwargs:
+          uploadDir = '%s-l10n' % kwargs['branchName']
+        else:
+          uploadDir = '%s-l10n' % self.getRepoName(kwargs['repoPath'])
         self.env = {}
         postUploadCmd = ['post_upload.py', 
                          '-p %s ' % kwargs['project'],
@@ -1328,7 +1351,7 @@ class NightlyRepackFactory(BaseRepackFactory):
          descriptionDone='wget en-US',
          env={'EN_US_BINARY_URL': self.enUSBinaryURL},
          haltOnFailure=True,
-         workdir='build/'+self.branchName+'/'+self.appName+'/locales'
+         workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
         )
 
     def updateEnUS(self):
@@ -1341,13 +1364,13 @@ class NightlyRepackFactory(BaseRepackFactory):
                      command=['make', 'unpack'],
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
-                     workdir='build/'+self.branchName+'/'+self.appName+
+                     workdir='build/'+self.origSrcDir+'/'+self.appName+
                      '/locales'
                      )
         self.addStep(SetProperty,
                      command=['make', 'ident'],
                      haltOnFailure=True,
-                     workdir='build/'+self.branchName+'/'+self.appName+
+                     workdir='build/'+self.origSrcDir+'/'+self.appName+
                      '/locales',
                      extract_fn=identToProperties('fx_revision')
                      )
@@ -1356,7 +1379,7 @@ class NightlyRepackFactory(BaseRepackFactory):
                      command=['hg', 'update', '-r',
                               WithProperties('%(fx_revision)s')],
                      haltOnFailure=True,
-                     workdir='build/' + self.branchName)
+                     workdir='build/' + self.origSrcDir)
 
     def tinderboxPrintRevisions(self):
         self.tinderboxPrint('fx_revision',WithProperties('%(fx_revision)s'))
@@ -1366,7 +1389,7 @@ class NightlyRepackFactory(BaseRepackFactory):
         if self.nightly:
             self.addStep(ShellCommand,
              command=['make'],
-             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, 'modules/libmar'),
+             workdir='%s/%s/%s' % (self.baseWorkDir, self.mozillaSrcDir, 'modules/libmar'),
              description=['make', 'modules/libmar'],
              haltOnFailure=True
             )
@@ -1377,7 +1400,7 @@ class NightlyRepackFactory(BaseRepackFactory):
          env = self.env,
          haltOnFailure=True,
          description=['make','installers'],
-         workdir='build/'+self.branchName+'/'+self.appName+'/locales'
+         workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
         )
 
     def uploadSnippet(self):
@@ -1392,7 +1415,7 @@ class NightlyRepackFactory(BaseRepackFactory):
                   'dist/update/complete.update.snippet',
                   WithProperties('%s:%s/complete.txt' % \
                     (self.ausHost, self.ausFullUploadDir))],
-         workdir='build/%s' % self.branchName,
+         workdir='build/%s' % self.mozillaSrcDir,
          description=['upload', 'complete', 'snippet'],
          haltOnFailure=True
         )
@@ -3958,7 +3981,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                   ' mobile ; ' +
                   'fi && hg -R mobile update -r default'],
          descriptionDone=['en-US', 'mobile', 'source'],
-         workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=30*60 # 30 minutes
         )
 
@@ -3982,7 +4005,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          descriptionDone='wget en-US',
          env={'EN_US_BINARY_URL': self.enUSBinaryURL},
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         )
 
@@ -3991,13 +4014,13 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          name='make_unpack',
          command=['make', 'unpack'],
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         )
         self.addStep(SetProperty,
          command=['make', 'ident'],
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
          extract_fn=identToProperties()
         )
@@ -4005,13 +4028,13 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          name='hg_update_gecko_revision',
          command=['hg', 'update', '-r', WithProperties('%(gecko_revision)s')],
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
         self.addStep(ShellCommand,
          name='hg_update_fennec_revision',
          command=['hg', 'update', '-r', WithProperties('%(fennec_revision)s')],
          haltOnFailure=True,
-         workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.appName)
+         workdir='%s/%s/%s' % (self.baseWorkDir, self.origSrcDir, self.appName)
         )
 
     def tinderboxPrintRevisions(self):
@@ -4025,7 +4048,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          command=['sh','-c',
                   WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.branchName,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         )
 
@@ -4037,12 +4060,12 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                      'dist/l10n-stage/%s/application.ini' % self.project,
                      'App', 'BuildID'],
             property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
         self.addStep(MozillaStageUpload,
-            objdir="%s/dist" % (self.branchName),
+            objdir="%s/dist" % (self.origSrcDir),
             username=self.stageUsername,
             milestone=self.baseUploadDir,
             platform=platform,
@@ -4058,7 +4081,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
             releaseToTinderboxBuilds=False,
             tinderboxBuildsDir=self.baseUploadDir,
             dependToDated=False,
-            workdir='%s/%s/dist' % (self.baseWorkDir, self.branchName)
+            workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir)
         )
 
     def doUpload(self):
