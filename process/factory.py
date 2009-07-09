@@ -1263,6 +1263,35 @@ class BaseRepackFactory(MozillaBuildFactory):
         '''
         pass
 
+class CCBaseRepackFactory(BaseRepackFactory):
+    # Override ignore_dirs so that we don't delete l10n nightly builds
+    # before running a l10n nightly build
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + [
+            'comm-central-macosx-l10n-nightly',
+            'comm-central-linux-l10n-nightly',
+            'comm-central-win32-l10n-nightly',
+            'comm-central-trunk-macosx-l10n-nightly',
+            'comm-central-trunk-linux-l10n-nightly',
+            'comm-central-trunk-win32-l10n-nightly',
+            'comm-1.9.1-macosx-l10n-nightly',
+            'comm-1.9.1-linux-l10n-nightly',
+            'comm-1.9.1-win32-l10n-nightly',
+    ]
+
+    def __init__(self, mozRepoPath, **kwargs):
+        self.mozRepoPath = mozRepoPath
+        BaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+
+    def getSources(self):
+        BaseRepackFactory.getSources(self)
+        self.addStep(ShellCommand,
+         name="client.py checkout",
+         command=['python', 'client.py', 'checkout',
+                  WithProperties('--comm-rev=%(en_revision)s'),
+                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath),
+                  '--mozilla-rev=default'],
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+        )
 
 class NightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
@@ -1419,6 +1448,53 @@ class NightlyRepackFactory(BaseRepackFactory):
          description=['upload', 'complete', 'snippet'],
          haltOnFailure=True
         )
+
+class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
+    def __init__(self, mozRepoPath, **kwargs):
+        self.mozRepoPath = mozRepoPath
+        NightlyRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+
+    # it sucks to override all of updateEnUS but we need to do it that way
+    # this is basically mirroring what mobile does
+    def updateEnUS(self):
+        '''Update en-US to the source stamp we get from make ident.
+
+        Requires that we run make unpack first.
+        '''
+        self.addStep(ShellCommand,
+         command=['make', 'unpack'],
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
+                                       self.appName)
+        )
+        self.addStep(SetProperty,
+         command=['make', 'ident'],
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
+                                       self.appName),
+         extract_fn=identToProperties()
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'update', '-r', WithProperties('%(comm_revision)s')],
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'update', '-r', WithProperties('%(moz_revision)s')],
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
+        )
+
+    def tinderboxPrintRevisions(self):
+        self.tinderboxPrint('comm_revision',WithProperties('%(comm_revision)s'))
+        self.tinderboxPrint('moz_revision',WithProperties('%(moz_revision)s'))
+        self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
+
+    # unsure why we need to explicitely do this but after bug 478436 we stopped
+    # executing the actual repackaging without this def here
+    def doRepack(self):
+        NightlyRepackFactory.doRepack(self)
+
 
 class ReleaseFactory(MozillaBuildFactory):
     def getCandidatesDir(self, product, version, buildNumber):
