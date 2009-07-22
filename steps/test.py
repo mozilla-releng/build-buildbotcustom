@@ -37,6 +37,7 @@ from urllib import urlencode
 from time import strptime, strftime, localtime, mktime
 import re
 import os
+import post_file
 import signal
 from os import path
 import string
@@ -377,35 +378,57 @@ class GraphServerPost(BuildStep):
                                  branch=branch, resultsname=resultsname,
                                  timeout=timeout)
         self.server = server
-        self.graphurl = "http://%s/%s/collect.cgi" % (server, selector,)
+        self.selector = selector
+        self.graphurl = "http://%s%s" % (self.server, self.selector)
         self.branch = branch
         self.resultsname = resultsname.replace(' ', '_')
         self.timeout = timeout
         self.name = 'graph server post'
+        self.description = 'graph server post results'
+        self.descriptionDone = 'graph server post results complete'
 
     def doTinderboxPrint(self, contents, testlongname, testname, prettyval):
-        # If there was no error, process the log
-        lines = contents.split('\n')
-        self.stdio.addStdout(contents + '\n')
-        for line in lines:
-            if "RETURN:" in line :
-                tboxPrint =  'TinderboxPrint: ' + \
-                  '<a title = "%s" href = "http://%s/%s">%s:%s</a>\n' % \
-                  (testlongname, self.server, line.rsplit(":")[3],
-                   testname, prettyval) 
-                self.stdio.addStdout(tboxPrint)
+        try:
+          # If there was no error, process the log
+          lines = contents.split('\n')
+          found = False
+          for line in lines:
+            if "RETURN" in line :
+              tboxPrint =  'TinderboxPrint: ' + \
+                '<a title = "%s" href = "http://%s/%s">%s:%s</a>\n' % \
+                (testlongname, self.server, line.split("\t")[3],
+                testname, prettyval) 
+              self.stdio.addStdout(tboxPrint)
+              found = True
+          if not found:
+              self.stdio.addStderr("results not added, response: \n" + contents)
+              raise Exception("graph server did not add results successfully")
+        except Exception, e:
+          self.stdio.addStderr(str(e))
+          raise
         
     def postFailed(self, testlongname):
         # This function is called when getPage() fails and simply sets
         # self.error = True so postFinished knows that something failed.
         self.error = True
-        self.stdio.addStderr('Encountered error when trying to post %s\n' % \
+        self.stdio.addStderr('\nEncountered error when trying to post %s\n' % \
           testlongname)
+
+    def constructString(self, machine, testname, branch, sourcestamp, buildid, date, val):
+        info_format = "%s,%s,%s,%s,%s,%s\n"
+        str = ""
+        str += "START\n"
+        str += "AVERAGE\n"
+        str += info_format % (machine, testname, branch, sourcestamp, buildid, date)
+        str += "%.2f\n" % (float(val))
+        str += "END"
+        return str
 
     def start(self):
         self.changes = self.build.allChanges()
         self.timestamp = int(self.step_status.build.getTimes()[0])
-        self.buildid = strftime("%Y%m%d%H%M", localtime(self.timestamp))
+        self.buildid = self.getProperty('buildid')
+        self.sourcestamp = self.getProperty('sourcestamp')
         self.testresults = self.getProperty('testresults')
         self.stdio = self.addLog('stdio')
         self.error = False
@@ -414,9 +437,11 @@ class GraphServerPost(BuildStep):
         deferreds = []
         for res in self.testresults:
             testname, testlongname, testval, prettyval = res
-            params = urlencode({'branchid': self.buildid, 'value': str(testval).strip(string.letters), 'testname': testlongname, 'tbox' : self.resultsname, 'type' : "continuous", 'time' : self.timestamp, 'branch' : self.branch})
-            d = getPage(self.graphurl, timeout=self.timeout, method='POST',
-                        postdata=params)
+            testval = str(testval).strip(string.letters)
+            data = self.constructString(self.resultsname, testlongname, self.branch, self.sourcestamp, self.buildid, self.timestamp, testval)
+            content_type, body = post_file.encode_multipart_formdata([("key", "value")], [("filename", "data", data)])
+            headers = {'Content-Type': content_type, 'Content-Length' : str(len(data))}
+            d = getPage(self.graphurl, timeout=self.timeout, method='POST', headers=headers, postdata=body)
             d.addCallback(self.doTinderboxPrint, testlongname, testname,
                           prettyval)
             d.addErrback(lambda x: self.postFailed(testlongname))
