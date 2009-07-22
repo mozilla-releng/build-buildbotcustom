@@ -371,7 +371,7 @@ class Codesighs(ShellCommand):
 class GraphServerPost(BuildStep):
     flunkOnFailure = True
 
-    def __init__(self, server, selector, branch, resultsname, timeout=30):
+    def __init__(self, server, selector, branch, resultsname, timeout=120):
         BuildStep.__init__(self)
         self.addFactoryArguments(server=server, selector=selector,
                                  branch=branch, resultsname=resultsname,
