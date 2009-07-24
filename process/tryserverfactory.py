@@ -53,11 +53,18 @@ class TryBuildFactory(MercurialBuildFactory):
 
     def addPreBuildSteps(self):
         self.addStep(MozillaTryProcessing)
-        self.addStep(ShellCommand,
-         command=['rm', '-rf', 'build'],
-         workdir='.',
-         timeout=60*60
-        )
+        if self.platform == 'win32':
+            self.addStep(ShellCommand,
+             command=['rmdir', '/s', '/q', 'build'],
+             workdir='.',
+             timeout=60*60
+            )
+        else:
+            self.addStep(ShellCommand,
+             command=['rm', '-rf', 'build'],
+             workdir='.',
+             timeout=60*60
+            )
 
     def addSourceSteps(self):
         self.addStep(MozillaTryServerHgClone,
@@ -278,7 +285,7 @@ class WinmoTryBuildFactory(WinmoBuildFactory):
         self.addStep(MozillaTryProcessing)
         self.addStep(ShellCommand,
             name="remove source and obj dirs",
-            command=["rm", "-rf", "%s" % self.baseWorkDir],
+            command=["rmdir", "/s", "/q", "%s" % self.baseWorkDir],
             haltOnFailure=True,
             flunkOnFailure=True,
             workdir=".",
