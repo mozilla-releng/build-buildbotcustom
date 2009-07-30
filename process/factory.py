@@ -2796,8 +2796,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             mochichrome_leak_threshold=None, mochibrowser_leak_threshold=None,
             crashtest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, stageUsername=None, stageServer=None,
-            stageSshKey=None, exec_reftest_suites=True, exec_mochi_suites=True,
-            run_a11y=True, **kwargs):
+            stageSshKey=None, exec_reftest_suites=True, exec_mochi_suites=True, 
+            exec_mozmill_suites=False, run_a11y=True, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -2825,6 +2825,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.mochibrowser_leak_threshold = mochibrowser_leak_threshold
         self.exec_reftest_suites = exec_reftest_suites
         self.exec_mochi_suites = exec_mochi_suites
+        self.exec_mozmill_suites = exec_mozmill_suites
 
         self.config_repo_url = self.getRepository(self.config_repo_path)
 
@@ -3021,6 +3022,17 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.
         )
+
+        if self.exec_mozmill_suites:
+            mozmillEnv = self.env.copy()
+            mozmillEnv['NO_EM_RESTART'] = "0"
+            self.addStep(unittest_steps.MozillaCheck,
+             test_name="mozmill",
+             warnOnWarnings=True,
+             workdir="build/%s" % self.objdir,
+             timeout=5*60, # 5 minutes.
+             env=mozmillEnv,
+            )
 
         if self.exec_reftest_suites:
             self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
