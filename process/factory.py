@@ -2109,7 +2109,7 @@ class SingleSourceFactory(ReleaseFactory):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
         releaseTag = '%s_RELEASE' % (baseTag)
         bundleFile = 'source/%s-%s.bundle' % (productName, version)
-        sourceTarball = 'source/%s-%s-source.tar.bz2' % (productName,
+        sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
                                                          version)
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
