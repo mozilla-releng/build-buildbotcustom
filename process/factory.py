@@ -495,8 +495,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
         self.addStep(SetProperty,
-          command=['python', 'build/config/printconfigsetting.py',
-          'build/%s/dist/bin/application.ini' % self.objdir,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
           'App', 'BuildID'],
           property='buildid',
           workdir='.',
@@ -504,8 +504,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
           descriptionDone=['got', 'buildid']
         )
         self.addStep(SetProperty,
-          command=['python', 'build/config/printconfigsetting.py',
-          'build/%s/dist/bin/application.ini' % self.objdir,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
           'App', 'SourceStamp'],
           property='sourcestamp',
           workdir='.',
@@ -708,8 +708,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env
         )
         self.addStep(SetProperty,
-          command=['python', 'build/config/printconfigsetting.py',
-          'build/%s/dist/bin/application.ini' % self.objdir,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
           'App', 'BuildID'],
           property='buildid',
           workdir='.',
@@ -717,8 +717,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
           descriptionDone=['got', 'buildid']
         )
         self.addStep(SetProperty,
-          command=['python', 'build/config/printconfigsetting.py',
-          'build/%s/dist/bin/application.ini' % self.objdir,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
           'App', 'SourceStamp'],
           property='sourcestamp',
           workdir='.',
