@@ -26,7 +26,6 @@
 # ***** END LICENSE BLOCK *****
 
 import re
-import os
 
 from buildbot.steps.shell import ShellCommand, WithProperties
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, HEADER
@@ -41,8 +40,8 @@ def emphasizeFailureText(text):
 # Some test suites (like TUnit) may not (yet) have the knownFailCount feature.
 # Some test suites (like TUnit) may not (yet) have the crashed feature.
 # Expected values for leaked: False, no leak; True, leaked; None, report failure.
-def summaryText(passCount, failCount, knownFailCount = None,
-        crashed = False, leaked = False):
+def summaryText(passCount, failCount, knownFailCount=None,
+        crashed=False, leaked=False):
     # Format the tests counts.
     if passCount < 0 or failCount < 0 or \
        (knownFailCount != None and knownFailCount < 0):
@@ -72,11 +71,12 @@ def summaryText(passCount, failCount, knownFailCount = None,
 
     return summary
 
+# otherIdent can be None if the test suite does not have this feature (yet).
 def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
     # Counts and flags.
     successCount = -1
     failureCount = -1
-    otherCount = -1
+    otherCount = otherIdent and -1
     crashed = False
     leaked = False
 
@@ -95,6 +95,8 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
                 successCount = int(m.group(2))
             elif r == failureIdent:
                 failureCount = int(m.group(2))
+            # If otherIdent == None, then infoRe should not match it,
+            # so this test is fine as is.
             elif r == otherIdent:
                 otherCount = int(m.group(2))
             continue
@@ -133,8 +135,13 @@ def summarizeLogReftest(name, log):
         name, log, "Successful", "Unexpected", "Known problems",
         r"REFTEST INFO \| (Successful|Unexpected|Known problems): (\d+) \(")
 
+def summarizeLogXpcshelltests(name, log):
+    return summarizeLog(
+        name, log, "Passed", "Failed", None,
+        r"INFO \| (Passed|Failed): (\d+)")
+
 def summarizeTUnit(name, log):
-    # Counts.
+    # Counts and flags.
     passCount = 0
     failCount = 0
     leaked = False
@@ -144,7 +151,7 @@ def summarizeTUnit(name, log):
     # Process the log.
     for line in log.readlines():
         if "TEST-PASS" in line:
-            passCount = passCount + 1
+            passCount += 1
             continue
         if "TEST-UNEXPECTED-" in line:
             # Set the error flags.
@@ -157,7 +164,7 @@ def summarizeTUnit(name, log):
                 else:
                     leaked = True
             else:
-                failCount = failCount + 1
+                failCount += 1
             # continue
 
     # Return the summary.
@@ -175,7 +182,7 @@ class ShellCommandReportTimeout(ShellCommand):
 
     def evaluateCommand(self, cmd):
         superResult = self.my_shellcommand.evaluateCommand(self, cmd)
-        for line in cmd.logs['stdio'].readlines(channel=HEADER):
+        for line in cmd.logs["stdio"].readlines(channel=HEADER):
             if "command timed out" in line:
                 self.addCompleteLog('timeout',
                                     'buildbot.slave.commands.TimeoutError: ' +
@@ -264,8 +271,8 @@ class UpdateClobberFiles(ShellCommandReportTimeout):
             self.buildbotClobberModule = 'mozilla/tools/buildbot-configs/testing/unittest/CLOBBER/firefox/' + kwargs['branch'] + '/' + self.platform
         else:
             self.branchString = ''
-            self.buildbotClobberModule = 'mozilla/tools/buildbot-configs/testing/unittest/CLOBBER/firefox/TRUNK/' + self.platform 
-            
+            self.buildbotClobberModule = 'mozilla/tools/buildbot-configs/testing/unittest/CLOBBER/firefox/TRUNK/' + self.platform
+
         if not 'command' in kwargs:
             self.command = r'cd ' + self.clobberFilePath + r' && cvs -d ' + self.cvsroot + r' checkout' + self.branchString + r' -d tinderbox-configs ' + self.tboxClobberModule + r'>' + self.logDir + tboxClobberCvsCoLog + r' && cvs -d ' + self.cvsroot + r' checkout -d buildbot-configs ' + self.buildbotClobberModule + r'>' + self.logDir + buildbotClobberCvsCoLog
         ShellCommandReportTimeout.__init__(self, **kwargs)
@@ -323,6 +330,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.name = test_name
         if test_name == "check":
             # Target executing recursively in all (sub)directories.
+            # "-k: Keep going when some targets can't be made."
             self.command = ["make", "-k", test_name]
         else:
             # Target calling a python script.
@@ -334,14 +342,27 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.addFactoryArguments(test_name=test_name)
    
     def createSummary(self, log):
-        self.addCompleteLog('summary', summarizeTUnit(self.name, log))
+        if self.name == "check":
+            self.addCompleteLog('summary', summarizeTUnit(self.name, log))
+        else:
+            self.addCompleteLog('summary', summarizeLogXpcshelltests(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
-        if SUCCESS != superResult:
+        if superResult != SUCCESS:
             return WARNINGS
-        if None != re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
+
+        # Xpcshell tests (only):
+        # Assume that having the "Failed: 0" line
+        # means the tests run completed (successfully).
+        if self.name != "check" and \
+           not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
+
+        # Also check for "^TEST-UNEXPECTED-" for harness errors.
+        if re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+            return WARNINGS
+
         return SUCCESS
 
     
@@ -367,12 +388,14 @@ class MozillaReftest(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        if superResult != SUCCESS:
+            return WARNINGS
 
-        # Assume that having the "Unexpected: 0" line means the tests run completed.
+        # Assume that having the "Unexpected: 0" line
+        # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
-        if superResult != SUCCESS or \
-                not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
-                re.search(r"^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+        if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 
         return SUCCESS
@@ -400,18 +423,19 @@ class MozillaMochitest(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        if superResult != SUCCESS:
+            return WARNINGS
 
         failIdent = r"^\d+ INFO Failed: 0"
-        # Support browser-chrome result summary format which differs 
+        # Support browser-chrome result summary format which differs
         # from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
             failIdent = r"^\tFail: 0"
-        # Assume that having the 'failIdent' line means the tests run 
-        # completed.
+        # Assume that having the 'failIdent' line
+        # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
-        if superResult != SUCCESS or \
-           not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
-            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+        if not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 
         return SUCCESS
@@ -435,14 +459,20 @@ cp -R bin/plugins/* %(exedir)s/plugins/
 python -u xpcshell/runxpcshelltests.py --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell""".replace("\n", " && "))]
 
     def createSummary(self, log):
-        self.addCompleteLog('summary', summarizeTUnit(self.name, log))
+        self.addCompleteLog('summary', summarizeLogXpcshelltests(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
         if superResult != SUCCESS:
             return superResult
-        if None != re.search('TEST-UNEXPECTED-', cmd.logs['stdio'].getText()):
+
+        # Assume that having the "Failed: 0" line
+        # means the tests run completed (successfully).
+        # Also check for "^TEST-UNEXPECTED-" for harness errors.
+        if not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE) or \
+           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
+
         return SUCCESS
 
 
@@ -487,7 +517,8 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
             failIdent = r"^\tFail: 0"
-        # Assume that having the 'failIdent' line means the tests run completed.
+        # Assume that having the 'failIdent' line
+        # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
@@ -535,7 +566,8 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
         if superResult != SUCCESS:
             return superResult
 
-        # Assume that having the "Unexpected: 0" line means the tests run completed.
+        # Assume that having the "Unexpected: 0" line
+        # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
