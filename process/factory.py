@@ -3417,6 +3417,14 @@ class MobileBuildFactory(MozillaBuildFactory):
             ))
 
     def getMozconfig(self):
+        self.addStep(ShellCommand,
+            name='rm_configs',
+            command=['rm', '-rf', 'configs'],
+            workdir=self.baseWorkDir,
+            description=['removing', 'configs'],
+            descriptionDone=['remove', 'configs'],
+            haltOnFailure=True
+        )
         self.addHgPullSteps(repository=self.configRepository,
                             workdir=self.baseWorkDir,
                             targetDirectory='configs')
