@@ -4229,6 +4229,13 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                                 '/%(locale)s'),
          haltOnFailure=True
         )
+        self.addStep(SetProperty,
+                     command=['hg', 'ident', '-i'],
+                     haltOnFailure=True,
+                     property='l10n_revision',
+                     workdir=WithProperties(self.baseWorkDir + '/' + self.l10nRepoPath + 
+                                            '/%(locale)s')
+                     )
 
     def getMozconfig(self):
         pass
