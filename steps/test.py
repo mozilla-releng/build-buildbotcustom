@@ -407,12 +407,14 @@ class GraphServerPost(BuildStep):
           self.stdio.addStderr(str(e))
           raise
         
-    def postFailed(self, testlongname):
+    def postFailed(self, testlongname, res=None):
         # This function is called when getPage() fails and simply sets
         # self.error = True so postFinished knows that something failed.
         self.error = True
         self.stdio.addStderr('\nEncountered error when trying to post %s\n' % \
           testlongname)
+        if res:
+            self.stdio.addStderr(str(res))
 
     def constructString(self, machine, testname, branch, sourcestamp, buildid, date, val):
         info_format = "%s,%s,%s,%s,%s,%s\n"
@@ -444,7 +446,8 @@ class GraphServerPost(BuildStep):
             d = getPage(self.graphurl, timeout=self.timeout, method='POST', headers=headers, postdata=body)
             d.addCallback(self.doTinderboxPrint, testlongname, testname,
                           prettyval)
-            d.addErrback(lambda x: self.postFailed(testlongname))
+            d.addErrback(lambda res: self.postFailed(testlongname, res))
+
             deferreds.append(d)
 
         # Now, once *everything* has finished we need to tell Buildbot
