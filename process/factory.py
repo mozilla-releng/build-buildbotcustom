@@ -985,7 +985,7 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
-    def __init__(self, version, buildNumber, brandName=None, **kwargs):
+    def __init__(self, env, version, buildNumber, brandName=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
@@ -993,11 +993,14 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             self.brandName = brandName
         else:
             self.brandName = kwargs['productName'].capitalize()
+        # Copy the environment to avoid screwing up other consumers of
+        # MercurialBuildFactory
+        env = env.copy()
         # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
         # The latter is only strictly necessary for RCs.
-        kwargs['env']['MOZ_PKG_PRETTYNAMES'] = '1'
-        kwargs['env']['MOZ_PKG_VERSION'] = version
-        MercurialBuildFactory.__init__(self, **kwargs)
+        env['MOZ_PKG_PRETTYNAMES'] = '1'
+        env['MOZ_PKG_VERSION'] = version
+        MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
     def doUpload(self):
         # Make sure the complete MAR has been generated
