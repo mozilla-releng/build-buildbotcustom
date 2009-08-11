@@ -421,6 +421,32 @@ class SetBuildProperty(BuildStep):
         self.addCompleteLog("property changes", "%s: %s" % (self.property_name, value))
         return self.finished(SUCCESS)
 
+class OutputStep(BuildStep):
+    """Simply logs some output"""
+    name = "output"
+    def __init__(self, data, log='output', **kwargs):
+        self.data = data
+        self.log = log
+
+        BuildStep.__init__(self, **kwargs)
+
+        self.addFactoryArguments(data=data, log=log)
+
+    def start(self):
+        properties = self.build.getProperties()
+        if callable(self.data):
+            data = properties.render(self.data(self.build))
+        else:
+            data = properties.render(self.data)
+        if not isinstance(data, (str, unicode)):
+            try:
+                data = " ".join(data)
+            except:
+                data = str(data)
+        self.addCompleteLog(self.log, data)
+        self.step_status.setText([self.name])
+        return self.finished(SUCCESS)
+
 class DisconnectStep(ShellCommand):
     """This step is used when a command is expected to cause the slave to
     disconnect from the master.  It will handle connection lost errors as
