@@ -2540,6 +2540,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.config_dir = config_dir
         self.objdir = objdir
         self.run_a11y = run_a11y
+        self.crashtest_leak_threshold = crashtest_leak_threshold
+        self.mochitest_leak_threshold = mochitest_leak_threshold
         if unittestMasters is None:
             self.unittestMasters = []
         else:
@@ -2703,6 +2705,14 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.addPreTestSteps()
 
+        self.addTestSteps()
+
+        self.addPostTestSteps()
+
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
+
+    def addTestSteps(self):
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
          warnOnWarnings=True,
@@ -2724,13 +2734,13 @@ class UnittestBuildFactory(MozillaBuildFactory):
         )
         self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
          test_name="crashtest",
-         leakThreshold=crashtest_leak_threshold,
+         leakThreshold=self.crashtest_leak_threshold,
          workdir="build/%s" % self.objdir,
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
          test_name="mochitest-plain",
          workdir="build/%s" % self.objdir,
-         leakThreshold=mochitest_leak_threshold,
+         leakThreshold=self.mochitest_leak_threshold,
          timeout=5*60, # 5 minutes.
         )
         self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
@@ -2746,11 +2756,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
              test_name="mochitest-a11y",
              workdir="build/%s" % self.objdir,
             )
-
-        self.addPostTestSteps()
-
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
 
     def addPrintChangesetStep(self):
         changesetLink = ''.join(['<a href=http://hg.mozilla.org/',
@@ -2796,7 +2801,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             mochichrome_leak_threshold=None, mochibrowser_leak_threshold=None,
             crashtest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, stageUsername=None, stageServer=None,
-            stageSshKey=None, exec_reftest_suites=True, exec_mochi_suites=True, 
+            stageSshKey=None, exec_reftest_suites=True, exec_mochi_suites=True,
             exec_mozmill_suites=False, run_a11y=True, **kwargs):
         self.env = {}
 
@@ -3214,6 +3219,35 @@ class CodeCoverageFactory(UnittestBuildFactory):
          command=['python', 'build/upload.py', tarfile],
          workdir="build",
         )
+
+        # Tar up and upload the js report
+        tarfile = "codecoverage-%s-jsreport.tar.bz2" % self.branchName
+        self.addStep(ShellCommand,
+         name='tar_cc_jsreport',
+         command=['tar', 'jcv', '-C', '%s/dist/bin' % self.objdir, '-f', tarfile, 'jscoverage-report'],
+         workdir="build",
+        )
+        self.addStep(ShellCommand,
+         name='upload_jsreport',
+         env=uploadEnv,
+         command=['python', 'build/upload.py', tarfile],
+         workdir="build",
+        )
+
+        # And the logs too
+        tarfile = "codecoverage-%s-logs.tar" % self.branchName
+        self.addStep(ShellCommand,
+         name='tar_cc_logs',
+         command=['tar', 'cvf', tarfile, 'logs'],
+         workdir="build",
+        )
+        self.addStep(ShellCommand,
+         name='upload_logs',
+         env=uploadEnv,
+         command=['python', 'build/upload.py', tarfile],
+         workdir="build",
+        )
+
         # Clean up after ourselves
         self.addStep(ShellCommand,
          name='rm_builddir',
@@ -3221,6 +3255,54 @@ class CodeCoverageFactory(UnittestBuildFactory):
          workdir=".",
          timeout=30*60,
         )
+
+    def addTestSteps(self):
+        self.addStep(ShellCommand(
+         command=['rm', '-rf', 'logs'],
+         workdir="build",
+        ))
+        self.addStep(ShellCommand(
+         command=['mkdir', 'logs'],
+         workdir="build",
+        ))
+
+        commands = [
+                ('check', ['make', '-k', 'check'], 10*60),
+                ('xpcshell', ['make', 'xpcshell-tests'], 1*60*60),
+                ('reftest', ['make', 'reftest'], 1*60*60),
+                ('crashtest', ['make', 'crashtest'], 12*60*60),
+                ('mochitest-chrome', ['make', 'mochitest-chrome'], 1*60*60),
+                ('mochitest-browser-chrome', ['make', 'mochitest-browser-chrome'], 12*60*60),
+                ]
+
+        # This should be replaced with 'make mochitest-plain-serial'
+        # or chunked calls once those are available.
+        mochitest_dirs = ['browser', 'caps', 'content', 'docshell', 'dom',
+                'editor', 'embedding', 'extensions', 'fonts', 'intl', 'js',
+                'layout', 'MochiKit_Unit_Tests', 'modules', 'parser',
+                'toolkit', 'uriloader',]
+
+        for test_dir in mochitest_dirs:
+            commands.append(
+                ('mochitest-plain-%s' % test_dir,
+                 ['make', 'TEST_PATH=%s' % test_dir, 'mochitest-plain'],
+                 4*60*60,)
+                )
+
+        if self.run_a11y:
+            commands.append(
+                ('mochitest-a11y', ['make', 'mochitest-a11y'], 4*60*60),
+            )
+
+        for name, command, timeout in commands:
+            real_command = " ".join(command)
+            real_command += " 2>&1 | bzip2 > ../logs/%s.log.bz2" % name
+            self.addStep(ShellCommand,
+             name=name,
+             command=['bash', '-c', real_command],
+             workdir="build/%s" % self.objdir,
+             timeout=timeout,
+            )
 
 class L10nVerifyFactory(ReleaseFactory):
     def __init__(self, cvsroot, stagingServer, productName, version,
