@@ -29,7 +29,7 @@ reload(buildbotcustom.env)
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
   TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
   FindFile, DownloadFile, UnpackFile, SetBuildProperty, GetHgRevision, \
-  DisconnectStep
+  DisconnectStep, OutputStep
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -3901,98 +3901,133 @@ class TalosFactory(BuildFactory):
     """Create working talos build factory"""
     def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest='', customTalos=None,
-            workdirBase=None, fetchSymbols=False, plugins='zips/plugins.zip', pageset='zips/pagesets.zip',
+            workdirBase=None, fetchSymbols=False, plugins='zips/plugins.zip',
+            pageset='zips/pagesets.zip',
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
+
         BuildFactory.__init__(self)
+
         if workdirBase is None:
             workdirBase = "."
+
+        self.workdirBase = workdirBase
+        self.envName = envName
+        self.OS = OS
+        self.toolsDir = toolsDir
+        self.buildBranch = buildBranch
+        self.branchName = branchName
+        self.configOptions = configOptions
+        self.talosCmd = talosCmd
+        self.customManifest = customManifest
+        self.customTalos = customTalos
+        self.cvsRoot = cvsRoot
+        self.fetchSymbols = fetchSymbols
+        self.plugins = plugins
+        self.pageset = pageset
+        self.exepath = None
+
+        self.addCleanupSteps()
+        self.addSetupSteps()
+        self.addDownloadBuildStep()
+        if fetchSymbols:
+            self.addDownloadSymbolsStep()
+        self.addUnpackBuildSteps()
+        self.addGetBuildInfoStep()
+        self.addUpdateConfigStep()
+        self.addRunTestStep()
+        self.addRebootStep()
+
+    def addCleanupSteps(self):
         self.addStep(ShellCommand(
          name='cleanup',
-         workdir=workdirBase,
+         workdir=self.workdirBase,
          description="Cleanup",
          command='rm -vrf *',
-         env=MozillaEnvironments[envName])
+         env=MozillaEnvironments[self.envName])
         )
-        if OS in ('leopard', 'tiger'):
+
+    def addSetupSteps(self):
+        if self.OS in ('leopard', 'tiger'):
             self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/installdmg.sh" % toolsDir,
+             mastersrc="%s/buildfarm/utils/installdmg.sh" % self.toolsDir,
              slavedest="installdmg.sh",
-             workdir=workdirBase,
+             workdir=self.workdirBase,
             ))
 
         self.addStep(FileDownload(
-         mastersrc="%s/buildfarm/maintenance/count_and_reboot.py" % toolsDir,
+         mastersrc="%s/buildfarm/maintenance/count_and_reboot.py" % self.toolsDir,
          slavedest="count_and_reboot.py",
-         workdir=workdirBase,
+         workdir=self.workdirBase,
         ))
 
-        if customManifest != '':
+        if self.customManifest != '':
             self.addStep(FileDownload(
-             mastersrc=customManifest,
+             mastersrc=self.customManifest,
              slavedest="tp3.manifest",
-             workdir=os.path.join(workdirBase, "talos/page_load_test"))
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
             )
 
-        if customTalos is None:
+        if self.customTalos is None:
             self.addStep(ShellCommand(
              name='checkout_talos',
-             command=["cvs", "-d", cvsRoot, "co", "-d", "talos",
+             command=["cvs", "-d", self.cvsRoot, "co", "-d", "talos",
                       "mozilla/testing/performance/talos"],
-             workdir=workdirBase,
+             workdir=self.workdirBase,
              description="checking out talos",
              haltOnFailure=True,
              flunkOnFailure=True,
-             env=MozillaEnvironments[envName])
+             env=MozillaEnvironments[self.envName])
             )
             self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/generate-tpcomponent.py" % toolsDir,
+             mastersrc="%s/buildfarm/utils/generate-tpcomponent.py" % self.toolsDir,
              slavedest="generate-tpcomponent.py",
-             workdir=os.path.join(workdirBase, "talos/page_load_test"))
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
             )
             self.addStep(ShellCommand(
              name='setup_pageloader',
              command=["python", "generate-tpcomponent.py"],
-             workdir=os.path.join(workdirBase, "talos/page_load_test"),
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
              description="setting up pageloader",
              haltOnFailure=True,
              flunkOnFailure=True,
-             env=MozillaEnvironments[envName])
+             env=MozillaEnvironments[self.envName])
             )
         else:
             self.addStep(FileDownload(
-             mastersrc=customTalos,
-             slavedest=customTalos,
-             workdir=workdirBase,
+             mastersrc=self.customTalos,
+             slavedest=self.customTalos,
+             workdir=self.workdirBase,
             ))
             self.addStep(UnpackFile(
-             filename=customTalos,
-             workdir=workdirBase,
+             filename=self.customTalos,
+             workdir=self.workdirBase,
             ))
 
-        if plugins != '':
+        if self.plugins != '':
             self.addStep(FileDownload(
-             mastersrc=plugins,
-             slavedest=os.path.basename(plugins),
-             workdir=os.path.join(workdirBase, "talos/base_profile"),
+             mastersrc=self.plugins,
+             slavedest=os.path.basename(self.plugins),
+             workdir=os.path.join(self.workdirBase, "talos/base_profile"),
              blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
-             filename=os.path.basename(plugins),
-             workdir=os.path.join(workdirBase, "talos/base_profile"),
+             filename=os.path.basename(self.plugins),
+             workdir=os.path.join(self.workdirBase, "talos/base_profile"),
             ))
 
-        if pageset != '':
+        if self.pageset != '':
             self.addStep(FileDownload(
-             mastersrc=pageset,
-             slavedest=os.path.basename(pageset),
-             workdir=os.path.join(workdirBase, "talos/page_load_test"),
+             mastersrc=self.pageset,
+             slavedest=os.path.basename(self.pageset),
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
              blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
-             filename=os.path.basename(pageset),
-             workdir=os.path.join(workdirBase, "talos/page_load_test"),
+             filename=os.path.basename(self.pageset),
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
             ))
 
+    def addDownloadBuildStep(self):
         def get_url(build):
             url = build.source.changes[-1].files[0]
             # Lies!!!
@@ -4023,51 +4058,54 @@ class TalosFactory(BuildFactory):
          url_fn=get_url,
          url_property="fileURL",
          filename_property="filename",
-         workdir=workdirBase,
+         workdir=self.workdirBase,
          name="Download build",
         ))
-        if fetchSymbols:
-            def get_symbols_url(build):
-                suffixes = ('.tar.bz2', '.dmg', '.zip')
-                buildURL = build.getProperty('fileURL')
 
-                for suffix in suffixes:
-                    if buildURL.endswith(suffix):
-                        return buildURL[:-len(suffix)] + '.crashreporter-symbols.zip'
+    def addDownloadSymbolsStep(self):
+        def get_symbols_url(build):
+            suffixes = ('.tar.bz2', '.dmg', '.zip')
+            buildURL = build.getProperty('fileURL')
 
-            self.addStep(DownloadFile(
-             url_fn=get_symbols_url,
-             filename_property="symbolsFile",
-             workdir=workdirBase,
-             name="Download symbols",
-            ))
-            self.addStep(ShellCommand(
-             command=['mkdir', 'symbols'],
-             workdir=workdirBase,
-            ))
-            self.addStep(UnpackFile(
-             filename=WithProperties("../%(symbolsFile)s"),
-             workdir="%s/symbols" % workdirBase,
-             name="Unpack symbols",
-            ))
+            for suffix in suffixes:
+                if buildURL.endswith(suffix):
+                    return buildURL[:-len(suffix)] + '.crashreporter-symbols.zip'
+
+        self.addStep(DownloadFile(
+         url_fn=get_symbols_url,
+         filename_property="symbolsFile",
+         workdir=self.workdirBase,
+         name="Download symbols",
+        ))
+        self.addStep(ShellCommand(
+         command=['mkdir', 'symbols'],
+         workdir=self.workdirBase,
+        ))
+        self.addStep(UnpackFile(
+         filename=WithProperties("../%(symbolsFile)s"),
+         workdir="%s/symbols" % self.workdirBase,
+         name="Unpack symbols",
+        ))
+
+    def addUnpackBuildSteps(self):
         self.addStep(UnpackFile(
          filename=WithProperties("%(filename)s"),
-         workdir=workdirBase,
+         workdir=self.workdirBase,
          name="Unpack build",
         ))
-        if OS in ('xp', 'vista'):
+        if self.OS in ('xp', 'vista'):
             self.addStep(ShellCommand(
              name='chmod_files',
-             workdir=os.path.join(workdirBase, "firefox/"),
+             workdir=os.path.join(self.workdirBase, "firefox/"),
              flunkOnFailure=False,
              warnOnFailure=False,
              description="chmod files (see msys bug)",
              command=["chmod", "-v", "-R", "a+x", "."],
-             env=MozillaEnvironments[envName])
+             env=MozillaEnvironments[self.envName])
             )
-        if OS in ('tiger', 'leopard'):
+        if self.OS in ('tiger', 'leopard'):
             self.addStep(FindFile(
-             workdir=os.path.join(workdirBase, "talos"),
+             workdir=os.path.join(self.workdirBase, "talos"),
              filename="firefox-bin",
              directory="..",
              max_depth=4,
@@ -4075,7 +4113,7 @@ class TalosFactory(BuildFactory):
              name="Find executable",
              filetype="file",
             ))
-        elif OS in ('xp', 'vista'):
+        elif self.OS in ('xp', 'vista'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../firefox/firefox"
@@ -4085,8 +4123,9 @@ class TalosFactory(BuildFactory):
              property_name="exepath",
              value="../firefox/firefox-bin"
             ))
-        exepath = WithProperties('%(exepath)s')
+        self.exepath = WithProperties('%(exepath)s')
 
+    def addGetBuildInfoStep(self):
         def get_exedir(build):
             return os.path.dirname(build.getProperty('exepath'))
         self.addStep(SetBuildProperty(
@@ -4113,29 +4152,34 @@ class TalosFactory(BuildFactory):
             return retval
         self.addStep(SetProperty,
          command=['cat', WithProperties('%(exedir)s/application.ini')],
-         workdir=os.path.join(workdirBase, "talos"),
+         workdir=os.path.join(self.workdirBase, "talos"),
          extract_fn=get_build_info,
          name='get build info',
         )
 
+    def addUpdateConfigStep(self):
         self.addStep(talos_steps.MozillaUpdateConfig(
-         workdir=os.path.join(workdirBase, "talos/"),
-         branch=buildBranch,
-         branchName=branchName,
+         workdir=os.path.join(self.workdirBase, "talos/"),
+         branch=self.buildBranch,
+         branchName=self.branchName,
          haltOnFailure=True,
-         executablePath=exepath,
-         addOptions=configOptions,
-         env=MozillaEnvironments[envName],
-         useSymbols=fetchSymbols)
+         executablePath=self.exepath,
+         addOptions=self.configOptions,
+         env=MozillaEnvironments[self.envName],
+         useSymbols=self.fetchSymbols)
         )
+
+    def addRunTestStep(self):
         self.addStep(talos_steps.MozillaRunPerfTests(
          warnOnWarnings=True,
-         workdir=os.path.join(workdirBase, "talos/"),
+         workdir=os.path.join(self.workdirBase, "talos/"),
          timeout=21600,
          haltOnFailure=False,
-         command=talosCmd,
-         env=MozillaEnvironments[envName])
+         command=self.talosCmd,
+         env=MozillaEnvironments[self.envName])
         )
+
+    def addRebootStep(self):
         def do_disconnect(cmd):
             try:
                 if 'SCHEDULED REBOOT' in cmd.logs['stdio'].getText():
@@ -4148,12 +4192,99 @@ class TalosFactory(BuildFactory):
          flunkOnFailure=False,
          warnOnFailure=False,
          alwaysRun=True,
-         workdir=workdirBase,
+         workdir=self.workdirBase,
          description="reboot after 1 test run",
          command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
          force_disconnect=do_disconnect,
-         env=MozillaEnvironments[envName],
+         env=MozillaEnvironments[self.envName],
         ))
+
+class TryTalosFactory(TalosFactory):
+    def addDownloadBuildStep(self):
+        def get_url(build):
+            url = build.source.changes[-1].files[0]
+            timestamp_re = re.compile('[^\d]*(\d*-\d*-\d*_\d*:\d*).*')
+            match = timestamp_re.search(url)
+            if match:
+                # Lies!!!
+                # Once we don't need to lie about our start time,
+                # the following code can go away
+                try:
+                    timestamp = int(time.mktime(time.strptime(match.group(1), '%Y-%m-%d_%H:%M')))
+                    last_change = build.source.changes[-1]
+                    # Since change objects are shared between builders, when we
+                    # modify the 'when' attribute below, it affects all other
+                    # builders that have this change as well. So we save the
+                    # original 'when' attribute before we modify the change object.
+                    # If we check for the 'orig_when' attribute instead of the
+                    # 'when' attribute, we get the true original change time.
+                    if hasattr(last_change, "orig_when"):
+                        orig_when = last_change.orig_when
+                    else:
+                        orig_when = last_change.when
+                        last_change.orig_when = orig_when
+                    # Now that we know what our original change time is, save that
+                    # as a build property
+                    build.setProperty('orig_changetime', orig_when, 'get_url')
+                    last_change.when = timestamp
+                except:
+                    pass
+            return url
+        self.addStep(DownloadFile(
+         url_fn=get_url,
+         url_property="fileURL",
+         filename_property="filename",
+         workdir=self.workdirBase,
+         name="Download build",
+         ignore_certs=True,
+        ))
+
+        def make_tinderbox_header(build):
+            identifier = build.getProperty("filename").rsplit('-', 1)[0]
+            # Grab the submitter out of the dir name. CVS and Mercurial builds
+            # are a little different, so we need to try fairly hard to find
+            # the e-mail address.
+            dir = os.path.basename(os.path.dirname(build.getProperty("fileURL")))
+            who = ''
+            for section in dir.split('-'):
+                if '@' in section:
+                    who = section
+                    break
+            msg =  'TinderboxPrint: %s\n' % who
+            msg += 'TinderboxPrint: %s\n' % identifier
+            return msg
+        self.addStep(OutputStep(data=make_tinderbox_header, log='header', name='echo_id'))
+
+    def addDownloadSymbolsStep(self):
+        def get_symbols_url(build):
+            suffixes = ('.tar.bz2', '.dmg', '.zip')
+            buildURL = build.getProperty('fileURL')
+
+            for suffix in suffixes:
+                if buildURL.endswith(suffix):
+                    return buildURL[:-len(suffix)] + '.crashreporter-symbols.zip'
+
+        self.addStep(DownloadFile(
+         url_fn=get_symbols_url,
+         filename_property="symbolsFile",
+         workdir=self.workdirBase,
+         name="Download symbols",
+         ignore_certs=True,
+         haltOnFailure=False,
+         flunkOnFailure=False,
+        ))
+        self.addStep(ShellCommand(
+         command=['mkdir', 'symbols'],
+         workdir=self.workdirBase,
+        ))
+        self.addStep(UnpackFile(
+         filename=WithProperties("../%(symbolsFile)s"),
+         workdir="%s/symbols" % self.workdirBase,
+         name="Unpack symbols",
+         haltOnFailure=False,
+         flunkOnFailure=False,
+        ))
+
 
 class MobileNightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
