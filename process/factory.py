@@ -1039,6 +1039,16 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          workdir='build/%s' % self.objdir
         )
 
+class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
+    def __init__(self, mozRepoPath='', inspectorRepoPath='',
+                 venkmanRepoPath='', cvsroot='', **kwargs):
+        self.skipBlankRepos = True
+        self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.cvsroot = cvsroot
+        ReleaseBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+
 
 def identToProperties(default_prop=None):
     '''Create a method that is used in a SetProperty step to map the
@@ -1810,6 +1820,59 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
         )
 
+class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseRepackFactory):
+    def __init__(self, mozRepoPath='', inspectorRepoPath='',
+                 venkmanRepoPath='', cvsroot='', **kwargs):
+        self.skipBlankRepos = True
+        self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.cvsroot = cvsroot
+        ReleaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+
+    def updateSources(self):
+        ReleaseRepackFactory.updateSources(self)
+        self.addStep(ShellCommand,
+         command=['hg', 'up', '-C', '-r', self.buildRevision],
+         workdir='build/'+self.mozillaSrcDir,
+         description=['update mozilla',
+                      'to %s' % self.buildRevision],
+         haltOnFailure=True
+        )
+        if self.venkmanRepoPath:
+            self.addStep(ShellCommand,
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             workdir='build/'+self.mozillaSrcDir+'/extensions/venkman',
+             description=['update venkman',
+                          'to %s' % self.buildRevision],
+             haltOnFailure=True
+            )
+        if self.inspectorRepoPath:
+            self.addStep(ShellCommand,
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             workdir='build/'+self.mozillaSrcDir+'/extensions/inspector',
+             description=['update inspector',
+                          'to %s' % self.buildRevision],
+             haltOnFailure=True
+            )
+        if self.cvsroot:
+            self.addStep(ShellCommand,
+             command=['cvs', 'up', '-r', self.buildRevision],
+             workdir='build/'+self.mozillaSrcDir+'/extensions/irc',
+             description=['update chatzilla',
+                          'to %s' % self.buildRevision],
+             haltOnFailure=True
+            )
+
+    def downloadBuilds(self):
+        ReleaseRepackFactory.downloadBuilds(self)
+
+    # unsure why we need to explicitely do this but after bug 478436 we stopped
+    # executing the actual repackaging without this def here
+    def doRepack(self):
+        ReleaseRepackFactory.doRepack(self)
+
+
 class StagingRepositorySetupFactory(ReleaseFactory):
     """This Factory should be run at the start of a staging release run. It
        deletes and reclones all of the repositories in 'repositories'. Note that
@@ -1936,8 +1999,8 @@ class ReleaseTaggingFactory(ReleaseFactory):
                   '. You must provide a relbranchOverride when buildNumber > 2'
 
         # now, down to work
-        buildTag = '%s_BUILD%s' % (baseTag, str(buildNumber))
-        releaseTag = '%s_RELEASE' % baseTag
+        self.buildTag = '%s_BUILD%s' % (baseTag, str(buildNumber))
+        self.releaseTag = '%s_RELEASE' % baseTag
 
         # generate the release branch name, which is based on the
         # version and the current date.
@@ -2028,7 +2091,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
             # we don't need to do any version bumping if this is a respin
             if buildNumber == 1 and len(bumpFiles) > 0:
                 command = ['perl', 'tools/release/version-bump.pl',
-                           '-w', repoName, '-t', releaseTag, '-a', appName,
+                           '-w', repoName, '-t', self.releaseTag, '-a', appName,
                            '-v', appVersion, '-m', milestone]
                 command.extend(bumpFiles)
                 self.addStep(ShellCommand,
@@ -2066,7 +2129,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  workdir=repoName,
                  haltOnFailure=True
                 )
-            for tag in (buildTag, releaseTag):
+            for tag in (self.buildTag, self.releaseTag):
                 self.addStep(ShellCommand,
                  name='hg_tag',
                  command=['hg', 'tag', '-u', hgUsername, '-f', '-r',
@@ -2102,6 +2165,30 @@ class ReleaseTaggingFactory(ReleaseFactory):
              description=['push %s' % repoName],
              haltOnFailure=True
             )
+
+class CCReleaseTaggingFactory(ReleaseTaggingFactory):
+    def __init__(self, chatzillaTimestamp, cvsroot, **kwargs):
+        ReleaseTaggingFactory.__init__(self, **kwargs)
+
+        if cvsroot and chatzillaTimestamp:
+            self.addStep(ShellCommand,
+             command=['cvs', '-d', cvsroot, '-q',
+                      'checkout', '-P', '-D', chatzillaTimestamp,
+                      '-d', 'chatzilla', 'mozilla/extensions/irc'],
+             workdir='.',
+             description=['check out ChatZilla'],
+             haltOnFailure=True,
+             timeout=30*60 # 30 minutes
+            )
+            for tag in (self.buildTag, self.releaseTag):
+                self.addStep(ShellCommand,
+                 command=['cvs', '-d', cvsroot, 'tag',
+                          '-D', chatzillaTimestamp,
+                          '-F', tag],
+                 workdir='chatzilla',
+                 description=['tag ChatZilla'],
+                 haltOnFailure=True
+                )
 
 
 
@@ -2202,6 +2289,99 @@ class SingleSourceFactory(ReleaseFactory):
          command=['python', '%s/build/upload.py' % self.branchName,
                   '--base-path', '.',
                   bundleFile, sourceTarball],
+         workdir='.',
+         env=uploadEnv,
+         description=['upload files'],
+        )
+
+class CCSourceFactory(ReleaseFactory):
+    def __init__(self, productName, version, baseTag, stagingServer,
+                 stageUsername, stageSshKey, buildNumber, mozRepoPath,
+                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
+                 autoconfDirs=['.'], buildSpace=1, **kwargs):
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
+        releaseTag = '%s_RELEASE' % (baseTag)
+        sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
+                                                         version)
+        # '-c' is for "release to candidates dir"
+        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
+          (productName, version, buildNumber)
+        uploadEnv = {'UPLOAD_HOST': stagingServer,
+                     'UPLOAD_USER': stageUsername,
+                     'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
+                     'UPLOAD_TO_TEMP': '1',
+                     'POST_UPLOAD_CMD': postUploadCmd}
+
+        self.addStep(ShellCommand,
+         command=['rm', '-rf', 'source'],
+         workdir='.',
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['mkdir', 'source'],
+         workdir='.',
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['hg', 'clone', self.repository, self.branchName],
+         workdir='.',
+         description=['clone %s' % self.branchName],
+         haltOnFailure=True,
+         timeout=30*60 # 30 minutes
+        )
+        # build up the checkout command that will bring us up to the release version
+        co_command = ['python', 'client.py', 'checkout',
+                      '--comm-rev=%s' % releaseTag,
+                      '--mozilla-repo=%s' % self.getRepository(mozRepoPath),
+                      '--mozilla-rev=%s' % releaseTag]
+        if inspectorRepoPath:
+            co_command.append('--inspector-repo=%s' % self.getRepository(inspectorRepoPath))
+            co_command.append('--inspector-rev=%s' % releaseTag)
+        else:
+            co_command.append('--skip-inspector')
+        if venkmanRepoPath:
+            co_command.append('--venkman-repo=%s' % self.getRepository(venkmanRepoPath))
+            co_command.append('--venkman-rev=%s' % releaseTag)
+        else:
+            co_command.append('--skip-venkman')
+        if cvsroot:
+            co_command.append('--cvsroot=%s' % cvsroot)
+        else:
+            co_command.append('--skip-chatzilla')
+        # execute the checkout
+        self.addStep(ShellCommand,
+         command=co_command,
+         workdir=self.branchName,
+         description=['update to', releaseTag],
+         haltOnFailure=True
+        )
+        if cvsroot:
+            # Update ChatZilla to release tag
+            self.addStep(ShellCommand,
+             command=['cvs', 'up', '-r', releaseTag],
+             workdir='%s/mozilla/extensions/irc' % self.branchName,
+             description=['update to', releaseTag],
+             haltOnFailure=True
+            )
+        # the autoconf and actual tarring steps
+        # should be replaced by calling the build target
+        for dir in autoconfDirs:
+            self.addStep(ShellCommand,
+             command=['autoconf-2.13'],
+             workdir='%s/%s' % (self.branchName, dir),
+             haltOnFailure=True
+            )
+        self.addStep(ShellCommand,
+         command=['tar', '-cj', '--owner=0', '--group=0', '--numeric-owner',
+                  '--mode=go-w', '--exclude=.hg*', '--exclude=CVS',
+                  '--exclude=.cvs*', '-f', sourceTarball, self.branchName],
+         workdir='.',
+         description=['create tarball'],
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         command=['python', '%s/mozilla/build/upload.py' % self.branchName,
+                  '--base-path', '.', sourceTarball],
          workdir='.',
          env=uploadEnv,
          description=['upload files'],
