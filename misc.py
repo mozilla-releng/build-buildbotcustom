@@ -113,7 +113,7 @@ def generateBranchObjects(config, name):
             triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % config['platforms'][platform]['base_name'])
-        if config['enable_xulrunner']:
+        if config['enable_xulrunner'] and platform not in ('wince'):
             xulrunnerNightlyBuilders.append('%s xulrunner' % config['platforms'][platform]['base_name'])
 
     # Currently, each branch goes to a different tree
@@ -284,7 +284,7 @@ def generateBranchObjects(config, name):
             codesighs = False
             uploadPackages = False
             talosMasters = None
-        if platform.find('win32') > -1 or platform.find('64') > -1:
+        if platform.find('win') > -1 or platform.find('64') > -1:
             codesighs = False
         if 'upload_symbols' in pf and pf['upload_symbols']:
             uploadSymbols = True
@@ -582,7 +582,7 @@ def generateBranchObjects(config, name):
              }
              branchObjects['builders'].append(mozilla2_shark_builder)
 
-        if config['enable_xulrunner']:
+        if config['enable_xulrunner'] and platform not in ('wince'):
              xr_env = pf['env'].copy()
              xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
              xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']

@@ -305,7 +305,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
+        assert self.platform in ('linux', 'linux64', 'win32', 'wince', 'macosx')
 
         # Mozilla subdir and objdir
         if mozillaDir:
