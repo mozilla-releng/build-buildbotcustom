@@ -1438,16 +1438,21 @@ class NightlyRepackFactory(BaseRepackFactory):
                          '-p %s ' % kwargs['project'],
                          '-b %s ' % uploadDir]
         if l10nDatedDirs:
-            postUploadCmd += ['-i %(buildid)s']
+            # nightly repacks and on-change upload to different places
             if self.nightly:
-                postUploadCmd += ['--release-to-latest',
+                postUploadCmd += ['--buildid %(buildid)s',
+                                  '--release-to-latest',
                                   '--release-to-dated']
             else:
                 # For the repack-on-change scenario we just want to upload
-                # to tinderbox dated directories
-                postUploadCmd += ['--release-to-tinderbox-dated-builds']
+                # to tinderbox builds
+                postUploadCmd += \
+                      ['--tinderbox-builds-dir %s' % uploadDir,
+                      '--release-to-tinderbox-builds']
             self.postUploadCmd = WithProperties(' '.join(postUploadCmd))
         else:
+            # for backwards compatibility when the nightly and repack on-change
+            # runs were the same 
             postUploadCmd += ['--release-to-latest']
             self.postUploadCmd = ' '.join(postUploadCmd)
 
