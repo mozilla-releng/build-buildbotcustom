@@ -170,6 +170,7 @@ MozillaEnvironments['winmo-arm'] = {
     "MOZ_MSVCVERSION": '9',
     "MOZ_NO_RESET_PATH": '1',
     "MOZ_TOOLS": 'D:\\mozilla-build\\moztools',
+    "NVAPSDK": 'd:\sdks\tegra042',
     "PATH": 'D:\\mozilla-build\\msys\\local\\bin;' + \
             'd:\\mozilla-build\\wget;' + \
             'd:\\mozilla-build\\7zip;' + \
@@ -198,6 +199,9 @@ MozillaEnvironments['winmo-arm'] = {
             'd:\\mozilla-build\\python25;' + \
             'd:\\mercurial;' + \
             'c:\\Program Files\\Microsoft SQL Server\\90\\Tools\\binn\\;' + \
+            'd:\\sdks\\tegra042\\tools;' + \
+            'd:\\sdks\\tegra042\\platformlibs\\bin\\winxp\\x86\\release;' + \
+            'd:\\sdks\\tegra042\\3rdparty\\bin\\winxp\\x86\\release;' + \
             'd:\\mozilla-build\\moztools\\bin',
     "SDKDIR": 'D:\\sdks\\v6.0\\',
     "SDKVER": '6',
