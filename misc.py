@@ -239,7 +239,7 @@ def generateBranchObjects(config, name):
             name=builder,
             branch=config['repo_path'],
             # bug 482123 - keep the minute to avoid problems with DST changes
-            hour=[3], minute=[02],
+            hour=config['start_hour'], minute=config['start_minute'],
             builderNames=[builder]
         )
         branchObjects['schedulers'].append(nightly_scheduler)
