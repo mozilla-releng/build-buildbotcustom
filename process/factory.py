@@ -4371,7 +4371,7 @@ class TalosFactory(BuildFactory):
          name="Download symbols",
         ))
         self.addStep(ShellCommand(
-         name="mkdir_symbols',
+         name="mkdir_symbols",
          command=['mkdir', 'symbols'],
          workdir=self.workdirBase,
         ))
