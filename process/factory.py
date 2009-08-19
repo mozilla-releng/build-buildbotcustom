@@ -189,6 +189,7 @@ class MozillaBuildFactory(BuildFactory):
 
         if self.clobberURL is not None and self.clobberTime is not None:
             self.addStep(MozillaClobberer,
+             name='checking_clobber_times',
              branch=self.branchName,
              clobber_url=self.clobberURL,
              clobberer_path='tools/clobberer/clobberer.py',
@@ -370,6 +371,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
     def addSourceSteps(self):
         self.addStep(Mercurial,
+         name='hg_update',
          mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
@@ -382,6 +384,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              haltOnFailure=True
             )
             self.addStep(SetProperty,
+             name='set_got_revision',
              command=['hg', 'identify', '-i'],
              property='got_revision'
             )
@@ -487,6 +490,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                 self.logUploadDir)]
         )
         self.addStep(CompareBloatLogs,
+         name='compare_bloat_log',
          bloatLog='bloat.log',
          env=self.env,
          workdir='.',
@@ -559,6 +563,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                   '../sdleak.log'],
         )
         self.addStep(CompareLeakLogs,
+         name='compare_current_leak_log',
          mallocLog='../malloc.log',
          platform=self.platform,
          env=self.env,
@@ -575,6 +580,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              resultsname=self.baseName
             )
         self.addStep(CompareLeakLogs,
+         name='compare_previous_leak_log',
          mallocLog='../malloc.log.old',
          platform=self.platform,
          env=self.env,
@@ -582,7 +588,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          testname='previous'
         )
         self.addStep(ShellCommand,
-         name='diffbloatdump',
+         name='create_sdleak_tree',
          env=self.env,
          workdir='.',
          command=['bash', '-c',
@@ -594,7 +600,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         if self.platform in ('macosx', 'linux'):
             self.addStep(ShellCommand,
-             name='mv_sdleak_raw',
+             name='create_sdleak_raw',
              env=self.env,
              workdir='.',
              command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
@@ -621,7 +627,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                 self.logUploadDir)]
         )
         self.addStep(ShellCommand,
-         name='diffbloatdump',
+         name='compare_sdleak_tree',
          env=self.env,
          workdir='.',
          command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
@@ -671,6 +677,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          )
         if self.productName == 'xulrunner':
             self.addStep(GetBuildID,
+             name='get_build_id',
              objdir=self.objdir,
              inifile='platform.ini',
              section='Build',
@@ -702,6 +709,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         else:
             codesighsObjdir = '../%s' % self.mozillaObjdir
         self.addStep(Codesighs,
+         name='get_codesighs_diff',
          objdir=codesighsObjdir,
          platform=self.platform,
          workdir='build%s' % self.mozillaDir,
@@ -811,7 +819,9 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(Mercurial, mode='update',
+        self.addStep(Mercurial, 
+         name='hg_update',
+         mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          alwaysUseLatest=True,
@@ -832,6 +842,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(ShellCommand,
+         name='tinderboxprint_changeset',
          command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
         )
         # build up the checkout command with all options
@@ -869,6 +880,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             )
 
         self.addStep(SetProperty,
+         name='set_hg_revision',
          command=['hg', 'identify', '-i'],
          workdir='build%s' % self.mozillaDir,
          property='hg_revision'
@@ -953,6 +965,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         talosBranch = "%s-%s" % (self.branchName, self.platform)
         for master, warn in self.talosMasters:
             self.addStep(SendChangeStep(
+             name='sendchange_%s' % master,
              warnOnFailure=warn,
              master=master,
              branch=talosBranch,
@@ -963,6 +976,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         unittestBranch = "%s-%s-unittest" % (self.branchName, self.platform)
         for master, warn in self.unittestMasters:
             self.addStep(SendChangeStep(
+             name='sendchange_%s' % master,
              warnOnFailure=warn,
              master=master,
              branch=unittestBranch,
@@ -1203,7 +1217,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
         for dir in ('nsprpub', 'config'):
             self.addStep(ShellCommand,
-             name='make %s' % dir,
+             name='make_%s' % dir,
              command=['make'],
              workdir='%s/%s/%s' % (self.baseWorkDir, self.mozillaSrcDir, dir),
              description=['make', dir],
@@ -2772,7 +2786,9 @@ class UnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStepNoEnv(Mercurial, mode='update',
+        self.addStepNoEnv(Mercurial, 
+         name='hg_update',
+         mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          timeout=60*60 # 1 hour
@@ -2781,7 +2797,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.addPrintChangesetStep()
 
         self.addStep(ShellCommand,
-         name='clean_configs',
+         name='rm_configs',
          command=['rm', '-rf', 'mozconfigs'],
          workdir='.'
         )
@@ -2836,6 +2852,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
              haltOnFailure=True
             )
             self.addStep(GetBuildID,
+             name='get_build_id',
              objdir=self.objdir,
             )
 
@@ -2870,6 +2887,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
             branch = "%s-%s-unittest" % (self.branchName, self.platform)
             for master, warn in self.unittestMasters:
                 self.addStep(SendChangeStep(
+                 name='sendchange_%s' % master,
                  warnOnFailure=warn,
                  master=master,
                  branch=branch,
@@ -3092,7 +3110,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.addPrintMozillaChangesetStep()
 
         self.addStep(ShellCommand,
-         name='clean_configs',
+         name='rm_configs',
          command=['rm', '-rf', 'mozconfigs'],
          workdir='.'
         )
@@ -3777,16 +3795,19 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
 
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
+                name='rm_cltbld_logs',
                 command='rm -f /tmp/*_cltbld.log',
                 description=['removing', 'log', 'file']
             )
         self.addStep(ShellCommand,
+                name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
                 description=['clobber', 'build']
             )
 
     def addBuildSteps(self):
         self.addStep(ShellCommand,
+                name='compile',
                 command=['make', '-f', 'client.mk', 'build'],
                 description=['compile'],
                 workdir=self.baseWorkDir + "/" +  self.branchName
@@ -3794,12 +3815,14 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
 
     def addPackageSteps(self):
         self.addStep(ShellCommand,
+                name='make_xr_pkg',
                 command=['make', 'package'],
                 workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
                     self.branchName, self.objdir),
                 description=['make', 'xr', 'package']
                 )
         self.addStep(ShellCommand,
+                name='make_mobile_pkg',
                 command=['make', 'package'],
                 workdir='%s/%s/%s/mobile' % (self.baseWorkDir,
                     self.branchName, self.objdir),
@@ -3833,7 +3856,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
         if self.clobber:
             self.addStep(ShellCommand,
-                name='clobber',
+                name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
                 env=self.env,
                 workdir=self.baseWorkDir,
@@ -3919,7 +3942,7 @@ class WinmoBuildFactory(MobileBuildFactory):
     def addPreCleanSteps(self):
         if self.clobber:
             self.addStep(ShellCommand,
-                name='clobber',
+                name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
                 env=self.env,
                 workdir=self.baseWorkDir,
@@ -4348,6 +4371,7 @@ class TalosFactory(BuildFactory):
          name="Download symbols",
         ))
         self.addStep(ShellCommand(
+         name="mkdir_symbols',
          command=['mkdir', 'symbols'],
          workdir=self.workdirBase,
         ))
