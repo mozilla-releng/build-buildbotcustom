@@ -4196,6 +4196,7 @@ class TalosFactory(BuildFactory):
             configOptions, talosCmd, customManifest='', customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins='zips/plugins.zip',
             pageset='zips/pagesets.zip',
+            talosAddOns=[],
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
 
         BuildFactory.__init__(self)
@@ -4217,6 +4218,7 @@ class TalosFactory(BuildFactory):
         self.fetchSymbols = fetchSymbols
         self.plugins = plugins
         self.pageset = pageset
+        self.talosAddOns = talosAddOns[:]
         self.exepath = None
 
         self.addCleanupSteps()
@@ -4318,6 +4320,18 @@ class TalosFactory(BuildFactory):
             self.addStep(UnpackFile(
              filename=os.path.basename(self.pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+            ))
+
+        for addOn in self.talosAddOns:
+            self.addStep(FileDownload(
+             mastersrc=addOn,
+             slavedest=os.path.basename(addOn),
+             workdir=os.path.join(self.workdirBase, "talos"),
+             blocksize=640*1024,
+            ))
+            self.addStep(UnpackFile(
+             filename=os.path.basename(addOn),
+             workdir=os.path.join(self.workdirBase, "talos"),
             ))
 
     def addDownloadBuildStep(self):
