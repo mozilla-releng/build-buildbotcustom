@@ -42,7 +42,7 @@ MozillaEnvironments['win32-ref-platform'] = {
             'D:\\msvs8\\VC;' + \
             'D:\\msvs8\\Common7\\Tools;' + \
             'D:\\msvs8\\Common7\\Tools\\bin;' + \
-            'd:\\mercurial;' + \
+            'd:\\mozilla-build\\hg;' + \
             'd:\\mozilla-build\\moztools\\bin;' + \
             'd:\\mozilla-build\\msys\\local\\bin;' + \
             'd:\\mozilla-build\\msys\\bin;' + \
@@ -119,7 +119,7 @@ MozillaEnvironments['win32-unittest'] = {
             'D:\\mozilla-build\\msys\\bin;' + \
             'D:\\mozilla-build\\python25;' + \
             'D:\\mozilla-build\\python25\\Scripts;' + \
-            'D:\\Mercurial;' + \
+            'D:\\mozilla-build\\hg;' + \
             'D:\\SDKs\\v6.0\\bin;' + \
             'D:\\msvs8\\Common7\\IDE;' + \
             'D:\\msvs8\\VC\\BIN;' + \
@@ -197,7 +197,7 @@ MozillaEnvironments['winmo-arm'] = {
             'c:\\WINDOWS;' + \
             'c:\\WINDOWS\\System32\\Wbem;' + \
             'd:\\mozilla-build\\python25;' + \
-            'd:\\mercurial;' + \
+            'd:\\mozilla-build\\hg;' + \
             'c:\\Program Files\\Microsoft SQL Server\\90\\Tools\\binn\\;' + \
             'd:\\sdks\\tegra042\\tools;' + \
             'd:\\sdks\\tegra042\\platformlibs\\bin\\winxp\\x86\\release;' + \
