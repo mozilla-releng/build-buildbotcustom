@@ -171,7 +171,7 @@ def generateBranchObjects(config, name):
             relayhost="mail.build.mozilla.org",
             logCompression="bzip2",
             builders=l10n_builders,
-            binaryURL="http://ftp.mozilla.org/pub/mozilla.org/firefox/nightly/latest-mozilla-central-l10n/"
+            binaryURL=config['enUS_binaryURL']
         ))
 
         # We only want the builds from the specified builders
@@ -183,7 +183,7 @@ def generateBranchObjects(config, name):
             relayhost="mail.build.mozilla.org",
             logCompression="bzip2",
             builders=l10n_builders,
-            binaryURL="http://ftp.mozilla.org/pub/mozilla.org/firefox/nightly/latest-mozilla-central-l10n/"
+            binaryURL=config['enUS_binaryURL']
         ))
 
     # change sources
