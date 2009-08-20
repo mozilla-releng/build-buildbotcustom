@@ -472,7 +472,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='.',
          command=['wget', '-O', 'bloat.log.old',
                   'http://%s/pub/mozilla.org/%s/%s/bloat.log' % \
-                    (self.stageServer, self.productName, self.logUploadDir)]
+                    (self.stageServer, self.productName, self.logUploadDir)],
+         warnOnFailure=True,
+         flunkOnFailure=False
         )
         self.addStep(ShellCommand,
          name='mv_bloat_log',
@@ -496,7 +498,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='.',
          mozillaDir=self.mozillaDir,
          warnOnFailure=True,
-         haltOnFailure=True
+         haltOnFailure=False
         )
         self.addStep(SetProperty,
           command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
