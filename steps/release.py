@@ -1,9 +1,6 @@
 from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS
 from buildbot.steps.shell import ShellCommand
 
-import buildbotcustom.steps.misc
-reload(buildbotcustom.steps.misc)
-
 from buildbotcustom.steps.misc import TinderboxShellCommand
 
 class UpdateVerify(ShellCommand):
