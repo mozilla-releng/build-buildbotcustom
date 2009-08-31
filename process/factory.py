@@ -5,6 +5,7 @@ from time import strftime
 from twisted.python import log
 
 from buildbot.process.factory import BuildFactory
+from buildbot.steps import trigger
 from buildbot.steps.shell import ShellCommand, WithProperties, SetProperty
 from buildbot.steps.source import Mercurial
 from buildbot.steps.transfer import FileDownload
@@ -254,8 +255,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  ausHost=None, nightly=False, leakTest=False, codesighs=True,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
-                 createSnippet=False, doCleanup=True, packageSDK=False,
-                 packageTests=False, mozillaDir=None, **kwargs):
+                 createSnippet=False, triggerBuilds=False,
+                 doCleanup=True, packageSDK=False, packageTests=False,
+                 mozillaDir=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -286,6 +288,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.uploadPackages = uploadPackages
         self.uploadSymbols = uploadSymbols
         self.createSnippet = createSnippet
+        self.triggerBuilds = triggerBuilds
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
         self.packageTests = packageTests
@@ -331,6 +334,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addCodesighsSteps()
         if self.createSnippet:
             self.addUpdateSteps()
+        if self.triggerBuilds:
+            self.addTriggeredBuildsSteps()
         if self.doCleanup:
             self.addPostBuildCleanupSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
@@ -799,6 +804,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
 
+    def addTriggeredBuildsSteps(self):
+        '''Allow this build to trigger other builds before starting cleanup.
+
+        Don't trigger any other builds by default, but children can override
+        this, e.g. triggering l10n nightly builds once the en-US nightly has 
+        completed.
+        '''
+        pass
+
     def addPostBuildCleanupSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
@@ -904,7 +918,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
-    def __init__(self, talosMasters=None, unittestMasters=None, **kwargs):
+    def __init__(self, talosMasters=None, unittestMasters=None,
+                 triggerL10n=False, l10nScheduler=None, **kwargs):
         if talosMasters is None:
             self.talosMasters = []
         else:
@@ -914,7 +929,10 @@ class NightlyBuildFactory(MercurialBuildFactory):
             self.unittestMasters = []
         else:
             self.unittestMasters = unittestMasters
-        MercurialBuildFactory.__init__(self, **kwargs)
+        self.triggerL10n = triggerL10n
+        self.l10nScheduler = l10nScheduler
+        MercurialBuildFactory.__init__(self, triggerBuilds=triggerL10n,
+                                       **kwargs)
 
     def doUpload(self):
         uploadEnv = self.env.copy()
@@ -986,6 +1004,16 @@ class NightlyBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange-unittest")
             )
+            
+    def addTriggeredBuildsSteps(self):
+        '''Trigger a round of l10n nightlies if we're supposed to AND 
+        we have a scheduler.
+        '''
+        if self.triggerL10n and self.l10nScheduler is not None:
+            self.addStep(trigger.Trigger(
+                schedulerNames=[self.l10nScheduler],
+                waitForFinish=False))
+
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',

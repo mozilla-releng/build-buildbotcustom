@@ -38,7 +38,7 @@
 
 from twisted.python import log as log2
 from buildbotcustom import log
-from buildbot.scheduler import BaseUpstreamScheduler, Nightly, Dependent 
+from buildbot.scheduler import BaseUpstreamScheduler, Dependent, Triggerable 
 from buildbot.sourcestamp import SourceStamp
 from buildbot import buildset, process
 from buildbot.changes import changes
@@ -877,7 +877,7 @@ class L10nMixin(object):
       def canBeMergedWith(self, other):
         return False
   
-  def _cbLoadedLocales(self, locales):
+  def _cbLoadedLocales(self, locales, reason=None, set_props=None):
       """
       This is the callback function that gets called once the list
       of locales are ready to be processed
@@ -895,6 +895,8 @@ class L10nMixin(object):
             continue
         props = properties.Properties()
         props.updateFromProperties(self.properties)
+        if set_props:
+          props.updateFromProperties(set_props)
         #I do not know exactly what to pass as the source parameter
         props.update(dict(locale=locale),"Scheduler")
         props.setProperty("en_revision",self.baseTag,"Scheduler")
@@ -904,7 +906,7 @@ class L10nMixin(object):
         self.submitBuildSet(
             buildset.BuildSet(self.builderNames,
                               self.NoMergeStamp(branch=self.branch),
-                              self.reason,
+                              reason,
                               properties = props))
 
   def getLocales(self): 
@@ -934,14 +936,14 @@ class L10nMixin(object):
           d.addCallback(lambda data: ParseLocalesFile(data))
           return d
 
-  def createL10nBuilds(self):
+  def createL10nBuilds(self, reason=None, set_props=None):
       """
       We request to get the locales that we have to process and which
       method to call once they are ready
       """
       log2.msg('L10nMixin:: A list of locales is going to be requested')
       d = defer.maybeDeferred(self.getLocales)
-      d.addCallback(self._cbLoadedLocales)
+      d.addCallback(self._cbLoadedLocales, reason=reason, set_props=set_props)
       return d
 
 
@@ -964,11 +966,11 @@ def ParseLocalesFile(data):
     return locales
 
 
-class NightlyL10n(Nightly, L10nMixin):
+class TriggerableL10n(Triggerable, L10nMixin):
   """
-  NightlyL10n is used to paralellize the generation of l10n builds.
+  TriggerableL10n is used to paralellize the generation of l10n builds.
 
-  NightlyL10n is designed to be used with a Build factory that gets the
+  TriggerableL10n is designed to be used with a Build factory that gets the
   locale to build from the 'locale' build property.
   """
 
@@ -981,18 +983,18 @@ class NightlyL10n(Nightly, L10nMixin):
                repo = 'http://hg.mozilla.org/', branch=None, baseTag='default',
                localesFile=None, cvsRoot=DEFAULT_CVSROOT, locales=None,
                tree="notset"):
-    
-    Nightly.__init__(self, name, builderNames, minute, hour, dayOfMonth, month,
-                     dayOfWeek, branch, properties={'nightly': True})
+    self.branch = branch 
+    self.reason = None 
     L10nMixin.__init__(self, platform = platform, repoType = repoType,
                        repo = repo, branch = branch, baseTag = baseTag,
                        localesFile = localesFile, cvsRoot = cvsRoot,
                        locales = locales, tree = tree)
-  
-  def doPeriodicBuild(self):
-    # Schedule the next run (as in Nightly's doPeriodicBuild)
-    self.setTimer()
-    self.createL10nBuilds()
+    Triggerable.__init__(self, name, builderNames)
+
+  def trigger(self, ss, set_props=None):
+      reason="This build was triggered by the successful completion of the en-US nightly."
+      self.createL10nBuilds(reason=reason, set_props=set_props)
+
 
 class DependentL10n(Dependent, L10nMixin):
   """
@@ -1019,3 +1021,12 @@ class DependentL10n(Dependent, L10nMixin):
   # ss is the source stamp that we don't use currently
   def upstreamBuilt(self, ss):
       self.createL10nBuilds()
+
+
+class NightlyL10n(TriggerableL10n):
+    ''' This is a thin wrapper around the TriggerableL10n class to make 
+    using the class in the nightly context -- our standard use case --
+    more clear. 
+    '''
+    def __init__(self, **kwargs):
+        TriggerableL10n.__init__(self, **kwargs)
