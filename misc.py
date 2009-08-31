@@ -163,6 +163,11 @@ def generateBranchObjects(config, name):
         for b in l10nNightlyBuilders:
             l10n_builders.append(l10nNightlyBuilders[b]['l10n_builder'])
             l10n_builders.append(l10nNightlyBuilders[b]['l10n_builder'] + " build")
+        l10n_binaryURL = config['enUS_binaryURL']
+        if l10n_binaryURL.endswith('/'):
+            l10n_binaryURL = l10n_binaryURL[:-1]
+        l10n_binaryURL += "-l10n"
+
         # This notifies all l10n related build objects to Mozilla-l10n
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="bootstrap@mozilla.com",
@@ -171,7 +176,7 @@ def generateBranchObjects(config, name):
             relayhost="mail.build.mozilla.org",
             logCompression="bzip2",
             builders=l10n_builders,
-            binaryURL=config['enUS_binaryURL']
+            binaryURL=l10n_binaryURL
         ))
 
         # We only want the builds from the specified builders
@@ -183,7 +188,7 @@ def generateBranchObjects(config, name):
             relayhost="mail.build.mozilla.org",
             logCompression="bzip2",
             builders=l10n_builders,
-            binaryURL=config['enUS_binaryURL']
+            binaryURL=l10n_binaryURL
         ))
 
     # change sources
