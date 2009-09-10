@@ -3808,12 +3808,17 @@ class MobileBuildFactory(MozillaBuildFactory):
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
     def __init__(self, packageGlob="-r mobile/dist/*.tar.bz2 " +
-            "xulrunner/dist/*.tar.bz2", **kwargs):
-        """This class creates a desktop fennec build.  Only tested
-        to do Linux-i686 builds.  -r in package glob is to ensure that all
-        files are uploaded as this is the first option given to -r.  hack alert!"""
+                 "xulrunner/dist/*.tar.bz2", uploadPlatform=None,
+                 **kwargs):
+        """This class creates a desktop fennec build.  -r in package glob
+        is to ensure that all files are uploaded as this is the first
+        option given to scp.  hack alert!"""
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
+        if uploadPlatform is not None:
+            self.uploadPlatform = uploadPlatform
+        else:
+            self.uploadPlatform = self.platform.replace('-i686', '')
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -3821,18 +3826,20 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
-        self.addUploadSteps(platform='linux')
+        self.addUploadSteps(platform=self.uploadPlatform)
 
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
                 name='rm_cltbld_logs',
                 command='rm -f /tmp/*_cltbld.log',
-                description=['removing', 'log', 'file']
+                description=['removing', 'log', 'file'],
+                workdir=self.baseWorkDir
             )
         self.addStep(ShellCommand,
                 name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
-                description=['clobber', 'build']
+                description=['clobber', 'build'],
+                workdir=self.baseWorkDir
             )
 
     def addBuildSteps(self):
@@ -3840,24 +3847,37 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
                 name='compile',
                 command=['make', '-f', 'client.mk', 'build'],
                 description=['compile'],
-                workdir=self.baseWorkDir + "/" +  self.branchName
+                workdir=self.baseWorkDir + "/" +  self.branchName,
+                env=self.env,
+                haltOnFailure=True
             )
 
     def addPackageSteps(self):
-        self.addStep(ShellCommand,
+        if self.platform.startswith("linux"):
+            self.addStep(ShellCommand,
                 name='make_xr_pkg',
                 command=['make', 'package'],
                 workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
                     self.branchName, self.objdir),
-                description=['make', 'xr', 'package']
-                )
+                description=['make', 'xr', 'package'],
+                env=self.env,
+            )
         self.addStep(ShellCommand,
-                name='make_mobile_pkg',
-                command=['make', 'package'],
-                workdir='%s/%s/%s/mobile' % (self.baseWorkDir,
+            name='make_mobile_pkg',
+            command=['make', 'package'],
+            workdir='%s/%s/%s/mobile' % (self.baseWorkDir,
+            self.branchName, self.objdir),
+            description=['make', 'mobile', 'package'],
+            env=self.env,
+        )
+        if self.platform.startswith("linux"):
+            self.addStep(ShellCommand,
+                name='make_pkg_tests',
+                command=['make', 'package-tests'],
+                workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
                     self.branchName, self.objdir),
-                description=['make', 'mobile', 'package']
-                )
+                env=self.env,
+            )
 
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, scratchboxPath="/scratchbox/moz_scratchbox",
