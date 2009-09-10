@@ -39,9 +39,14 @@
 
 This module provides base classes for testing the integration of buildbot
 and the django status database models.
+
+This module also provides general utility functions for testing other
+buildbotcustom code
 """
 
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime
+import threading
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor
@@ -192,3 +197,33 @@ class TimedChangesQueue(BuildTestCase):
     Calls subclassed allBuildsDone().
     """
     self.allBuildsDone()
+
+
+class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    # This class requires the consumer to set contents, because we
+    # cannot override __init__ due to the way HTTPServer works
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(self.contents)
+        return
+
+    def log_message(self, fmt, *args): pass
+
+
+def startHTTPServer(contents):
+    # Starts up a simple HTTPServer that processes requests with
+    # VerySimpleHTTPRequestHandler (subclassed to make sure it's unique
+    # for each instance), and serving the contents passed as contents
+    # Returns a tuple containing the HTTPServer instance and the port it is
+    # listening on. The caller is responsible for shutting down the HTTPServer.
+    class OurHandler(VerySimpleHTTPRequestHandler):
+        pass
+    OurHandler.contents = contents
+    server = HTTPServer(('', 0), OurHandler)
+    ip, port = server.server_address
+    server_thread = threading.Thread(target=server.serve_forever)
+    server_thread.setDaemon(True)
+    server_thread.start()
+    return (server, port)

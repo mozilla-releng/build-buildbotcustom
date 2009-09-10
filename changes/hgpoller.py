@@ -299,6 +299,7 @@ class BasePoller(object):
         d.addCallback(self.processData)
         d.addCallbacks(self.dataFinished, self.dataFailed)
         d.addCallback(self.pollDone)
+        return d
 
     def stopLoad(self, res):
         self.loadTime = time.time() - self.startLoad
@@ -489,6 +490,8 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
 
         BasePoller.__init__(self)
         self.hgURL = hgURL
+        if hgURL.endswith("/"):
+            hgURL = hgURL[:-1]
         self.repositoryIndex = repositoryIndex
         self.pollInterval = pollInterval
         self.localePollers = {}
@@ -512,9 +515,9 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
         return "Getting changes from all locales at %s" % self.repositoryIndex
 
     def getData(self):
-        log.msg("Polling all locales at %s%s/" % (self.hgURL,
+        log.msg("Polling all locales at %s/%s/" % (self.hgURL,
                                                   self.repositoryIndex))
-        return getPage(self.hgURL + self.repositoryIndex + '/?style=raw',
+        return getPage(self.hgURL + '/' + self.repositoryIndex + '/?style=raw',
                        timeout = self.timeout)
 
     def getLocalePoller(self, locale, branch):
@@ -577,5 +580,5 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
         reactor.callLater(0, self.pollNextLocale)        
 
     def __str__(self):
-        return "<HgAllLocalesPoller for %s%s/>" % (self.hgURL,
+        return "<HgAllLocalesPoller for %s/%s/>" % (self.hgURL,
                                                    self.repositoryIndex)
