@@ -219,18 +219,26 @@ class MozillaBuildFactory(BuildFactory):
             )
 
     def addPeriodicRebootSteps(self):
-        self.addStep(ShellCommand,
+        def do_disconnect(cmd):
+            try:
+                if 'SCHEDULED REBOOT' in cmd.logs['stdio'].getText():
+                    return True
+            except:
+                pass
+            return False
+        self.addStep(DisconnectStep(
          name='maybe_rebooting',
          command=['python', 'tools/buildfarm/maintenance/count_and_reboot.py',
                   '-f', '../reboot_count.txt',
                   '-n', str(self.buildsBeforeReboot),
                   '-z'],
          description=['maybe rebooting'],
+         force_disconnect=do_disconnect,
          warnOnFailure=False,
          flunkOnFailure=False,
          alwaysRun=True,
          workdir='.'
-        )
+        ))
 
     def getRepoName(self, repo):
         return repo.rstrip('/').split('/')[-1]
