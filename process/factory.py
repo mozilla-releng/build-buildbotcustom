@@ -135,7 +135,8 @@ class MozillaBuildFactory(BuildFactory):
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-                 branchName=None, **kwargs):
+                 branchName=None, triggerBuilds=False, 
+                 triggeredSchedulers=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -148,6 +149,8 @@ class MozillaBuildFactory(BuildFactory):
         self.clobberURL = clobberURL
         self.clobberTime = clobberTime
         self.buildsBeforeReboot = buildsBeforeReboot
+        self.triggerBuilds = triggerBuilds
+        self.triggeredSchedulers = triggeredSchedulers
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -218,6 +221,22 @@ class MozillaBuildFactory(BuildFactory):
              timeout=3600, # One hour, because Windows is slow
             )
 
+    def addTriggeredBuildsSteps(self,
+                                triggeredSchedulers=None):
+        '''Trigger other schedulers.
+        We don't include these steps by default because different
+        children may want to trigger builds at different stages.
+        '''
+        if triggeredSchedulers is None:
+            if self.triggeredSchedulers is None:
+                return True
+            triggeredSchedulers = self.triggeredSchedulers
+
+        for triggeredScheduler in triggeredSchedulers:
+            self.addStep(trigger.Trigger(
+                schedulerNames=[triggeredScheduler],
+                waitForFinish=False))
+
     def addPeriodicRebootSteps(self):
         def do_disconnect(cmd):
             try:
@@ -263,9 +282,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  ausHost=None, nightly=False, leakTest=False, codesighs=True,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
-                 createSnippet=False, triggerBuilds=False,
-                 doCleanup=True, packageSDK=False, packageTests=False,
-                 mozillaDir=None, **kwargs):
+                 createSnippet=False, doCleanup=True, packageSDK=False,
+                 packageTests=False, mozillaDir=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -296,7 +314,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.uploadPackages = uploadPackages
         self.uploadSymbols = uploadSymbols
         self.createSnippet = createSnippet
-        self.triggerBuilds = triggerBuilds
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
         self.packageTests = packageTests
@@ -812,15 +829,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
 
-    def addTriggeredBuildsSteps(self):
-        '''Allow this build to trigger other builds before starting cleanup.
-
-        Don't trigger any other builds by default, but children can override
-        this, e.g. triggering l10n nightly builds once the en-US nightly has 
-        completed.
-        '''
-        pass
-
     def addPostBuildCleanupSteps(self):
         if self.nightly:
             self.addStep(ShellCommand,
@@ -926,8 +934,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
-    def __init__(self, talosMasters=None, unittestMasters=None,
-                 triggerL10n=False, l10nScheduler=None, **kwargs):
+    def __init__(self, talosMasters=None, unittestMasters=None, **kwargs):
         if talosMasters is None:
             self.talosMasters = []
         else:
@@ -937,10 +944,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             self.unittestMasters = []
         else:
             self.unittestMasters = unittestMasters
-        self.triggerL10n = triggerL10n
-        self.l10nScheduler = l10nScheduler
-        MercurialBuildFactory.__init__(self, triggerBuilds=triggerL10n,
-                                       **kwargs)
+        MercurialBuildFactory.__init__(self, **kwargs)
 
     def doUpload(self):
         uploadEnv = self.env.copy()
@@ -1013,15 +1017,6 @@ class NightlyBuildFactory(MercurialBuildFactory):
              user="sendchange-unittest")
             )
             
-    def addTriggeredBuildsSteps(self):
-        '''Trigger a round of l10n nightlies if we're supposed to AND 
-        we have a scheduler.
-        '''
-        if self.triggerL10n and self.l10nScheduler is not None:
-            self.addStep(trigger.Trigger(
-                schedulerNames=[self.l10nScheduler],
-                waitForFinish=False))
-
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
@@ -3814,6 +3809,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                                         self.objdir)
         )
 
+
 class MobileDesktopBuildFactory(MobileBuildFactory):
     def __init__(self, packageGlob="-r mobile/dist/*.tar.bz2 " +
                  "xulrunner/dist/*.tar.bz2", uploadPlatform=None,
@@ -3835,6 +3831,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform=self.uploadPlatform)
+        if self.triggerBuilds:
+            self.addTriggeredBuildsSteps()
 
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
@@ -3904,6 +3902,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform='linux')
+        if self.triggerBuilds:
+            self.addTriggeredBuildsSteps()
 
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
@@ -3996,6 +3996,8 @@ class WinmoBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addUploadSteps(platform='win32')
+        if self.triggerBuilds:
+            self.addTriggeredBuildsSteps()
 
     def addPreCleanSteps(self):
         if self.clobber:

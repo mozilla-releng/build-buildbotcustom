@@ -257,7 +257,6 @@ def generateBranchObjects(config, name):
                                    name=l10n_builder,
                                    platform=platform,
                                    tree=tree,
-                                   hour=[7],
                                    builderNames=[l10n_builder],
                                    repoType='hg',
                                    branch=config['repo_path'],
@@ -346,11 +345,10 @@ def generateBranchObjects(config, name):
 
         nightly_builder = '%s nightly' % pf['base_name']
 
+        triggeredSchedulers=None
         if platform in ('linux', 'macosx', 'win32') and \
            nightly_builder in l10nNightlyBuilders:
-            l10nScheduler=l10nNightlyBuilders[nightly_builder]['l10n_builder']
-        else:
-            l10nScheduler=None
+            triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
 
         mozilla2_nightly_factory = NightlyBuildFactory(
             env=pf['env'],
@@ -385,8 +383,8 @@ def generateBranchObjects(config, name):
             buildsBeforeReboot=pf['builds_before_reboot'],
             talosMasters=talosMasters,
             packageTests=False,
-            triggerL10n=config['enable_l10n'],
-            l10nScheduler=l10nScheduler,
+            triggerBuilds=config['enable_l10n'],
+            triggeredSchedulers=triggeredSchedulers,
         )
 
         mozilla2_nightly_builder = {
