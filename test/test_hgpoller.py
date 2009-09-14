@@ -3,8 +3,9 @@ from xml.parsers.expat import ExpatError
 from twisted.internet import defer, reactor
 from twisted.trial import unittest
 
-from buildbotcustom.changes.hgpoller import BasePoller, BaseHgPoller, HgPoller, \
-  HgLocalePoller, HgAllLocalesPoller, _parse_changes
+from buildbotcustom.changes.hgpoller import BaseHgPoller, \
+  BaseHgAllLocalesPoller, BuildbotHgPoller, BuildbotHgLocalePoller, \
+  _parse_changes
 from buildbotcustom.test.utils import startHTTPServer
 
 
@@ -49,9 +50,10 @@ fakeLocalesFile = """/l10n-central/af/
 /l10n-central/kk/
 /l10n-central/zh-TW/"""
 
-class FakeHgAllLocalesPoller(HgAllLocalesPoller):
+class FakeHgAllLocalesPoller(BaseHgAllLocalesPoller):
     def __init__(self):
-        HgAllLocalesPoller.__init__(self, hgURL='fake', repositoryIndex='fake')
+        BaseHgAllLocalesPoller.__init__(self, hgURL='fake',
+                                        repositoryIndex='fake')
 
     def pollNextLocale(self):
         pass
@@ -99,18 +101,19 @@ class TestPolling(unittest.TestCase):
         d.addCallbacks(self.success, self.failure)
         return d
 
-    def testHgPoller(self):
+    def testBuildbotHgPoller(self):
         url = 'http://localhost:%s' % str(self.portnum)
-        return self.doPollingTest(HgPoller, hgURL=url, branch='whatever')
+        return self.doPollingTest(BuildbotHgPoller, hgURL=url,
+                                  branch='whatever')
 
-    def testHgLocalePoller(self):
+    def testBuildbotHgLocalePoller(self):
         url = 'http://localhost:%s' % str(self.portnum)
-        return self.doPollingTest(HgLocalePoller, locale='fake', parent='fake',
-                                  hgURL=url, branch='whatever')
+        return self.doPollingTest(BuildbotHgLocalePoller, locale='fake',
+                                  parent='fake', hgURL=url, branch='whatever')
 
-    def testHgAllLocalesPoller(self):
+    def testBaseHgAllLocalesPoller(self):
         url = 'http://localhost:%s' % str(self.portnum)
-        return self.doPollingTest(HgAllLocalesPoller, hgURL=url,
+        return self.doPollingTest(BaseHgAllLocalesPoller, hgURL=url,
                                   repositoryIndex='foobar')
 
 

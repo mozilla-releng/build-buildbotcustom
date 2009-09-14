@@ -15,7 +15,8 @@ reload(buildbotcustom.log)
 reload(buildbotcustom.l10n)
 reload(buildbotcustom.scheduler)
 
-from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
+from buildbotcustom.changes.hgpoller import BuildbotHgPoller, \
+  BuildbotHgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
   UnittestPackagedBuildFactory
@@ -192,7 +193,7 @@ def generateBranchObjects(config, name):
         ))
 
     # change sources
-    branchObjects['change_source'].append(HgPoller(
+    branchObjects['change_source'].append(BuildbotHgPoller(
         hgURL=config['hgurl'],
         branch=config['repo_path'],
         pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
@@ -201,9 +202,10 @@ def generateBranchObjects(config, name):
     ))
     
     if config['enable_l10n']:
-        hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
-                            repositoryIndex = config['l10n_repo_path'],
-                            pollInterval = 15*60)
+        hg_all_locales_poller = BuildbotHgAllLocalesPoller(
+            hgURL = config['hgurl'],
+            repositoryIndex = config['l10n_repo_path'],
+            pollInterval = 15*60)
         hg_all_locales_poller.parallelRequests = 1
         branchObjects['change_source'].append(hg_all_locales_poller)
 
