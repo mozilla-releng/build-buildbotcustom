@@ -1599,6 +1599,16 @@ class NightlyRepackFactory(BaseRepackFactory):
          description=['make','installers'],
          workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
         )
+        if self.createSnippet:
+            self.addStep(ShellCommand,
+             name='make_locale_snippet',
+             command=['sh','-c',
+                      WithProperties('make generate-snippet-%(locale)s')],
+             env = self.env,
+             haltOnFailure=True,
+             description=['make','snippet'],
+             workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
+            )
 
     def uploadSnippet(self):
         self.addStep(ShellCommand,
