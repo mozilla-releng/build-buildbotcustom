@@ -626,7 +626,7 @@ class HgL10nDispatcher(L10nDispatcher):
       self.debug("not our branch, ignore, %s != %s" %
                  (self.l10n_branch, change.branch))
       return
-    if not change.properties.has_key('locale'):
+    if not hasattr(change, 'locale'):
       log2.msg("I'm confused, the branches match, but this is not a locale change")
       return
     if self.tree not in self.parent.locales:
@@ -634,9 +634,7 @@ class HgL10nDispatcher(L10nDispatcher):
       # this change and go on
       self.debug("locales list for %s not set up, ignoring change" % self.tree)
       return
-
-    locale = change.properties.getProperty('locale')
-    if locale not in self.parent.locales[self.tree]:
+    if change.locale not in self.parent.locales[self.tree]:
       # this is a change to a locale that this build doesn't pay attention to
       return
     # Only changes in the modules mentioned in self.paths should trigger a build
@@ -650,7 +648,7 @@ class HgL10nDispatcher(L10nDispatcher):
       self.debug("dropping change %d, not our app" % change.number)
       self.debug("%s listens to %s" % (self.tree, ' '.join(self.paths)))
       return
-    self.parent.queueBuild(locale, change, self.tree, self.props)
+    self.parent.queueBuild(change.locale, change, self.tree, self.props)
 
 class EnDispatcher(IBaseDispatcher):
   """

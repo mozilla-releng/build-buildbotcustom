@@ -120,9 +120,8 @@ import re
 
 __all__ = ["parse_timezone", "parse_date", "parse_date_string",
            "ParseError", "Utc", "FixedOffset", 
-           "Pluggable", "BasePoller", "BaseHgPoller", "BaseBuildbotHgPoller",
-           "BuildbotHgPoller", "HgLocalePoller", "BuildbotHgLocalePoller",
-           "BaseHgAllLocalesPoller", "BuildbotHgAllLocalesPoller"]
+           "Pluggable", "BasePoller", "BaseHgPoller", "HgPoller",
+           "HgLocalePoller", "HgAllLocalesPoller"]
 
 # Adapted from http://delete.me.uk/2005/03/iso8601.html
 ISO8601_REGEX = re.compile(r"(?P<year>[0-9]{4})(-(?P<month>[0-9]{1,2})(-(?P<day>[0-9]{1,2})"
@@ -375,7 +374,14 @@ class BaseHgPoller(BasePoller):
         if self.lastChangeset is not None:
             for change in change_list:
                 adjustedChangeTime = change["updated"]
-                self.submitChange(change, adjustedChangeTime)
+                c = changes.Change(who = change["author"],
+                                   files = change["files"],
+                                   revision = change["changeset"],
+                                   comments = change["link"],
+                                   when = adjustedChangeTime,
+                                   branch = self.branch)
+                self.changeHook(c)
+                self.parent.addChange(c)
         if len(change_list) > 0:
             self.lastChange = max(self.lastChange, *[c["updated"]
                                                      for c in change_list])
@@ -384,20 +390,10 @@ class BaseHgPoller(BasePoller):
                 log.msg("last changeset %s on %s" %
                         (self.lastChangeset, self.baseURL))
 
+    def changeHook(self, change):
+        pass
 
-
-class BaseBuildbotHgPoller(BaseHgPoller):
-    def submitChange(self, change, adjustedChangeTime, properties={}):
-        c = changes.Change(who = change["author"],
-                           files = change["files"],
-                           revision = change["changeset"],
-                           comments = change["link"],
-                           when = adjustedChangeTime,
-                           branch = self.branch,
-                           properties = properties)
-        self.parent.addChange(c)
-
-class BuildbotHgPoller(base.ChangeSource, BaseBuildbotHgPoller):
+class HgPoller(base.ChangeSource, BaseHgPoller):
     """This source will poll a Mercurial server over HTTP using
     the built-in RSS feed for changes and submit them to the
     change master."""
@@ -424,8 +420,8 @@ class BuildbotHgPoller(base.ChangeSource, BaseBuildbotHgPoller):
                                 as *one* changeset
         """
         
-        BaseBuildbotHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
-                                      tipsOnly)
+        BaseHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
+                              tipsOnly)
         self.pollInterval = pollInterval
 
     def startService(self):
@@ -441,7 +437,7 @@ class BuildbotHgPoller(base.ChangeSource, BaseBuildbotHgPoller):
         return "Getting changes from: %s" % self._make_url()
 
     def __str__(self):
-        return "<BuildbotHgPoller for %s%s>" % (self.hgURL, self.branch)
+        return "<HgPoller for %s%s>" % (self.hgURL, self.branch)
 
 class HgLocalePoller(BaseHgPoller):
     """This helper class for HgAllLocalesPoller polls a single locale and
@@ -450,10 +446,14 @@ class HgLocalePoller(BaseHgPoller):
     timeout = 30
     verbose = False
 
-    def __init__(self, locale, parent, **kwargs):
-        BaseHgPoller.__init__(self, tree=locale, **kwargs)
+    def __init__(self, locale, parent, branch, hgURL):
+        BaseHgPoller.__init__(self, hgURL, branch, tree = locale)
         self.locale = locale
         self.parent = parent
+        self.branch = branch
+
+    def changeHook(self, change):
+        change.locale = self.locale
 
     def pollDone(self, res):
         self.parent.localeDone(self.locale)
@@ -461,15 +461,7 @@ class HgLocalePoller(BaseHgPoller):
     def __str__(self):
         return "<HgLocalePoller for %s>" % self.baseURL
 
-
-class BuildbotHgLocalePoller(HgLocalePoller, BaseBuildbotHgPoller):
-    def submitChange(self, change, adjustedChangeTime, properties={}):
-        properties['locale'] = self.locale
-        BaseBuildbotHgPoller.submitChange(self, change, adjustedChangeTime,
-                                          properties)
-
-
-class BaseHgAllLocalesPoller(BasePoller):
+class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     """Poll all localization repositories from an index page.
 
     For a index page like http://hg.mozilla.org/releases/l10n-mozilla-1.9.1/,
@@ -478,7 +470,7 @@ class BaseHgAllLocalesPoller(BasePoller):
     as branch for the changes, i.e. 'releases/l10n-mozilla-1.9.1'.
     """
 
-    compare_attrs = ['repositoryIndex']
+    compare_attrs = ['repositoryIndex', 'pollInterval']
     parent = None
     loop = None
     volatile = ['loop']
@@ -487,7 +479,7 @@ class BaseHgAllLocalesPoller(BasePoller):
     parallelRequests = 2
     verboseChilds = False
 
-    def __init__(self, hgURL, repositoryIndex):
+    def __init__(self, hgURL, repositoryIndex, pollInterval=120):
         """
         @type  repositoryIndex:      string
         @param repositoryIndex:      The URL listing all locale repos
@@ -501,10 +493,23 @@ class BaseHgAllLocalesPoller(BasePoller):
         if hgURL.endswith("/"):
             hgURL = hgURL[:-1]
         self.repositoryIndex = repositoryIndex
+        self.pollInterval = pollInterval
         self.localePollers = {}
         self.locales = []
         self.pendingLocales = []
         self.activeRequests = 0
+
+    def startService(self):
+        self.loop = LoopingCall(self.poll)
+        base.ChangeSource.startService(self)
+        reactor.callLater(0, self.loop.start, self.pollInterval)
+
+    def stopService(self):
+        self.loop.stop()
+        return base.ChangeSource.stopService(self)
+
+    def addChange(self, change):
+        self.parent.addChange(change)
 
     def describe(self):
         return "Getting changes from all locales at %s" % self.repositoryIndex
@@ -517,10 +522,8 @@ class BaseHgAllLocalesPoller(BasePoller):
 
     def getLocalePoller(self, locale, branch):
         if (locale, branch) not in self.localePollers:
-            lp = BuildbotHgLocalePoller(locale=locale,
-                                        parent=self,
-                                        branch=branch,
-                                        hgURL=self.hgURL)
+            lp = HgLocalePoller(locale, self, branch,
+                                self.hgURL)
             lp.verbose = self.verboseChilds
             self.localePollers[(locale, branch)] = lp
         return self.localePollers[(locale, branch)]
@@ -577,25 +580,5 @@ class BaseHgAllLocalesPoller(BasePoller):
         reactor.callLater(0, self.pollNextLocale)        
 
     def __str__(self):
-        return "<BaseHgAllLocalesPoller for %s/%s/>" % (self.hgURL,
-                                                        self.repositoryIndex)
-
-
-class BuildbotHgAllLocalesPoller(base.ChangeSource, BaseHgAllLocalesPoller):
-    compare_attrs = BaseHgAllLocalesPoller.compare_attrs + ['pollInterval']
-
-    def __init__(self, pollInterval=120, **kwargs):
-        BaseHgAllLocalesPoller.__init__(self, **kwargs)
-        self.pollInterval = pollInterval
-
-    def startService(self):
-        self.loop = LoopingCall(self.poll)
-        base.ChangeSource.startService(self)
-        reactor.callLater(0, self.loop.start, self.pollInterval)
-
-    def stopService(self):
-        self.loop.stop()
-        return base.ChangeSource.stopService(self)
-
-    def addChange(self, change):
-        self.parent.addChange(change)
+        return "<HgAllLocalesPoller for %s/%s/>" % (self.hgURL,
+                                                   self.repositoryIndex)
