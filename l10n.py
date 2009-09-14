@@ -85,6 +85,17 @@ class L10nConfigParser(object):
     # optional defaults to be passed to the inner ConfigParser (unused?)
     self.defaults = kwargs
 
+  def getDepth(self, cp):
+    '''Get the depth for the comparison from the parsed l10n.ini.
+
+    Overloadable to get the source depth for fennec and friends.
+    '''
+    try:
+      depth = cp.get('general', 'depth')
+    except:
+      depth = '.'
+    return depth
+
   def loadConfigs(self):
     """Entry point to load the l10n.ini file this Parser refers to.
 
@@ -98,10 +109,7 @@ class L10nConfigParser(object):
     """Parse a file-like object for the loaded l10n.ini file."""
     cp = ConfigParser(self.defaults)
     cp.readfp(inifile)
-    try:
-      depth = cp.get('general', 'depth')
-    except:
-      depth = '.'
+    depth = self.getDepth(cp)
     self.baseurl = urljoin(self.inipath, depth)
     # create child loaders for any other l10n.ini files to be included
     try:
@@ -118,13 +126,22 @@ class L10nConfigParser(object):
       self.dirs.extend(cp.get('compare', 'dirs').split())
     except (NoOptionError, NoSectionError):
       pass
+    # try getting a top level compare dir, as used for fennec
+    try:
+      self.tld = cp.get('compare', 'tld')
+      # remove tld from comparison dirs
+      if self.tld in self.dirs:
+        self.dirs.remove(self.tld)
+    except (NoOptionError, NoSectionError):
+      self.tld = None
     # try to set "all_path" and "all_url"
     try:
       self.all_path = cp.get('general', 'all')
-      self.all_url = urljoin(self.inipath, 'all-locales')
+      self.all_url = urljoin(self.baseurl, self.all_path)
     except (NoOptionError, NoSectionError):
       self.all_path = None
       self.all_url = None
+    return cp
 
   def addChild(self, title, path, orig_cp):
     """Create a child L10nConfigParser and load it.
@@ -140,11 +157,10 @@ class L10nConfigParser(object):
   def dirsIter(self):
     """Iterate over all dirs and our base path for this l10n.ini"""
     url = urlparse(self.baseurl)
-    basepath = None
-    if url[0] == 'file':
-      basepath = url2pathname(url[2])
+    basepath = url2pathname(url[2])
     for dir in self.dirs:
-      yield (dir, basepath)
+      yield (dir, os.path.join(basepath, dir, 'locales', 'en-US'))
+    
 
   def directories(self):
     """Iterate over all dirs and base paths for this l10n.ini as well
@@ -443,10 +459,17 @@ def configureDispatcher(config, section, scheduler, buildOnEnUS=False):
     while loaders:
       l = loaders.pop(0)
       ldirs = dict(l.dirsIter()).keys()
-      if l.branch not in dirs[l.type]:
-        dirs[l.type][l.branch] = ldirs
+      _type = l.type
+      # backwards compat, make type single-module-hg be hg.
+      # single-module-hg is only for storing the tld dirs from l10n.inis
+      if _type.endswith('hg'):
+        _type = 'hg'
+      if l.branch not in dirs[_type]:
+        dirs[_type][l.branch] = ldirs
       else:
-        dirs[l.type][l.branch] += ldirs
+        dirs[_type][l.branch] += ldirs
+      if l.tld is not None:
+        dirs['single-module-hg'][l.branch] = [l.tld]
       # Let's append at the end any children (which are loaders)
       # that the current loader has
       loaders += l.children
