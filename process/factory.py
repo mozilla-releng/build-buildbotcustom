@@ -691,10 +691,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='build/%s' % self.objdir,
          haltOnFailure=True
         )
+        # Windows special cases
         if self.platform.startswith("win32"):
          self.addStep(ShellCommand,
              name='make_installer',
              command=['make', 'installer'] + pkgArgs,
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+         )
+        elif self.platform.startswith("wince"):
+         self.addStep(ShellCommand,
+             name='make_cab',
+             command=['make', 'package', 'MOZ_PKG_FORMAT=CAB'] + pkgArgs,
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
