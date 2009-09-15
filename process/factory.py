@@ -2058,7 +2058,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
             for repo in repositories:
                 assert repositories[repo]['relbranchOverride'], \
                   'No relbranchOverride specified for ' + repo + \
-                  '. You must provide a relbranchOverride when buildNumber > 2'
+                  '. You must provide a relbranchOverride when buildNumber > 1'
 
         # now, down to work
         self.buildTag = '%s_BUILD%s' % (baseTag, str(buildNumber))
