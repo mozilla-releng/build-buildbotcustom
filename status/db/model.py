@@ -339,7 +339,7 @@ class SourceStamp(Base):
         if len(self.changes) != len(bbSource.changes):
             return False
         for c1, c2 in zip(self.changes, bbSource.changes):
-            if not c1.equals(c2):
+            if not c1.change.equals(c2):
                 return False
 
         return True

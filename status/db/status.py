@@ -1,8 +1,10 @@
+import sys
 from datetime import datetime
 
 import sqlalchemy
 
 from twisted.python import log
+from twisted.internet import reactor
 
 from buildbot.status import base
 from buildbot.status.builder import FAILURE, HEADER
@@ -189,9 +191,17 @@ class DBStatus(base.StatusReceiverMultiService):
         self.builders = []
         self.dburl = dburl
         self.name = name
+        self.status = None
+        self.orig_parent = None
+
+    def lostConnection(self):
+        log.msg("DBERROR: Lost connection to database, trying to reconnect in 60 seconds")
+        self.disownServiceParent()
+        reactor.callLater(60, self.setServiceParent, self.orig_parent)
 
     def setServiceParent(self, parent):
         log.msg("Starting DB Status handler")
+        self.orig_parent = parent
         base.StatusReceiverMultiService.setServiceParent(self, parent)
 
         # Skip doing anything if we're just doing a checkconfig.  We don't want to
@@ -203,25 +213,33 @@ class DBStatus(base.StatusReceiverMultiService):
         # model.Session will be reset to None, and we might get
         # stepStarted/stepFinished notifications while the reconfig is
         # happening.
-        self.Session = model.connect(self.dburl, echo_pool=True, pool_recycle=60)
+        try:
+            self.Session = model.connect(self.dburl, pool_recycle=60)
 
-        # Let our subscribers know about the database connection
-        # This gives them the opportunity to set up their own tables, etc.
-        for sub in self.subscribers:
-            if hasattr(sub, 'databaseConnected'):
-                try:
-                    sub.databaseConnected(self.engine)
-                except:
-                    log.msg("DBERROR: Couldn't notify subscriber %s of database connection" % sub)
-                    log.err()
+            # Let our subscribers know about the database connection
+            # This gives them the opportunity to set up their own tables, etc.
+            for sub in self.subscribers:
+                if hasattr(sub, 'databaseConnected'):
+                    try:
+                        sub.databaseConnected(model.metadata.bind)
+                    except:
+                        log.msg("DBERROR: Couldn't notify subscriber %s of database connection" % sub)
+                        log.err()
 
-        self.setup()
+            self.setup()
+        except:
+            if sys.exc_info()[0] is not sqlalchemy.exc.OperationalError:
+                log.msg("DBERROR: Couldn't connect to database")
+                log.err()
+            self.lostConnection()
 
     def disownServiceParent(self):
         log.msg("Stopping DB Status handler")
         base.StatusReceiverMultiService.disownServiceParent(self)
         try:
-            self.status.unsubscribe(self)
+            if self.status:
+                self.status.unsubscribe(self)
+                self.status = None
         except:
             log.msg("DBERROR: Couldn't unsubscribe from the master")
             log.err()
@@ -263,7 +281,7 @@ class DBStatus(base.StatusReceiverMultiService):
                         force_done = True
                         end_time = datetime.utcfromtimestamp(master_build.finished)
                         result = master_build.results
-                except (IOError, IndexError):
+                except (IOError, IndexError, KeyError):
                     # The master doesn't have information about this build, so
                     # that means it's not active.  Mark it as finished as of now, and FAILED
                     force_done = True
@@ -376,7 +394,6 @@ class DBStatus(base.StatusReceiverMultiService):
         finally:
             session.close()
 
-
     def buildStarted(self, builderName, build):
         session = self.Session()
         try:
@@ -397,8 +414,11 @@ class DBStatus(base.StatusReceiverMultiService):
                         log.err()
             return DBBuildStatus(b.id, self.subscribers)
         except:
-            log.msg("DBERROR: Couldn't start build %s on builder %s" % (build.number, builderName))
-            log.err()
+            if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
+                self.lostConnection()
+            else:
+                log.msg("DBERROR: Couldn't start build %s on builder %s" % (build.number, builderName))
+                log.err()
         finally:
             session.close()
 
@@ -431,8 +451,11 @@ class DBStatus(base.StatusReceiverMultiService):
                         log.msg("DBERROR: Couldn't notify subscriber %s of build finishing" % sub)
                         log.err()
         except:
-            log.msg("DBERROR: Couldn't stop build %s on builder %s" % (build.number, builderName))
-            log.err()
+            if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
+                self.lostConnection()
+            else:
+                log.msg("DBERROR: Couldn't stop build %s on builder %s" % (build.number, builderName))
+                log.err()
         finally:
             session.close()
 
@@ -448,8 +471,11 @@ class DBStatus(base.StatusReceiverMultiService):
             self.request_mapping[request] = r
             log.msg("DBMSG: Mapping %i requests" % len(self.request_mapping))
         except:
-            log.msg("DBERROR: Couldn't record new request on builder %s" % request.builderName)
-            log.err()
+            if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
+                self.lostConnection()
+            else:
+                log.msg("DBERROR: Couldn't record new request on builder %s" % request.builderName)
+                log.err()
         finally:
             session.close()
 
@@ -464,8 +490,11 @@ class DBStatus(base.StatusReceiverMultiService):
                 session.commit()
                 del self.request_mapping[request]
             except:
-                log.msg("DBERROR: Couldn't cancel request %s" % req.id)
-                log.err()
+                if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
+                    self.lostConnection()
+                else:
+                    log.msg("DBERROR: Couldn't cancel request %s" % req.id)
+                    log.err()
             finally:
                 session.close()
 
@@ -478,8 +507,11 @@ class DBStatus(base.StatusReceiverMultiService):
             model.MasterSlave.setConnected(session, self.master_id, slaveName)
             session.commit()
         except:
-            log.msg("DBERROR: Couldn't mark slave %s as connected" % slaveName)
-            log.err()
+            if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
+                self.lostConnection()
+            else:
+                log.msg("DBERROR: Couldn't mark slave %s as connected" % slaveName)
+                log.err()
         finally:
             session.close()
 
@@ -489,7 +521,10 @@ class DBStatus(base.StatusReceiverMultiService):
             model.MasterSlave.setDisconnected(session, self.master_id, slaveName)
             session.commit()
         except:
-            log.msg("DBERROR: Couldn't mark slave %s as disconnected" % slaveName)
-            log.err()
+            if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
+                self.lostConnection()
+            else:
+                log.msg("DBERROR: Couldn't mark slave %s as disconnected" % slaveName)
+                log.err()
         finally:
             session.close()
