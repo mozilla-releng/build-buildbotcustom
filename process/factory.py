@@ -1529,6 +1529,7 @@ class NightlyRepackFactory(BaseRepackFactory):
             # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/fr
             self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
               (self.ausBaseUploadDir, self.updatePlatform)
+            self.createNightlySnippet()
             self.uploadSnippet()
 
     def updateSources(self):
@@ -1608,16 +1609,17 @@ class NightlyRepackFactory(BaseRepackFactory):
          description=['make','installers'],
          workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
         )
-        if self.createSnippet:
-            self.addStep(ShellCommand,
-             name='make_locale_snippet',
-             command=['sh','-c',
-                      WithProperties('make generate-snippet-%(locale)s')],
-             env = self.env,
-             haltOnFailure=True,
-             description=['make','snippet'],
-             workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
-            )
+
+    def createNightlySnippet(self):
+        self.addStep(ShellCommand,
+         name='make_locale_snippet',
+         command=['sh','-c',
+                  WithProperties('make generate-snippet-%(locale)s')],
+         env = self.env,
+         haltOnFailure=True,
+         description=['make','snippet'],
+         workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
+        )
 
     def uploadSnippet(self):
         self.addStep(ShellCommand,
