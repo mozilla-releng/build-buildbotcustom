@@ -1297,6 +1297,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          env=self.uploadEnv,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
+         haltOnFailure=True,
          flunkOnFailure=True
         )
 
