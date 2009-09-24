@@ -1,6 +1,6 @@
 from urlparse import urljoin
 
-from buildbot.scheduler import Nightly
+from buildbot.scheduler import Nightly, Scheduler
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
 
@@ -97,20 +97,27 @@ def generateBranchObjects(config, name):
         builder = '%s nightly' % base_name
         nightlyBuilders.append(builder)
         if config['enable_shark'] and platform in ('macosx'):
-            nightlyBuilders.append('%s shark' % base_name) 
+            nightlyBuilders.append('%s shark' % base_name)
         if config['enable_l10n'] and platform in ('linux','win32','macosx'):
-            l10nNightlyBuilders[builder] = {} 
+            l10nNightlyBuilders[builder] = {}
             l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
             l10nNightlyBuilders[builder]['l10n_builder'] = \
                 '%s %s %s l10n' % (config['product_name'].capitalize(),
                                    name, platform)
             l10nNightlyBuilders[builder]['platform'] = platform
         if config['enable_unittests'] and platform in ('linux','win32','macosx'):
+            # Regular unittest builds
             unittestBuilders.append('%s unit test' % base_name)
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
                 test_builders.append('%s test %s' % (config['platforms'][platform]['base_name'], suites_name))
-            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders))
+            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, False))
+            # And debug too
+            if config.get('enable_packaged_debug_unittests'):
+                test_builders = []
+                for suites_name, suites in config['unittest_suites']:
+                    test_builders.append('%s test debug %s' % (config['platforms'][platform]['base_name'], suites_name))
+                triggeredUnittestBuilders.append(('%s-%s-debug-unittest' % (name, platform), test_builders, True))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % config['platforms'][platform]['base_name'])
         if config['enable_xulrunner'] and platform not in ('wince'):
@@ -199,7 +206,7 @@ def generateBranchObjects(config, name):
                                               config['repo_path']),
         pollInterval=1*60
     ))
-    
+
     if config['enable_l10n']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
@@ -218,9 +225,13 @@ def generateBranchObjects(config, name):
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl'])
     ))
 
-    for scheduler_branch, test_builders in triggeredUnittestBuilders:
+    for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
         scheduler_name = scheduler_branch
-        branchObjects['schedulers'].append(NoMergeScheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+        if not merge:
+            branchObjects['schedulers'].append(NoMergeScheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+        else:
+            branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+
         branchObjects['schedulers'].append(NightlyRebuild(name=scheduler_name+"-nightly",
             builderNames=test_builders,
             dayOfWeek=0, # Monday
@@ -282,12 +293,19 @@ def generateBranchObjects(config, name):
         codesighs = True
         uploadPackages = True
         uploadSymbols = False
+        packageTests = True
+        unittestBranch = "%s-%s-unittest" % (name, platform)
         talosMasters = config['talos_masters']
         if platform.find('-debug') > -1:
             leakTest = True
             codesighs = False
-            uploadPackages = False
+            if not config.get('enable_packaged_debug_unittests'):
+                uploadPackages = False
+                packageTests = False
             talosMasters = None
+            packageTests = True
+            # Platform already has the -debug suffix
+            unittestBranch = "%s-%s-unittest" % (name, platform)
         if platform.find('win') > -1 or platform.find('64') > -1:
             codesighs = False
         if 'upload_symbols' in pf and pf['upload_symbols']:
@@ -328,7 +346,9 @@ def generateBranchObjects(config, name):
             clobberTime=clobberTime,
             buildsBeforeReboot=pf['builds_before_reboot'],
             talosMasters=talosMasters,
-            packageTests=False,
+            packageTests=packageTests,
+            unittestMasters=config['unittest_masters'],
+            unittestBranch=unittestBranch,
         )
         mozilla2_dep_builder = {
             'name': '%s build' % pf['base_name'],
@@ -488,6 +508,7 @@ def generateBranchObjects(config, name):
                     stageUsername=config['stage_username'],
                     stageSshKey=config['stage_ssh_key'],
                     unittestMasters=config['unittest_masters'],
+                    unittestBranch="%s-%s-unittest" % (name, platform),
                     uploadPackages=True,
                 )
                 unittest_builder = {
@@ -523,6 +544,17 @@ def generateBranchObjects(config, name):
                         'factory': packaged_unittest_factory,
                         'category': name,
                     }
+
+                    if config.get('enable_packaged_debug_unittests'):
+                        packaged_debug_unittest_builder = {
+                            'name': '%s test debug %s' % (pf['base_name'], suites_name),
+                            'slavenames': pf['slaves'],
+                            'builddir': '%s-%s-debug-unittest-%s' % (name, platform, suites_name),
+                            'factory': packaged_unittest_factory,
+                            'category': name,
+                        }
+                        branchObjects['builders'].append(packaged_debug_unittest_builder)
+
                     branchObjects['builders'].append(packaged_unittest_builder)
 
         if config['enable_codecoverage']:

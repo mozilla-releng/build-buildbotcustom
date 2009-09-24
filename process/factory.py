@@ -826,7 +826,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['make', 'buildsymbols'],
          env=self.env,
          workdir='build/%s' % self.objdir,
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=60*60,
         )
 
     def addUploadSymbolsStep(self):
@@ -943,16 +944,17 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
 
 class NightlyBuildFactory(MercurialBuildFactory):
-    def __init__(self, talosMasters=None, unittestMasters=None, **kwargs):
-        if talosMasters is None:
-            self.talosMasters = []
-        else:
-            self.talosMasters = talosMasters
+    def __init__(self, talosMasters=None, unittestMasters=None,
+            unittestBranch=None, **kwargs):
 
-        if unittestMasters is None:
-            self.unittestMasters = []
-        else:
-            self.unittestMasters = unittestMasters
+        self.talosMasters = talosMasters or []
+
+        self.unittestMasters = unittestMasters or []
+        self.unittestBranch = unittestBranch
+
+        if self.unittestMasters:
+            assert self.unittestBranch
+
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def doUpload(self):
@@ -1014,13 +1016,12 @@ class NightlyBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")
             )
-        unittestBranch = "%s-%s-unittest" % (self.branchName, self.platform)
         for master, warn in self.unittestMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
              warnOnFailure=warn,
              master=master,
-             branch=unittestBranch,
+             branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange-unittest")
@@ -2782,8 +2783,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
             objdir, mochitest_leak_threshold=None,
             crashtest_leak_threshold=None, uploadPackages=False,
-            unittestMasters=None, stageUsername=None, stageServer=None,
-            stageSshKey=None, run_a11y=True, **kwargs):
+            unittestMasters=None, unittestBranch=None, stageUsername=None,
+            stageServer=None, stageSshKey=None, run_a11y=True, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -2799,10 +2800,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.run_a11y = run_a11y
         self.crashtest_leak_threshold = crashtest_leak_threshold
         self.mochitest_leak_threshold = mochitest_leak_threshold
-        if unittestMasters is None:
-            self.unittestMasters = []
-        else:
-            self.unittestMasters = unittestMasters
+
+        self.unittestMasters = unittestMasters or []
+        self.unittestBranch = unittestBranch
+        if self.unittestMasters:
+            assert self.unittestBranch
 
         self.config_repo_url = self.getRepository(self.config_repo_path)
 
@@ -2939,13 +2941,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
              extract_fn = get_url,
             )
 
-            branch = "%s-%s-unittest" % (self.branchName, self.platform)
             for master, warn in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
                  warnOnFailure=warn,
                  master=master,
-                 branch=branch,
+                 branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange-unittest")
                 )
@@ -4208,12 +4209,14 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  variant=variant,
                  env=self.env,
                  symbols_path='symbols',
-                 leakThreshold=leak_threshold
+                 leakThreshold=leak_threshold,
+                 maxTime=60*60, # One Hour
                 ))
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
                  symbols_path='symbols',
+                 maxTime=60*60, # One Hour
                 ))
             elif suite in ('reftest', 'crashtest'):
                 crashtest = (suite == "crashtest")
@@ -4222,6 +4225,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  env=self.env,
                  leakThreshold=leak_threshold,
                  symbols_path='symbols',
+                 maxTime=60*60, # One Hour
                 ))
 
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
