@@ -2981,43 +2981,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
          timeout=5*60, # 5 minutes.
         )
 
-        self.addStep(unittest_steps.MozillaCheck,
-         test_name="xpcshell-tests",
-         warnOnWarnings=True,
-         workdir="build/%s" % self.objdir,
-         timeout=5*60, # 5 minutes.
-        )
-
-        self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
-         test_name="reftest",
-         workdir="build/%s" % self.objdir,
-         timeout=5*60, # 5 minutes.
-        )
-        self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
-         test_name="crashtest",
-         leakThreshold=self.crashtest_leak_threshold,
-         workdir="build/%s" % self.objdir,
-        )
-        self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-         test_name="mochitest-plain",
-         workdir="build/%s" % self.objdir,
-         leakThreshold=self.mochitest_leak_threshold,
-         timeout=5*60, # 5 minutes.
-        )
-        self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-         test_name="mochitest-chrome",
-         workdir="build/%s" % self.objdir,
-        )
-        self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-         test_name="mochitest-browser-chrome",
-         workdir="build/%s" % self.objdir,
-        )
-        if self.run_a11y:
-            self.addStep(unittest_steps.MozillaMochitest, warnOnWarnings=True,
-             test_name="mochitest-a11y",
-             workdir="build/%s" % self.objdir,
-            )
-
     def addPrintChangesetStep(self):
         changesetLink = ''.join(['<a href=http://hg.mozilla.org/',
             self.repoPath,
