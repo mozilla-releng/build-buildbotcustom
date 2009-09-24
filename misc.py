@@ -112,6 +112,12 @@ def generateBranchObjects(config, name):
             for suites_name, suites in config['unittest_suites']:
                 test_builders.append('%s test %s' % (config['platforms'][platform]['base_name'], suites_name))
             triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, False))
+            # Release unittest builds
+            if config['platforms'][platform].get('enable_packaged_opt_unittests'):
+                test_builders = []
+                for suites_name, suites in config['unittest_suites']:
+                    test_builders.append('%s test opt %s' % (config['platforms'][platform]['base_name'], suites_name))
+                triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, False))
             # And debug too
             if config.get('enable_packaged_debug_unittests'):
                 test_builders = []
@@ -294,8 +300,8 @@ def generateBranchObjects(config, name):
         uploadPackages = True
         uploadSymbols = False
         packageTests = True
-        unittestBranch = "%s-%s-unittest" % (name, platform)
         talosMasters = config['talos_masters']
+        unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         if platform.find('-debug') > -1:
             leakTest = True
             codesighs = False
@@ -306,6 +312,9 @@ def generateBranchObjects(config, name):
             packageTests = True
             # Platform already has the -debug suffix
             unittestBranch = "%s-%s-unittest" % (name, platform)
+        elif not pf.get('enable_packaged_opt_unittests'):
+            packageTests = False
+
         if platform.find('win') > -1 or platform.find('64') > -1:
             codesighs = False
         if 'upload_symbols' in pf and pf['upload_symbols']:
@@ -402,7 +411,9 @@ def generateBranchObjects(config, name):
             clobberTime=clobberTime,
             buildsBeforeReboot=pf['builds_before_reboot'],
             talosMasters=talosMasters,
-            packageTests=False,
+            packageTests=packageTests,
+            unittestMasters=config['unittest_masters'],
+            unittestBranch=unittestBranch,
             triggerBuilds=config['enable_l10n'],
             triggeredSchedulers=triggeredSchedulers,
         )
@@ -544,6 +555,7 @@ def generateBranchObjects(config, name):
                         'factory': packaged_unittest_factory,
                         'category': name,
                     }
+                    branchObjects['builders'].append(packaged_unittest_builder)
 
                     if config.get('enable_packaged_debug_unittests'):
                         packaged_debug_unittest_builder = {
@@ -555,7 +567,15 @@ def generateBranchObjects(config, name):
                         }
                         branchObjects['builders'].append(packaged_debug_unittest_builder)
 
-                    branchObjects['builders'].append(packaged_unittest_builder)
+                    if pf.get('enable_packaged_opt_unittests'):
+                        packaged_opt_unittest_builder = {
+                            'name': '%s test opt %s' % (pf['base_name'], suites_name),
+                            'slavenames': pf['slaves'],
+                            'builddir': '%s-%s-opt-unittest-%s' % (name, platform, suites_name),
+                            'factory': packaged_unittest_factory,
+                            'category': name,
+                        }
+                        branchObjects['builders'].append(packaged_opt_unittest_builder)
 
         if config['enable_codecoverage']:
             # We only do code coverage builds on linux right now
