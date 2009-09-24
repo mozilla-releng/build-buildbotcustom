@@ -91,9 +91,9 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
         m = infoRe.match(line)
         if m:
             r = m.group(1)
-            if r == successIdent:
+            if r == successIdent or (successIdent == "Pass" and r == "Passed"):
                 successCount = int(m.group(2))
-            elif r == failureIdent:
+            elif r == failureIdent or (failureIdent == "Fail" and r == "Failed"):
                 failureCount = int(m.group(2))
             # If otherIdent == None, then infoRe should not match it,
             # so this test is fine as is.
@@ -124,7 +124,7 @@ def summarizeLogMochitest(name, log):
     if name == 'mochitest-browser-chrome':
         passIdent = "Pass"
         failIdent = "Fail"
-        infoRe = r"\t(Pass|Fail|Todo): (\d+)"
+        infoRe = r"\t(Pass|Fail|Passed|Failed|Todo): (\d+)"
 
     return summarizeLog(
         name, log, passIdent, failIdent, "Todo",
