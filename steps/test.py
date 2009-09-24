@@ -29,9 +29,10 @@ from buildbot.steps.shell import ShellCommand
 from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS
 from buildbot.process.buildstep import BuildStep
 
-from twisted.internet.defer import DeferredList
+from twisted.internet.defer import DeferredList, Deferred
 from twisted.python import log
 from twisted.web.client import getPage
+from twisted.internet import reactor
 
 from urllib import urlencode
 from time import strptime, strftime, localtime, mktime
@@ -406,13 +407,36 @@ class GraphServerPost(BuildStep):
         except Exception, e:
           self.stdio.addStderr(str(e))
           raise
+
+    def postResult(self, testresult, retries=5, sleepTime=5):
+        testname, testlongname, testval, prettyval = testresult
+        testval = str(testval).strip(string.letters)
+        data = self.constructString(self.resultsname, testlongname, self.branch, self.sourcestamp, self.buildid, self.timestamp, testval)
+        content_type, body = post_file.encode_multipart_formdata([("key", "value")], [("filename", "data", data)])
+        headers = {'Content-Type': content_type, 'Content-Length' : str(len(data))}
+        d = getPage(self.graphurl, timeout=self.timeout, method='POST', headers=headers, postdata=body)
+        d.addCallback(self.doTinderboxPrint, testlongname, testname,
+                      prettyval)
+        d.addErrback(lambda res: self.postFailed(testresult, retries, sleepTime, res))
+
+        return d
         
-    def postFailed(self, testlongname, res=None):
+    def postFailed(self, testresult, retries, sleepTime, res):
+        # Go to sleep, and then try again!
+        if retries > 0:
+            self.stdio.addStderr('\nWarning: error when trying to post %s, trying again in %i seconds\n' % \
+              (testresult[1], sleepTime))
+            log.msg("Error when trying to post %s: %s.  %i tries left.  Trying again in %i seconds" % (testresult[1], str(res), retries, sleepTime))
+            d = Deferred()
+            reactor.callLater(sleepTime, d.callback, None)
+            d.addCallback(lambda res: self.postResult(testresult, retries-1, sleepTime*2))
+            return d
+
         # This function is called when getPage() fails and simply sets
         # self.error = True so postFinished knows that something failed.
         self.error = True
         self.stdio.addStderr('\nEncountered error when trying to post %s\n' % \
-          testlongname)
+          testresult[1])
         if res:
             self.stdio.addStderr(str(res))
 
@@ -437,17 +461,8 @@ class GraphServerPost(BuildStep):
         # Make a list of Deferreds so we can properly clean up once everything
         # has posted.
         deferreds = []
-        for res in self.testresults:
-            testname, testlongname, testval, prettyval = res
-            testval = str(testval).strip(string.letters)
-            data = self.constructString(self.resultsname, testlongname, self.branch, self.sourcestamp, self.buildid, self.timestamp, testval)
-            content_type, body = post_file.encode_multipart_formdata([("key", "value")], [("filename", "data", data)])
-            headers = {'Content-Type': content_type, 'Content-Length' : str(len(data))}
-            d = getPage(self.graphurl, timeout=self.timeout, method='POST', headers=headers, postdata=body)
-            d.addCallback(self.doTinderboxPrint, testlongname, testname,
-                          prettyval)
-            d.addErrback(lambda res: self.postFailed(testlongname, res))
-
+        for testresult in self.testresults:
+            d = self.postResult(testresult)
             deferreds.append(d)
 
         # Now, once *everything* has finished we need to tell Buildbot
