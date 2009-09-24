@@ -438,7 +438,6 @@ def generateBranchObjects(config, name):
                     nightly=True,
                     l10nNightlyUpdate=config['l10nNightlyUpdate'],
                     l10nDatedDirs=config['l10nDatedDirs'],
-                    createSnippet=config['create_snippet'],
                     ausBaseUploadDir=config['aus2_base_upload_dir'],
                     updatePlatform=pf['update_platform'],
                     downloadBaseURL=config['download_base_url'],

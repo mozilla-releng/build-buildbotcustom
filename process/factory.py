@@ -1258,14 +1258,13 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
-        for dir in ('nsprpub', 'config'):
-            self.addStep(ShellCommand,
-             name='make_%s' % dir,
-             command=['make'],
-             workdir='%s/%s/%s' % (self.baseWorkDir, self.mozillaSrcDir, dir),
-             description=['make', dir],
-             haltOnFailure=True
-            )
+        self.addStep(ShellCommand,
+         name='make_config',
+         command=['make'],
+         workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaSrcDir),
+         description=['make config'],
+         haltOnFailure=True
+        )
 
         self.tinderboxPrintBuildInfo()
         self.downloadBuilds()
@@ -1470,13 +1469,13 @@ class CCBaseRepackFactory(BaseRepackFactory):
 class NightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
     
-    def __init__(self, enUSBinaryURL, nightly=False, createSnippet=False,
+    def __init__(self, enUSBinaryURL, nightly=False,
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausHost=None,
                  l10nNightlyUpdate=False, l10nDatedDirs=False, **kwargs):
         self.enUSBinaryURL = enUSBinaryURL
         self.nightly = nightly
-        self.createSnippet = createSnippet
+        self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
@@ -1520,8 +1519,7 @@ class NightlyRepackFactory(BaseRepackFactory):
             self.extraConfigureArgs = ['--enable-update-packaging']
 
         BaseRepackFactory.__init__(self, **kwargs)
-        # the other subclassing classes do not need to have self.createSnippet
-        if self.createSnippet and l10nNightlyUpdate:
+        if l10nNightlyUpdate:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
             assert ausUser and ausHost
 
@@ -1595,7 +1593,15 @@ class NightlyRepackFactory(BaseRepackFactory):
         self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
 
     def doRepack(self):
-        if self.nightly:
+        self.addStep(ShellCommand,
+         name='make_nsprpub',
+         command=['make'],
+         workdir='build/'+self.mozillaSrcDir+'/nsprpub',
+         description=['make nsprpub'],
+         haltOnFailure=True
+        )
+        if self.l10nNightlyUpdate:
+            # Because we're generating updates we need to build the libmar tools
             self.addStep(ShellCommand,
              command=['make'],
              workdir='%s/%s/%s' % (self.baseWorkDir, self.mozillaSrcDir, 'modules/libmar'),
@@ -1877,8 +1883,17 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         )
 
     def doRepack(self):
+        # For releases we have to make memory/jemalloc
+        if self.platform.startswith('win32'):
+            self.addStep(ShellCommand,
+             name='make_memory_jemalloc',
+             command=['make'],
+             workdir='build/'+self.mozillaSrcDir+'/memory/jemalloc',
+             description=['make memory/jemalloc'],
+             haltOnFailure=True
+            )
         # Because we're generating updates we need to build the libmar tools
-        for dir in ('nsprpub', 'config', 'modules/libmar'):
+        for dir in ('nsprpub', 'modules/libmar'):
             self.addStep(ShellCommand,
              name='make_%s' % dir,
              command=['make'],
