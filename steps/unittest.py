@@ -451,12 +451,17 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
         self.addFactoryArguments(symbols_path=symbols_path)
-        
-        #TODO: Add --symbols-path when it's supported by runxpcshelltests.py
-        self.command = ['bash', '-c', WithProperties("""cp bin/xpcshell %(exedir)s
+
+        script = """cp bin/xpcshell %(exedir)s
 cp -R bin/components/* %(exedir)s/components/
 cp -R bin/plugins/* %(exedir)s/plugins/
-python -u xpcshell/runxpcshelltests.py --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell""".replace("\n", " && "))]
+python -u xpcshell/runxpcshelltests.py""".replace("\n", " && ")
+
+        if symbols_path:
+            script += " --symbols-path=%s" % symbols_path
+        script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell"
+
+        self.command = ['bash', '-c', WithProperties(script)]
 
     def createSummary(self, log):
         self.addCompleteLog('summary', summarizeLogXpcshelltests(self.name, log))
