@@ -215,8 +215,7 @@ class MozillaBuildFactory(BuildFactory):
              command=command,
              description=['cleaning', 'old', 'builds'],
              descriptionDone=['clean', 'old', 'builds'],
-             warnOnFailure=True,
-             flunkOnFailure=False,
+             haltOnFailure=True,
              workdir='.',
              timeout=3600, # One hour, because Windows is slow
             )
