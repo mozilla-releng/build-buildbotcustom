@@ -1189,27 +1189,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         if stageSshKey:
             self.uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % stageSshKey
 
-        self.addStep(ShellCommand,
-         name='rm_dist_upload',
-         command=['sh', '-c',
-                  'if [ -d '+self.mozillaSrcDir+'/dist/upload ]; then ' +
-                  'rm -rf '+self.mozillaSrcDir+'/dist/upload; ' +
-                  'fi'],
-         description="rm dist/upload",
-         workdir=self.baseWorkDir,
-         haltOnFailure=True
-        )
-
-        self.addStep(ShellCommand,
-         name='rm_dist_update',
-         command=['sh', '-c',
-                  'if [ -d '+self.branchName+'/dist/update ]; then ' +
-                  'rm -rf '+self.branchName+'/dist/update; ' +
-                  'fi'],
-         description="rm dist/update",
-         workdir=self.baseWorkDir,
-         haltOnFailure=True
-        )
+        self.preClean()
 
         self.addStep(ShellCommand,
          name='mkdir_l10nrepopath',
@@ -1407,6 +1387,29 @@ class BaseRepackFactory(MozillaBuildFactory):
         This is implemented in the subclasses.
         '''
         pass
+
+    def preClean(self):
+        self.addStep(ShellCommand,
+         name='rm_dist_upload',
+         command=['sh', '-c',
+                  'if [ -d '+self.mozillaSrcDir+'/dist/upload ]; then ' +
+                  'rm -rf '+self.mozillaSrcDir+'/dist/upload; ' +
+                  'fi'],
+         description="rm dist/upload",
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )
+
+        self.addStep(ShellCommand,
+         name='rm_dist_update',
+         command=['sh', '-c',
+                  'if [ -d '+self.branchName+'/dist/update ]; then ' +
+                  'rm -rf '+self.branchName+'/dist/update; ' +
+                  'fi'],
+         description="rm dist/update",
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )
 
 class CCBaseRepackFactory(BaseRepackFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
@@ -4781,6 +4784,18 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
 
     def doUpload(self):
         pass
+
+    def preClean(self):
+        self.addStep(ShellCommand,
+         name='rm_dist',
+         command=['sh', '-c',
+                  'if [ -d '+self.mozillaSrcDir+'/dist ]; then ' +
+                  'rm -rf '+self.mozillaSrcDir+'/dist; ' +
+                  'fi'],
+         description=['rm', 'dist'],
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )
 
 
 class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
