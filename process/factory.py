@@ -4056,7 +4056,6 @@ class WinmoBuildFactory(MobileBuildFactory):
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, test_suites, env=None,
             mochitest_leak_threshold=None, crashtest_leak_threshold=None,
-            totalChunks=None, thisChunk=None, chunkByDir=None,
             **kwargs):
         if env is None:
             self.env = MozillaEnvironments['%s-unittest' % platform].copy()
@@ -4228,9 +4227,6 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  env=self.env,
                  symbols_path='symbols',
                  leakThreshold=leak_threshold,
-                 chunkByDir=chunkByDir,
-                 totalChunks=totalChunks,
-                 thisChunk=thisChunk,
                  maxTime=60*60, # One Hour
                 ))
             elif suite == 'xpcshell':

@@ -486,22 +486,14 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
     warnOnWarnings = True
 
     def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
-            chunkByDir=None, totalChunks=None, thisChunk=None,
             **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
-        if totalChunks:
-            assert 1 <= thisChunk <= totalChunks
-
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
-                leakThreshold=leakThreshold, chunkByDir=chunkByDir,
-                totalChunks=totalChunks, thisChunk=thisChunk)
+                leakThreshold=leakThreshold)
 
-        if totalChunks:
-            self.name = 'mochitest-%s-%i' % (variant, thisChunk)
-        else:
-            self.name = 'mochitest-%s' % variant
+        self.name = 'mochitest-%s' % variant
 
         self.command = ['python', 'mochitest/runtests.py',
                 WithProperties('--appname=%(exepath)s'), '--utility-path=bin',
@@ -514,12 +506,6 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
 
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
-
-        if totalChunks:
-            self.command.append("--total-chunks=%d" % totalChunks)
-            self.command.append("--this-chunk=%d" % thisChunk)
-            if chunkByDir:
-                self.command.append("--chunk-by-dir=%d" % chunkByDir)
 
         if variant != 'plain':
             self.command.append("--%s" % variant)
