@@ -105,48 +105,6 @@ MozillaEnvironments['win32-unittest'] = {
     "FrameworkSDKDir": 'D:\\msvs8\\SDK\\v2.0',
     "MSVCDir": 'D:\\msvs8\\VC',
     "DevEnvDir": "D:\\msvs8\\Common7\\IDE",
-    "PATH": 'D:\\mozilla-build\\msys\\local\\bin;' + \
-            'D:\\mozilla-build\\wget;' + \
-            'D:\\mozilla-build\\7zip;' + \
-            'D:\\mozilla-build\\blat261\\full;' + \
-            'D:\\mozilla-build\\svn-win32-1.4.2\\bin;' + \
-            'D:\\mozilla-build\\upx203w;' + \
-            'D:\\mozilla-build\\xemacs\\XEmacs-21.4.19\\i586-pc-win32;' + \
-            'D:\\mozilla-build\\info-zip;' + \
-            'D:\\mozilla-build\\nsis-2.22;' + \
-            'D:\\mozilla-build\\nsis-2.33u;' + \
-            '.;' + \
-            'D:\\mozilla-build\\msys\\bin;' + \
-            'D:\\mozilla-build\\python25;' + \
-            'D:\\mozilla-build\\python25\\Scripts;' + \
-            'D:\\mozilla-build\\hg;' + \
-            'D:\\SDKs\\v6.0\\bin;' + \
-            'D:\\msvs8\\Common7\\IDE;' + \
-            'D:\\msvs8\\VC\\BIN;' + \
-            'D:\\msvs8\\Common7\\Tools;' + \
-            'D:\\msvs8\\Common7\\Tools\\bin;' + \
-            'D:\\msvs8\\VC\\PlatformSDK\\bin;' + \
-            'D:\\msvs8\\SDK\\v2.0\\bin;' + \
-            'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
-            'D:\\msvs8\\VC\\VCPackages;' + \
-            'C:\\WINDOWS\\System32;' + \
-            'C:\\WINDOWS;' + \
-            'C:\\WINDOWS\\System32\\Wbem;' + \
-            'D:\\mozilla-build\\moztools\\bin;' + \
-            'D:\\Utilities;',
-    "INCLUDE": 'C:\\Program Files\\Microsoft SDKs;' + \
-            'D:\\SDKs\\v6.0\\include;' + \
-            'D:\\SDKs\\v6.0\\include\\atl;' + \
-            'D:\\msvs8\\VC\\ATLMFC\\INCLUDE;' + \
-            'D:\\msvs8\\VC\\INCLUDE;' + \
-            'D:\\msvs8\\VC\\PlatformSDK\\include;' + \
-            'D:\\msvs8\\SDK\\v2.0\\include;' + \
-            '%INCLUDE%',
-    "LIB": 'D:\\SDKs\\v6.0\\lib;' + \
-           'D:\\msvs8\\VC\\ATLMFC\\LIB;' + \
-           'D:\\msvs8\\VC\\LIB;' + \
-           'D:\\msvs8\\VC\\PlatformSDK\\lib;' + \
-           'D:\\msvs8\\SDK\\v2.0\\lib;',
     "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
                'D:\\msvs8\\VC\\ATLMFC\\LIB'
 }
