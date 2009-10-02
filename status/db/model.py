@@ -189,7 +189,7 @@ class BuilderSlave(Base):
 class Builder(Base):
     __tablename__ = "builders"
     id = Column(Integer, primary_key=True)
-    name = Column(Unicode(50), index=True, nullable=False)
+    name = Column(Unicode(200), index=True, nullable=False)
     master_id = Column(Integer, ForeignKey(Master.id), nullable=False, index=True)
     master = relation(Master, backref='builders')
     category = Column(Unicode(30), index=True)

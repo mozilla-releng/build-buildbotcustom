@@ -2,17 +2,29 @@ import buildbotcustom.status.db.model as model
 import cPickle, os, re, time, sys
 from datetime import datetime
 
-def getBuilds(builder, last_time):
-    for f in os.listdir(builder):
+def getBuildNumbers(builder, last_time):
+    files = os.listdir(builder)
+    def _sortfunc(x):
+        try:
+            return int(x)
+        except:
+            return x
+    files.sort(key=_sortfunc)
+
+    retval = []
+    for f in files:
         if re.match("^\d+$", f):
             p = os.path.join(builder, f)
             if os.path.getmtime(p) < last_time:
                 continue
+            retval.append(f)
+    return retval
 
-            try:
-                yield cPickle.load(open(p))
-            except:
-                continue
+def getBuild(builder, number):
+    try:
+        return cPickle.load(open(os.path.join(builder, number)))
+    except:
+        return None
 
 def getBuilder(builder):
     # Monkey patch BuilderStatus so that it doesn't clear out list of slaves
@@ -125,12 +137,20 @@ def updateSlaveTimes(session, master, builder, db_builder, last_time):
     session.commit()
 
 
-def updateFromFiles(session, master_url, master_name, builders, last_time):
+def updateFromFiles(session, master_url, master_name, builders, last_time, update_times):
     master = model.Master.get(session, master_url)
     master.name = unicode(master_name)
+    i = 0
     n = 0
+    allBuilds = {}
     for builder in builders:
-        b = 0
+        buildNumbers = getBuildNumbers(builder, last_time)
+        allBuilds[builder] = buildNumbers
+        n += len(buildNumbers)
+
+    s = time.time()
+
+    for builder in builders:
         master = session.merge(master)
         builder_name = os.path.basename(builder)
         bb_builder = getBuilder(builder)
@@ -138,10 +158,26 @@ def updateFromFiles(session, master_url, master_name, builders, last_time):
         db_builder.category = unicode(bb_builder.category)
 
         updateBuilderSlaves(session, bb_builder, db_builder)
-        updateSlaveTimes(session, master, bb_builder, db_builder, last_time)
+        if update_times:
+            updateSlaveTimes(session, master, bb_builder, db_builder, last_time)
 
-        for build in getBuilds(builder, last_time):
-            b += 1
+        builds = allBuilds[builder]
+        bn = len(builds)
+
+        for j, buildNumber in enumerate(builds):
+            master = session.merge(master)
+            db_builder = session.merge(db_builder)
+            complete = i / float(n)
+            if complete == 0:
+                eta = 0
+            else:
+                eta = (time.time() - s) / (complete)
+                eta = (1-complete) * eta
+            print builder, buildNumber, "%i/%i" % (j+1, bn), "%.2f%% complete" % (100* complete), "ETA in %i seconds" % eta
+            i += 1
+            build = getBuild(builder, buildNumber)
+            if not build:
+                continue
             starttime = None
             endtime = None
             if build.started:
@@ -161,9 +197,8 @@ def updateFromFiles(session, master_url, master_name, builders, last_time):
             else:
                 db_build.updateFromBBBuild(session, build)
             session.commit()
-        session.expunge_all()
-        n += b
-    return n
+            session.expunge_all()
+    return i
 
 if __name__ == "__main__":
     from optparse import OptionParser
@@ -172,6 +207,7 @@ if __name__ == "__main__":
     parser.add_option("-d", "--database", dest="database", help="database url")
     parser.add_option("-m", "--master", dest="master", help="master url (buildbotURL in the master.cfg file)")
     parser.add_option("-n", "--description", dest="name", help="human friendly name for master")
+    parser.add_option("", "--times", dest="times", help="update slave connect/disconnect times", action="store_true", default=False)
 
     options, args = parser.parse_args()
 
@@ -202,7 +238,7 @@ if __name__ == "__main__":
     except:
         last_time = 0
 
-    updated = updateFromFiles(session, options.master, options.name, builders, last_time)
+    updated = updateFromFiles(session, options.master, options.name, builders, last_time, options.times)
 
     print "Updated", updated, "builds"
 
