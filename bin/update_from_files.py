@@ -1,6 +1,31 @@
 import buildbotcustom.status.db.model as model
 import cPickle, os, re, time, sys
 from datetime import datetime
+from buildbot.status.builder import BuilderStatus, BuildStepStatus
+
+# Monkey patching!
+# These are various replacement functions for __setstate__, which is
+# called when unpickling files.
+def monkeypatch(orig, new):
+    orig_setstate = orig.__setstate__
+    def wrapper(self, state):
+        return new(self, orig_setstate, state)
+    orig.__setstate__ = wrapper
+
+def builder_setstate_noevents(self, orig, state):
+    slaves = state['slavenames']
+    state['events'] = []
+    orig(self, state)
+    self.slavenames = slaves
+
+def builder_setstate_events(self, orig, state):
+    slaves = state['slavenames']
+    orig(self, state)
+    self.slavenames = slaves
+
+def buildstep_setstate(self, orig, state):
+    stats['logs'] = []
+    orig(self, state)
 
 def getBuildNumbers(builder, last_time):
     files = os.listdir(builder)
@@ -27,12 +52,8 @@ def getBuild(builder, number):
         return None
 
 def getBuilder(builder):
-    # Monkey patch BuilderStatus so that it doesn't clear out list of slaves
-    # when unpickling
-    from buildbot.status.builder import BuilderStatus
-    if '__setstate__' in BuilderStatus.__dict__:
-        del BuilderStatus.__dict__['__setstate__']
-    return cPickle.load(open(os.path.join(builder, 'builder')))
+    builder = cPickle.load(open(os.path.join(builder, 'builder')))
+    return builder
 
 def updateBuilderSlaves(session, builder, db_builder):
     bb_slaves = set(s for s in builder.slavenames)
@@ -151,6 +172,12 @@ def updateFromFiles(session, master_url, master_name, builders, last_time, updat
     s = time.time()
 
     for builder in builders:
+        builds = allBuilds[builder]
+        bn = len(builds)
+
+        if bn == 0:
+            continue
+
         master = session.merge(master)
         builder_name = os.path.basename(builder)
         bb_builder = getBuilder(builder)
@@ -160,9 +187,6 @@ def updateFromFiles(session, master_url, master_name, builders, last_time, updat
         updateBuilderSlaves(session, bb_builder, db_builder)
         if update_times:
             updateSlaveTimes(session, master, bb_builder, db_builder, last_time)
-
-        builds = allBuilds[builder]
-        bn = len(builds)
 
         for j, buildNumber in enumerate(builds):
             master = session.merge(master)
@@ -219,6 +243,17 @@ if __name__ == "__main__":
 
     if not args:
         parser.error("Must specify at least one builder or directory")
+
+    # Do some monkey patching!
+    # This is required to prevent this script from trying to load all the logs
+    # for all the builds, which slows things down quite a bit, and increases
+    # memory load
+    if options.times:
+        # Preserve events if we're updating slave times
+        monkeypatch(BuilderStatus, builder_setstate_events)
+    else:
+        monkeypatch(BuilderStatus, builder_setstate_noevents)
+    monkeypatch(BuildStepStatus, buildstep_setstate)
 
     builders = []
     for a in args:
