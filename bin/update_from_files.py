@@ -24,7 +24,7 @@ def builder_setstate_events(self, orig, state):
     self.slavenames = slaves
 
 def buildstep_setstate(self, orig, state):
-    stats['logs'] = []
+    state['logs'] = []
     orig(self, state)
 
 def getBuildNumbers(builder, last_time):
