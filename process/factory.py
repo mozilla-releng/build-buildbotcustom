@@ -4689,7 +4689,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                      command=['hg', 'ident', '-i'],
                      haltOnFailure=True,
                      property='l10n_revision',
-                     workdir=WithProperties(self.baseWorkDir + '/' + self.l10nRepoPath + 
+                     workdir=WithProperties(self.baseWorkDir + '/' + self.l10nRepoPath +
                                             '/%(locale)s')
                      )
 
@@ -4810,4 +4810,4 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
 
 class MobileDesktopNightlyRepackFactory(MobileNightlyRepackFactory):
     def doUpload(self):
-        self.addUploadSteps(platform='linux')
+        self.addUploadSteps(platform=self.platform)
