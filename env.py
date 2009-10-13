@@ -114,6 +114,11 @@ MozillaEnvironments['winmo-arm'] = {
     "FRAMEWORK35VERSION": 'v3.5',
     "FRAMEWORKDIR": 'C:\\WINDOWS\\Microsoft.NET\\Framework',
     "FRAMEWORKVERSION": 'v2.0.50727',
+    "INCLUDE": 'd:\\msvs9\\VC\\ATLMFC\\INCLUDE;' + \
+               'd:\\msvs9\\VC\\INCLUDE;' + \
+               'C:\\Program Files\\Microsoft SDKs\\Windows\\v6.0A\\include;',
+    "LIB": 'd:\\msvs9\\VC\\ATLMFC\\LIB;' + \
+           'd:\\msvs9\\VC\\LIB;C:\\Program Files\\Microsoft SDKs\\Windows\\v6.0A\\lib;',
     "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v3.5;' + \
                'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
                'd:\\msvs9\\VC\\ATLMFC\\LIB;d:\\msvs9\\VC\\LIB;',
@@ -156,6 +161,8 @@ MozillaEnvironments['winmo-arm'] = {
             'd:\\sdks\\tegra042\\platformlibs\\bin\\winxp\\x86\\release;' + \
             'd:\\sdks\\tegra042\\3rdparty\\bin\\winxp\\x86\\release;' + \
             'd:\\mozilla-build\\moztools\\bin',
+    "SDKDIR": 'D:\\sdks\\v6.0\\',
+    "SDKVER": '6',
     "VC8DIR": 'D:\\msvs8\\VC\\',
     "VC9DIR": 'd:\\msvs9\\VC\\',
     "VCINSTALLDIR": 'd:\\msvs9\\VC',
