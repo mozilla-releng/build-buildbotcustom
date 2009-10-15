@@ -3408,7 +3408,7 @@ class CodeCoverageFactory(UnittestBuildFactory):
          name='jscoverage_bin',
          command=['jscoverage', '--mozilla',
                   '--no-instrument=defaults',
-                  '--no-instrument=greprefs',
+                  '--no-instrument=greprefs.js',
                   '--no-instrument=chrome/browser/content/browser/places/treeView.js',
                   'bin-original', 'bin'],
          workdir="build/%s/dist" % self.objdir,
