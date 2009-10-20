@@ -560,6 +560,22 @@ def generateBranchObjects(config, name):
                     }
                     branchObjects['builders'].append(packaged_unittest_builder)
 
+                    if platform.startswith("macosx") and 'mochitest-a11y' in suites:
+                        # Create a new factory that doesn't have mochitest-a11y
+                        suites = suites[:]
+                        suites.remove('mochitest-a11y')
+                        packaged_unittest_factory = UnittestPackagedBuildFactory(
+                            platform=platform,
+                            test_suites=suites,
+                            mochitest_leak_threshold=mochitestLeakThreshold,
+                            crashtest_leak_threshold=crashtestLeakThreshold,
+                            hgHost=config['hghost'],
+                            repoPath=config['repo_path'],
+                            buildToolsRepoPath=config['build_tools_repo_path'],
+                            buildSpace=0.5,
+                            buildsBeforeReboot=pf['builds_before_reboot'],
+                        )
+
                     if config.get('enable_packaged_debug_unittests'):
                         packaged_debug_unittest_builder = {
                             'name': '%s test debug %s' % (pf['base_name'], suites_name),
