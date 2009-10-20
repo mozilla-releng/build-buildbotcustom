@@ -329,7 +329,7 @@ def generateBranchObjects(config, name):
         clobberTime = pf.get('clobber_time', config['default_clobber_time'])
         mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
         crashtestLeakThreshold = pf.get('crashtest_leak_threshold', None)
-        checkTest = config.get('enable_checktests', False)
+        checkTest = pf.get('enable_checktests', False)
         valgrindCheck = pf.get('enable_valgrind_checktests', False)
 
         mozilla2_dep_factory = NightlyBuildFactory(
