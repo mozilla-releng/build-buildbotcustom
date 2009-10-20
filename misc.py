@@ -117,7 +117,7 @@ def generateBranchObjects(config, name):
                 test_builders = []
                 for suites_name, suites in config['unittest_suites']:
                     test_builders.append('%s test opt %s' % (config['platforms'][platform]['base_name'], suites_name))
-                triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, False))
+                triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
             # And debug too
             if config.get('enable_packaged_debug_unittests'):
                 test_builders = []
