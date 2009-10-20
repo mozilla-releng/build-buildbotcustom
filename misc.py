@@ -81,6 +81,7 @@ def generateBranchObjects(config, name):
     triggeredUnittestBuilders = []
     nightlyBuilders = []
     xulrunnerNightlyBuilders = []
+    debugBuilders = []
     weeklyBuilders = []
     # This dict provides a mapping between en-US nightly scheduler names
     # and l10n nightly scheduler names. It's filled out just below here.
@@ -89,10 +90,12 @@ def generateBranchObjects(config, name):
     # for easy access
     for platform in config['platforms'].keys():
         base_name = config['platforms'][platform]['base_name']
-        builders.append('%s build' % base_name)
         # Skip l10n, unit tests and nightlies for debug builds
         if platform.find('debug') >= 0:
+            debugBuilders.append('%s build' % base_name)
             continue
+        else:
+            builders.append('%s build' % base_name)
 
         builder = '%s nightly' % base_name
         nightlyBuilders.append(builder)
@@ -156,7 +159,7 @@ def generateBranchObjects(config, name):
         tree=config['tinderbox_tree'],
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
-        builders=unittestBuilders,
+        builders=unittestBuilders + debugBuilders,
         logCompression="bzip2",
         errorparser="unittest"
     ))
@@ -326,6 +329,8 @@ def generateBranchObjects(config, name):
         clobberTime = pf.get('clobber_time', config['default_clobber_time'])
         mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
         crashtestLeakThreshold = pf.get('crashtest_leak_threshold', None)
+        checkTest = config.get('enable_checktests', False)
+        valgrindCheck = pf.get('enable_valgrind_checktests', False)
 
         mozilla2_dep_factory = NightlyBuildFactory(
             env=pf['env'],
@@ -349,6 +354,8 @@ def generateBranchObjects(config, name):
             graphBranch=config['tinderbox_tree'],
             baseName=pf['base_name'],
             leakTest=leakTest,
+            checkTest=checkTest,
+            valgrindCheck=valgrindCheck,
             codesighs=codesighs,
             uploadPackages=uploadPackages,
             uploadSymbols=False,

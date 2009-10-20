@@ -342,10 +342,10 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.addFactoryArguments(test_name=test_name)
    
     def createSummary(self, log):
-        if self.name == "check":
-            self.addCompleteLog('summary', summarizeTUnit(self.name, log))
-        else:
+        if 'xpcshell' in self.name:
             self.addCompleteLog('summary', summarizeLogXpcshelltests(self.name, log))
+        else:
+            self.addCompleteLog('summary', summarizeTUnit(self.name, log))
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
@@ -355,7 +355,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         # Xpcshell tests (only):
         # Assume that having the "Failed: 0" line
         # means the tests run completed (successfully).
-        if self.name != "check" and \
+        if 'xpcshell' in self.name and \
            not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 

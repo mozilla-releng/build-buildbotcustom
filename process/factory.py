@@ -278,11 +278,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  stageServer=None, stageUsername=None, stageGroup=None,
                  stageSshKey=None, stageBasePath=None, ausBaseUploadDir=None,
                  updatePlatform=None, downloadBaseURL=None, ausUser=None,
-                 ausHost=None, nightly=False, leakTest=False, codesighs=True,
-                 graphServer=None, graphSelector=None, graphBranch=None,
-                 baseName=None, uploadPackages=True, uploadSymbols=True,
-                 createSnippet=False, doCleanup=True, packageSDK=False,
-                 packageTests=False, mozillaDir=None, **kwargs):
+                 ausHost=None, nightly=False, leakTest=False, checkTest=False,
+                 valgrindCheck=False, codesighs=True, graphServer=None,
+                 graphSelector=None, graphBranch=None, baseName=None,
+                 uploadPackages=True, uploadSymbols=True, createSnippet=False,
+                 doCleanup=True, packageSDK=False, packageTests=False,
+                 mozillaDir=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -305,6 +306,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.ausHost = ausHost
         self.nightly = nightly
         self.leakTest = leakTest
+        self.checkTest = checkTest
+        self.valgrindCheck = valgrindCheck
         self.codesighs = codesighs
         self.graphServer = graphServer
         self.graphSelector = graphSelector
@@ -354,6 +357,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addUploadSteps()
         if self.leakTest:
             self.addLeakTestSteps()
+        if self.checkTest:
+            self.addCheckTestSteps()
+        if self.valgrindCheck:
+            self.addValgrindCheckSteps()
         if self.codesighs:
             self.addCodesighsSteps()
         if self.createSnippet:
@@ -663,6 +670,22 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='.',
          command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
                   '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
+        )
+
+    def addCheckTestSteps(self):
+        self.addStep(unittest_steps.MozillaCheck,
+         test_name="check",
+         warnOnWarnings=True,
+         workdir="build/%s" % self.objdir,
+         timeout=5*60, # 5 minutes.
+        )
+
+    def addValgrindCheckSteps(self):
+        self.addStep(unittest_steps.MozillaCheck,
+         test_name="check-valgrind",
+         warnOnWarnings=True,
+         workdir="build/%s/js/src" % self.objdir,
+         timeout=5*60, # 5 minutes.
         )
 
     def addUploadSteps(self, pkgArgs=None):
