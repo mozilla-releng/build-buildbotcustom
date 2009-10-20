@@ -302,6 +302,7 @@ def generateBranchObjects(config, name):
         packageTests = True
         talosMasters = config['talos_masters']
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
+        tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
             leakTest = True
             codesighs = False
@@ -312,6 +313,7 @@ def generateBranchObjects(config, name):
             packageTests = True
             # Platform already has the -debug suffix
             unittestBranch = "%s-%s-unittest" % (name, platform)
+            tinderboxBuildsDir = "%s-%s" % (name, platform)
         elif not pf.get('enable_packaged_opt_unittests'):
             packageTests = False
 
@@ -358,6 +360,7 @@ def generateBranchObjects(config, name):
             packageTests=packageTests,
             unittestMasters=config['unittest_masters'],
             unittestBranch=unittestBranch,
+            tinderboxBuildsDir=tinderboxBuildsDir,
         )
         mozilla2_dep_builder = {
             'name': '%s build' % pf['base_name'],
@@ -416,6 +419,7 @@ def generateBranchObjects(config, name):
             unittestBranch=unittestBranch,
             triggerBuilds=config['enable_l10n'],
             triggeredSchedulers=triggeredSchedulers,
+            tinderboxBuildsDir=tinderboxBuildsDir,
         )
 
         mozilla2_nightly_builder = {

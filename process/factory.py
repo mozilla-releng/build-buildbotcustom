@@ -944,7 +944,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
 class NightlyBuildFactory(MercurialBuildFactory):
     def __init__(self, talosMasters=None, unittestMasters=None,
-            unittestBranch=None, **kwargs):
+            unittestBranch=None, tinderboxBuildsDir=None, **kwargs):
 
         self.talosMasters = talosMasters or []
 
@@ -953,6 +953,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         if self.unittestMasters:
             assert self.unittestBranch
+
+        self.tinderboxBuildsDir = tinderboxBuildsDir
 
         MercurialBuildFactory.__init__(self, **kwargs)
 
@@ -965,9 +967,12 @@ class NightlyBuildFactory(MercurialBuildFactory):
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
         # Always upload builds to the dated tinderbox builds directories
+        if self.tinderboxBuildsDir is None:
+            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
+        else:
+            tinderboxBuildsDir = self.tinderboxBuildsDir
         postUploadCmd =  ['post_upload.py']
-        postUploadCmd += ['--tinderbox-builds-dir %s-%s' % (self.branchName,
-                                                            self.platform),
+        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
                           '-i %(buildid)s',
                           '-p %s' % self.productName,
                           '--release-to-tinderbox-dated-builds']

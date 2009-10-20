@@ -550,7 +550,9 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
             self.name = "reftest"
 
         self.command = ['python', 'reftest/runreftest.py',
-                WithProperties('--appname=%(exepath)s')]
+                WithProperties('--appname=%(exepath)s'),
+                '--utility-path=bin',
+                ]
 
         if symbols_path:
             self.command.append("--symbols-path=%s" % symbols_path)
