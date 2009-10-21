@@ -4203,11 +4203,18 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         ))
 
         # Set up the stack walker
-        self.addStep(SetProperty,
-         command=['bash', '-c', 'pwd'],
-         property='toolsdir',
-         workdir='tools'
-        )
+        if self.platform == 'win32':
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd -W'],
+             property='toolsdir',
+             workdir='tools'
+            )
+        else:
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd'],
+             property='toolsdir',
+             workdir='tools'
+            )
 
         platform_minidump_path = {
             'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
