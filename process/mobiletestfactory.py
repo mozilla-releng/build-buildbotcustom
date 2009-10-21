@@ -45,12 +45,13 @@ class MaemoUnittestFactory(BuildFactory):
         assert self.activeTests is not None
 
         self.addStep(ShellCommand,
-            command='echo "TinderboxPrint: `hostname`"; ifconfig -a',
+            command='echo "TinderboxPrint: `hostname`"; ifconfig -a; date',
             description='hostname',
         )
         self.addStep(ShellCommand,
-            command='rm -rf %s fennec* /home/user/.mozilla /root/.mozilla /tools/.mozilla release' % self.binaryDir,
-            workdir=self.baseDir
+            command='rm -rf %s fennec* talos* pageloader* /home/user/.mozilla /root/.mozilla /media/mmc2/.mozilla' % self.binaryDir,
+            workdir=self.baseDir,
+            haltOnFailure=True,
         )
         self.addStep(ShellCommand,
             command=['mkdir', '-p', '%s/maemkit_logs' % self.binaryDir],
@@ -334,44 +335,42 @@ class MaemoRunPerfTests(ShellCommand):
 class MaemoTalosFactory(BuildFactory):
     """Create maemo talos build factory"""
     
-    maemoClean = "rm -rf fennec fennec*.tar.bz2 release /home/user/.mozilla /root/.mozilla /tools/.mozilla unittest"
+    maemoClean = "rm -rf fennec fennec*.tar.bz2 talos* pageloader* /home/user/.mozilla /root/.mozilla unittest /media/mmc2/.mozilla"
     mozChangesetLink = '<a href=%(repo_path)s/rev/%(got_revision)s title="Built from Mozilla revision %(got_revision)s">moz:%(got_revision)s</a>'
     mobileChangesetLink = '<a href=%(repo_path)s/rev/%(got_revision)s title="Built from Mobile revision %(got_revision)s">mobile:%(got_revision)s</a>'
 
-    def __init__(self,
-                activeTests={
-                    'ts':     20,
-                    'tp':     20,
-                    'tdhtml': 20,
-                    'tsvg':   20,
-                    'twinopen':   20,
-                    'tsspider':   20,
-                    'tgfx':   20,
-                },
-                talosConfigFile='sample.config',
-                resultsServer=None,
-                builderName = "unnamed",
-                disableJit = 1,
-                hackTbPrint = 0,
-                reboot = True,
-                branch = None,
-                baseDir = "/builds",
+    def __init__(self, talosConfigFile='sample.config', resultsServer=None,
+                 builderName='unnamed', hackTbPrint=0, reboot=True,
+                 branch=None, baseDir='/builds',
+                 activeTests={
+                     'ts':       60,
+                     'tp4':      90,
+                     'tdhtml':   60,
+                     'tsvg':     60,
+                     'twinopen': 60,
+                     'tsspider': 60,
+                     'tgfx':     60,
+                 },
+                 talosTarball='http://mobile-master.mv.mozilla.com/maemo/talos.tar.bz2',
+                 pageloaderTarball='http://mobile-master.mv.mozilla.com/maemo/pageloader.tar.bz2',
     ):
         BuildFactory.__init__(self)
         self.baseDir = baseDir
         self.branch = branch
-        self.disableJit = disableJit
         self.hackTbPrint = hackTbPrint
         self.reboot = reboot
+        self.talosTarball = talosTarball
+        self.pageloaderTarball = pageloaderTarball
 
         self.addStep(ShellCommand,
-            command='echo "TinderboxPrint: `hostname`"; ifconfig -a',
+            command='echo "TinderboxPrint: `hostname`"; ifconfig -a; date',
             description="hostname",
         )
         self.addStep(ShellCommand,
             workdir=self.baseDir,
             description="Cleanup",
-            command=self.maemoClean
+            command=self.maemoClean,
+            haltOnFailure=True
         )
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
@@ -395,62 +394,81 @@ class MaemoTalosFactory(BuildFactory):
             command=['echo', 'TinderboxPrint:',
                      WithProperties(self.mobileChangesetLink)]
         )
-        if (self.disableJit):
-            self.addStep(ShellCommand,
-                        command = ["sh", "-x", "/builds/talos/fix_jit.sh"],
-                        description="disable JIT",
-            )
+
         self.addStep(ShellCommand,
-                     command="echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
-                     description=['disable', 'scaling', 'governor'],
-                     haltOnFailure=True,
+            command=['wget', self.talosTarball, '-O', 'talos.tar.bz2'],
+            workdir=self.baseDir,
+            haltOnFailure=True,
+            timeout=60*60,
+            name="Download talos",
+        )
+        self.addStep(UnpackFile(
+            filename='talos.tar.bz2',
+            workdir=self.baseDir,
+            haltOnFailure=True,
+            timeout=60*60,
+            name="Unpack talos",
+        ))
+        self.addStep(ShellCommand,
+            command=['wget', self.pageloaderTarball, '-O', 'pageloader.tar.bz2'],
+            workdir=self.baseDir,
+            haltOnFailure=True,
+            timeout=60*60,
+            name="Download pageloader",
+        )
+        self.addStep(UnpackFile(
+            filename='../pageloader.tar.bz2',
+            workdir='%s/fennec' % self.baseDir,
+            haltOnFailure=True,
+            timeout=60*60,
+            name="Unpack pageloader",
+        ))
+        self.addStep(ShellCommand,
+            command=['ln', '-s', '/tools/tp4', '.'],
+            workdir='%s/talos/page_load_test' % self.baseDir,
+            description=['create', 'tp4', 'softlink'],
         )
         self.addStep(ShellCommand,
-                        command = ["cp", "-r", "chrome", "components",
-                                   "/builds/fennec"],
-                        workdir = "/builds/talos",
-                        description="Copy pageloader",
-                        haltOnFailure=True,
+            command="echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+            description=['disable', 'scaling', 'governor'],
+            haltOnFailure=True,
         )
 
-        firstTest = 1
         for testName in activeTests.keys():
             self.addStep(ShellCommand,
-             command='python PerfConfigurator.py -v -e %s/fennec/fennec -t `hostname` --branch %s --branchName %s --activeTests %s --sampleConfig %s --browserWait %d --noChrome --oldresultsServer %s --oldresultsLink /server/bulk.cgi --output local.config' % (self.baseDir,self.branch,self.branch,testName,talosConfigFile,activeTests[testName],resultsServer),
-             workdir = "/builds/talos",
-             description="Create config %s" % (testName),
-             haltOnFailure=True,
+                command='python PerfConfigurator.py -v -e %s/fennec/fennec -t `hostname` --branch %s --branchName %s --activeTests %s --sampleConfig %s --browserWait %d --noChrome --resultsServer %s --resultsLink /server/collect.cgi --output local.config' % (self.baseDir,self.branch,self.branch,testName,talosConfigFile,activeTests[testName],resultsServer),
+                workdir = "/builds/talos",
+                description="Create config %s" % (testName),
+                haltOnFailure=True,
             )
             self.addStep(ShellCommand(
-                         command=["cat", "local.config"],
-                         workdir = "/builds/talos",
-                         description="Show config %s" % (testName),
+                command=["cat", "local.config"],
+                workdir = "/builds/talos",
+                description="Show config %s" % (testName),
             ))
             self.addStep(ShellCommand(
-                        command="free; df -h",
-                        workdir = ".",
-                        description="Check memory/disk",
+                command="free; df -h",
+                workdir = ".",
+                description="Check memory/disk",
             ))
             self.addStep(MaemoRunPerfTests,
-                        command=["python", "run_tests.py", "--noisy",
-                                 "--debug", "local.config"],
-                        workdir = "/builds/talos",
-                        description="Run %s" % (testName),
-                        branch=self.branch,
-                        configFile="local.config",
-                        timeout=60 * 60,
-                        hackTbPrint=hackTbPrint,
-                        warnOnWarnings=True,
-                        haltOnFailure=False,
+                command=["python", "run_tests.py", "--noisy",
+                         "--debug", "local.config"],
+                workdir = "/builds/talos",
+                description="Run %s" % (testName),
+                branch=self.branch,
+                configFile="local.config",
+                timeout=60 * 60,
+                warnOnWarnings=True,
+                haltOnFailure=False,
             )
-            firstTest = 0
         if self.reboot:
             self.addStep(DisconnectStep(
-                            command="reboot; sleep 600",
-                            force_disconnect=True,
-                            warnOnFailure=False,
-                            flunkOnFailure=False,
-                            alwaysRun=True
+                command="reboot; sleep 600",
+                force_disconnect=True,
+                warnOnFailure=False,
+                flunkOnFailure=False,
+                alwaysRun=True
             ))
 
     # from UnittestPackagedBuildFactory
