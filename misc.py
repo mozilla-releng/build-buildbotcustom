@@ -230,7 +230,7 @@ def generateBranchObjects(config, name):
         branch=config['repo_path'],
         treeStableTimer=3*60,
         idleTimeout=config.get('idle_timeout', None),
-        builderNames=builders + unittestBuilders,
+        builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl'])
     ))
 
