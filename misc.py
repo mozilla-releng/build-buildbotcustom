@@ -18,9 +18,9 @@ reload(buildbotcustom.scheduler)
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
-  UnittestPackagedBuildFactory
+  UnittestPackagedBuildFactory, TalosFactory
 from buildbotcustom.scheduler import MozScheduler, NoMergeScheduler, \
-  NightlyRebuild
+  NightlyRebuild, MultiScheduler, NoMergeMultiScheduler
 from buildbotcustom.l10n import NightlyL10n
 
 # This file contains misc. helper function that don't make sense to put in
@@ -769,3 +769,101 @@ def generateBranchObjects(config, name):
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
     return branchObjects
+
+def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
+        factory_class=TalosFactory):
+    branchObjects = {'schedulers': [], 'builders': [], 'status': []}
+    branch_builders = []
+
+    branchName = branch_config['branch_name']
+    buildBranch = branch_config['build_branch']
+    talosCmd = branch_config['talos_command']
+
+    for platform, platform_config in PLATFORMS.items():
+        for slave_platform in platform_config['slave_platforms']:
+            for suite, talosConfig in SUITES.items():
+                tests, merge, extra, platforms = branch_config['%s_tests' % suite]
+                if tests == 0 or slave_platform not in platforms:
+                    continue
+
+                factory = factory_class(
+                    OS=slave_platform,
+                    toolsDir="tools",
+                    envName=platform_config['env_name'],
+                    workdirBase="../talos-data",
+                    buildBranch=buildBranch,
+                    branchName=branchName,
+                    configOptions=talosConfig,
+                    talosCmd=talosCmd,
+                    fetchSymbols=branch_config['fetch_symbols'],
+                    **extra # Extra test specific factory parameters
+                )
+                platform_name = platform_config[slave_platform]['name']
+                if suite == "chrome":
+                    name_suffix = ""
+                    builddir_suffix = ""
+                else:
+                    name_suffix = " %s" % suite
+                    builddir_suffix = "-%s" % suite
+
+                builder = {
+                    'name': "%s %s talos%s" % (platform_name, branch, name_suffix),
+                    'slavenames': platform_config[slave_platform]['slaves'],
+                    'builddir': "%s-%s%s" % (branch, slave_platform, builddir_suffix),
+                    'factory': factory,
+                    'category': branch,
+                }
+                if merge:
+                    scheduler_class = MultiScheduler
+                else:
+                    scheduler_class = NoMergeMultiScheduler
+                s = scheduler_class(name='%s %s %s scheduler' % (branch, slave_platform, suite),
+                              branch='%s-%s' % (branch, platform),
+                              treeStableTimer=0,
+                              builderNames=[builder['name']],
+                              numberOfBuildsToTrigger=tests,
+                              )
+                branchObjects['schedulers'].append(s)
+                branchObjects['builders'].append(builder)
+                branch_builders.append(builder['name'])
+
+    branchObjects['status'].append(TinderboxMailNotifier(
+                           fromaddr="talos.buildbot@build.mozilla.org",
+                           tree=branch_config['tinderbox_tree'],
+                           extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+                           relayhost="smtp.mozilla.org",
+                           builders=branch_builders,
+                           useChangeTime=False,
+                           logCompression="bzip2"))
+
+    if branch_config.get('release_tests'):
+        releaseObjects = generateTalosReleaseBranchObjects(branch,
+                branch_config, PLATFORMS, SUITES, factory_class)
+        for k,v in releaseObjects.items():
+            branchObjects[k].extend(v)
+    return branchObjects
+
+def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
+        factory_class=TalosFactory):
+    branch_config = branch_config.copy()
+    release_tests = branch_config['release_tests']
+
+    # Update the # of tests to run with our release_tests number
+    # Force no merging
+    for suite, talosConfig in SUITES.items():
+        tests, merge, extra, platforms = branch_config['%s_tests' % suite]
+        if tests > 0:
+            branch_config['%s_tests' % suite] = (release_tests, False, extra, platforms)
+
+
+    # Update the TinderboxTree and the branch_name
+    branch_config['tinderbox_tree'] += '-Release'
+    branch_config['branch_name'] += '-Release'
+    branch += "-release"
+
+    # Remove the release_tests key so we don't call ourselves again
+    del branch_config['release_tests']
+
+    # Don't fetch symbols
+    branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
+    return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, factory_class)

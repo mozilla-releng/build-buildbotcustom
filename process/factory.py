@@ -1,6 +1,7 @@
 from datetime import datetime
 import os.path, re
 from time import strftime
+import urllib
 
 from twisted.python import log
 
@@ -1093,10 +1094,12 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
-    def __init__(self, env, version, buildNumber, brandName=None, **kwargs):
+    def __init__(self, env, version, buildNumber, brandName=None,
+            talosMasters=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
+        self.talosMasters = talosMasters or []
         if brandName:
             self.brandName = brandName
         else:
@@ -1140,12 +1143,35 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                                        '-v %s ' % self.version + \
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
-        self.addStep(ShellCommand,
-         name='make_upload',
+        def get_url(rc, stdout, stderr):
+            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
+                if m.endswith("crashreporter-symbols.zip"):
+                    continue
+                if m.endswith("tests.tar.bz2"):
+                    continue
+                return {'packageUrl': m}
+            return {}
+
+        self.addStep(SetProperty,
          command=['make', 'upload'],
          env=uploadEnv,
-         workdir='build/%s' % self.objdir
+         workdir='build/%s' % self.objdir,
+         extract_fn = get_url,
         )
+
+        # Send to the "release" branch on talos, it will do
+        # super-duper-extra testing
+        talosBranch = "%s-release-%s" % (self.branchName, self.platform)
+        for master, warn in self.talosMasters:
+            self.addStep(SendChangeStep(
+             name='sendchange_%s' % master,
+             warnOnFailure=warn,
+             master=master,
+             branch=talosBranch,
+             revision=WithProperties("%(got_revision)s"),
+             files=[WithProperties('%(packageUrl)s')],
+             user="sendchange")
+            )
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
@@ -4480,9 +4506,8 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 class TalosFactory(BuildFactory):
     """Create working talos build factory"""
     def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
-            configOptions, talosCmd, customManifest='', customTalos=None,
-            workdirBase=None, fetchSymbols=False, plugins='zips/plugins.zip',
-            pageset='zips/pagesets.zip',
+            configOptions, talosCmd, customManifest=None, customTalos=None,
+            workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             talosAddOns=[],
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
 
@@ -4547,6 +4572,7 @@ class TalosFactory(BuildFactory):
     def addDownloadBuildStep(self):
         def get_url(build):
             url = build.source.changes[-1].files[0]
+            url = urllib.unquote(url)
             return url
         self.addStep(DownloadFile(
          url_fn=get_url,
@@ -4649,7 +4675,7 @@ class TalosFactory(BuildFactory):
          workdir=self.workdirBase,
         ))
 
-        if self.customManifest != '':
+        if self.customManifest:
             self.addStep(FileDownload(
              mastersrc=self.customManifest,
              slavedest="tp3.manifest",
@@ -4692,7 +4718,7 @@ class TalosFactory(BuildFactory):
              workdir=self.workdirBase,
             ))
 
-        if self.plugins != '':
+        if self.plugins:
             self.addStep(FileDownload(
              mastersrc=self.plugins,
              slavedest=os.path.basename(self.plugins),
@@ -4704,7 +4730,7 @@ class TalosFactory(BuildFactory):
              workdir=os.path.join(self.workdirBase, "talos/base_profile"),
             ))
 
-        if self.pageset != '':
+        if self.pageset:
             self.addStep(FileDownload(
              mastersrc=self.pageset,
              slavedest=os.path.basename(self.pageset),
