@@ -58,6 +58,69 @@ def isHgPollerTriggered(change, hgUrl):
         return True
     return False
 
+def generateTestBuilderNames(name_prefix, suites_name, suites):
+    test_builders = []
+    if isinstance(suites, dict) and "totalChunks" in suites:
+        totalChunks = suites['totalChunks']
+        for i in range(totalChunks):
+            test_builders.append('%s %s-%i/%i' % \
+                    (name_prefix, suites_name, i+1, totalChunks))
+    else:
+        test_builders.append('%s %s' % (name_prefix, suites_name))
+
+    return test_builders
+
+def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
+        suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold):
+    builders = []
+    if isinstance(suites, dict) and "totalChunks" in suites:
+        totalChunks = suites['totalChunks']
+        for i in range(totalChunks):
+            factory = UnittestPackagedBuildFactory(
+                platform=platform,
+                test_suites=[suites['suite']],
+                mochitest_leak_threshold=mochitestLeakThreshold,
+                crashtest_leak_threshold=crashtestLeakThreshold,
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                buildSpace=0.5,
+                buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+                totalChunks=totalChunks,
+                thisChunk=i+1,
+                chunkByDir=suites.get('chunkByDir'),
+            )
+            builder = {
+                'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                'slavenames': config['platforms'][platform]['slaves'],
+                'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                'factory': factory,
+                'category': branch_name,
+            }
+            builders.append(builder)
+    else:
+        factory = UnittestPackagedBuildFactory(
+            platform=platform,
+            test_suites=suites,
+            mochitest_leak_threshold=mochitestLeakThreshold,
+            crashtest_leak_threshold=crashtestLeakThreshold,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            buildSpace=0.5,
+            buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': config['platforms'][platform]['slaves'],
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'factory': factory,
+            'category': branch_name,
+        }
+        builders.append(builder)
+    return builders
+
+
 
 def generateBranchObjects(config, name):
     """name is the name of branch which is usually the last part of the path
@@ -113,19 +176,19 @@ def generateBranchObjects(config, name):
             unittestBuilders.append('%s unit test' % base_name)
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
-                test_builders.append('%s test %s' % (config['platforms'][platform]['base_name'], suites_name))
+                test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
             triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, False))
             # Release unittest builds
             if config['platforms'][platform].get('enable_packaged_opt_unittests'):
                 test_builders = []
                 for suites_name, suites in config['unittest_suites']:
-                    test_builders.append('%s test opt %s' % (config['platforms'][platform]['base_name'], suites_name))
+                    test_builders.extend(generateTestBuilderNames('%s test opt' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
             # And debug too
             if config.get('enable_packaged_debug_unittests'):
                 test_builders = []
                 for suites_name, suites in config['unittest_suites']:
-                    test_builders.append('%s test debug %s' % (config['platforms'][platform]['base_name'], suites_name))
+                    test_builders.extend(generateTestBuilderNames('%s test debug' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-debug-unittest' % (name, platform), test_builders, True))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % config['platforms'][platform]['base_name'])
@@ -542,66 +605,38 @@ def generateBranchObjects(config, name):
                 branchObjects['builders'].append(unittest_builder)
 
                 for suites_name, suites in config['unittest_suites']:
-                    # If we're not supposed to run the a11y tests, then
-                    # remove the mochitest-a11y suite
+                    # For the regular unittest build, run the a11y suite if
+                    # enable_mac_a11y is set on mac
                     if not runA11y and 'mochitest-a11y' in suites:
                         suites = suites[:]
                         suites.remove('mochitest-a11y')
-                    packaged_unittest_factory = UnittestPackagedBuildFactory(
-                        platform=platform,
-                        test_suites=suites,
-                        mochitest_leak_threshold=mochitestLeakThreshold,
-                        crashtest_leak_threshold=crashtestLeakThreshold,
-                        hgHost=config['hghost'],
-                        repoPath=config['repo_path'],
-                        buildToolsRepoPath=config['build_tools_repo_path'],
-                        buildSpace=0.5,
-                        buildsBeforeReboot=pf['builds_before_reboot'],
-                    )
-                    packaged_unittest_builder = {
-                        'name': '%s test %s' % (pf['base_name'], suites_name),
-                        'slavenames': pf['slaves'],
-                        'builddir': '%s-%s-unittest-%s' % (name, platform, suites_name),
-                        'factory': packaged_unittest_factory,
-                        'category': name,
-                    }
-                    branchObjects['builders'].append(packaged_unittest_builder)
 
+                    branchObjects['builders'].extend(generateTestBuilder(
+                        config, name, platform, "%s test" % pf['base_name'],
+                        "%s-%s-unittest" % (name, platform),
+                        suites_name, suites, mochitestLeakThreshold,
+                        crashtestLeakThreshold))
+
+                    # Remove mochitest-a11y from other types of builds, since they're not
+                    # built with a11y enabled
                     if platform.startswith("macosx") and 'mochitest-a11y' in suites:
                         # Create a new factory that doesn't have mochitest-a11y
                         suites = suites[:]
                         suites.remove('mochitest-a11y')
-                        packaged_unittest_factory = UnittestPackagedBuildFactory(
-                            platform=platform,
-                            test_suites=suites,
-                            mochitest_leak_threshold=mochitestLeakThreshold,
-                            crashtest_leak_threshold=crashtestLeakThreshold,
-                            hgHost=config['hghost'],
-                            repoPath=config['repo_path'],
-                            buildToolsRepoPath=config['build_tools_repo_path'],
-                            buildSpace=0.5,
-                            buildsBeforeReboot=pf['builds_before_reboot'],
-                        )
 
                     if config.get('enable_packaged_debug_unittests'):
-                        packaged_debug_unittest_builder = {
-                            'name': '%s test debug %s' % (pf['base_name'], suites_name),
-                            'slavenames': pf['slaves'],
-                            'builddir': '%s-%s-debug-unittest-%s' % (name, platform, suites_name),
-                            'factory': packaged_unittest_factory,
-                            'category': name,
-                        }
-                        branchObjects['builders'].append(packaged_debug_unittest_builder)
+                        branchObjects['builders'].extend(generateTestBuilder(
+                            config, name, platform, "%s test debug" % pf['base_name'],
+                            "%s-%s-debug-unittest" % (name, platform),
+                            suites_name, suites, mochitestLeakThreshold,
+                            crashtestLeakThreshold))
 
                     if pf.get('enable_packaged_opt_unittests'):
-                        packaged_opt_unittest_builder = {
-                            'name': '%s test opt %s' % (pf['base_name'], suites_name),
-                            'slavenames': pf['slaves'],
-                            'builddir': '%s-%s-opt-unittest-%s' % (name, platform, suites_name),
-                            'factory': packaged_unittest_factory,
-                            'category': name,
-                        }
-                        branchObjects['builders'].append(packaged_opt_unittest_builder)
+                        branchObjects['builders'].extend(generateTestBuilder(
+                            config, name, platform, "%s test opt" % pf['base_name'],
+                            "%s-%s-opt-unittest" % (name, platform),
+                            suites_name, suites, mochitestLeakThreshold,
+                            crashtestLeakThreshold))
 
         if config['enable_codecoverage']:
             # We only do code coverage builds on linux right now
