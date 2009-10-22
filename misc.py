@@ -383,6 +383,10 @@ def generateBranchObjects(config, name):
         elif not pf.get('enable_packaged_opt_unittests'):
             packageTests = False
 
+        # Allow for test packages on platforms that can't be tested
+        # on the same master.
+        packageTests = pf.get('packageTests', packageTests)
+
         if platform.find('win') > -1 or platform.find('64') > -1:
             codesighs = False
         if 'upload_symbols' in pf and pf['upload_symbols']:
