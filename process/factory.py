@@ -1228,11 +1228,17 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
 
 class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
-            talosMasters=None, **kwargs):
+            unittestMasters=None, unittestBranch=None, talosMasters=None,
+            **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
         self.talosMasters = talosMasters or []
+        self.unittestMasters = unittestMasters or []
+        self.unittestBranch = unittestBranch
+        if self.unittestMasters:
+            assert self.unittestBranch
+
         if brandName:
             self.brandName = brandName
         else:
@@ -1288,7 +1294,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 if m.endswith("tests.tar.bz2"):
                     continue
                 return {'packageUrl': m}
-            return {}
+            return {'packageUrl': ''}
 
         self.addStep(SetProperty,
          command=['make', 'upload'],
@@ -1309,6 +1315,18 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")
+            )
+
+        for master, warn, retries in self.unittestMasters:
+            self.addStep(SendChangeStep(
+             name='sendchange_%s' % master,
+             warnOnFailure=warn,
+             master=master,
+             retries=retries,
+             branch=self.unittestBranch,
+             revision=WithProperties("%(got_revision)s"),
+             files=[WithProperties('%(packageUrl)s')],
+             user="sendchange-unittest")
             )
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
@@ -3949,6 +3967,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=unsigned',
                   '--exclude=update',
                   '--exclude=*.crashreporter-symbols.zip',
+                  '--exclude=*.tests.tar.bz2',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer, productName, version, str(buildNumber)),
                   '%s-%s-build%s/' % (productName,
@@ -3974,6 +3993,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=unsigned',
                   '--exclude=update',
                   '--exclude=*.crashreporter-symbols.zip',
+                  '--exclude=*.tests.tar.bz2',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer,
                     productName,
