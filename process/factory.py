@@ -178,7 +178,7 @@ class MozillaBuildFactory(BuildFactory):
         self.addStep(ShellCommand,
          name='clone_buildtools',
          command=['bash', '-c',
-          'if [ ! -d tools ]; then hg clone %s; fi' % self.buildToolsRepo],
+          'if [ ! -d tools ]; then hg clone %s tools;fi' % self.buildToolsRepo],
          description=['clone', 'build tools'],
          workdir='.'
         )
