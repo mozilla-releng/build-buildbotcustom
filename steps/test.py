@@ -408,7 +408,7 @@ class GraphServerPost(BuildStep):
           self.stdio.addStderr(str(e))
           raise
 
-    def postResult(self, testresult, retries=5, sleepTime=5):
+    def postResult(self, testresult, retries=8, sleepTime=5):
         testname, testlongname, testval, prettyval = testresult
         testval = str(testval).strip(string.letters)
         data = self.constructString(self.resultsname, testlongname, self.branch, self.sourcestamp, self.buildid, self.timestamp, testval)
