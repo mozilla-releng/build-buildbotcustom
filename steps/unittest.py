@@ -550,18 +550,15 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
     warnOnFailure = True
     warnOnWarnings = True
 
-    def __init__(self, crashtest=False, symbols_path=None, leakThreshold=None,
+    def __init__(self, suite, symbols_path=None, leakThreshold=None,
             **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
-        self.addFactoryArguments(crashtest=crashtest,
+        self.addFactoryArguments(suite=suite,
                 symbols_path=symbols_path, leakThreshold=leakThreshold)
 
-        if crashtest:
-            self.name = "crashtest"
-        else:
-            self.name = "reftest"
+        self.name = suite
 
         self.command = ['python', 'reftest/runreftest.py',
                 WithProperties('--appname=%(exepath)s'),
@@ -574,10 +571,13 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
 
-        if crashtest:
+        if suite == 'crashtest':
             self.command.append('reftest/tests/testing/crashtest/crashtests.list')
-        else:
+        elif suite == 'reftest':
             self.command.append('reftest/tests/layout/reftests/reftest.list')
+        elif suite == 'jsreftest':
+            self.command.append('--extra-profile-file=jsreftest/tests/user.js')
+            self.command.append('jsreftest/tests/jstests.list')
 
     def createSummary(self, log):
         self.addCompleteLog('summary', summarizeLogReftest(self.name, log))

@@ -4282,10 +4282,9 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  symbols_path='symbols',
                  maxTime=60*60, # One Hour
                 ))
-            elif suite in ('reftest', 'crashtest'):
-                crashtest = (suite == "crashtest")
+            elif suite in ('reftest', 'crashtest', 'jsreftest'):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
-                 crashtest=crashtest,
+                 suite=suite,
                  env=self.env,
                  leakThreshold=leak_threshold,
                  symbols_path='symbols',
