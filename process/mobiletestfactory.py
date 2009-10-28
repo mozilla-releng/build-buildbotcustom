@@ -353,6 +353,7 @@ class MaemoTalosFactory(BuildFactory):
                  },
                  talosTarball='http://mobile-master.mv.mozilla.com/maemo/talos.tar.bz2',
                  pageloaderTarball='http://mobile-master.mv.mozilla.com/maemo/pageloader.tar.bz2',
+                 nochrome=False
     ):
         BuildFactory.__init__(self)
         self.baseDir = baseDir
@@ -361,6 +362,10 @@ class MaemoTalosFactory(BuildFactory):
         self.reboot = reboot
         self.talosTarball = talosTarball
         self.pageloaderTarball = pageloaderTarball
+        if nochrome:
+            nochrome = '--noChrome'
+        else:
+            nochrome = ''
 
         self.addStep(ShellCommand,
             command='echo "TinderboxPrint: `hostname`"; ifconfig -a; date',
@@ -436,7 +441,7 @@ class MaemoTalosFactory(BuildFactory):
 
         for testName in activeTests.keys():
             self.addStep(ShellCommand,
-                command='python PerfConfigurator.py -v -e %s/fennec/fennec -t `hostname` --branch %s --branchName %s --activeTests %s --sampleConfig %s --browserWait %d --noChrome --resultsServer %s --resultsLink /server/collect.cgi --output local.config' % (self.baseDir,self.branch,self.branch,testName,talosConfigFile,activeTests[testName],resultsServer),
+                command='python PerfConfigurator.py -v -e %s/fennec/fennec -t `hostname` --branch %s --branchName %s --activeTests %s --sampleConfig %s --browserWait %d %s --resultsServer %s --resultsLink /server/collect.cgi --output local.config' % (self.baseDir,self.branch,self.branch,testName,talosConfigFile,activeTests[testName],nochrome,resultsServer),
                 workdir = "/builds/talos",
                 description="Create config %s" % (testName),
                 haltOnFailure=True,
