@@ -4016,7 +4016,7 @@ class MaemoBuildFactory(MobileBuildFactory):
 
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
-                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.cab xulrunner/dist/*.tar.bz2",
+                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.cab",
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
@@ -4078,14 +4078,6 @@ class WinmoBuildFactory(MobileBuildFactory):
             workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
                                          self.objdir),
             description=['make', 'installer'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='make_pkg_tests',
-            command=['make', 'package-tests'],
-            workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir, self.branchName,
-                                         self.objdir),
-            description=['make', 'package-tests'],
             haltOnFailure=True
         )
 
