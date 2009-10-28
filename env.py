@@ -171,6 +171,60 @@ MozillaEnvironments['winmo-arm'] = {
     "VSINSTALLDIR": 'd:\\msvs9',
 }
 
+MozillaEnvironments['win32-fennec'] = {
+    "DEVENVDIR": 'd:\\msvs9\\Common7\\IDE',
+    "FRAMEWORK35VERSION": 'v3.5',
+    "FRAMEWORKDIR": 'C:\\WINDOWS\\Microsoft.NET\\Framework',
+    "FRAMEWORKVERSION": 'v2.0.50727',
+    "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v3.5;' + \
+               'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
+               'd:\\msvs9\\VC\\ATLMFC\\LIB;d:\\msvs9\\VC\\LIB;',
+    "MOZILLABUILD": 'D:\\mozilla-build\\',
+    "MOZILLABUILDDRIVE": 'D:',
+    "MOZILLABUILDPATH": '\\mozilla-build\\',
+    "MOZ_MSVCVERSION": '9',
+    "MOZ_NO_RESET_PATH": '1',
+    "MOZ_TOOLS": 'D:\\mozilla-build\\moztools',
+    "NVAPSDK": 'd:\sdks\tegra042',
+    "PATH": 'D:\\mozilla-build\\msys\\local\\bin;' + \
+            'd:\\mozilla-build\\wget;' + \
+            'd:\\mozilla-build\\7zip;' + \
+            'd:\\mozilla-build\\blat261\\full;' + \
+            'd:\\mozilla-build\\python25;' + \
+            'd:\\mozilla-build\\svn-win32-1.4.2\\bin;' + \
+            'd:\\mozilla-build\\upx203w;' + \
+            'd:\\mozilla-build\\xemacs\\XEmacs-21.4.19\\i586-pc-win32;' + \
+            'd:\\mozilla-build\\info-zip;' + \
+            'd:\\mozilla-build\\nsis-2.22;' + \
+            'd:\\mozilla-build\\nsis-2.33u;' + \
+            '.;' + \
+            'D:\\mozilla-build\\msys\\local\\bin;' + \
+            'D:\\mozilla-build\\msys\\mingw\\bin;' + \
+            'D:\\mozilla-build\\msys\\bin;' + \
+            'd:\\msvs9\\Common7\\IDE;' + \
+            'd:\\msvs9\\VC\\BIN;' + \
+            'd:\\msvs9\\Common7\\Tools;' + \
+            'c:\\WINDOWS\\Microsoft.NET\\Framework\\v3.5;' + \
+            'c:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
+            'd:\\msvs9\\VC\\VCPackages;' + \
+            'c:\\Program Files\\Microsoft SDKs\\Windows\\v6.0A\\bin;' + \
+            'c:\\WINDOWS\\system32;' + \
+            'c:\\WINDOWS;' + \
+            'c:\\WINDOWS\\System32\\Wbem;' + \
+            'd:\\mozilla-build\\python25;' + \
+            'd:\\mozilla-build\\hg;' + \
+            'c:\\Program Files\\Microsoft SQL Server\\90\\Tools\\binn\\;' + \
+            'd:\\sdks\\tegra042\\tools;' + \
+            'd:\\sdks\\tegra042\\platformlibs\\bin\\winxp\\x86\\release;' + \
+            'd:\\sdks\\tegra042\\3rdparty\\bin\\winxp\\x86\\release;' + \
+            'd:\\mozilla-build\\moztools\\bin',
+    "VC8DIR": 'D:\\msvs8\\VC\\',
+    "VC9DIR": 'd:\\msvs9\\VC\\',
+    "VCINSTALLDIR": 'd:\\msvs9\\VC',
+    "VS80COMNTOOLS": 'D:\\msvs8\\Common7\\Tools\\',
+    "VS90COMNTOOLS": 'd:\\msvs9\\Common7\\Tools\\',
+    "VSINSTALLDIR": 'd:\\msvs9',
+}
 
 ### Talos environments
 # platform SDK location.  we can build both from one generic template.
