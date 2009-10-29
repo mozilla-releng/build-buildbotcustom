@@ -2936,6 +2936,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          name='make_buildsymbols',
          command=['make', 'buildsymbols'],
          workdir='build/%s' % self.objdir,
+         timeout=60*60
         )
 
         if self.uploadPackages:
