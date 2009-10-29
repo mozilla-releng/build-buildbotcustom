@@ -430,7 +430,7 @@ class MozillaMochitest(ShellCommandReportTimeout):
         # Support browser-chrome result summary format which differs
         # from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
-            failIdent = r"^\t(Fail|Failed): 0"
+            failIdent = r"^\tFail: 0"
         # Assume that having the 'failIdent' line
         # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
@@ -538,7 +538,7 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
         failIdent = r"^\d+ INFO Failed: 0"
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
-            failIdent = r"^\t(Fail|Failed): 0"
+            failIdent = r"^\tFail: 0"
         # Assume that having the 'failIdent' line
         # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
