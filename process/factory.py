@@ -933,7 +933,9 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         # execute the checkout
         self.addStep(ShellCommand,
          command=co_command,
-         description=['client.py', 'checkout']
+         description=['running', 'client.py', 'checkout'],
+         descriptionDone=['client.py', 'checkout'],
+         haltOnFailure=True
         )
         if self.buildRevision and (self.cvsroot or not self.skipBlankRepos):
             # Update ChatZilla to specified revision
@@ -1492,7 +1494,9 @@ class CCBaseRepackFactory(BaseRepackFactory):
         # execute the checkout
         self.addStep(ShellCommand,
          command=co_command,
-         description=['client.py', 'checkout'],
+         description=['running', 'client.py', 'checkout'],
+         descriptionDone=['client.py', 'checkout'],
+         haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
 
@@ -3169,7 +3173,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.addStepNoEnv(ShellCommand,
          name='checkout_client.py',
          command=['python', 'client.py', 'checkout',
-                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)]
+                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)],
+         description=['running', 'client.py', 'checkout'],
+         descriptionDone=['client.py', 'checkout'],
+         haltOnFailure=True
         )
 
         self.addPrintMozillaChangesetStep()
