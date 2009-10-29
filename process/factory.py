@@ -1388,7 +1388,6 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='rm_merged',
          command=['rm', '-rf', 'merged'],
          description=['remove', 'merged'],
-         workdir=self.baseWorkDir,
          workdir="%s/%s/%s/locales" % (self.baseWorkDir,
                                        self.origSrcDir,
                                        self.appName),
@@ -3925,25 +3924,49 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
             )
 
 class MaemoBuildFactory(MobileBuildFactory):
-    def __init__(self, scratchboxPath="/scratchbox/moz_scratchbox",
+    def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
+                 multiLocale = False,
+                 l10nRepoPath = 'l10n-central',
+                 compareLocalesRepoPath = 'build/compare-locales',
+                 compareLocalesTag = 'RELEASE_AUTOMATION',
                  packageGlob="mobile/dist/*.tar.bz2 " +
                  "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
                  "xulrunner/dist/*.tar.bz2",
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
+        self.baseBuildDir = baseBuildDir
         self.packageGlob = packageGlob
         self.scratchboxPath = scratchboxPath
+        self.multiLocale = multiLocale
+        self.l10nRepoPath = l10nRepoPath
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
         self.getMozconfig()
         self.addPreBuildSteps()
-        self.addBuildSteps()
+        if self.multiLocale:
+            self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
+            self.compareLocalesTag = compareLocalesTag
+            self.addStep(ShellCommand,
+                name='create_dir_l10n',
+                command=['mkdir', '-p', self.l10nRepoPath],
+                workdir='%s' % self.baseWorkDir,
+                description=['create', 'l10n', 'dir']
+            )
+            self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
+        else:
+            self.addBuildSteps()
         self.addPackageSteps()
+        # This uploads the single 'en-US' build
         self.addUploadSteps(platform='linux')
         if self.triggerBuilds:
-            self.addTriggeredBuildsSteps()
+            self.addTriggeredBuildsSteps()            
 
+    def newBuild(self, requests):
+        if self.multiLocale:
+            self.addMultiLocaleSteps(requests, 'locales')
+        return BuildFactory.newBuild(self, requests)
+        
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
             name='rm_logfile',
@@ -3959,6 +3982,14 @@ class MaemoBuildFactory(MobileBuildFactory):
                 workdir=self.baseWorkDir,
                 timeout=60*60
             )
+            if self.multiLocale:
+                self.addStep(ShellCommand,
+                    name='clobber_l10n_dir',
+                    command=['rm', '-rf', self.l10nRepoPath],
+                    env=self.env,
+                    workdir=self.baseWorkDir,
+                    timeout=10*60
+                )
         else:
             self.addStep(ShellCommand,
                 name='rm_old_builds',
@@ -3975,51 +4006,161 @@ class MaemoBuildFactory(MobileBuildFactory):
                 descriptionDone=['removed', 'old', 'builds']
             )
 
-    def addBuildSteps(self):
+    def addBuildSteps(self, extraEnv=''):
         self.addStep(ShellCommand,
             name='compile',
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s' % self.branchName,
-                     'make -f client.mk build'],
+                     'build/%s/%s' % (self.baseBuildDir, self.branchName),
+                     'make -f client.mk build %s' %  extraEnv],
             description=['compile'],
             env={'PKG_CONFIG_PATH': '/usr/lib/pkgconfig:/usr/local/lib/pkgconfig'},
             haltOnFailure=True
         )
 
-    def addPackageSteps(self):
+    def addPackageSteps(self, multiLocale=False):
+        extraArgs=''
+        if multiLocale:
+            extraArgs='AB_CD=multi'
         self.addStep(ShellCommand,
             name='make_pkg',
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/mobile' % (self.branchName, self.objdir),
-                     'make package'],
+                     'build/%s/%s/%s/mobile' % \
+                     (self.baseBuildDir, self.branchName, self.objdir),
+                     'make package', extraArgs],
             description=['make', 'package'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='make_pkg_tests',
-            command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/xulrunner' % (self.branchName, self.objdir),
-                     'make package-tests PYTHON=python2.5'],
-            description=['make', 'package-tests'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
             name='make_mobile_deb',
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/mobile' % (self.branchName,
-                                                self.objdir),
+                     'build/%s/%s/%s/mobile' % \
+                     (self.baseBuildDir, self.branchName, self.objdir),
                      'make deb'],
             description=['make', 'mobile', 'deb'],
             haltOnFailure=True
         )
+        if not multiLocale:
+            self.addStep(ShellCommand,
+                name='make_pkg_tests',
+                command=[self.scratchboxPath, '-p', '-d',
+                         'build/%s/%s/%s/xulrunner' % \
+                         (self.baseBuildDir, self.branchName, self.objdir),
+                         'make package-tests PYTHON=python2.5'],
+                description=['make', 'package-tests'],
+                haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+                name='make_xulrunner_deb',
+                command=[self.scratchboxPath, '-p', '-d',
+                         'build/%s/%s/%s/xulrunner' % \
+                         (self.baseBuildDir, self.branchName, self.objdir),
+                         'make deb'],
+                description=['make', 'xulrunner', 'deb'],
+                haltOnFailure=True
+            )
+
+    def addMultiLocaleSteps(self, requests, propertyName):
+        req = requests[-1]
+        # get the list of locales that has been added by the scheduler
+        locales = req.properties.getProperty(propertyName)
+        # remove all packages that have been created by the single locale build
         self.addStep(ShellCommand,
-            name='make_xulrunner_deb',
+            name='rm_packages',
+            command=['sh', '-c', 'rm %s' % self.packageGlob],
+            description=['remove single-locale packages'],
+            workdir="%s/%s/%s" % (self.baseWorkDir,
+                                  self.branchName,
+                                  self.objdir),
+            flunkOnFailure=False,
+            warnOnFailure=False,
+        )
+        self.compareLocalesSetup()
+        for locale in locales:
+            self.checkOutLocale(locale)
+            self.compareLocales(locale)
+            self.addChromeLocale(locale)
+        # Let's package the multi-locale build and upload it
+        self.addPackageSteps(multiLocale=True)
+        self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb"
+        self.addUploadSteps(platform='linux')
+
+    def compareLocalesSetup(self):
+        self.addStep(ShellCommand,
+         name='rm_compare_locales',
+         command=['rm', '-rf', 'compare-locales'],
+         description=['remove', 'compare-locales'],
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='clone_compare_locales',
+         command=['hg', 'clone', self.compareLocalesRepo, 'compare-locales'],
+         description=['checkout', 'compare-locales'],
+         workdir=self.baseWorkDir,
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='update_compare_locales',
+         command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
+         description='update compare-locales',
+         workdir='%s/compare-locales' % self.baseWorkDir,
+         haltOnFailure=True
+        )
+
+    def checkOutLocale(self, locale):
+        self.addStep(ShellCommand,
+         name='get_locale_src_%s' % locale,
+         command=['sh', '-c',
+          WithProperties('if [ -d '+locale+' ]; then ' +
+                         'hg -R '+locale+' pull -r default ; ' +
+                         'else ' +
+                         'hg clone ' +
+                         'http://'+self.hgHost+'/'+self.l10nRepoPath+\
+                           '/'+locale+'/ ; ' +
+                         'fi ')],
+         descriptionDone="locale source",
+         timeout=5*60, # 5 minutes
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
+        )
+
+    def compareLocales(self, locale):
+        self.addStep(ShellCommand,
+         name='rm_merged_%s' % locale,
+         command=['rm', '-rf', 'merged'],
+         description=['remove', 'merged'],
+         workdir="%s/%s/%s/mobile/mobile/locales" % (self.baseWorkDir,
+                                                     self.branchName,
+                                                     self.objdir),
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='merge_locale_%s' % locale,
+         command=['python',
+                  '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir,
+                  '-m', 'merged',
+                  "l10n.ini",
+                  "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
+                  locale],
+         description='comparing %s' % locale,
+         env={'PYTHONPATH': ['%s/compare-locales/lib' % self.baseWorkDir]},
+         flunkOnFailure=False,
+         warnOnFailure=True,
+         workdir="%s/%s/mobile/locales" % \
+                (self.baseWorkDir, self.branchName),
+        )
+
+    def addChromeLocale(self, locale):
+        self.addStep(ShellCommand,
+            name='make_locale_chrome_%s' % locale,
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/xulrunner' % (self.branchName,
-                                                self.objdir),
-                     'make deb'],
-            description=['make', 'xulrunner', 'deb'],
-            haltOnFailure=True
+                     'build/%s/%s/%s/mobile/mobile/locales' % \
+                     (self.baseBuildDir, self.branchName, self.objdir),
+                     'make chrome-%s' % locale,
+                     'LOCALE_MERGEDIR=$PWD/merged'],
+            env = self.env,
+            haltOnFailure=False,
+            description=['make','chrome-%s' % locale],
         )
 
 class WinmoBuildFactory(MobileBuildFactory):

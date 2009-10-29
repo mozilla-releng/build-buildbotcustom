@@ -38,7 +38,7 @@
 
 from twisted.python import log as log2
 from buildbotcustom import log
-from buildbot.scheduler import BaseUpstreamScheduler, Dependent, Triggerable 
+from buildbot.scheduler import BaseUpstreamScheduler, Dependent, Triggerable, Nightly 
 from buildbot.sourcestamp import SourceStamp
 from buildbot import buildset, process
 from buildbot.changes import changes
@@ -969,6 +969,27 @@ class L10nMixin(object):
       d.addCallback(self._cbLoadedLocales, reason=reason, set_props=set_props)
       return d
 
+  def submitBuildSetWithLocales(self):
+      """
+      Instead of submitting a job per locale, we just append a list of locales
+      to a BuildSet's property and let the factory use it through the BuildRequests
+      """
+      def _submit(locales):
+          locales = locales.keys()
+          locales.sort()
+          props = properties.Properties()
+          props.updateFromProperties(self.properties)
+          props.setProperty('locales', locales, "L10nMixin::submitBuildSetWithLocales")
+          print "Submitted BuildSet with list of locales as a property"
+          self.submitBuildSet(buildset.BuildSet(self.builderNames,
+                                  SourceStamp(branch=self.branch),
+                                  properties = props,
+                                  reason = None))
+      def _errBack():
+          print "It seems that the list of locales have not been loaded correctly"
+      d = defer.maybeDeferred(self.getLocales)
+      d.addCallbacks(_submit, _errBack)
+      return d
 
 def ParseLocalesFile(data):
     """
@@ -1053,3 +1074,17 @@ class NightlyL10n(TriggerableL10n):
     '''
     def __init__(self, **kwargs):
         TriggerableL10n.__init__(self, **kwargs)
+
+class MultiNightlyL10n(Nightly, L10nMixin):
+    '''This scheduler creates a property which is a list of locales.
+    The factories that want to use this should implement "newBuild(self, request)"
+    and grab the last request which contains the property "locales" 
+    '''
+    def __init__(self, platform, repoType='hg', branch=None, localesFile=None, **kwargs):
+        L10nMixin.__init__(self, platform = platform, repoType = repoType,
+                           branch = branch, localesFile = localesFile)
+        Nightly.__init__(self, **kwargs)
+
+    def doPeriodicBuild(self):
+        self.setTimer()
+        self.submitBuildSetWithLocales()
