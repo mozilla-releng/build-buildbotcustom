@@ -366,6 +366,13 @@ class WinmoTryBuildFactory(WinmoBuildFactory):
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
+            name='make_pkg_tests',
+            command=['make', 'package-tests'],
+            workdir='%s/%s/xulrunner' % (self.baseWorkDir, self.objdir),
+            description=['make', 'package-tests'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
             command="cp %s ../%s" % (self.packageGlob, self.slavesrcdir),
             description=['copy', 'globs', 'to', 'upload', 'directory'],
             workdir="%s\%s" % (self.baseWorkDir, self.objdir))
