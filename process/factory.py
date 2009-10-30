@@ -4035,7 +4035,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             command=[self.scratchboxPath, '-p', '-d',
                      'build/%s/%s/%s/mobile' % \
                      (self.baseBuildDir, self.branchName, self.objdir),
-                     'make deb'],
+                     'make deb', extraArgs],
             description=['make', 'mobile', 'deb'],
             haltOnFailure=True
         )
@@ -4045,7 +4045,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 command=[self.scratchboxPath, '-p', '-d',
                          'build/%s/%s/%s/xulrunner' % \
                          (self.baseBuildDir, self.branchName, self.objdir),
-                         'make package-tests PYTHON=python2.5'],
+                         'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
                 haltOnFailure=True
             )
@@ -4054,7 +4054,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 command=[self.scratchboxPath, '-p', '-d',
                          'build/%s/%s/%s/xulrunner' % \
                          (self.baseBuildDir, self.branchName, self.objdir),
-                         'make deb'],
+                         'make deb', extraArgs],
                 description=['make', 'xulrunner', 'deb'],
                 haltOnFailure=True
             )
