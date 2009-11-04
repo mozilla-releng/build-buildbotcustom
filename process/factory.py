@@ -4131,20 +4131,19 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
     def compareLocales(self, locale):
+        objdirAbsPath = "%s/%s/%s" % (self.baseWorkDir, self.branchName, self.objdir)
         self.addStep(ShellCommand,
          name='rm_merged_%s' % locale,
          command=['rm', '-rf', 'merged'],
          description=['remove', 'merged'],
-         workdir="%s/%s/%s/mobile/mobile/locales" % (self.baseWorkDir,
-                                                     self.branchName,
-                                                     self.objdir),
+         workdir=objdirAbsPath,
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
          name='merge_locale_%s' % locale,
          command=['python',
                   '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir,
-                  '-m', 'merged',
+                  '-m', '%s/merged' % objdirAbsPath, 
                   "l10n.ini",
                   "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
                   locale],
@@ -4157,13 +4156,17 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
     def addChromeLocale(self, locale):
+        # This is relative to scratchbox's home directory
+        objdir = 'build/%s/%s/%s' % (self.baseBuildDir, self.branchName, self.objdir)
+        # TODO: Move '/home/cltbld' to our config files
+        # the absolute path (from within scratchbox)  for the objdir
+        objdirAbsPath = '/home/cltbld/%s' % objdir
         self.addStep(ShellCommand,
             name='make_locale_chrome_%s' % locale,
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/%s/mobile/mobile/locales' % \
-                     (self.baseBuildDir, self.branchName, self.objdir),
+                     '%s/mobile/mobile/locales' % objdir,
                      'make chrome-%s' % locale,
-                     'LOCALE_MERGEDIR=$PWD/merged'],
+                     'LOCALE_MERGEDIR=%s/merged' % objdirAbsPath],
             env = self.env,
             haltOnFailure=False,
             description=['make','chrome-%s' % locale],
