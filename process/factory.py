@@ -208,7 +208,13 @@ class MozillaBuildFactory(BuildFactory):
                 command.extend(["-n", i])
             # Ignore the current dir also.
             command.extend(["-n", WithProperties("%(builddir)s")])
-            command.append("..")
+            # These are the base_dirs that get passed to purge_builds.py.
+            # The scratchbox dir is only present on linux slaves, but since
+            # not all classes that inherit from MozillaBuildFactory provide
+            # a platform property we can use for limiting the base_dirs, it
+            # is easier to include scratchbox by default and simply have
+            # purge_builds.py skip the dir when it isn't present.
+            command.extend(["..","/scratchbox/users/cltbld/home/cltbld/build"])
 
             self.addStep(ShellCommand,
              name='clean_old_builds',
