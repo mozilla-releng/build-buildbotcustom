@@ -25,8 +25,10 @@
 # ***** END LICENSE BLOCK *****
 
 from twisted.python.failure import Failure
-from twisted.internet import error
+from twisted.internet import reactor
 from twisted.spread.pb import PBConnectionLost
+from twisted.python import log
+from twisted.internet.defer import DeferredList, Deferred
 
 import os
 import buildbot
@@ -207,45 +209,68 @@ class SendChangeStep(BuildStep):
         self.comments = comments
 
         self.name = 'sendchange'
+        self.warnings = None
 
         self.sender = Sender(master)
+        self.retries = 5
+        self.sleepTime = 5
 
     def start(self):
-        properties = self.build.getProperties()
-
         master = self.master
         try:
-            branch = properties.render(self.branch)
-            revision = properties.render(self.revision)
-            comments = properties.render(self.comments)
-            files = properties.render(self.files)
-            user = properties.render(self.user)
+            properties = self.build.getProperties()
+            self.branch = properties.render(self.branch)
+            self.revision = properties.render(self.revision)
+            self.comments = properties.render(self.comments)
+            self.files = properties.render(self.files)
+            self.user = properties.render(self.user)
 
             self.addCompleteLog("sendchange", """\
-    master: %(master)s
-    branch: %(branch)s
-    revision: %(revision)s
-    comments: %(comments)s
-    user: %(user)s
-    files: %(files)s""" % locals())
+    master: %s
+    branch: %s
+    revision: %s
+    comments: %s
+    user: %s
+    files: %s""" % (self.master, self.branch, self.revision, self.comments, self.user, self.files))
+            return self.sendChange()
         except KeyError:
             return self.finished(Failure())
 
-        d = self.sender.send(branch, revision, comments, files, user)
-
-        d.addCallbacks(self.finished, self.finished)
+    def sendChange(self):
+        d = self.sender.send(self.branch, self.revision, self.comments, self.files, self.user)
+        d.addCallback(self.sendChangeSuccess)
+        d.addErrback(self.sendChangeFailed)
         return d
 
-    def finished(self, results):
-        if results is None:
-            self.step_status.setText(['sendchange to', self.master, 'ok'])
-            return BuildStep.finished(self, SUCCESS)
-        else:
+    def sendChangeFailed(self, res):
+        # Go to sleep and then try again!
+        try:
+            if self.retries > 0:
+                if not self.warnings:
+                    self.warnings = self.addLog('warnings')
+                self.warnings.addStderr('\nWarning: error when trying to sendchange to %s, trying again in %i seconds (%i tries left)\n' % \
+                        (self.master, self.sleepTime, self.retries))
+                log.msg("Error when trying to sendchange to %s: %s.  %i tries left.  Trying again in %i seconds" % (self.master, str(res), self.retries, self.sleepTime))
+                self.retries -= 1
+                self.sleepTime *= 2
+                d = Deferred()
+                d.addCallback(lambda res: self.sendChange())
+                reactor.callLater(self.sleepTime, d.callback, None)
+                return d
+
             self.step_status.setText(['sendchange to', self.master, 'failed'])
             if self.warnOnFailure:
                 self.step_status.setText2(['sendchange'])
-            self.addCompleteLog("errors", str(results))
+            self.addCompleteLog("errors", str(res))
             return BuildStep.finished(self, FAILURE)
+        except:
+            log.msg("Error processing sendchange failure")
+            log.err()
+            return BuildStep.finished(self, FAILURE)
+
+    def sendChangeSuccess(self, results):
+        self.step_status.setText(['sendchange to', self.master, 'ok'])
+        return BuildStep.finished(self, SUCCESS)
 
 class DownloadFile(ShellCommand):
     haltOnFailure = True
