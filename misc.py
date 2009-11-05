@@ -73,6 +73,7 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
 def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
         suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold):
     builders = []
+    pf = config['platforms'].get(platform, {})
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
         for i in range(totalChunks):
@@ -89,6 +90,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
                 totalChunks=totalChunks,
                 thisChunk=i+1,
                 chunkByDir=suites.get('chunkByDir'),
+                env=pf.get('unittest-env', {}),
             )
             builder = {
                 'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
@@ -572,11 +574,13 @@ def generateBranchObjects(config, name):
 
         if config['enable_unittests']:
             if platform in ('linux','win32','macosx'):
+                pf = config['platforms'].get(platform, {})
                 runA11y = True
                 if platform == 'macosx':
                     runA11y = config['enable_mac_a11y']
 
                 unittest_factory = UnittestBuildFactory(
+                    env=pf.get('unittest-env', {}),
                     platform=platform,
                     productName=config['product_name'],
                     config_repo_path=config['config_repo_path'],

@@ -684,6 +684,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          warnOnWarnings=True,
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.
+         env=self.env,
         )
 
     def addValgrindCheckSteps(self):
@@ -2838,7 +2839,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
             objdir, mochitest_leak_threshold=None,
             crashtest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, unittestBranch=None, stageUsername=None,
-            stageServer=None, stageSshKey=None, run_a11y=True, **kwargs):
+            stageServer=None, stageSshKey=None, run_a11y=True,
+            env={}, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -2873,6 +2875,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
+        self.env.update(env)
 
         if self.platform == 'win32':
             self.addStep(TinderboxShellCommand,
@@ -3035,6 +3038,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          warnOnWarnings=True,
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.
+         env=self.env,
         )
 
     def addPrintChangesetStep(self):
@@ -4248,14 +4252,13 @@ class WinmoBuildFactory(MobileBuildFactory):
         )
 
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, test_suites, env=None,
+    def __init__(self, platform, test_suites, env={},
             mochitest_leak_threshold=None, crashtest_leak_threshold=None,
             totalChunks=None, thisChunk=None, chunkByDir=None,
             **kwargs):
-        if env is None:
-            self.env = MozillaEnvironments['%s-unittest' % platform].copy()
-        else:
-            self.env = env
+        self.env = MozillaEnvironments['%s-unittest' % platform].copy()
+        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+        self.env.update(env)
 
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
@@ -4388,8 +4391,6 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
             'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
             }
-
-        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
 
         # Figure out which revision we're running
         def get_build_info(rc, stdout, stderr):
