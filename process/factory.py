@@ -4256,8 +4256,14 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             mochitest_leak_threshold=None, crashtest_leak_threshold=None,
             totalChunks=None, thisChunk=None, chunkByDir=None,
             **kwargs):
+        platform_minidump_path = {
+            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+            }
+
         self.env = MozillaEnvironments['%s-unittest' % platform].copy()
-        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[platform]
         self.env.update(env)
 
         self.platform = platform.split('-')[0]
@@ -4385,12 +4391,6 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
              property='toolsdir',
              workdir='tools'
             )
-
-        platform_minidump_path = {
-            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
-            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
-            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-            }
 
         # Figure out which revision we're running
         def get_build_info(rc, stdout, stderr):
