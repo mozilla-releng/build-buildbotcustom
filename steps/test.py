@@ -120,16 +120,17 @@ class CompareBloatLogs(ShellCommand):
     
     def __init__(self, bloatLog, testname="", testnameprefix="",
                        bloatDiffPath="tools/rb/bloatdiff.pl",
-                       mozillaDir="", **kwargs):
+                       mozillaDir="", tbPrint=True, **kwargs):
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(bloatLog=bloatLog, testname=testname,
                                  testnameprefix=testnameprefix,
                                  bloatDiffPath=bloatDiffPath,
-                                 mozillaDir=mozillaDir)
+                                 mozillaDir=mozillaDir, tbPrint=tbPrint)
         self.bloatLog = bloatLog
         self.testname = testname
         self.testnameprefix = testnameprefix
         self.bloatDiffPath = "build%s/%s" % (mozillaDir, bloatDiffPath)
+        self.tbPrint = tbPrint
 
         if len(self.testname) > 0:
             self.testname += " "
@@ -176,14 +177,15 @@ class CompareBloatLogs(ShellCommand):
         leaksTestname = ("%srefcnt_leaks" % self.testnameprefix).replace(' ', '_')
         leaksTestnameLabel = "%srefcnt Leaks" % self.testnameprefix
 
-        tinderLink = tinderboxPrint(leaksTestname,
-                                    leaksTestnameLabel, 
-                                    0,
-                                    'bytes',
-                                    leaksAbbr,
-                                    formatBytes(leaks,3)
-                                    )
-        summary += tinderLink
+        if self.tbPrint:
+            tinderLink = tinderboxPrint(leaksTestname,
+                                        leaksTestnameLabel,
+                                        0,
+                                        'bytes',
+                                        leaksAbbr,
+                                        formatBytes(leaks,3)
+                                        )
+            summary += tinderLink
 
         self.setProperty('leaks',leaks)
         self.setProperty('bloat',bloat)
@@ -200,14 +202,15 @@ class CompareLeakLogs(ShellCommand):
 
     def __init__(self, platform, mallocLog, leakFailureThreshold=7261838,
                  testname="", testnameprefix="", objdir='obj-firefox',
-                 **kwargs):
+                 tbPrint=True, **kwargs):
         assert platform.startswith('win32') or platform.startswith('macosx') \
           or platform.startswith('linux')
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(platform=platform, mallocLog=mallocLog,
                                  leakFailureThreshold=leakFailureThreshold,
                                  testname=testname,
-                                 testnameprefix=testnameprefix, objdir=objdir)
+                                 testnameprefix=testnameprefix, objdir=objdir,
+                                 tbPrint=tbPrint)
         self.platform = platform
         self.mallocLog = mallocLog
         self.leakFailureThreshold = leakFailureThreshold
@@ -216,6 +219,7 @@ class CompareLeakLogs(ShellCommand):
         self.objdir = objdir
         self.name = "compare " + testname + "leak logs"
         self.description = ["compare " + testname, "leak logs"]
+        self.tbPrint = tbPrint
 
         if len(self.testname) > 0:
             self.testname += " "
@@ -293,7 +297,7 @@ class CompareLeakLogs(ShellCommand):
 
         slug = "%s: %s, %s: %s, %s: %s" % (lkAbbr, lk, mhAbbr, mh, aAbbr, a)
         logText = ""
-        if self.testname.startswith("current"):
+        if self.tbPrint and self.testname.startswith("current"):
             logText += tinderboxPrint(lkTestname,
                                       "Total Bytes malloc'ed and not free'd",
                                       0,
@@ -319,9 +323,9 @@ class CompareLeakLogs(ShellCommand):
 
 
 class Codesighs(ShellCommand):
-    def __init__(self, objdir, platform, type='auto', **kwargs):
+    def __init__(self, objdir, platform, type='auto', tbPrint=True, **kwargs):
         ShellCommand.__init__(self, **kwargs)
-        self.addFactoryArguments(objdir=objdir, platform=platform, type=type)
+        self.addFactoryArguments(objdir=objdir, platform=platform, type=type, tbPrint=tbPrint)
 
         assert platform in ('win32', 'macosx', 'linux')
         assert type in ('auto', 'base')
@@ -331,6 +335,7 @@ class Codesighs(ShellCommand):
         if self.platform in ('macosx', 'linux'):
             self.platform = 'unix'
         self.type = type
+        self.tbPrint = tbPrint
 
         runScript = 'tools/codesighs/' + \
                     type + 'summary.' + self.platform + '.bash'
@@ -361,9 +366,11 @@ class Codesighs(ShellCommand):
 
         self.setProperty('testresults', [(z, zLong, rawBytes, bytes)])
 
-        slug = '%s:%s' % (z, bytes)
-        summary = 'TinderboxPrint:%s\n' % slug
-        self.addCompleteLog(slug, summary)
+        if self.tbPrint:
+            slug = '%s:%s' % (z, bytes)
+            summary = 'TinderboxPrint:%s\n' % slug
+            self.addCompleteLog(slug, summary)
+
         if diff:
             # buildbot chokes if we put all the data in the short log
             slug = '%sdiff' % z
@@ -396,9 +403,9 @@ class GraphServerPost(BuildStep):
           for line in lines:
             if "RETURN" in line :
               tboxPrint =  'TinderboxPrint: ' + \
-                '<a title = "%s" href = "http://%s/%s">%s:%s</a>\n' % \
+                '<a title="%s" href=\'http://%s/%s\'>%s:%s</a>\n' % \
                 (testlongname, self.server, line.split("\t")[3],
-                testname, prettyval) 
+                testname, prettyval)
               self.stdio.addStdout(tboxPrint)
               found = True
           if not found:
@@ -476,4 +483,5 @@ class GraphServerPost(BuildStep):
             self.step_status.setText2(["Error:", "failed", "graph", "server", "post"])
             self.finished(FAILURE)
         else:
+            self.step_status.setText(["graph", "server", "post", "ok"])
             self.finished(SUCCESS)

@@ -344,6 +344,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'wince', 'macosx')
 
+        if self.graphServer is not None:
+            self.tbPrint = False
+        else:
+            self.tbPrint = True
+
+
         # Mozilla subdir and objdir
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
@@ -539,6 +545,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env,
          workdir='.',
          mozillaDir=self.mozillaDir,
+         tbPrint=self.tbPrint,
          warnOnFailure=True,
          haltOnFailure=False
         )
@@ -613,6 +620,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env,
          objdir=self.mozillaObjdir,
          testname='current',
+         tbPrint=self.tbPrint,
          warnOnFailure=True,
          haltOnFailure=True
         )
@@ -778,12 +786,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
             codesighsObjdir = self.objdir
         else:
             codesighsObjdir = '../%s' % self.mozillaObjdir
+
         self.addStep(Codesighs,
          name='get_codesighs_diff',
          objdir=codesighsObjdir,
          platform=self.platform,
          workdir='build%s' % self.mozillaDir,
-         env=self.env
+         env=self.env,
+         tbPrint=self.tbPrint,
         )
         self.addStep(SetProperty,
           command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
