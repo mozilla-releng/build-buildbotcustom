@@ -4271,12 +4271,12 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
             'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
             }
+        self.platform = platform.split('-')[0]
 
-        self.env = MozillaEnvironments['%s-unittest' % platform].copy()
-        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[platform]
+        self.env = MozillaEnvironments['%s-unittest' % self.platform].copy()
+        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
         self.env.update(env)
 
-        self.platform = platform.split('-')[0]
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -4361,7 +4361,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         ))
 
         # Find firefox!
-        if platform == "macosx":
+        if self.platform == "macosx":
             self.addStep(FindFile(
              filename="firefox-bin",
              directory=".",
@@ -4370,7 +4370,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
              property_name="exepath",
              name="Find executable",
             ))
-        elif platform == "win32":
+        elif self.platform == "win32":
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="firefox/firefox.exe",
