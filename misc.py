@@ -85,7 +85,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
                 hgHost=config['hghost'],
                 repoPath=config['repo_path'],
                 buildToolsRepoPath=config['build_tools_repo_path'],
-                buildSpace=0.5,
+                buildSpace=1.0,
                 buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
                 totalChunks=totalChunks,
                 thisChunk=i+1,
@@ -109,7 +109,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             hgHost=config['hghost'],
             repoPath=config['repo_path'],
             buildToolsRepoPath=config['build_tools_repo_path'],
-            buildSpace=0.5,
+            buildSpace=1.0,
             buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
         )
         builder = {
