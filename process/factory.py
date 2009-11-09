@@ -4443,7 +4443,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  chunkByDir=chunkByDir,
                  totalChunks=totalChunks,
                  thisChunk=thisChunk,
-                 maxTime=60*60, # One Hour
+                 maxTime=90*60, # One and a half hours, to allow for slow minis
                 ))
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
