@@ -3907,6 +3907,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
                 name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
                 description=['clobber', 'build'],
+                timeout=60*60,
                 workdir=self.baseWorkDir
             )
 
