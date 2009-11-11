@@ -3081,7 +3081,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
             (self.config_dir, config_dir_map[self.platform])
 
-        self.addStep(ShellCommand, name="copy mozconfig",
+        self.addStep(ShellCommand,
          name='copy_mozconfig',
          command=['cp', mozconfig, 'build/.mozconfig'],
          description=['copy mozconfig'],

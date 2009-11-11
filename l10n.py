@@ -750,7 +750,8 @@ class Scheduler(BaseUpstreamScheduler):
     """
     
     BaseUpstreamScheduler.__init__(self, name)
-    # path to the l10nbuilds.ini file that is read synchronously
+    # Path to the l10nbuilds.ini file that is read synchronously
+    assert os.path.exists(inipath)
     self.inipath = inipath
     self.treeStableTimer = treeStableTimer
     self.nextBuildTime = None
