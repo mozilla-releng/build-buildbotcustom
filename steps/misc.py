@@ -40,6 +40,23 @@ from buildbot.steps.shell import ShellCommand, WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS
 from buildbot.clients.sendchange import Sender
 
+class EvaluatingShellCommand(ShellCommand):
+     """Like a basic ShellCommand but can pass in a custom eval_fn to determine if the
+        results of the ShellCommand were successful or not
+     """
+     def __init__(self, eval_fn=None, **kwargs):
+         self.super_class = ShellCommand
+         self.super_class.__init__(self, **kwargs)
+         self.addFactoryArguments(eval_fn=eval_fn)
+         self.eval_fn = eval_fn
+
+     def evaluateCommand(self, cmd):
+         if self.eval_fn:
+             return self.eval_fn(self, cmd)
+         else:
+             return self.super_class.evaluateCommand(cmd)
+
+
 class CreateDir(ShellCommand):
     name = "create dir"
     haltOnFailure = False

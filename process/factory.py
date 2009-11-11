@@ -30,7 +30,7 @@ reload(buildbotcustom.env)
 from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
   TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
   FindFile, DownloadFile, UnpackFile, SetBuildProperty, GetHgRevision, \
-  DisconnectStep, OutputStep
+  DisconnectStep, OutputStep, EvaluatingShellCommand
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -41,6 +41,7 @@ from buildbotcustom.env import MozillaEnvironments
 import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
 
 class BootstrapFactory(BuildFactory):
     def __init__(self, automation_tag, logdir, bootstrap_config,
@@ -4508,12 +4509,13 @@ class TalosFactory(BuildFactory):
         self.exepath = None
 
         self.addCleanupSteps()
-        self.addSetupSteps()
+        self.addDmgInstaller()
         self.addDownloadBuildStep()
-        if fetchSymbols:
-            self.addDownloadSymbolsStep()
         self.addUnpackBuildSteps()
         self.addGetBuildInfoStep()
+        if fetchSymbols:
+            self.addDownloadSymbolsStep()
+        self.addSetupSteps()
         self.addUpdateConfigStep()
         self.addRunTestStep()
         self.addRebootStep()
@@ -4526,8 +4528,15 @@ class TalosFactory(BuildFactory):
          command='rm -vrf *',
          env=MozillaEnvironments[self.envName])
         )
+        self.addStep(ShellCommand(
+         name='create talos dir',
+         workdir=self.workdirBase,
+         description="talos dir creation",
+         command='mkdir talos',
+         env=MozillaEnvironments[self.envName])
+        )
 
-    def addSetupSteps(self):
+    def addDmgInstaller(self):
         if self.OS in ('leopard', 'tiger'):
             self.addStep(FileDownload(
              mastersrc="%s/buildfarm/utils/installdmg.sh" % self.toolsDir,
@@ -4535,6 +4544,105 @@ class TalosFactory(BuildFactory):
              workdir=self.workdirBase,
             ))
 
+    def addDownloadBuildStep(self):
+        def get_url(build):
+            url = build.source.changes[-1].files[0]
+            return url
+        self.addStep(DownloadFile(
+         url_fn=get_url,
+         url_property="fileURL",
+         filename_property="filename",
+         workdir=self.workdirBase,
+         name="Download build",
+        ))
+
+    def addUnpackBuildSteps(self):
+        self.addStep(UnpackFile(
+         filename=WithProperties("%(filename)s"),
+         workdir=self.workdirBase,
+         name="Unpack build",
+        ))
+        if self.OS in ('xp', 'vista'):
+            self.addStep(ShellCommand(
+             name='chmod_files',
+             workdir=os.path.join(self.workdirBase, "firefox/"),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="chmod files (see msys bug)",
+             command=["chmod", "-v", "-R", "a+x", "."],
+             env=MozillaEnvironments[self.envName])
+            )
+        if self.OS in ('tiger', 'leopard'):
+            self.addStep(FindFile(
+             workdir=os.path.join(self.workdirBase, "talos"),
+             filename="firefox-bin",
+             directory="..",
+             max_depth=4,
+             property_name="exepath",
+             name="Find executable",
+             filetype="file",
+            ))
+        elif self.OS in ('xp', 'vista'):
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="../firefox/firefox"
+            ))
+        else:
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="../firefox/firefox-bin"
+            ))
+        self.exepath = WithProperties('%(exepath)s')
+
+    def addGetBuildInfoStep(self):
+        def get_exedir(build):
+            return os.path.dirname(build.getProperty('exepath'))
+        self.addStep(SetBuildProperty(
+         property_name="exedir",
+         value=get_exedir,
+        ))
+
+        # Figure out which revision we're running
+        def get_build_info(rc, stdout, stderr):
+            retval = {'repo_path': None,
+                      'revision': None,
+                      'buildid': None,
+                     }
+            stdout = "\n".join([stdout, stderr])
+            m = re.search("^BuildID\s*=\s*(\w+)", stdout, re.M)
+            if m:
+                retval['buildid'] = m.group(1)
+            m = re.search("^SourceStamp\s*=\s*(.*)", stdout, re.M)
+            if m:
+                retval['revision'] = m.group(1).strip()
+            m = re.search("^SourceRepository\s*=\s*(\S+)", stdout, re.M)
+            if m:
+                retval['repo_path'] = m.group(1)
+            return retval
+        self.addStep(SetProperty,
+         command=['cat', WithProperties('%(exedir)s/application.ini')],
+         workdir=os.path.join(self.workdirBase, "talos"),
+         extract_fn=get_build_info,
+         name='get build info',
+        )
+
+        def check_sdk(step, cmd):
+            if self.OS == 'tiger':
+                txt = cmd.logs['stdio'].getText()
+                m = re.search("MacOSX10\.5\.sdk", txt, re.M)
+                if m :
+                    step.addCompleteLog('sdk-fail', 'TinderboxPrint: can\'t run 10.5.sdk on 10.4 slave')
+                    return FAILURE
+            return SUCCESS
+        if self.OS in ("tiger", "leopard"):
+            self.addStep(EvaluatingShellCommand(
+                command=['cat', WithProperties('%(exedir)s/chrome/toolkit.jar')],
+                workdir=os.path.join(self.workdirBase, "talos"),
+                eval_fn=check_sdk,
+                haltOnFailure=True,
+                name='check sdk okay'))
+     
+    def addSetupSteps(self):
         self.addStep(FileDownload(
          mastersrc="%s/buildfarm/maintenance/count_and_reboot.py" % self.toolsDir,
          slavedest="count_and_reboot.py",
@@ -4620,18 +4728,6 @@ class TalosFactory(BuildFactory):
              workdir=os.path.join(self.workdirBase, "talos"),
             ))
 
-    def addDownloadBuildStep(self):
-        def get_url(build):
-            url = build.source.changes[-1].files[0]
-            return url
-        self.addStep(DownloadFile(
-         url_fn=get_url,
-         url_property="fileURL",
-         filename_property="filename",
-         workdir=self.workdirBase,
-         name="Download build",
-        ))
-
     def addDownloadSymbolsStep(self):
         def get_symbols_url(build):
             suffixes = ('.tar.bz2', '.dmg', '.zip')
@@ -4657,76 +4753,6 @@ class TalosFactory(BuildFactory):
          workdir="%s/symbols" % self.workdirBase,
          name="Unpack symbols",
         ))
-
-    def addUnpackBuildSteps(self):
-        self.addStep(UnpackFile(
-         filename=WithProperties("%(filename)s"),
-         workdir=self.workdirBase,
-         name="Unpack build",
-        ))
-        if self.OS in ('xp', 'vista'):
-            self.addStep(ShellCommand(
-             name='chmod_files',
-             workdir=os.path.join(self.workdirBase, "firefox/"),
-             flunkOnFailure=False,
-             warnOnFailure=False,
-             description="chmod files (see msys bug)",
-             command=["chmod", "-v", "-R", "a+x", "."],
-             env=MozillaEnvironments[self.envName])
-            )
-        if self.OS in ('tiger', 'leopard'):
-            self.addStep(FindFile(
-             workdir=os.path.join(self.workdirBase, "talos"),
-             filename="firefox-bin",
-             directory="..",
-             max_depth=4,
-             property_name="exepath",
-             name="Find executable",
-             filetype="file",
-            ))
-        elif self.OS in ('xp', 'vista'):
-            self.addStep(SetBuildProperty(
-             property_name="exepath",
-             value="../firefox/firefox"
-            ))
-        else:
-            self.addStep(SetBuildProperty(
-             property_name="exepath",
-             value="../firefox/firefox-bin"
-            ))
-        self.exepath = WithProperties('%(exepath)s')
-
-    def addGetBuildInfoStep(self):
-        def get_exedir(build):
-            return os.path.dirname(build.getProperty('exepath'))
-        self.addStep(SetBuildProperty(
-         property_name="exedir",
-         value=get_exedir,
-        ))
-
-        # Figure out which revision we're running
-        def get_build_info(rc, stdout, stderr):
-            retval = {'repo_path': None,
-                      'revision': None,
-                      'buildid': None,
-                     }
-            stdout = "\n".join([stdout, stderr])
-            m = re.search("^BuildID\s*=\s*(\w+)", stdout, re.M)
-            if m:
-                retval['buildid'] = m.group(1)
-            m = re.search("^SourceStamp\s*=\s*(.*)", stdout, re.M)
-            if m:
-                retval['revision'] = m.group(1).strip()
-            m = re.search("^SourceRepository\s*=\s*(\S+)", stdout, re.M)
-            if m:
-                retval['repo_path'] = m.group(1)
-            return retval
-        self.addStep(SetProperty,
-         command=['cat', WithProperties('%(exedir)s/application.ini')],
-         workdir=os.path.join(self.workdirBase, "talos"),
-         extract_fn=get_build_info,
-         name='get build info',
-        )
 
     def addUpdateConfigStep(self):
         self.addStep(talos_steps.MozillaUpdateConfig(
