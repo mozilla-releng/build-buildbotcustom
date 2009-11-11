@@ -91,9 +91,9 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
         m = infoRe.match(line)
         if m:
             r = m.group(1)
-            if r == successIdent or (successIdent == "Pass" and r == "Passed"):
+            if r == successIdent:
                 successCount = int(m.group(2))
-            elif r == failureIdent or (failureIdent == "Fail" and r == "Failed"):
+            elif r == failureIdent:
                 failureCount = int(m.group(2))
             # If otherIdent == None, then infoRe should not match it,
             # so this test is fine as is.
@@ -117,17 +117,13 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
         summaryText(successCount, failureCount, otherCount, crashed, leaked))
 
 def summarizeLogMochitest(name, log):
-    passIdent = "Passed"
-    failIdent = "Failed"
     infoRe = r"\d+ INFO (Passed|Failed|Todo):\ +(\d+)"
     # Support browser-chrome result summary format which differs from MozillaMochitest's.
     if name == 'mochitest-browser-chrome':
-        passIdent = "Pass"
-        failIdent = "Fail"
-        infoRe = r"\t(Pass|Fail|Passed|Failed|Todo): (\d+)"
+        infoRe = r"\t(Passed|Failed|Todo): (\d+)"
 
     return summarizeLog(
-        name, log, passIdent, failIdent, "Todo",
+        name, log, "Passed", "Failed", "Todo",
         infoRe)
 
 def summarizeLogReftest(name, log):
@@ -430,7 +426,7 @@ class MozillaMochitest(ShellCommandReportTimeout):
         # Support browser-chrome result summary format which differs
         # from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
-            failIdent = r"^\t(Fail|Failed): 0"
+            failIdent = r"^\tFailed: 0"
         # Assume that having the 'failIdent' line
         # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
@@ -538,7 +534,7 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
         failIdent = r"^\d+ INFO Failed: 0"
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
         if self.name == 'mochitest-browser-chrome':
-            failIdent = r"^\t(Fail|Failed): 0"
+            failIdent = r"^\tFailed: 0"
         # Assume that having the 'failIdent' line
         # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
