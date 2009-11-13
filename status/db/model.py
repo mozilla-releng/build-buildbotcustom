@@ -492,7 +492,11 @@ class Build(Base):
                 if isinstance(step.results, int):
                     s.status = step.results
                 else:
-                    s.status = step.results[0]
+                    try:
+                        s.status = step.results[0]
+                    except:
+                        # A Failure most likely
+                        s.status = None
                 # This may not be set yet
                 if step.started:
                     s.starttime = datetime.datetime.utcfromtimestamp(step.started)
