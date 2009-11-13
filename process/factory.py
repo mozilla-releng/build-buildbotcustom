@@ -1222,6 +1222,7 @@ class BaseRepackFactory(MozillaBuildFactory):
     def __init__(self, project, appName, l10nRepoPath,
                  compareLocalesRepoPath, compareLocalesTag,
                  stageServer, stageUsername, stageSshKey=None,
+                 mozconfig=None, configRepoPath=None, configSubDir=None,
                  baseWorkDir='build', tree="notset", mozillaDir=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -1235,6 +1236,10 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.tree = tree
+        if mozconfig and configSubDir and configRepoPath:
+            self.mozconfig = 'configs/%s/%s/mozconfig' % (configSubDir,
+                                                          mozconfig)
+            self.configRepoPath = configRepoPath
 
         self.addStep(SetProperty,
                      command=['echo', self.tree],
@@ -1271,8 +1276,8 @@ class BaseRepackFactory(MozillaBuildFactory):
 
         self.addStep(ShellCommand,
          name='mkdir_l10nrepopath',
-         command=['sh', '-c', 'mkdir -p %s' % l10nRepoPath],
-         descriptionDone='mkdir '+ l10nRepoPath,
+         command=['sh', '-c', 'mkdir -p %s' % self.l10nRepoPath],
+         descriptionDone='mkdir '+ self.l10nRepoPath,
          workdir=self.baseWorkDir,
          flunkOnFailure=False
         )
@@ -1281,7 +1286,17 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.getSources()
         self.updateSources()
         self.getMozconfig()
+        self.configure()
+        self.tinderboxPrintBuildInfo()
+        self.downloadBuilds()
+        self.updateEnUS()
+        self.tinderboxPrintRevisions()
+        self.compareLocalesSetup()
+        self.compareLocales()
+        self.doRepack()
+        self.doUpload()
 
+    def configure(self):
         self.addStep(ShellCommand,
          name='autoconf',
          command=['bash', '-c', 'autoconf-2.13'],
@@ -1308,7 +1323,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='configure',
          command=['sh', '--',
                   './configure', '--enable-application=%s' % self.appName,
-                  '--with-l10n-base=../%s' % l10nRepoPath ] +
+                  '--with-l10n-base=../%s' % self.l10nRepoPath ] +
                   self.extraConfigureArgs,
          description='configure',
          descriptionDone='configure done',
@@ -1322,15 +1337,6 @@ class BaseRepackFactory(MozillaBuildFactory):
          description=['make config'],
          haltOnFailure=True
         )
-
-        self.tinderboxPrintBuildInfo()
-        self.downloadBuilds()
-        self.updateEnUS()
-        self.tinderboxPrintRevisions()
-        self.compareLocalesSetup()
-        self.compareLocales()
-        self.doRepack()
-        self.doUpload()
 
     def tinderboxPrint(self, propName, propValue):
         self.addStep(ShellCommand,
@@ -5035,6 +5041,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
             descriptionDone=['got', 'buildid']
         )
         self.addStep(MozillaStageUpload,
+            name='upload',
             objdir="%s/dist" % (self.origSrcDir),
             username=self.stageUsername,
             milestone=self.baseUploadDir,
@@ -5075,8 +5082,75 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
 
     def __init__(self, **kwargs):
         MobileNightlyRepackFactory.__init__(self, **kwargs)
+        assert self.configRepoPath
+
+    def getMozconfig(self):
+        self.addStep(ShellCommand,
+            name='rm_configs',
+            command=['rm', '-rf', 'configs'],
+            workdir=self.baseWorkDir,
+            description=['removing', 'configs'],
+            descriptionDone=['remove', 'configs'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            name='pull_configs',
+            command=['hg', 'clone', 'http://%s/%s' % (self.hgHost,
+                                              self.configRepoPath),
+                     'configs'],
+            workdir=self.baseWorkDir,
+            timeout=30*60 # 30 minutes
+        )
+        self.addStep(ShellCommand,
+            name='copy_mozconfig',
+            command=['cp', self.mozconfig,
+                     '%s/.mozconfig' % self.origSrcDir],
+            workdir=self.baseWorkDir,
+            description=['copying', 'mozconfig'],
+            descriptionDone=['copied', 'mozconfig'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            name='cat_mozconfig',
+            command=['cat', '.mozconfig'],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['cat', 'mozconfig']
+        )
+
+    def downloadBuilds(self):
+        MobileNightlyRepackFactory.downloadBuilds(self)
+        self.addStep(ShellCommand,
+         name='wget_deb',
+         command=['make', 'wget-deb', 'EN_US_BINARY_URL=%s' % self.enUSBinaryURL,
+                  'DEB_BUILD_ARCH=armel'],
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir,
+                                       self.origSrcDir, self.appName),
+         haltOnFailure=True,
+         description=['wget','deb'],
+        )
+
+    def doRepack(self):
+        self.addStep(ShellCommand,
+         name='repack_debs',
+         command=['sh','-c',
+                  WithProperties('make installers-%(locale)s deb-%(locale)s ' +
+                                 'DEB_BUILD_ARCH=armel ' +
+                                 'LOCALE_MERGEDIR=$PWD/merged')],
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
+                                       self.appName),
+         haltOnFailure=True,
+         description=['repack','deb'],
+        )
 
     def doUpload(self):
+        self.addStep(ShellCommand,
+         name='copy_deb',
+         command=['sh', '-c', WithProperties('if [ -f %(locale)s/*.deb ] ' +
+                  '; then cp -r %(locale)s ' + '%s/%s/dist ; fi' %
+                  (self.baseWorkDir, self.origSrcDir))],
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
+                                       self.appName),
+        )
         self.addUploadSteps(platform='linux')
 
 
