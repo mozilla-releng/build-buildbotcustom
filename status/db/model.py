@@ -295,8 +295,9 @@ class Change(Base):
 
 class SourceChange(Base):
     __tablename__ = "source_changes"
-    source_id = Column(Integer, ForeignKey('sourcestamps.id'), nullable=False, primary_key=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False, primary_key=True)
+    id = Column(Integer, primary_key=True)
+    source_id = Column(Integer, ForeignKey('sourcestamps.id'), nullable=False, index=True)
+    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False, index=True)
     order = Column(Integer, nullable=False)
     change = relation(Change)
 
