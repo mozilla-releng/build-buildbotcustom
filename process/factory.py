@@ -3680,6 +3680,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=xpi',
                   '--exclude=unsigned',
                   '--exclude=update',
+                  '--exclude=*.crashreporter-symbols.zip',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer, productName, version, str(buildNumber)),
                   '%s-%s-build%s/' % (productName,
@@ -3704,6 +3705,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=xpi',
                   '--exclude=unsigned',
                   '--exclude=update',
+                  '--exclude=*.crashreporter-symbols.zip',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer,
                     productName,
