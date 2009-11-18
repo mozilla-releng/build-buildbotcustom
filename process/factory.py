@@ -992,7 +992,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
 class NightlyBuildFactory(MercurialBuildFactory):
     def __init__(self, talosMasters=None, unittestMasters=None,
-            unittestBranch=None, tinderboxBuildsDir=None, **kwargs):
+            unittestBranch=None, tinderboxBuildsDir=None, 
+            geriatricMasters=None, geriatricBranches=None, **kwargs):
 
         self.talosMasters = talosMasters or []
 
@@ -1004,7 +1005,17 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         self.tinderboxBuildsDir = tinderboxBuildsDir
 
+        self.geriatricMasters = geriatricMasters or []
+        #geriatricBranches is a mapping between MozillaBF platform
+        #and geriatric master branches that are applicable to that MBF platform
+        self.geriatricBranches = geriatricBranches
+
         MercurialBuildFactory.__init__(self, **kwargs)
+        
+        if len(self.geriatricMasters) > 0:
+            assert self.geriatricBranches
+            assert self.platform
+
 
     def doUpload(self):
         uploadEnv = self.env.copy()
@@ -1078,6 +1089,19 @@ class NightlyBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange-unittest")
             )
+        for master, warn in self.geriatricMasters:
+            if self.platform in self.geriatricBranches:
+              for branch in self.geriatricBranches[self.platform]:
+                self.addStep(SendChangeStep(
+                  name='sendchange_geriatric',
+                  warnOnFailure=warn,
+                  master=master,
+                  branch=branch,
+                  revision=WithProperties("%(got_revision)s"),
+                  files=[WithProperties('%(packageUrl)s')],
+                  user='sendchange-geriatric',)
+                )
+              
             
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):

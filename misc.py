@@ -508,6 +508,8 @@ def generateBranchObjects(config, name):
             packageTests=packageTests,
             unittestMasters=config['unittest_masters'],
             unittestBranch=unittestBranch,
+            geriatricMasters=config['geriatric_masters'],
+            geriatricBranches=config['geriatric_branches'],
             triggerBuilds=config['enable_l10n'],
             triggeredSchedulers=triggeredSchedulers,
             tinderboxBuildsDir=tinderboxBuildsDir,
