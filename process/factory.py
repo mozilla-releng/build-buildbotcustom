@@ -4228,7 +4228,7 @@ class MaemoBuildFactory(MobileBuildFactory):
 
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
-                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.exe xulrunner/dist/*.tar.bz2",
+                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.exe xulrunner/dist/*.tar.bz2",
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
@@ -4254,7 +4254,9 @@ class WinmoBuildFactory(MobileBuildFactory):
         else:
             self.addStep(ShellCommand,
                 name='remove_old_builds',
-                command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.exe ' %
+                command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.zip ' %
+                           (self.branchName, self.objdir) +
+                           '%s/%s/mobile/dist/*.exe ' %
                            (self.branchName, self.objdir) +
                            '%s/%s/xulrunner/dist/*.zip' %
                            (self.branchName, self.objdir)],
