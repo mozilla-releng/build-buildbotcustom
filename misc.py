@@ -310,7 +310,7 @@ def generateBranchObjects(config, name):
 
         branchObjects['schedulers'].append(NightlyRebuild(name=scheduler_name+"-nightly",
             builderNames=test_builders,
-            dayOfWeek=0, # Monday
+            dayOfWeek=4, # Friday
             hour=3, minute=2, # at 3:02 am local time
             numberOfBuildsToTrigger=2,
             mergeBuilds=False))
