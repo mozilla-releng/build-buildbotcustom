@@ -1,10 +1,9 @@
 import time
-import re
 
-from urllib2 import urlopen, unquote
-from twisted.python import log, failure
-from twisted.internet import defer, reactor
+from twisted.python import log
+from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
+from twisted.web.client import getPage
 
 from buildbot.changes import base, changes
 
@@ -29,7 +28,8 @@ class FtpPoller(base.ChangeSource):
     working = 0
     gotFile = 1
     
-    def __init__(self, branch="", pollInterval=30, ftpURLs=[], searchString=""):
+    def __init__(self, branch="", pollInterval=30, ftpURLs=[], searchString="",
+                 timeout=30):
         """
         @type   ftpURLs:            list of strings
         @param  ftpURLs:            The ftp directories to monitor
@@ -48,6 +48,7 @@ class FtpPoller(base.ChangeSource):
         self.branch = branch
         self.pollInterval = pollInterval
         self.searchString = searchString
+        self.timeout = timeout
     
     def startService(self):
         self.loop = LoopingCall(self.poll)
@@ -71,7 +72,7 @@ class FtpPoller(base.ChangeSource):
             for url in self.ftpURLs:
               self.working = self.working + 1
               d = self._get_changes(url)
-              d.addCallback(self._process_changes, 0)
+              d.addCallback(self._process_changes, url)
               d.addBoth(self._finished)
         return
 
@@ -79,16 +80,12 @@ class FtpPoller(base.ChangeSource):
         self.working = self.working - 1
 
     def _get_changes(self, url):
-        log.msg("Polling dir %s" % url)
-        return defer.maybeDeferred(urlopen, url)
+        return getPage(url, timeout=self.timeout)
     
-    def _process_changes(self, query, forceDate):
+    def _process_changes(self, pageContents, url):
     
         try:
           counter = 0
-          url = query.geturl()
-          pageContents = query.read()
-          query.close()
           lines = pageContents.split('\n')
           """ Check through lines to see if file exists """
           # scenario 1:
