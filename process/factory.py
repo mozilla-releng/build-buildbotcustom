@@ -4029,6 +4029,11 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.getMozconfig()
         self.addPreBuildSteps()
         if self.multiLocale:
+            # In the multi-locale scenario we build and upload the single-locale
+            # before the multi-locale. This packageGlob will be used to move packages
+            # into the "en-US" directory before uploading it and later on the 
+            # multi-locale overwrites it in addMultiLocaleSteps(...) 
+            self.packageGlob = "mobile/dist/*.tar.bz2 mobile/mobile/*.deb"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -4042,7 +4047,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addBuildSteps()
         self.addPackageSteps()
         # This uploads the single 'en-US' build
-        self.addUploadSteps(platform='linux')
+        self.doUpload()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()            
 
@@ -4123,7 +4128,8 @@ class MaemoBuildFactory(MobileBuildFactory):
             description=['make', 'mobile', 'deb'],
             haltOnFailure=True
         )
-        if not multiLocale:
+        # Build only for the multilocale and dependent builds
+        if multiLocale or not self.nightly:
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=[self.scratchboxPath, '-p', '-d',
@@ -4142,6 +4148,25 @@ class MaemoBuildFactory(MobileBuildFactory):
                 description=['make', 'xulrunner', 'deb'],
                 haltOnFailure=True
             )
+    
+    def doUpload(self):
+        # This function is only called by the nightly and dependent single-locale
+        # build since we want to upload the 'en-US' subdirectory as a whole
+        self.addStep(ShellCommand,
+            name='prepare_upload',
+            command=['mkdir', '-p', 'en-US'],
+            haltOnFailure=True,
+            workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName, self.objdir)
+        )
+        self.addStep(ShellCommand,
+            name='mv_binaries',
+            command=['sh', '-c', 'mv %s mobile/dist/en-US' % self.packageGlob],
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
+        )
+        # Now that we have moved all the packages that we want under 'en-US'
+        # let's indicate that we want to upload the whole directory
+        self.packageGlob = '-r mobile/dist/en-US'
+        self.addUploadSteps(platform='linux')
 
     def addMultiLocaleSteps(self, requests, propertyName):
         req = requests[-1]
@@ -4165,7 +4190,8 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True)
-        self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb"
+        self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
+                         "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
         self.addUploadSteps(platform='linux')
 
     def compareLocalesSetup(self):
