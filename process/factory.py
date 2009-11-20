@@ -5057,15 +5057,6 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
     # Upload targets aren't defined in mobile/locales/Makefile,
     # so use MozillaStageUpload for now.
     def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            command=['python', 'config/printconfigsetting.py',
-                     'dist/l10n-stage/%s/application.ini' % self.project,
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
         self.addStep(MozillaStageUpload,
             name='upload',
             objdir="%s/dist" % (self.origSrcDir),
