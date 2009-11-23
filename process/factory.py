@@ -4043,11 +4043,14 @@ class MaemoBuildFactory(MobileBuildFactory):
                 description=['create', 'l10n', 'dir']
             )
             self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
-        else:
+            # This will package the en-US single-locale build (no xulrunner)
+            self.addPackageSteps()
+            self.doUpload()
+        else: # Normal single-locale nightly like Electrolysis and Tracemonkey
             self.addBuildSteps()
-        self.addPackageSteps()
-        # This uploads the single 'en-US' build
-        self.doUpload()
+            self.addPackageSteps(packageXulrunner=True)
+            self.addUploadSteps(platform='linux')
+        
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()            
 
@@ -4106,7 +4109,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             haltOnFailure=True
         )
 
-    def addPackageSteps(self, multiLocale=False):
+    def addPackageSteps(self, multiLocale=False, packageXulrunner=False):
         extraArgs=''
         if multiLocale:
             extraArgs='AB_CD=multi'
@@ -4128,8 +4131,9 @@ class MaemoBuildFactory(MobileBuildFactory):
             description=['make', 'mobile', 'deb'],
             haltOnFailure=True
         )
-        # Build only for the multilocale and dependent builds
-        if multiLocale or not self.nightly:
+        # Build xulrunner for multi-locale nightly builds, dependent builds
+        # and nightly builds which are not multi-locale like Electrolysis and Tracemonkey 
+        if packageXulrunner or not self.nightly:
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=[self.scratchboxPath, '-p', '-d',
@@ -4189,7 +4193,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.compareLocales(locale)
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
-        self.addPackageSteps(multiLocale=True)
+        self.addPackageSteps(multiLocale=True, packageXulrunner=True)
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
                          "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
         self.addUploadSteps(platform='linux')
