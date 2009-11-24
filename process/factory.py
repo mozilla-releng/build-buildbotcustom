@@ -4948,7 +4948,7 @@ class TryTalosFactory(TalosFactory):
 class MobileNightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
 
-    def __init__(self, hgHost=None, enUSBinaryURL=None,
+    def __init__(self, enUSBinaryURL, hgHost=None, 
                  mobileRepoPath='mobile-browser',
                  project='fennec', baseWorkDir='build',
                  repoPath='mozilla-central', appName='mobile',
@@ -5128,6 +5128,10 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     extraConfigureArgs = ['--target=arm-linux-gnueabi']
 
     def __init__(self, **kwargs):
+        # Only for Maemo we upload the 'en-US' binaries under an 'en-US' subdirectory
+        assert 'enUSBinaryURL' in kwargs
+        assert kwargs['enUSBinaryURL'] is not ''
+        kwargs['enUSBinaryURL'] = '%s/en-US' % kwargs['enUSBinaryURL']
         MobileNightlyRepackFactory.__init__(self, **kwargs)
         assert self.configRepoPath
 
