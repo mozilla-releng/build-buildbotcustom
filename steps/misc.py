@@ -24,11 +24,11 @@
 #   Chris Cooper <ccooper@mozilla.com>
 # ***** END LICENSE BLOCK *****
 
-from twisted.python.failure import Failure
+from twisted.python.failure import Failure, DefaultException
 from twisted.internet import reactor
 from twisted.spread.pb import PBConnectionLost
 from twisted.python import log
-from twisted.internet.defer import DeferredList, Deferred
+from twisted.internet.defer import DeferredList, Deferred, TimeoutError
 
 import os
 import buildbot
@@ -39,6 +39,58 @@ from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep, \
 from buildbot.steps.shell import ShellCommand, WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS
 from buildbot.clients.sendchange import Sender
+
+def errbackAfter(wrapped_d, timeout):
+    # Thanks to Dustin!
+    """Calls wrapped_d's errback after timeout seconds"""
+    wrapper_d = Deferred()
+    already_fired = [False]
+    def cb(*args, **kwargs):
+        if not already_fired[0]:
+            already_fired[0] = True
+            wrapper_d.callback(*args, **kwargs)
+        else:
+            log.msg("callback called again: %s %s" % (args, kwargs))
+    def eb(*args, **kwargs):
+        if not already_fired[0]:
+            already_fired[0] = True
+            wrapper_d.errback(*args, **kwargs)
+        else:
+            log.msg("errback called again: %s %s" % (args, kwargs))
+    def to():
+        if not already_fired[0]:
+            already_fired[0] = True
+            wrapper_d.errback(TimeoutError("More than %i seconds elapsed" % timeout))
+    reactor.callLater(timeout, to)
+    wrapped_d.addCallbacks(cb, eb)
+    return wrapper_d
+
+class InterruptableDeferred(Deferred):
+    def __init__(self, wrapped_d):
+        Deferred.__init__(self)
+
+        self.already_fired = False
+
+        def callback(*args, **kwargs):
+            if not self.already_fired:
+                self.already_fired = True
+                self.callback(*args, **kwargs)
+            else:
+                log.msg("callback called again: %s %s" % (args, kwargs))
+
+        def errback(*args, **kwargs):
+            if not self.already_fired:
+                self.already_fired = True
+                self.errback(*args, **kwargs)
+            else:
+                log.msg("errback called again: %s %s" % (args, kwargs))
+
+        wrapped_d.addCallbacks(callback, errback)
+
+    def interrupt(self, reason="Interrupted"):
+        if not self.already_fired:
+            self.already_fired = True
+            self.errback(DefaultException(reason))
 
 class EvaluatingShellCommand(ShellCommand):
      """Like a basic ShellCommand but can pass in a custom eval_fn to determine if the
@@ -214,16 +266,17 @@ class SetMozillaBuildProperties(LoggingBuildStep):
 class SendChangeStep(BuildStep):
     warnOnFailure = True
     def __init__(self, master, branch, files, revision=None, user=None,
-            comments="", **kwargs):
+            comments="", timeout=60, **kwargs):
         BuildStep.__init__(self, **kwargs)
         self.addFactoryArguments(master=master, branch=branch, files=files,
-                revision=revision, user=user, comments=comments)
+                revision=revision, user=user, comments=comments, timeout=timeout)
         self.master = master
         self.branch = branch
         self.files = files
         self.revision = revision
         self.user = user
         self.comments = comments
+        self.timeout = timeout
 
         self.name = 'sendchange'
         self.warnings = None
@@ -231,6 +284,8 @@ class SendChangeStep(BuildStep):
         self.sender = Sender(master)
         self.retries = 5
         self.sleepTime = 5
+
+        self._interrupt = None
 
     def start(self):
         master = self.master
@@ -255,6 +310,10 @@ class SendChangeStep(BuildStep):
 
     def sendChange(self):
         d = self.sender.send(self.branch, self.revision, self.comments, self.files, self.user)
+        if self.timeout:
+            d = errbackAfter(d, self.timeout)
+        d = InterruptableDeferred(d)
+        self._interrupt = d.interrupt
         d.addCallback(self.sendChangeSuccess)
         d.addErrback(self.sendChangeFailed)
         return d
@@ -272,7 +331,13 @@ class SendChangeStep(BuildStep):
                 self.sleepTime *= 2
                 d = Deferred()
                 d.addCallback(lambda res: self.sendChange())
-                reactor.callLater(self.sleepTime, d.callback, None)
+                d.addErrback(lambda res: log.msg("delayed call interrupted"))
+                delayed = reactor.callLater(self.sleepTime, d.callback, None)
+                def interrupt(reason):
+                    delayed.cancel()
+                    self.retries = 0
+                    return self.sendChangeFailed(reason)
+                self._interrupt = interrupt
                 return d
 
             self.step_status.setText(['sendchange to', self.master, 'failed'])
@@ -288,6 +353,12 @@ class SendChangeStep(BuildStep):
     def sendChangeSuccess(self, results):
         self.step_status.setText(['sendchange to', self.master, 'ok'])
         return BuildStep.finished(self, SUCCESS)
+
+    def interrupt(self, reason):
+        self.retries = 0
+        if self._interrupt:
+            self._interrupt("Cancelled sendchange")
+            self._interrupt = None
 
 class DownloadFile(ShellCommand):
     haltOnFailure = True
