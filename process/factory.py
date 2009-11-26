@@ -28,10 +28,10 @@ reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 
-from buildbotcustom.steps.misc import SetMozillaBuildProperties, \
-  TinderboxShellCommand, SendChangeStep, GetBuildID, MozillaClobberer, \
-  FindFile, DownloadFile, UnpackFile, SetBuildProperty, GetHgRevision, \
-  DisconnectStep, OutputStep, EvaluatingShellCommand
+from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
+  GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
+  SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
+  EvaluatingShellCommand
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -138,7 +138,7 @@ class MozillaBuildFactory(BuildFactory):
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
                  branchName=None, triggerBuilds=False, 
-                 triggeredSchedulers=None, **kwargs):
+                 triggeredSchedulers=None, hashType='sha1', **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -153,6 +153,7 @@ class MozillaBuildFactory(BuildFactory):
         self.buildsBeforeReboot = buildsBeforeReboot
         self.triggerBuilds = triggerBuilds
         self.triggeredSchedulers = triggeredSchedulers
+        self.hashType = hashType
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -282,6 +283,73 @@ class MozillaBuildFactory(BuildFactory):
         proto = 'ssh' if push else 'http'
         return '%s://%s/%s' % (proto, hgHost, repoPath)
 
+    def getPackageFilename(self, platform):
+        if platform.startswith("linux"):
+            packageFilename = '*.tar.bz2'
+        elif platform.startswith("macosx"):
+            packageFilename = '*.dmg'
+        elif platform.startswith("win32"):
+            packageFilename = '*.win32.zip'
+        elif platform.startswith("wince"):
+            packageFilename = '*.wince-arm.zip'
+        else:
+            return False
+        return packageFilename
+    
+    def parseFileSize(self, propertyName):
+        def getSize(rv, stdout, stderr):
+            stdout = stdout.strip()        
+            return {propertyName: stdout.split()[4]}
+        return getSize
+
+    def parseFileHash(self, propertyName):
+        def getHash(rv, stdout, stderr):
+            stdout = stdout.strip()        
+            return {propertyName: stdout.split(' ',2)[1]}
+        return getHash
+
+    def unsetFilepath(self, rv, stdout, stderr):
+        return {'filepath': None}
+
+    def addFilePropertiesSteps(self, filename, directory, fileType, 
+                               maxDepth=1, haltOnFailure=False):
+        self.addStep(FindFile(
+            name='find_filepath',
+            filename=filename,
+            directory=directory,
+            filetype='file',
+            max_depth=maxDepth,
+            property_name='filepath',
+            workdir='.',
+            haltOnFailure=haltOnFailure
+        ))
+        self.addStep(SetProperty,
+            command=['basename', WithProperties('%(filepath)s')],
+            property=fileType+'Filename',
+            workdir='.',
+            name='set_'+fileType.lower()+'_filename',
+            haltOnFailure=haltOnFailure
+        )
+        self.addStep(SetProperty,
+            command=['ls', '-l', WithProperties('%(filepath)s')],
+            workdir='.',
+            name='set_'+fileType.lower()+'_size',
+            extract_fn = self.parseFileSize(propertyName=fileType+'Size'),
+            haltOnFailure=haltOnFailure
+        )
+        self.addStep(SetProperty,
+            command=['openssl', self.hashType, WithProperties('%(filepath)s')],
+            workdir='.',
+            name='set_'+fileType.lower()+'_hash',
+            extract_fn=self.parseFileHash(propertyName=fileType+'Hash'),
+            haltOnFailure=haltOnFailure
+        )   
+        self.addStep(SetProperty,
+            name='unset_filepath',
+            command='echo "filepath:"',
+            workdir=directory,
+            extract_fn = self.unsetFilepath,
+        )
 
 
 class MercurialBuildFactory(MozillaBuildFactory):
@@ -466,7 +534,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
-         name='hg_clone',
+         name='hg_clone_configs',
          command=['hg', 'clone', configRepo, 'configs'],
          description=['checking', 'out', 'configs'],
          descriptionDone=['checkout', 'configs'],
@@ -728,48 +796,81 @@ class MercurialBuildFactory(MozillaBuildFactory):
              haltOnFailure=True,
             )
         self.addStep(ShellCommand,
-         name='make_pkg',
-         command=['make', 'package'] + pkgArgs,
-         env=self.env,
-         workdir='build/%s' % self.objdir,
-         haltOnFailure=True
+            name='make_pkg',
+            command=['make', 'package'] + pkgArgs,
+            env=self.env,
+            workdir='build/%s' % self.objdir,
+            haltOnFailure=True
         )
+        # Get package details
+        packageFilename = self.getPackageFilename(self.platform)
+        if packageFilename:
+            self.addFilePropertiesSteps(filename=packageFilename, 
+                                        directory='build/%s/dist' % self.objdir,
+                                        fileType='package',
+                                        haltOnFailure=True)
         # Windows special cases
         if self.platform.startswith("win32"):
-         self.addStep(ShellCommand,
-             name='make_installer',
-             command=['make', 'installer'] + pkgArgs,
-             env=self.env,
-             workdir='build/%s' % self.objdir,
-             haltOnFailure=True
-         )
+            self.addStep(ShellCommand,
+                name='make_installer',
+                command=['make', 'installer'] + pkgArgs,
+                env=self.env,
+                workdir='build/%s' % self.objdir,
+                haltOnFailure=True
+            )
+            self.addFilePropertiesSteps(filename='*.installer.exe', 
+                                        directory='build/%s/dist/install/sea' % self.objdir,
+                                        fileType='installer',
+                                        haltOnFailure=True)
         elif self.platform.startswith("wince"):
-         self.addStep(ShellCommand,
-             name='make_cab',
-             command=['make', 'package', 'MOZ_PKG_FORMAT=CAB'] + pkgArgs,
-             env=self.env,
-             workdir='build/%s' % self.objdir,
-             haltOnFailure=True
-         )
+            self.addStep(ShellCommand,
+                name='make_cab',
+                command=['make', 'package', 'MOZ_PKG_FORMAT=CAB'] + pkgArgs,
+                env=self.env,
+                workdir='build/%s' % self.objdir,
+                haltOnFailure=True
+            )
+            self.addFilePropertiesSteps(filename='*.wince-arm.cab', 
+                                        directory='build/%s' % self.objdir,
+                                        fileType='installer',
+                                        maxDepth=3,
+                                        haltOnFailure=True)
         if self.createSnippet:
-         self.addStep(ShellCommand,
-             name='make_update_pkg',
-             command=['make', '-C',
-                      '%s/tools/update-packaging' % self.mozillaObjdir],
-             env=self.env,
-             haltOnFailure=True
-         )
+            self.addStep(ShellCommand,
+                name='make_update_pkg',
+                command=['make', '-C',
+                         '%s/tools/update-packaging' % self.mozillaObjdir],
+                env=self.env,
+                haltOnFailure=True
+            )
+            self.addFilePropertiesSteps(filename='*.complete.mar', 
+                                        directory='build/%s/dist/update' % self.objdir,
+                                        fileType='completeMar',
+                                        haltOnFailure=True)
+
         if self.productName == 'xulrunner':
-            self.addStep(GetBuildID,
-             name='get_build_id',
-             objdir=self.objdir,
-             inifile='platform.ini',
-             section='Build',
-            )
+            self.addStep(SetProperty(
+                command=['python', 'config/printconfigsetting.py',
+                         '%s/dist/bin/platform.ini' % self.objdir,
+                         'App', 'BuildID'],
+                property='buildid',
+                name='get_build_id',
+            ))
         else:
-            self.addStep(SetMozillaBuildProperties,
-             objdir='build/%s' % self.mozillaObjdir
-            )
+            self.addStep(SetProperty(
+                command=['python', 'config/printconfigsetting.py',
+                         '%s/dist/bin/application.ini' % self.objdir,
+                         'App', 'BuildID'],
+                property='buildid',
+                name='get_build_id',
+            ))
+            self.addStep(SetProperty(
+                command=['python', 'config/printconfigsetting.py',
+                         '%s/dist/bin/application.ini' % self.objdir,
+                         'App', 'Version'],
+                property='appVersion',
+                name='get_app_version',
+            ))
 
         # Call out to a subclass to do the actual uploading
         self.doUpload()
