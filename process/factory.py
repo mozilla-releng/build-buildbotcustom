@@ -285,9 +285,9 @@ class MozillaBuildFactory(BuildFactory):
 
     def getPackageFilename(self, platform):
         if platform.startswith("linux64"):
-            packageFilename = '.linux-x86_64.tar.bz2'
+            packageFilename = '*.linux-x86_64.tar.bz2'
         elif platform.startswith("linux"):
-            packageFilename = '.linux-i686.tar.bz2'
+            packageFilename = '*.linux-i686.tar.bz2'
         elif platform.startswith("macosx"):
             packageFilename = '*.dmg'
         elif platform.startswith("win32"):
