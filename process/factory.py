@@ -951,7 +951,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(CreateCompleteUpdateSnippet,
          objdir='build/%s' % self.mozillaObjdir,
          milestone=self.branchName,
-         baseurl='%s/nightly' % self.downloadBaseURL
+         baseurl='%s/nightly' % self.downloadBaseURL,
+         hashType=self.hashType
         )
         self.addStep(ShellCommand,
          name='create_aus_updir',
@@ -1242,6 +1243,10 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         env['MOZ_PKG_PRETTYNAMES'] = '1'
         env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
+
+    def addFilePropertiesSteps(self):
+        # We don't need to do this for release builds.
+        pass    
 
     def doUpload(self):
         # Make sure the complete MAR has been generated

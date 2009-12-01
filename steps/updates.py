@@ -10,7 +10,8 @@ from buildbot.steps.transfer import _FileReader, StatusRemoteCommand
 
 
 class CreateCompleteUpdateSnippet(BuildStep):
-    def __init__(self, objdir, milestone, baseurl, appendDatedDir=True):
+    def __init__(self, objdir, milestone, baseurl, hashType='sha512', 
+                 appendDatedDir=True):
         BuildStep.__init__(self)
 
         self.addFactoryArguments(
@@ -24,6 +25,7 @@ class CreateCompleteUpdateSnippet(BuildStep):
         self.updateDir = path.join(objdir, 'dist', 'update')
         self.milestone = milestone
         self.baseurl = baseurl
+        self.hashType = hashType
         self.appendDatedDir = appendDatedDir
         self.maxsize = 16384
         self.mode = None
@@ -57,7 +59,7 @@ class CreateCompleteUpdateSnippet(BuildStep):
         # download URL
         snippet += "%s\n" % (downloadURL)
         # hash type
-        snippet += "sha1\n"
+        snippet += "%s\n" % (self.hashType)
         # hash of mar
         snippet += "%s\n" % self.getProperty('completeMarHash')
         # size (bytes) of mar
