@@ -4712,7 +4712,7 @@ class TalosFactory(BuildFactory):
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
         self.addGetBuildInfoStep()
-        if fetchSymbols:
+        if fetchSymbols and self.OS <> 'linux64':
             self.addDownloadSymbolsStep()
         self.addSetupSteps()
         self.addUpdateConfigStep()
