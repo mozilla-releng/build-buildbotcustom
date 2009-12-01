@@ -51,6 +51,10 @@ class TryBuildFactory(MercurialBuildFactory):
                                        uploadSymbols=uploadSymbols,
                                        env=env, **kwargs)
 
+    def addFilePropertiesSteps(self):
+        # We don't need to do this for try builds.
+        pass    
+
     def addPreBuildSteps(self):
         self.addStep(MozillaTryProcessing)
         if self.platform == 'win32':
