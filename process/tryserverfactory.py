@@ -225,7 +225,11 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
             workdir="%s/%s" % (self.baseWorkDir, self.objdir),
         )
 
-    def addPackageSteps(self):
+
+    # In MaemoBuildFactory's __init__, addPackageSteps gets called
+    # with the argument 'packageXulrunner' and we have to add here
+    # even if it is not used
+    def addPackageSteps(self, packageXulrunner=False):
         self.addStep(ShellCommand,
             command='mkdir upload',
             description=['create', 'upload', 'directory'],
