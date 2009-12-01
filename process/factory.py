@@ -1244,7 +1244,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
-    def addFilePropertiesSteps(self):
+    def addFilePropertiesSteps(self, filename=None, directory=None, 
+                               fileType=None, maxDepth=1, haltOnFailure=False):
         # We don't need to do this for release builds.
         pass    
 
