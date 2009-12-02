@@ -187,7 +187,7 @@ def generateBranchObjects(config, name):
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
                 test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
-            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, False))
+            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, True))
         # Optimized unittest builds
         if pf.get('enable_opt_unittests'):
             test_builders = []
