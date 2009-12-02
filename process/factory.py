@@ -2712,7 +2712,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  ftpServer, bouncerServer, stagingServer, useBetaChannel,
                  stageUsername, stageSshKey, ausUser, ausHost, ausServerUrl,
                  hgSshKey, hgUsername, commitPatcherConfig=True, mozRepoPath=None,
-                 brandName=None, buildSpace=13, **kwargs):
+                 brandName=None, buildSpace=14, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
