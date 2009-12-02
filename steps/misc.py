@@ -266,10 +266,11 @@ class SetMozillaBuildProperties(LoggingBuildStep):
 class SendChangeStep(BuildStep):
     warnOnFailure = True
     def __init__(self, master, branch, files, revision=None, user=None,
-            comments="", timeout=60, retries=5, **kwargs):
+            comments="", timeout=1800, retries=5, **kwargs):
         BuildStep.__init__(self, **kwargs)
         self.addFactoryArguments(master=master, branch=branch, files=files,
-                revision=revision, user=user, comments=comments, timeout=timeout)
+                revision=revision, user=user, comments=comments, timeout=timeout,
+                retries=retries)
         self.master = master
         self.branch = branch
         self.files = files
