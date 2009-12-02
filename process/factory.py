@@ -1186,11 +1186,12 @@ class NightlyBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")
             )
-        for master, warn in self.unittestMasters:
+        for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
              warnOnFailure=warn,
              master=master,
+             retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
@@ -3182,11 +3183,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
              extract_fn = get_url,
             )
 
-            for master, warn in self.unittestMasters:
+            for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
                  warnOnFailure=warn,
                  master=master,
+                 retries=retries,
                  branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange-unittest")
