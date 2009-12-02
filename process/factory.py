@@ -815,7 +815,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
-        if self.platform.startswith("win32"):
+        if self.platform.startswith("win32") and \
+           self.productName != 'xulrunner':
             self.addStep(ShellCommand,
                 name='make_installer',
                 command=['make', 'installer'] + pkgArgs,
@@ -857,7 +858,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(SetProperty(
                 command=['python', 'config/printconfigsetting.py',
                          '%s/dist/bin/platform.ini' % self.objdir,
-                         'App', 'BuildID'],
+                         'Build', 'BuildID'],
                 property='buildid',
                 name='get_build_id',
             ))
