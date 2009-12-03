@@ -1362,12 +1362,13 @@ class BaseRepackFactory(MozillaBuildFactory):
                  stageServer, stageUsername, stageSshKey=None,
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  baseWorkDir='build', tree="notset", mozillaDir=None,
-                 **kwargs):
+                 l10nTag='default', **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
         self.appName = appName
         self.l10nRepoPath = l10nRepoPath
+        self.l10nTag = l10nTag
         self.compareLocalesRepoPath = compareLocalesRepoPath
         self.compareLocalesTag = compareLocalesTag
         self.stageServer = stageServer
@@ -1506,7 +1507,8 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='get_enUS_src',
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
-                         'hg -R '+self.origSrcDir+' pull -r default ; ' +
+                         'hg -R '+self.origSrcDir+' pull -r '+
+                         self.l10nTag+' ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.repoPath+' ' +
@@ -1522,7 +1524,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='get_locale_src',
          command=['sh', '-c',
           WithProperties('if [ -d %(locale)s ]; then ' +
-                         'hg -R %(locale)s pull -r default ; ' +
+                         'hg -R %(locale)s pull -r '+self.l10nRepoPath+' ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+\
@@ -1759,7 +1761,7 @@ class NightlyRepackFactory(BaseRepackFactory):
     def updateSources(self):
         self.addStep(ShellCommand,
          name='update_locale_source',
-         command=['hg', 'up', '-C', '-r', 'default'],
+         command=['hg', 'up', '-C', '-r', self.l10nTag],
          description='update workdir',
          workdir=WithProperties('build/' + self.l10nRepoPath + '/%(locale)s'),
          haltOnFailure=True
@@ -5271,7 +5273,7 @@ class TryTalosFactory(TalosFactory):
 class MobileNightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
 
-    def __init__(self, enUSBinaryURL, hgHost=None, 
+    def __init__(self, enUSBinaryURL, hgHost=None,
                  mobileRepoPath='mobile-browser',
                  project='fennec', baseWorkDir='build',
                  repoPath='mozilla-central', appName='mobile',
@@ -5324,10 +5326,10 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         self.addStep(ShellCommand,
          name='enUS_mobile_source',
          command=['sh', '-c', 'if [ -d mobile ]; then ' +
-                  'hg -R mobile pull -r default ; else ' +
+                  'hg -R mobile pull -r '+self.l10nTag+' ; else ' +
                   'hg clone http://' + self.hgHost + '/' + self.mobileRepoPath +
                   ' mobile ; ' +
-                  'fi && hg -R mobile update -r default'],
+                  'fi && hg -R mobile update -r '+self.l10nTag],
          descriptionDone=['en-US', 'mobile', 'source'],
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=30*60 # 30 minutes
@@ -5336,7 +5338,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
     def updateSources(self):
         self.addStep(ShellCommand,
          name='update_workdir',
-         command=['hg', 'up', '-C', '-r', 'default'],
+         command=['hg', 'up', '-C', '-r', self.l10nTag],
          description='update workdir',
          workdir=WithProperties(self.baseWorkDir + '/' + self.l10nRepoPath + \
                                 '/%(locale)s'),
@@ -5527,6 +5529,81 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         )
         self.addUploadSteps(platform='linux')
 
+class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
+    def __init__(self, env, version, buildNumber, productName=None,
+                 brandName=None, **kwargs):
+
+        # not sure i need all this?
+        self.version = version
+        self.buildNumber = buildNumber
+        self.productName = productName
+        if brandName:
+            self.brandName = brandName
+        else:
+            self.brandName = productName.capitalize()
+        assert 'l10nTag' in kwargs
+
+        # Copy the environment to avoid screwing up other consumers of
+        # MercurialBuildFactory
+        env = env.copy()
+        # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
+        # The latter is only strictly necessary for RCs.
+        env['MOZ_PKG_PRETTYNAMES'] = '1'
+        env['MOZ_PKG_VERSION'] = version
+        self.env = env
+        MaemoNightlyRepackFactory.__init__(self, **kwargs)
+
+    def addUploadSteps(self, platform):
+#        self.addStep(ShellCommand,
+#         name='echo_buildID',
+#         command=['bash', '-c',
+#                  WithProperties('echo buildID=%(buildid)s > ' + \
+#                                '%s_info.txt' % self.platform)],
+#         workdir='build/%s/dist' % self.mozillaObjdir
+#        )
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1',
+                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
+                                       '-p %s ' % self.productName + \
+                                       '-v %s ' % self.version + \
+                                       '-n %s ' % self.buildNumber + \
+                                       '--release-to-candidates-dir'
+#        self.addStep(SetProperty,
+#            command=['python', 'config/printconfigsetting.py',
+#                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+#                     'App', 'BuildID'],
+#            property='buildid',
+#            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+#            description=['getting', 'buildid'],
+#            descriptionDone=['got', 'buildid']
+#        )
+        # TODO Change this to scp, change path
+#        self.addStep(MozillaStageUpload,
+#            objdir="%s/%s" % (self.branchName, self.objdir),
+#            username=self.stageUsername,
+#            milestone=self.baseUploadDir,
+#            remoteHost=self.stageServer,
+#            remoteBasePath=self.stageBasePath,
+#            platform=platform,
+#            group=self.stageGroup,
+#            packageGlob=self.packageGlob,
+#            sshKey=self.stageSshKey,
+#            uploadCompleteMar=False,
+#            releaseToLatest=self.nightly,
+#            releaseToDated=self.nightly,
+#            releaseToTinderboxBuilds=True,
+#            tinderboxBuildsDir=self.baseUploadDir,
+#            dependToDated=True,
+#            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+#                                        self.objdir)
+#        )
+    
 
 class MobileDesktopNightlyRepackFactory(MobileNightlyRepackFactory):
     def doUpload(self):
