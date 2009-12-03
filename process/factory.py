@@ -2624,7 +2624,7 @@ class MultiSourceFactory(ReleaseFactory):
             repoConfig = [{
                 'repoPath': self.repoPath,
                 'location': self.branchName,
-                'bundleName': '%s-%s.bundle' % (self.productName, self.version)
+                'bundleName': '%s-%s.bundle' % (productName, version)
             }]
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
@@ -4268,8 +4268,6 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.scratchboxPath = scratchboxPath
         self.multiLocale = multiLocale
         self.l10nRepoPath = l10nRepoPath
-        self.locales = []
-#Dict TODO aki use self.locales
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -4530,11 +4528,15 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
 class MaemoReleaseBuildFactory(MaemoBuildFactory):
-    def __init__(self, env, version, buildNumber, brandName=None,
-            talosMasters=None, **kwargs):
+    def __init__(self, env, version, buildNumber, productName=None,
+                 brandName=None, talosMasters=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
-        self.brandName = brandName
+        self.productName = productName
+        if brandName:
+            self.brandName = brandName
+        else:
+            self.brandName = productName.capitalize()
 
         # Copy the environment to avoid screwing up other consumers of
         # MercurialBuildFactory
@@ -4543,17 +4545,16 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
         # The latter is only strictly necessary for RCs.
         env['MOZ_PKG_PRETTYNAMES'] = '1'
         env['MOZ_PKG_VERSION'] = version
-        MaemoBuildFactory.__init__(self, env=env, multiLocale=True, **kwargs)
+        MaemoBuildFactory.__init__(self, env=env, **kwargs)
 
-    def doUpload(self):
-        self.addStep(ShellCommand,
-         name='echo_buildID',
-         command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                '%s_info.txt' % self.platform)],
-         workdir='build/%s/dist' % self.mozillaObjdir
-        )
-
+    def addUploadSteps(self, platform):
+#        self.addStep(ShellCommand,
+#         name='echo_buildID',
+#         command=['bash', '-c',
+#                  WithProperties('echo buildID=%(buildid)s > ' + \
+#                                '%s_info.txt' % self.platform)],
+#         workdir='build/%s/dist' % self.mozillaObjdir
+#        )
         uploadEnv = self.env.copy()
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
                           'UPLOAD_USER': self.stageUsername,
@@ -4567,13 +4568,34 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
                                        '-v %s ' % self.version + \
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
-
-        # TODO upload and SetProperty packageUrl
-#        self.addStep(SetProperty,
-#         command=['make', 'upload'],
-#         env=uploadEnv,
-#         workdir='build/%s' % self.objdir,
-#         extract_fn = get_url,
+        self.addStep(SetProperty,
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        # TODO Change this to scp, change path
+#        self.addStep(MozillaStageUpload,
+#            objdir="%s/%s" % (self.branchName, self.objdir),
+#            username=self.stageUsername,
+#            milestone=self.baseUploadDir,
+#            remoteHost=self.stageServer,
+#            remoteBasePath=self.stageBasePath,
+#            platform=platform,
+#            group=self.stageGroup,
+#            packageGlob=self.packageGlob,
+#            sshKey=self.stageSshKey,
+#            uploadCompleteMar=False,
+#            releaseToLatest=self.nightly,
+#            releaseToDated=self.nightly,
+#            releaseToTinderboxBuilds=True,
+#            tinderboxBuildsDir=self.baseUploadDir,
+#            dependToDated=True,
+#            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+#                                        self.objdir)
 #        )
 
 class WinmoBuildFactory(MobileBuildFactory):
