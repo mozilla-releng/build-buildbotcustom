@@ -161,18 +161,18 @@ class MozillaBuildFactory(BuildFactory):
         else:
           self.branchName = self.getRepoName(self.repository)
 
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='get_buildername',
-         command=['echo', WithProperties('Building on: %(slavename)s')]
-        )
-        self.addStep(ShellCommand,
+         data=WithProperties('Building on: %(slavename)s'),
+        ))
+        self.addStep(OutputStep(
          name='tinderboxprint_buildername',
-         command=['echo', 'TinderboxPrint:', WithProperties('s: %(slavename)s')]
-        )
-        self.addStep(ShellCommand,
+         data=WithProperties('TinderboxPrint: s: %(slavename)s'),
+        ))
+        self.addStep(OutputStep(
          name='tinderboxsummarymessage_buildername',
-         command=['echo', 'TinderboxSummaryMessage:', WithProperties('s: %(slavename)s')]
-        )
+         data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
+        ))
         self.addInitialSteps()
 
     def addInitialSteps(self):
@@ -518,10 +518,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
                                                       self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)]
+        ))
 
     def addConfigSteps(self):
         assert self.configRepoPath is not None
@@ -1036,10 +1036,10 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             )
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)]
+        ))
         # build up the checkout command with all options
         co_command = ['python', 'client.py', 'checkout']
         if self.mozRepoPath:
@@ -1084,10 +1084,10 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         )
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)]
+        ))
 
     def addUploadSteps(self, pkgArgs=None):
         MercurialBuildFactory.addUploadSteps(self, pkgArgs)
@@ -1379,12 +1379,11 @@ class BaseRepackFactory(MozillaBuildFactory):
                                                           mozconfig)
             self.configRepoPath = configRepoPath
 
-        self.addStep(SetProperty,
-                     command=['echo', self.tree],
-                     property='tree',
-                     workdir='.',
-                     haltOnFailure=True
-                     )
+        self.addStep(SetBuildProperty(
+         property_name='tree',
+         value=self.tree,
+         haltOnFailure=True
+        ))
 
         # Needed for scratchbox
         self.baseWorkDir = baseWorkDir
@@ -1477,13 +1476,13 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
     def tinderboxPrint(self, propName, propValue):
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
                      name='tinderboxprint_%s' % propName,
-                     command=['echo',
-                              'TinderboxPrint:',
-                              '%s:' % propName,
-                              propValue]
-        )
+                     data=['TinderboxPrint:',
+                           '%s:' % propName,
+                           propValue]
+        ))
+
     def tinderboxPrintBuildInfo(self):
         '''Display some build properties for scraping in Tinderbox.
         '''
@@ -2352,12 +2351,11 @@ class ReleaseTaggingFactory(ReleaseFactory):
             # which we commit, and set this property again, so we tag
             # the right revision. For build2, we don't version bump, and this
             # will not get overridden
-            self.addStep(SetProperty,
-             command=['echo', repoRevision],
-             property='%s-revision' % repoName,
-             workdir='.',
+            self.addStep(SetBuildProperty(
+             property_name="%s-revision" % repoName,
+             value=repoRevision,
              haltOnFailure=True
-            )
+            ))
             # 'hg clone -r' breaks in the respin case because the cloned
             # repository will not have ANY changesets from the release branch
             # and 'hg up -C' will fail
@@ -3231,10 +3229,10 @@ class UnittestBuildFactory(MozillaBuildFactory):
         changesetLink = ''.join(['<a href=http://hg.mozilla.org/',
             self.repoPath,
             '/rev/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'])
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)],
+        ))
 
     def addStep(self, *args, **kw):
         kw.setdefault('env', self.env)
@@ -3555,10 +3553,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
     def addPrintChangesetStep(self):
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)],
+        ))
 
     def addPrintMozillaChangesetStep(self):
         self.addStep(SetProperty,
@@ -3568,10 +3566,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         )
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)]
+        ))
 
     def addStep(self, *args, **kw):
         kw.setdefault('env', self.env)
@@ -3968,9 +3966,9 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.addStep(GetHgRevision(
                 workdir='%s/%s' % (workdir, targetDirectory)
             ))
-            self.addStep(ShellCommand(
+            self.addStep(OutputStep(
                 name='tinderboxprint_changeset',
-                command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)]
+                data=['TinderboxPrint:', WithProperties(changesetLink)]
             ))
 
     def getMozconfig(self):
@@ -4634,10 +4632,10 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
         changesetLink = '<a href=%(repo_path)s/rev/%(revision)s' + \
                 ' title="Built from revision %(revision)s">rev:%(revision)s</a>'
-        self.addStep(ShellCommand,
+        self.addStep(OutputStep(
          name='tinderboxprint_changeset',
-         command=['echo', 'TinderboxPrint:', WithProperties(changesetLink)],
-        )
+         data=['TinderboxPrint:', WithProperties(changesetLink)],
+        ))
 
         # Run them!
         for suite in self.test_suites:
