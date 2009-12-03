@@ -4159,6 +4159,8 @@ class MaemoBuildFactory(MobileBuildFactory):
             # This will package the en-US single-locale build (no xulrunner)
             self.addPackageSteps()
             self.doUpload()
+            self.useProgress = False
+            self.nonMultiLocaleStepsLength = len(self.steps)
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
             self.addBuildSteps()
             self.addPackageSteps(packageXulrunner=True)
@@ -4289,6 +4291,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         req = requests[-1]
         # get the list of locales that has been added by the scheduler
         locales = req.properties.getProperty(propertyName)
+        # Drop all previous multi-locale steps, to fix bug 531873.
+        self.steps = self.steps[:self.nonMultiLocaleStepsLength]
         # remove all packages that have been created by the single locale build
         self.addStep(ShellCommand,
             name='rm_packages',
