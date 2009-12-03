@@ -2607,6 +2607,121 @@ class SingleSourceFactory(ReleaseFactory):
          description=['upload files'],
         )
 
+# This should be a drop-in replacement for SingleSourceFactory,
+# but that's currently untested.
+class MultiSourceFactory(ReleaseFactory):
+    def __init__(self, productName, version, baseTag, stagingServer,
+                 stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
+                 buildSpace=1, repoConfig=None, **kwargs):
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
+        releaseTag = '%s_RELEASE' % (baseTag)
+        bundleFiles = []
+        sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
+                                                         version)
+        if not repoConfig:
+            repoConfig = [{
+                'repoPath': self.repoPath,
+                'location': self.branchName,
+                'bundleName': '%s-%s.bundle' % (self.productName, self.version)
+            }]
+        # '-c' is for "release to candidates dir"
+        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
+          (productName, version, buildNumber)
+        uploadEnv = {'UPLOAD_HOST': stagingServer,
+                     'UPLOAD_USER': stageUsername,
+                     'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
+                     'UPLOAD_TO_TEMP': '1',
+                     'POST_UPLOAD_CMD': postUploadCmd}
+
+        self.addStep(ShellCommand,
+         name='rm_srcdir',
+         command=['rm', '-rf', 'source'],
+         workdir='.',
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='make_srcdir',
+         command=['mkdir', 'source'],
+         workdir='.',
+         haltOnFailure=True
+        )
+        for repo in repoConfig:
+            repository = self.getRepository(repo['repoPath'])
+            location = repo['location']
+            bundleFiles.append('source/%s' % repo['bundleName'])
+
+            self.addStep(ShellCommand,
+             name='hg_clone',
+             command=['hg', 'clone', repository, location],
+             workdir='.',
+             description=['clone %s' % location],
+             haltOnFailure=True,
+             timeout=30*60 # 30 minutes
+            )
+            # This will get us to the version we're building the release with
+            self.addStep(ShellCommand,
+             name='hg_update',
+             command=['hg', 'up', '-C', '-r', releaseTag],
+             workdir=location,
+             description=['update to', releaseTag],
+             haltOnFailure=True
+            )
+            # ...And this will get us the tags so people can do things like
+            # 'hg up -r FIREFOX_3_1b1_RELEASE' with the bundle
+            self.addStep(ShellCommand,
+             name='hg_update_incl_tags',
+             command=['hg', 'up'],
+             workdir=location,
+             description=['update to', 'include tag revs'],
+             haltOnFailure=True
+            )
+            self.addStep(SetProperty,
+             name='hg_ident_revision',
+             command=['hg', 'identify', '-i'],
+             property='revision',
+             workdir=location,
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             name='create_bundle',
+             command=['hg', '-R', location, 'bundle', '--base', 'null',
+                      '-r', WithProperties('%(revision)s'),
+                      'source/%s' % repo['bundleName']],
+             workdir='.',
+             description=['create bundle'],
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             name='delete_metadata',
+             command=['rm', '-rf', '.hg'],
+             workdir=location,
+             description=['delete metadata'],
+             haltOnFailure=True
+            )
+        for dir in autoconfDirs:
+            self.addStep(ShellCommand,
+             name='autoconf',
+             command=['autoconf-2.13'],
+             workdir='%s/%s' % (self.branchName, dir),
+             haltOnFailure=True
+            )
+        self.addStep(ShellCommand,
+         name='create_tarball',
+         command=['tar', '-cjf', sourceTarball, self.branchName],
+         workdir='.',
+         description=['create tarball'],
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='upload_files',
+         command=['python', '%s/build/upload.py' % self.branchName,
+                  '--base-path', '.',
+                  bundleFiles, sourceTarball],
+         workdir='.',
+         env=uploadEnv,
+         description=['upload files'],
+        )
+
 class CCSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, mozRepoPath,
@@ -3897,7 +4012,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
-                 clobber=False, env=None, **kwargs):
+                 clobber=False, env=None, mobileRevision='default',
+                 mozRevision='default', **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm, winmo-arm)
@@ -3918,6 +4034,8 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageServer = stageServer
         self.stageBasePath = stageBasePath
         self.stageGroup = stageGroup
+        self.mobileRevision = mobileRevision
+        self.mozRevision = mozRevision
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
 
@@ -3939,6 +4057,7 @@ class MobileBuildFactory(MozillaBuildFactory):
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
                        cloneTimeout=60*20,
+                       revision='default',
                        changesetLink=None):
         assert (repository and workdir)
         if (targetDirectory == None):
@@ -3955,8 +4074,16 @@ class MobileBuildFactory(MozillaBuildFactory):
             timeout=cloneTimeout
         )
         self.addStep(ShellCommand,
+            name='hg_pull',
+            command=['hg', 'pull'],
+            workdir="%s/%s" % (workdir, targetDirectory),
+            description=['pulling', targetDirectory],
+            descriptionDone=['pulled', targetDirectory],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
             name='hg_update',
-            command=['hg', 'pull', '-u'],
+            command=['hg', 'update', '-r', revision],
             workdir="%s/%s" % (workdir, targetDirectory),
             description=['updating', targetDirectory],
             descriptionDone=['updated', targetDirectory],
@@ -4006,11 +4133,13 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
                             changesetLink=self.mozChangesetLink,
+                            revision=self.mozRevision,
                             cloneTimeout=60*30)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
                             changesetLink=self.mobileChangesetLink,
+                            revision=self.mobileRevision,
                             targetDirectory='mobile')
 
     def addUploadSteps(self, platform):
@@ -4129,6 +4258,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                  packageGlob="mobile/dist/*.tar.bz2 " +
                  "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
                  "xulrunner/dist/*.tar.bz2",
+                 l10nTag='default',
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
@@ -4136,6 +4266,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.scratchboxPath = scratchboxPath
         self.multiLocale = multiLocale
         self.l10nRepoPath = l10nRepoPath
+        self.locales = []
+#Dict TODO aki use self.locales
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -4167,7 +4299,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addUploadSteps(platform='linux')
         
         if self.triggerBuilds:
-            self.addTriggeredBuildsSteps()            
+            self.addTriggeredBuildsSteps()
 
     def newBuild(self, requests):
         if self.multiLocale:
@@ -4268,7 +4400,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
     
-    def doUpload(self):
+    def doUpload(self, skipUpload=False):
         # This function is only called by the nightly and dependent single-locale
         # build since we want to upload the 'en-US' subdirectory as a whole
         self.addStep(ShellCommand,
@@ -4285,7 +4417,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         # Now that we have moved all the packages that we want under 'en-US'
         # let's indicate that we want to upload the whole directory
         self.packageGlob = '-r mobile/dist/en-US'
-        self.addUploadSteps(platform='linux')
+        if not skipUpload:
+            self.addUploadSteps(platform='linux')
 
     def addMultiLocaleSteps(self, requests, propertyName):
         req = requests[-1]
@@ -4343,11 +4476,12 @@ class MaemoBuildFactory(MobileBuildFactory):
          name='get_locale_src_%s' % locale,
          command=['sh', '-c',
           WithProperties('if [ -d '+locale+' ]; then ' +
-                         'hg -R '+locale+' pull -r default ; ' +
+                         'hg -R '+locale+' pull -r '+self.l10nTag+' ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+\
                            '/'+locale+'/ ; ' +
+                         'hg -R '+locale+' up -r '+self.l10nTag+' ; '
                          'fi ')],
          descriptionDone="locale source",
          timeout=5*60, # 5 minutes
@@ -4368,7 +4502,7 @@ class MaemoBuildFactory(MobileBuildFactory):
          name='merge_locale_%s' % locale,
          command=['python',
                   '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir,
-                  '-m', '%s/merged' % objdirAbsPath, 
+                  '-m', '%s/merged' % objdirAbsPath,
                   "l10n.ini",
                   "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
                   locale],
@@ -4396,6 +4530,53 @@ class MaemoBuildFactory(MobileBuildFactory):
             haltOnFailure=False,
             description=['make','chrome-%s' % locale],
         )
+
+class MaemoReleaseBuildFactory(MaemoBuildFactory):
+    def __init__(self, env, version, buildNumber, brandName=None,
+            talosMasters=None, **kwargs):
+        self.version = version
+        self.buildNumber = buildNumber
+        self.brandName = brandName
+
+        # Copy the environment to avoid screwing up other consumers of
+        # MercurialBuildFactory
+        env = env.copy()
+        # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
+        # The latter is only strictly necessary for RCs.
+        env['MOZ_PKG_PRETTYNAMES'] = '1'
+        env['MOZ_PKG_VERSION'] = version
+        MaemoBuildFactory.__init__(self, env=env, multiLocale=True, **kwargs)
+
+    def doUpload(self):
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                '%s_info.txt' % self.platform)],
+         workdir='build/%s/dist' % self.mozillaObjdir
+        )
+
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1',
+                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
+                                       '-p %s ' % self.productName + \
+                                       '-v %s ' % self.version + \
+                                       '-n %s ' % self.buildNumber + \
+                                       '--release-to-candidates-dir'
+
+        # TODO upload and SetProperty packageUrl
+#        self.addStep(SetProperty,
+#         command=['make', 'upload'],
+#         env=uploadEnv,
+#         workdir='build/%s' % self.objdir,
+#         extract_fn = get_url,
+#        )
 
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
