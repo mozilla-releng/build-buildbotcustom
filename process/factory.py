@@ -4254,6 +4254,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
                  multiLocale = False,
+                 uploadMultiLocaleInDir=False,
                  l10nRepoPath = 'l10n-central',
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
@@ -4267,9 +4268,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.packageGlob = packageGlob
         self.scratchboxPath = scratchboxPath
         self.multiLocale = multiLocale
+        self.uploadMultiLocaleInDir = uploadMultiLocaleInDir
         self.l10nRepoPath = l10nRepoPath
-        self.locales = []
-#Dict TODO aki use self.locales
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -4292,7 +4292,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
             # This will package the en-US single-locale build (no xulrunner)
             self.addPackageSteps()
-            self.doUpload()
+            self.uploadEnUS()
             self.useProgress = False
             self.nonMultiLocaleStepsLength = len(self.steps)
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
@@ -4402,25 +4402,38 @@ class MaemoBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
     
-    def doUpload(self, skipUpload=False):
-        # This function is only called by the nightly and dependent single-locale
-        # build since we want to upload the 'en-US' subdirectory as a whole
+    def prepUpload(self, localeDir='en-US', uploadDir=None):
+        """
+This function is only called by the nightly and dependent single-locale
+build since we want to upload the localeDir subdirectory as a whole.
+        """
+        # uploadDir allows you to use a nested directory structure in
+        # localeDir (e.g. maemo/en-US) and scp -r maemo instead of
+        # scp -r maemo/en-US, which loses that directory structure.
+        if not uploadDir:
+            uploadDir=localeDir
         self.addStep(ShellCommand,
             name='prepare_upload',
-            command=['mkdir', '-p', 'en-US'],
+            command=['mkdir', '-p', localeDir],
             haltOnFailure=True,
             workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName, self.objdir)
         )
         self.addStep(ShellCommand,
             name='mv_binaries',
-            command=['sh', '-c', 'mv %s mobile/dist/en-US' % self.packageGlob],
+            command=['sh', '-c', 'mv %s mobile/dist/%s' % (self.packageGlob,
+                                                           localeDir)],
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
-        # Now that we have moved all the packages that we want under 'en-US'
+        # Now that we have moved all the packages that we want under localeDir
         # let's indicate that we want to upload the whole directory
-        self.packageGlob = '-r mobile/dist/en-US'
-        if not skipUpload:
-            self.addUploadSteps(platform='linux')
+        self.packageGlob = '-r mobile/dist/%s' % uploadDir
+
+    def uploadEnUS(self):
+        self.prepUpload(localeDir='en-US')
+        self.addUploadSteps(platform='linux')
+
+    def uploadMulti(self):
+        self.addUploadSteps(platform='linux')
 
     def addMultiLocaleSteps(self, requests, propertyName):
         req = requests[-1]
@@ -4448,7 +4461,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addPackageSteps(multiLocale=True, packageXulrunner=True)
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
                          "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
-        self.addUploadSteps(platform='linux')
+        self.uploadMulti()
 
     def compareLocalesSetup(self):
         self.addStep(ShellCommand,
@@ -4534,47 +4547,24 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
 class MaemoReleaseBuildFactory(MaemoBuildFactory):
-    def __init__(self, env, version, buildNumber, productName=None,
-                 brandName=None, talosMasters=None, **kwargs):
-        self.version = version
-        self.buildNumber = buildNumber
-        self.brandName = brandName
-        self.productName = productName
-        if brandName:
-            self.brandName = brandName
-        else:
-            self.brandName = productName.capitalize()
+    def __init__(self, env, **kwargs):
 
         # Copy the environment to avoid screwing up other consumers of
         # MercurialBuildFactory
         env = env.copy()
         # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
         # The latter is only strictly necessary for RCs.
-        env['MOZ_PKG_PRETTYNAMES'] = '1'
-        env['MOZ_PKG_VERSION'] = version
+#        env['MOZ_PKG_PRETTYNAMES'] = '1'
+#        env['MOZ_PKG_VERSION'] = version
         MaemoBuildFactory.__init__(self, env=env, **kwargs)
+        assert (self.stageUsername)
 
-    def addUploadSteps(self, platform):
-#        self.addStep(ShellCommand,
-#         name='echo_buildID',
-#         command=['bash', '-c',
-#                  WithProperties('echo buildID=%(buildid)s > ' + \
-#                                '%s_info.txt' % self.platform)],
-#         workdir='build/%s/dist' % self.mozillaObjdir
-#        )
-        uploadEnv = self.env.copy()
-        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
-                          'UPLOAD_USER': self.stageUsername,
-                          'UPLOAD_TO_TEMP': '1',
-                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
-        if self.stageSshKey:
-            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
-
-        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
-                                       '-p %s ' % self.productName + \
-                                       '-v %s ' % self.version + \
-                                       '-n %s ' % self.buildNumber + \
-                                       '--release-to-candidates-dir'
+    def uploadEnUS(self):
+        self.prepUpload(localeDir='maemo/en-US', uploadDir='maemo')
+        self.addUploadSteps(platform='linux')
+        
+    def uploadMulti(self):
+        self.prepUpload(localeDir='maemo/multi', uploadDir='maemo')
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
                      '%s/mobile/dist/bin/application.ini' % self.objdir,
@@ -4584,26 +4574,32 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
-        # TODO Change this to scp, change path
-#        self.addStep(MozillaStageUpload,
-#            objdir="%s/%s" % (self.branchName, self.objdir),
-#            username=self.stageUsername,
-#            milestone=self.baseUploadDir,
-#            remoteHost=self.stageServer,
-#            remoteBasePath=self.stageBasePath,
-#            platform=platform,
-#            group=self.stageGroup,
-#            packageGlob=self.packageGlob,
-#            sshKey=self.stageSshKey,
-#            uploadCompleteMar=False,
-#            releaseToLatest=self.nightly,
-#            releaseToDated=self.nightly,
-#            releaseToTinderboxBuilds=True,
-#            tinderboxBuildsDir=self.baseUploadDir,
-#            dependToDated=True,
-#            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-#                                        self.objdir)
-#        )
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                'maemo_info.txt')],
+         workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName,
+                                           self.objdir)
+        )
+        self.packageGlob = '%s mobile/dist/maemo_info.txt' % self.packageGlob
+        self.addUploadSteps(platform='linux')
+
+    def addUploadSteps(self, platform):
+        self.addStep(ShellCommand,
+         command='ssh -l '+self.stageUsername+' '+
+                 '-i '+self.stageSshKey+' '+self.stageServer+' '+
+                 'mkdir -p '+self.stageBasePath+' && '+
+                 'scp -i '+self.stageSshKey+' '+self.packageGlob+' '+
+                 self.stageUsername+'@'+self.stageServer+':'+
+                 self.stageBasePath+' && '+
+                 'ssh -l '+self.stageUsername+' -i '+self.stageSshKey+' '+
+                 self.stageServer+' chmod -R 755 '+self.stageBasePath,
+         timeout=30*60,
+         haltOnFailure=True,
+         workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                               self.objdir)
+        )
 
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
@@ -5530,80 +5526,25 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         self.addUploadSteps(platform='linux')
 
 class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
-    def __init__(self, env, version, buildNumber, productName=None,
-                 brandName=None, **kwargs):
-
-        # not sure i need all this?
-        self.version = version
-        self.buildNumber = buildNumber
-        self.productName = productName
-        if brandName:
-            self.brandName = brandName
-        else:
-            self.brandName = productName.capitalize()
+    def __init__(self, **kwargs):
         assert 'l10nTag' in kwargs
-
-        # Copy the environment to avoid screwing up other consumers of
-        # MercurialBuildFactory
-        env = env.copy()
-        # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
-        # The latter is only strictly necessary for RCs.
-        env['MOZ_PKG_PRETTYNAMES'] = '1'
-        env['MOZ_PKG_VERSION'] = version
-        self.env = env
         MaemoNightlyRepackFactory.__init__(self, **kwargs)
 
     def addUploadSteps(self, platform):
-#        self.addStep(ShellCommand,
-#         name='echo_buildID',
-#         command=['bash', '-c',
-#                  WithProperties('echo buildID=%(buildid)s > ' + \
-#                                '%s_info.txt' % self.platform)],
-#         workdir='build/%s/dist' % self.mozillaObjdir
-#        )
-        uploadEnv = self.env.copy()
-        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
-                          'UPLOAD_USER': self.stageUsername,
-                          'UPLOAD_TO_TEMP': '1',
-                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
-        if self.stageSshKey:
-            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+        self.addStep(ShellCommand,
+         command=WithProperties('ssh -l '+self.stageUsername+' '+
+                 '-i '+self.stageSshKey+' '+self.stageServer+' '+
+                 'mkdir -p '+self.stageBasePath+' && '+
 
-        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
-                                       '-p %s ' % self.productName + \
-                                       '-v %s ' % self.version + \
-                                       '-n %s ' % self.buildNumber + \
-                                       '--release-to-candidates-dir'
-#        self.addStep(SetProperty,
-#            command=['python', 'config/printconfigsetting.py',
-#                     '%s/mobile/dist/bin/application.ini' % self.objdir,
-#                     'App', 'BuildID'],
-#            property='buildid',
-#            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-#            description=['getting', 'buildid'],
-#            descriptionDone=['got', 'buildid']
-#        )
-        # TODO Change this to scp, change path
-#        self.addStep(MozillaStageUpload,
-#            objdir="%s/%s" % (self.branchName, self.objdir),
-#            username=self.stageUsername,
-#            milestone=self.baseUploadDir,
-#            remoteHost=self.stageServer,
-#            remoteBasePath=self.stageBasePath,
-#            platform=platform,
-#            group=self.stageGroup,
-#            packageGlob=self.packageGlob,
-#            sshKey=self.stageSshKey,
-#            uploadCompleteMar=False,
-#            releaseToLatest=self.nightly,
-#            releaseToDated=self.nightly,
-#            releaseToTinderboxBuilds=True,
-#            tinderboxBuildsDir=self.baseUploadDir,
-#            dependToDated=True,
-#            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-#                                        self.objdir)
-#        )
-    
+                 'scp -i '+self.stageSshKey+' '+self.packageGlob+' '+
+                 self.stageUsername+'@'+self.stageServer+':'+
+                 self.stageBasePath+' && '+
+                 'ssh -l '+self.stageUsername+' -i '+self.stageSshKey+' '+
+                 self.stageServer+' chmod -R 755 '+self.stageBasePath),
+         timeout=30*60,
+         haltOnFailure=True,
+         workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir)
+        )
 
 class MobileDesktopNightlyRepackFactory(MobileNightlyRepackFactory):
     def doUpload(self):
