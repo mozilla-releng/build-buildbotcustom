@@ -2614,13 +2614,15 @@ class SingleSourceFactory(ReleaseFactory):
 class MultiSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
-                 buildSpace=1, repoConfig=None, parentDir="nightly",
-                 **kwargs):
+                 buildSpace=1, repoConfig=None, uploadProductName=None,
+                 parentDir="nightly", **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
         releaseTag = '%s_RELEASE' % (baseTag)
         bundleFiles = []
         sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
                                                          version)
+        if not uploadProductName:
+            uploadProductName = productName
         if not repoConfig:
             repoConfig = [{
                 'repoPath': self.repoPath,
@@ -2629,7 +2631,7 @@ class MultiSourceFactory(ReleaseFactory):
             }]
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c --candidates-parentdir %s' % \
-          (productName, version, buildNumber, parentDir)
+          (uploadProductName, version, buildNumber, parentDir)
         uploadEnv = {'UPLOAD_HOST': stagingServer,
                      'UPLOAD_USER': stageUsername,
                      'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
@@ -2718,8 +2720,7 @@ class MultiSourceFactory(ReleaseFactory):
         self.addStep(ShellCommand,
          name='upload_files',
          command=['python', '%s/build/upload.py' % self.branchName,
-                  '--base-path', '.',
-                  bundleFiles, sourceTarball],
+                  '--base-path', '.'] + bundleFiles + [sourceTarball],
          workdir='.',
          env=uploadEnv,
          description=['upload files'],
