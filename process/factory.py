@@ -5532,6 +5532,27 @@ class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
         assert 'l10nTag' in kwargs
         MaemoNightlyRepackFactory.__init__(self, **kwargs)
 
+    def doUpload(self):
+        self.addStep(ShellCommand,
+         name='copy_deb',
+         command=['sh', '-c', WithProperties('if [ -f %(locale)s/*.deb ] ' +
+                  '; then cp -r %(locale)s ' + '%s/%s/dist ; fi' %
+                  (self.baseWorkDir, self.origSrcDir))],
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
+                                       self.appName),
+         haltOnFailure=True,
+        )
+        self.addStep(ShellCommand,
+         name='copy_files',
+         command=['sh', '-c',
+                  WithProperties('cp fennec-*.%(locale)s.linux-gnueabi-arm.tar.bz2 ' +
+                                 'install/fennec-*.%(locale)s.langpack.xpi ' +
+                                 '%(locale)s/')],
+         workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir),
+         haltOnFailure=True,
+        )
+        self.addUploadSteps(platform='linux')
+
     def addUploadSteps(self, platform):
         self.addStep(ShellCommand,
          command=WithProperties('ssh -l '+self.stageUsername+' '+
