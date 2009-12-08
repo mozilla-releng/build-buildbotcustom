@@ -2614,7 +2614,8 @@ class SingleSourceFactory(ReleaseFactory):
 class MultiSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
-                 buildSpace=1, repoConfig=None, **kwargs):
+                 buildSpace=1, repoConfig=None, parentDir="nightly",
+                 **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
         releaseTag = '%s_RELEASE' % (baseTag)
         bundleFiles = []
@@ -2627,8 +2628,8 @@ class MultiSourceFactory(ReleaseFactory):
                 'bundleName': '%s-%s.bundle' % (productName, version)
             }]
         # '-c' is for "release to candidates dir"
-        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
-          (productName, version, buildNumber)
+        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c --candidates-parentdir %s' % \
+          (productName, version, buildNumber, parentDir)
         uploadEnv = {'UPLOAD_HOST': stagingServer,
                      'UPLOAD_USER': stageUsername,
                      'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
