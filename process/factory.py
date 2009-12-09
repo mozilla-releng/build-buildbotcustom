@@ -5271,7 +5271,8 @@ class TryTalosFactory(TalosFactory):
 class MobileNightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
 
-    def __init__(self, enUSBinaryURL, hgHost=None,
+    def __init__(self, enUSBinaryURL, hgHost=None, 
+                 nightly=True,
                  mobileRepoPath='mobile-browser',
                  project='fennec', baseWorkDir='build',
                  repoPath='mozilla-central', appName='mobile',
@@ -5283,6 +5284,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                  **kwargs):
 
         self.hgHost = hgHost
+        self.nightly = nightly
         self.mobileRepoPath = mobileRepoPath
         self.mobileRepository = self.getRepository(mobileRepoPath)
         self.mobileBranchName = self.getRepoName(self.mobileRepository)
@@ -5423,9 +5425,9 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
             sshKey=self.stageSshKey,
             uploadCompleteMar=False,
             uploadLangPacks=False,
-            releaseToLatest=True,
+            releaseToLatest=self.nightly,
             releaseToDated=False,
-            releaseToTinderboxBuilds=False,
+            releaseToTinderboxBuilds=True,
             tinderboxBuildsDir=self.baseUploadDir,
             dependToDated=False,
             workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir)
