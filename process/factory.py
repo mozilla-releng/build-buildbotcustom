@@ -1362,12 +1362,8 @@ class BaseRepackFactory(MozillaBuildFactory):
                  stageServer, stageUsername, stageSshKey=None,
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  baseWorkDir='build', tree="notset", mozillaDir=None,
-                 l10nTag='default', mergeLocales=True, **kwargs):
+                 l10nTag='default', **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
-        if mergeLocales:
-            self.compareLocaleOptions = ['-m', 'merged']
-        else:
-            self.compareLocaleOptions = []
 
         self.project = project
         self.appName = appName
@@ -1593,9 +1589,9 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='merge_locale',
          command=['python',
-                  '../../../compare-locales/scripts/compare-locales'] +
-                  self.compareLocaleOptions +
-                  ["l10n.ini",
+                  '../../../compare-locales/scripts/compare-locales',
+                  '-m', 'merged',
+                  "l10n.ini",
                   "../../../%s" % self.l10nRepoPath,
                   WithProperties('%(locale)s')],
          description='comparing locale',
@@ -4268,6 +4264,8 @@ class MaemoBuildFactory(MobileBuildFactory):
                  "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
                  "xulrunner/dist/*.tar.bz2",
                  l10nTag='default',
+                 mergeLocales=True,
+                 locales=None,
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
@@ -4276,6 +4274,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.multiLocale = multiLocale
         self.uploadMultiLocaleInDir = uploadMultiLocaleInDir
         self.l10nRepoPath = l10nRepoPath
+        self.locales = locales
+        self.mergeLocales = mergeLocales
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -4441,10 +4441,14 @@ build since we want to upload the localeDir subdirectory as a whole.
     def uploadMulti(self):
         self.addUploadSteps(platform='linux')
 
-    def addMultiLocaleSteps(self, requests, propertyName):
-        req = requests[-1]
-        # get the list of locales that has been added by the scheduler
-        locales = req.properties.getProperty(propertyName)
+    def addMultiLocaleSteps(self, requests=None, propertyName=None):
+        if self.locales:
+            locales = self.locales
+        else:
+            req = requests[-1]
+            # get the list of locales that has been added by the scheduler
+            locales = req.properties.getProperty(propertyName)
+
         # Drop all previous multi-locale steps, to fix bug 531873.
         self.steps = self.steps[:self.nonMultiLocaleStepsLength]
         # remove all packages that have been created by the single locale build
@@ -4512,6 +4516,10 @@ build since we want to upload the localeDir subdirectory as a whole.
 
     def compareLocales(self, locale):
         objdirAbsPath = "%s/%s/%s" % (self.baseWorkDir, self.branchName, self.objdir)
+        if self.mergeLocales:
+            mergeLocaleOptions = ['-m', '%s/merged' % objdirAbsPath]
+        else:
+            mergeLocaleOptions = []
         self.addStep(ShellCommand,
          name='rm_merged_%s' % locale,
          command=['rm', '-rf', 'merged'],
@@ -4522,9 +4530,9 @@ build since we want to upload the localeDir subdirectory as a whole.
         self.addStep(ShellCommand,
          name='merge_locale_%s' % locale,
          command=['python',
-                  '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir,
-                  '-m', '%s/merged' % objdirAbsPath,
-                  "l10n.ini",
+                  '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir] +
+                  mergeLocaleOptions +
+                  ["l10n.ini",
                   "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
                   locale],
          description='comparing %s' % locale,
@@ -4554,14 +4562,7 @@ build since we want to upload the localeDir subdirectory as a whole.
 
 class MaemoReleaseBuildFactory(MaemoBuildFactory):
     def __init__(self, env, **kwargs):
-
-        # Copy the environment to avoid screwing up other consumers of
-        # MercurialBuildFactory
         env = env.copy()
-        # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
-        # The latter is only strictly necessary for RCs.
-#        env['MOZ_PKG_PRETTYNAMES'] = '1'
-#        env['MOZ_PKG_VERSION'] = version
         MaemoBuildFactory.__init__(self, env=env, **kwargs)
         assert (self.stageUsername)
 
