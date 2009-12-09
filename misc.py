@@ -51,27 +51,22 @@ def get_l10n_repositories(file, l10nRepoPath, relbranch):
 
     return repositories
 
-def get_locales_from_json(file, l10nRepoPath, relbranch):
+def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
     if not l10nRepoPath.endswith('/'):
         l10nRepoPath = l10nRepoPath + '/'
 
     l10nRepositories = {}
     platformLocales = {}
-    allLocales = []
 
+    file = open(jsonFile)
     localesJson = json.load(file)
-    for locale in localesJson.keys()
-        allLocales.append(locale)
-    allLocales.sort()
-
-    for locale in allLocales:
+    for locale in localesJson.keys():
         revision = localesJson[locale]['revision']
-        locale, revision = localeLine.rstrip().split()
         if revision == 'FIXME':
             raise Exception('Found FIXME in %s for locale "%s"' % \
-                           (file, locale))
+                           (jsonFile, locale))
         localeUrl = urljoin(l10nRepoPath, locale)
-        l10nepositories[localeUrl] = {
+        l10nRepositories[localeUrl] = {
             'revision': revision,
             'relbranchOverride': relbranch,
             'bumpFiles': []
@@ -82,7 +77,7 @@ def get_locales_from_json(file, l10nRepoPath, relbranch):
             else:
                 platformLocales[platform].append(locale)
 
-    return (allLocales, l10nRepositories, platformLocales)
+    return (l10nRepositories, platformLocales)
 
 # This function is used as fileIsImportant parameter for Buildbots that do both
 # dep/nightlies and release builds. Because they build the same "branch" this
