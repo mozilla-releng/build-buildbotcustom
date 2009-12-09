@@ -73,9 +73,8 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
         }
         for platform in localesJson[locale]['platforms']:
             if platform not in platformLocales.keys():
-                platformLocales[platform] = [locale]
-            else:
-                platformLocales[platform].append(locale)
+                platformLocales[platform] = {}
+            platformLocales[platform][locale] = localesJson[locale]['platforms']
 
     return (l10nRepositories, platformLocales)
 
