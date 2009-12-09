@@ -4274,8 +4274,6 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.multiLocale = multiLocale
         self.uploadMultiLocaleInDir = uploadMultiLocaleInDir
         self.l10nRepoPath = l10nRepoPath
-        l10nRepository = self.getRepository(l10nRepoPath)
-        self.l10nRepoName = self.getRepoName(self.repository)
         self.l10nTag = l10nTag
         self.locales = locales
         self.mergeLocales = mergeLocales
@@ -4294,11 +4292,11 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
                 name='create_dir_l10n',
-                command=['mkdir', '-p', self.l10nRepoName],
+                command=['mkdir', '-p', self.l10nRepoPath],
                 workdir='%s' % self.baseWorkDir,
                 description=['create', 'l10n', 'dir']
             )
-            self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoName)
+            self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
             # This will package the en-US single-locale build (no xulrunner)
             self.addPackageSteps()
             self.uploadEnUS()
@@ -4335,7 +4333,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             if self.multiLocale:
                 self.addStep(ShellCommand,
                     name='clobber_l10n_dir',
-                    command=['rm', '-rf', self.l10nRepoName],
+                    command=['rm', '-rf', self.l10nRepoPath],
                     env=self.env,
                     workdir=self.baseWorkDir,
                     timeout=10*60
@@ -4514,7 +4512,7 @@ build since we want to upload the localeDir subdirectory as a whole.
          descriptionDone="locale source",
          timeout=5*60, # 5 minutes
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoName)
+         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
         )
 
     def compareLocales(self, locale):
@@ -4536,7 +4534,7 @@ build since we want to upload the localeDir subdirectory as a whole.
                   '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir] +
                   mergeLocaleOptions +
                   ["l10n.ini",
-                  "%s/%s" % (self.baseWorkDir, self.l10nRepoName),
+                  "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
                   locale],
          description='comparing %s' % locale,
          env={'PYTHONPATH': ['%s/compare-locales/lib' % self.baseWorkDir]},
