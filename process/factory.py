@@ -4274,6 +4274,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.multiLocale = multiLocale
         self.uploadMultiLocaleInDir = uploadMultiLocaleInDir
         self.l10nRepoPath = l10nRepoPath
+        self.l10nTag = l10nTag
         self.locales = locales
         self.mergeLocales = mergeLocales
 
