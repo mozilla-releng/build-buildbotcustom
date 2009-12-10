@@ -2631,8 +2631,6 @@ class SingleSourceFactory(ReleaseFactory):
          description=['upload files'],
         )
 
-# This should be a drop-in replacement for SingleSourceFactory,
-# but that's currently untested.
 class MultiSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
