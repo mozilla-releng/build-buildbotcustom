@@ -1591,22 +1591,39 @@ class BaseRepackFactory(MozillaBuildFactory):
                                        self.appName),
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
-         name='merge_locale',
-         command=['python',
-                  '../../../compare-locales/scripts/compare-locales'] +
-                  mergeLocaleOptions +
-                  ["l10n.ini",
-                  "../../../%s" % self.l10nRepoPath,
-                  WithProperties('%(locale)s')],
-         description='comparing locale',
-         env={'PYTHONPATH': ['../../../compare-locales/lib']},
-         flunkOnFailure=False,
-         warnOnFailure=True,
-         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.origSrcDir,
-                                       self.appName),
-        )
+        if self.mergeLocales:
+            self.addStep(ShellCommand,
+             name='merge_locale',
+             command=['python',
+                      '../../../compare-locales/scripts/compare-locales'] +
+                      mergeLocaleOptions +
+                      ["l10n.ini",
+                      "../../../%s" % self.l10nRepoPath,
+                      WithProperties('%(locale)s')],
+             description='comparing locale',
+             env={'PYTHONPATH': ['../../../compare-locales/lib']},
+             flunkOnFailure=False,
+             warnOnFailure=True,
+             workdir="%s/%s/%s/locales" % (self.baseWorkDir,
+                                           self.origSrcDir,
+                                           self.appName),
+            )
+        else:
+            self.addStep(ShellCommand,
+             name='merge_locale',
+             command=['python',
+                      '../../../compare-locales/scripts/compare-locales'] +
+                      mergeLocaleOptions +
+                      ["l10n.ini",
+                      "../../../%s" % self.l10nRepoPath,
+                      WithProperties('%(locale)s')],
+             description='comparing locale',
+             env={'PYTHONPATH': ['../../../compare-locales/lib']},
+             haltOnFailure=True,
+             workdir="%s/%s/%s/locales" % (self.baseWorkDir,
+                                           self.origSrcDir,
+                                           self.appName),
+            )
 
     def doRepack(self):
         '''Perform the repackaging.
