@@ -2630,7 +2630,7 @@ class MultiSourceFactory(ReleaseFactory):
                 'bundleName': '%s-%s.bundle' % (productName, version)
             }]
         # '-c' is for "release to candidates dir"
-        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c --candidates-parentdir %s' % \
+        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c --nightly-dir %s' % \
           (uploadProductName, version, buildNumber, parentDir)
         uploadEnv = {'UPLOAD_HOST': stagingServer,
                      'UPLOAD_USER': stageUsername,
