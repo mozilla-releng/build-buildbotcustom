@@ -1525,7 +1525,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='get_locale_src',
          command=['sh', '-c',
           WithProperties('if [ -d %(locale)s ]; then ' +
-                         'hg -R %(locale)s pull -r '+self.l10nRepoPath+' ; ' +
+                         'hg -R %(locale)s pull -r '+self.l10nTag+' ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+\
