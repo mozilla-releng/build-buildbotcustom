@@ -1362,7 +1362,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  stageServer, stageUsername, stageSshKey=None,
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  baseWorkDir='build', tree="notset", mozillaDir=None,
-                 l10nTag='default', **kwargs):
+                 l10nTag='default', mergeLocales=True, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
@@ -1371,6 +1371,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.l10nTag = l10nTag
         self.compareLocalesRepoPath = compareLocalesRepoPath
         self.compareLocalesTag = compareLocalesTag
+        self.mergeLocales = mergeLocales
         self.stageServer = stageServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
@@ -1577,6 +1578,10 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
     def compareLocales(self):
+        if self.mergeLocales:
+            mergeLocaleOptions = ['-m', 'merged']
+        else:
+            mergeLocaleOptions = []
         self.addStep(ShellCommand,
          name='rm_merged',
          command=['rm', '-rf', 'merged'],
@@ -1589,9 +1594,9 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='merge_locale',
          command=['python',
-                  '../../../compare-locales/scripts/compare-locales',
-                  '-m', 'merged',
-                  "l10n.ini",
+                  '../../../compare-locales/scripts/compare-locales'] +
+                  mergeLocaleOptions +
+                  ["l10n.ini",
                   "../../../%s" % self.l10nRepoPath,
                   WithProperties('%(locale)s')],
          description='comparing locale',
