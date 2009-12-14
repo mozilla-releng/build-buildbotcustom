@@ -307,7 +307,8 @@ class SendChangeStep(BuildStep):
     files: %s""" % (self.master, self.branch, self.revision, self.comments, self.user, self.files))
             return self.sendChange()
         except KeyError:
-            return self.finished(Failure())
+            self.addCompleteLog("errors", str(Failure()))
+            return self.finished(FAILURE)
 
     def sendChange(self):
         d = self.sender.send(self.branch, self.revision, self.comments, self.files, self.user)
@@ -345,15 +346,15 @@ class SendChangeStep(BuildStep):
             if self.warnOnFailure:
                 self.step_status.setText2(['sendchange'])
             self.addCompleteLog("errors", str(res))
-            return BuildStep.finished(self, FAILURE)
+            return self.finished(FAILURE)
         except:
             log.msg("Error processing sendchange failure")
             log.err()
-            return BuildStep.finished(self, FAILURE)
+            return self.finished(FAILURE)
 
     def sendChangeSuccess(self, results):
         self.step_status.setText(['sendchange to', self.master, 'ok'])
-        return BuildStep.finished(self, SUCCESS)
+        return self.finished(SUCCESS)
 
     def interrupt(self, reason):
         self.retries = 0
