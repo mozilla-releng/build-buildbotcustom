@@ -1,4 +1,9 @@
 from urlparse import urljoin
+try:
+    import json
+except:
+    import simplejson as json
+import collections
 
 from buildbot.scheduler import Nightly, Scheduler
 from buildbot.status.tinderbox import TinderboxMailNotifier
@@ -47,6 +52,30 @@ def get_l10n_repositories(file, l10nRepoPath, relbranch):
 
     return repositories
 
+def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
+    if not l10nRepoPath.endswith('/'):
+        l10nRepoPath = l10nRepoPath + '/'
+
+    l10nRepositories = {}
+    platformLocales = collections.defaultdict(dict)
+
+    file = open(jsonFile)
+    localesJson = json.load(file)
+    for locale in localesJson.keys():
+        revision = localesJson[locale]['revision']
+        if revision == 'FIXME':
+            raise Exception('Found FIXME in %s for locale "%s"' % \
+                           (jsonFile, locale))
+        localeUrl = urljoin(l10nRepoPath, locale)
+        l10nRepositories[localeUrl] = {
+            'revision': revision,
+            'relbranchOverride': relbranch,
+            'bumpFiles': []
+        }
+        for platform in localesJson[locale]['platforms']:
+            platformLocales[platform][locale] = localesJson[locale]['platforms']
+
+    return (l10nRepositories, platformLocales)
 
 # This function is used as fileIsImportant parameter for Buildbots that do both
 # dep/nightlies and release builds. Because they build the same "branch" this

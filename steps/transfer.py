@@ -8,7 +8,8 @@ class MozillaStageUpload(ShellCommand):
     def __init__(self, objdir, username, milestone, platform, remoteHost,
                  remoteBasePath, group=None, chmodMode=755, sshKey=None,
                  releaseToDated=True, releaseToLatest=True,
-                 releaseToTinderboxBuilds=True, tinderboxBuildsDir=None, 
+                 releaseToTinderboxBuilds=True, tinderboxBuildsDir=None,
+                 releaseToCandidates=False, remoteCandidatesPath=None,
                  dependToDated=True, uploadCompleteMar=True,
                  uploadLangPacks=False, packageGlob=None, **kwargs):
         """
@@ -67,13 +68,23 @@ class MozillaStageUpload(ShellCommand):
                 'remoteBasePath'/tinderbox-builds/$hostname. This should
                 generally be set to True for all builds. Default: True
 
-        @type  tinderboxBuildsDir: This option only has effect when
+        @type  tinderboxBuildsDir: string
+        @param tinderboxBuildsDir: This option only has effect when
                                    releaseToTinderboxBuilds is True. If this
                                    option is None (default), builds will be
                                    uploaded to:
                                    tinderbox-builds/builderName
                                    If otherwise set builds will be uploaded to
                                    tinderbox-builds/tinderboxBuildsDir.
+
+        @type  releaseToCandidates: bool
+        @param releaseToCandidates: If True, builds will be pushed to
+                remoteCandidatesDir.  This should only be set for releases.
+
+        @type  remoteCandidatesDir: string
+        @param remoteCandidatesDir: This option only has effect, and is
+                                    required, when releaseToCandidates is
+                                    True.
 
         @type  dependToDated: This option only has effect when
                               releaseToTinderboxBuilds is True. When
@@ -120,11 +131,15 @@ class MozillaStageUpload(ShellCommand):
                                  releaseToLatest=releaseToLatest,
                                  releaseToTinderboxBuilds=releaseToTinderboxBuilds,
                                  tinderboxBuildsDir=tinderboxBuildsDir,
+                                 releaseToCandidates=releaseToCandidates,
+                                 remoteCandidatesPath=remoteCandidatesPath,
                                  dependToDated=dependToDated,
                                  uploadCompleteMar=uploadCompleteMar,
                                  uploadLangPacks=uploadLangPacks)
 
         assert platform in ('win32', 'linux', 'macosx')
+        if releaseToCandidates:
+            assert remoteCandidatesPath
         self.objdir = objdir
         self.username = username
         self.milestone = milestone
@@ -137,6 +152,8 @@ class MozillaStageUpload(ShellCommand):
         self.sshKey = sshKey
         self.releaseToDated = releaseToDated
         self.releaseToLatest = releaseToLatest
+        self.releaseToCandidates = releaseToCandidates
+        self.remoteCandidatesPath = remoteCandidatesPath
         self.releaseToTinderboxBuilds = releaseToTinderboxBuilds
         self.tinderboxBuildsDir = tinderboxBuildsDir
         self.dependToDated = dependToDated
@@ -205,6 +222,9 @@ class MozillaStageUpload(ShellCommand):
         return path.join(self.remoteBasePath, 'nightly',
                          'latest-%s' % self.milestone)
 
+    def getCandidatesPath(self):
+        return self.remoteCandidatesPath
+
     def getTinderboxBuildsPath(self):
         tboxBuildsPath = path.join(self.remoteBasePath, 'tinderbox-builds')
         if self.tinderboxBuildsDir:
@@ -267,6 +287,7 @@ class MozillaStageUpload(ShellCommand):
         datedDir = self.getLongDatedPath()
         latestDir = self.getLatestPath()
         tinderboxBuildsDir = self.getTinderboxBuildsPath()
+        candidatesDir = self.getCandidatesPath()
 
         commands = []
         if self.releaseToDated:
@@ -321,6 +342,19 @@ class MozillaStageUpload(ShellCommand):
                    self.chmodCommand(tinderboxBuildsDir)
             if self.group:
                 cmd += " && " + self.chgrpCommand(tinderboxBuildsDir)
+            commands.append(cmd)
+
+        if self.releaseToCandidates:
+            # 1) Create the directory on the staging server.
+            # 2) Upload the package(s).
+            # 3) Fix the permissions on the package(s).
+            # 4) Maybe adjust the group on the package(s).
+            cmd = ""
+            cmd += self.createDirCommand(candidatesDir) + " && " + \
+                   self.uploadCommand(candidatesDir) + " && " + \
+                   self.chmodCommand(candidatesDir)
+            if self.group:
+                cmd += " && " + self.chgrpCommand(candidatesDir)
             commands.append(cmd)
 
         finalCommand = ' && '.join(commands)

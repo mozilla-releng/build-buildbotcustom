@@ -1362,14 +1362,16 @@ class BaseRepackFactory(MozillaBuildFactory):
                  stageServer, stageUsername, stageSshKey=None,
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  baseWorkDir='build', tree="notset", mozillaDir=None,
-                 **kwargs):
+                 l10nTag='default', mergeLocales=True, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.project = project
         self.appName = appName
         self.l10nRepoPath = l10nRepoPath
+        self.l10nTag = l10nTag
         self.compareLocalesRepoPath = compareLocalesRepoPath
         self.compareLocalesTag = compareLocalesTag
+        self.mergeLocales = mergeLocales
         self.stageServer = stageServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
@@ -1506,7 +1508,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='get_enUS_src',
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
-                         'hg -R '+self.origSrcDir+' pull -r default ; ' +
+                         'hg -R '+self.origSrcDir+' pull -r default ;'+
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.repoPath+' ' +
@@ -1575,6 +1577,16 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
     def compareLocales(self):
+        if self.mergeLocales:
+            mergeLocaleOptions = ['-m', 'merged']
+            flunkOnFailure = False
+            haltOnFailure = False
+            warnOnFailure = True
+        else:
+            mergeLocaleOptions = []
+            flunkOnFailure = True
+            haltOnFailure = True
+            warnOnFailure = False
         self.addStep(ShellCommand,
          name='rm_merged',
          command=['rm', '-rf', 'merged'],
@@ -1585,17 +1597,18 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
-         name='merge_locale',
+         name='run_compare_locales',
          command=['python',
-                  '../../../compare-locales/scripts/compare-locales',
-                  '-m', 'merged',
-                  "l10n.ini",
+                  '../../../compare-locales/scripts/compare-locales'] +
+                  mergeLocaleOptions +
+                  ["l10n.ini",
                   "../../../%s" % self.l10nRepoPath,
                   WithProperties('%(locale)s')],
          description='comparing locale',
          env={'PYTHONPATH': ['../../../compare-locales/lib']},
-         flunkOnFailure=False,
-         warnOnFailure=True,
+         flunkOnFailure=flunkOnFailure,
+         warnOnFailure=warnOnFailure,
+         haltOnFailure=haltOnFailure,
          workdir="%s/%s/%s/locales" % (self.baseWorkDir,
                                        self.origSrcDir,
                                        self.appName),
@@ -1759,7 +1772,7 @@ class NightlyRepackFactory(BaseRepackFactory):
     def updateSources(self):
         self.addStep(ShellCommand,
          name='update_locale_source',
-         command=['hg', 'up', '-C', '-r', 'default'],
+         command=['hg', 'up', '-C', '-r', self.l10nTag],
          description='update workdir',
          workdir=WithProperties('build/' + self.l10nRepoPath + '/%(locale)s'),
          haltOnFailure=True
@@ -2602,6 +2615,124 @@ class SingleSourceFactory(ReleaseFactory):
          command=['python', '%s/build/upload.py' % self.branchName,
                   '--base-path', '.',
                   bundleFile, sourceTarball],
+         workdir='.',
+         env=uploadEnv,
+         description=['upload files'],
+        )
+
+class MultiSourceFactory(ReleaseFactory):
+    """You need to pass in a repoConfig, which will be a list that
+       looks like this:
+       repoConfig = [{
+           'repoPath': repoPath,
+           'location': branchName,
+           'bundleName': '%s-%s.bundle' % (productName, version)
+       }]"""
+    def __init__(self, productName, version, baseTag, stagingServer,
+                 stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
+                 buildSpace=1, repoConfig=None, uploadProductName=None,
+                 stageNightlyDir="nightly", **kwargs):
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
+        releaseTag = '%s_RELEASE' % (baseTag)
+        bundleFiles = []
+        sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
+                                                         version)
+        if not uploadProductName:
+            uploadProductName = productName
+
+        assert repoConfig
+        # '-c' is for "release to candidates dir"
+        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c --nightly-dir %s' % \
+          (uploadProductName, version, buildNumber, stageNightlyDir)
+        uploadEnv = {'UPLOAD_HOST': stagingServer,
+                     'UPLOAD_USER': stageUsername,
+                     'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
+                     'UPLOAD_TO_TEMP': '1',
+                     'POST_UPLOAD_CMD': postUploadCmd}
+
+        self.addStep(ShellCommand,
+         name='rm_srcdir',
+         command=['rm', '-rf', 'source'],
+         workdir='.',
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='make_srcdir',
+         command=['mkdir', 'source'],
+         workdir='.',
+         haltOnFailure=True
+        )
+        for repo in repoConfig:
+            repository = self.getRepository(repo['repoPath'])
+            location = repo['location']
+            bundleFiles.append('source/%s' % repo['bundleName'])
+
+            self.addStep(ShellCommand,
+             name='hg_clone',
+             command=['hg', 'clone', repository, location],
+             workdir='.',
+             description=['clone %s' % location],
+             haltOnFailure=True,
+             timeout=30*60 # 30 minutes
+            )
+            # This will get us to the version we're building the release with
+            self.addStep(ShellCommand,
+             name='hg_update',
+             command=['hg', 'up', '-C', '-r', releaseTag],
+             workdir=location,
+             description=['update to', releaseTag],
+             haltOnFailure=True
+            )
+            # ...And this will get us the tags so people can do things like
+            # 'hg up -r FIREFOX_3_1b1_RELEASE' with the bundle
+            self.addStep(ShellCommand,
+             name='hg_update_incl_tags',
+             command=['hg', 'up'],
+             workdir=location,
+             description=['update to', 'include tag revs'],
+             haltOnFailure=True
+            )
+            self.addStep(SetProperty,
+             name='hg_ident_revision',
+             command=['hg', 'identify', '-i'],
+             property='revision',
+             workdir=location,
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             name='create_bundle',
+             command=['hg', '-R', location, 'bundle', '--base', 'null',
+                      '-r', WithProperties('%(revision)s'),
+                      'source/%s' % repo['bundleName']],
+             workdir='.',
+             description=['create bundle'],
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             name='delete_metadata',
+             command=['rm', '-rf', '.hg'],
+             workdir=location,
+             description=['delete metadata'],
+             haltOnFailure=True
+            )
+        for dir in autoconfDirs:
+            self.addStep(ShellCommand,
+             name='autoconf',
+             command=['autoconf-2.13'],
+             workdir='%s/%s' % (self.branchName, dir),
+             haltOnFailure=True
+            )
+        self.addStep(ShellCommand,
+         name='create_tarball',
+         command=['tar', '-cjf', sourceTarball, self.branchName],
+         workdir='.',
+         description=['create tarball'],
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='upload_files',
+         command=['python', '%s/build/upload.py' % self.branchName,
+                  '--base-path', '.'] + bundleFiles + [sourceTarball],
          workdir='.',
          env=uploadEnv,
          description=['upload files'],
@@ -3897,7 +4028,9 @@ class MobileBuildFactory(MozillaBuildFactory):
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
-                 clobber=False, env=None, **kwargs):
+                 clobber=False, env=None,
+                 mobileRevision='default',
+                 mozRevision='default', **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm, winmo-arm)
@@ -3918,6 +4051,8 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageServer = stageServer
         self.stageBasePath = stageBasePath
         self.stageGroup = stageGroup
+        self.mobileRevision = mobileRevision
+        self.mozRevision = mozRevision
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
 
@@ -3939,6 +4074,7 @@ class MobileBuildFactory(MozillaBuildFactory):
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
                        cloneTimeout=60*20,
+                       revision='default',
                        changesetLink=None):
         assert (repository and workdir)
         if (targetDirectory == None):
@@ -3955,8 +4091,16 @@ class MobileBuildFactory(MozillaBuildFactory):
             timeout=cloneTimeout
         )
         self.addStep(ShellCommand,
+            name='hg_pull',
+            command=['hg', 'pull'],
+            workdir="%s/%s" % (workdir, targetDirectory),
+            description=['pulling', targetDirectory],
+            descriptionDone=['pulled', targetDirectory],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
             name='hg_update',
-            command=['hg', 'pull', '-u'],
+            command=['hg', 'update', '-C', '-r', revision],
             workdir="%s/%s" % (workdir, targetDirectory),
             description=['updating', targetDirectory],
             descriptionDone=['updated', targetDirectory],
@@ -4006,11 +4150,13 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
                             changesetLink=self.mozChangesetLink,
+                            revision=self.mozRevision,
                             cloneTimeout=60*30)
         self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
                             changesetLink=self.mobileChangesetLink,
+                            revision=self.mobileRevision,
                             targetDirectory='mobile')
 
     def addUploadSteps(self, platform):
@@ -4038,6 +4184,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             releaseToDated=self.nightly,
             releaseToTinderboxBuilds=True,
             tinderboxBuildsDir=self.baseUploadDir,
+            remoteCandidatesPath=self.stageBasePath,
             dependToDated=True,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
                                         self.objdir)
@@ -4129,6 +4276,9 @@ class MaemoBuildFactory(MobileBuildFactory):
                  packageGlob="mobile/dist/*.tar.bz2 " +
                  "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
                  "xulrunner/dist/*.tar.bz2",
+                 l10nTag='default',
+                 mergeLocales=True,
+                 locales=None,
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
@@ -4136,6 +4286,9 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.scratchboxPath = scratchboxPath
         self.multiLocale = multiLocale
         self.l10nRepoPath = l10nRepoPath
+        self.l10nTag = l10nTag
+        self.locales = locales
+        self.mergeLocales = mergeLocales
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -4158,7 +4311,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
             # This will package the en-US single-locale build (no xulrunner)
             self.addPackageSteps()
-            self.doUpload()
+            self.uploadEnUS()
             self.useProgress = False
             self.nonMultiLocaleStepsLength = len(self.steps)
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
@@ -4167,7 +4320,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addUploadSteps(platform='linux')
         
         if self.triggerBuilds:
-            self.addTriggeredBuildsSteps()            
+            self.addTriggeredBuildsSteps()
 
     def newBuild(self, requests):
         if self.multiLocale:
@@ -4268,29 +4421,46 @@ class MaemoBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
     
-    def doUpload(self):
-        # This function is only called by the nightly and dependent single-locale
-        # build since we want to upload the 'en-US' subdirectory as a whole
+    def prepUpload(self, localeDir='en-US', uploadDir=None):
+        """This function is only called by the nightly and dependent
+        single-locale build since we want to upload the localeDir
+        subdirectory as a whole."""
+        # uploadDir allows you to use a nested directory structure in
+        # localeDir (e.g. maemo/en-US) and scp -r maemo instead of
+        # scp -r maemo/en-US, which loses that directory structure.
+        if not uploadDir:
+            uploadDir=localeDir
         self.addStep(ShellCommand,
             name='prepare_upload',
-            command=['mkdir', '-p', 'en-US'],
+            command=['mkdir', '-p', localeDir],
             haltOnFailure=True,
             workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName, self.objdir)
         )
         self.addStep(ShellCommand,
             name='mv_binaries',
-            command=['sh', '-c', 'mv %s mobile/dist/en-US' % self.packageGlob],
+            command=['sh', '-c', 'mv %s mobile/dist/%s' % (self.packageGlob,
+                                                           localeDir)],
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
-        # Now that we have moved all the packages that we want under 'en-US'
+        # Now that we have moved all the packages that we want under localeDir
         # let's indicate that we want to upload the whole directory
-        self.packageGlob = '-r mobile/dist/en-US'
+        self.packageGlob = '-r mobile/dist/%s' % uploadDir
+
+    def uploadEnUS(self):
+        self.prepUpload(localeDir='en-US')
         self.addUploadSteps(platform='linux')
 
-    def addMultiLocaleSteps(self, requests, propertyName):
-        req = requests[-1]
-        # get the list of locales that has been added by the scheduler
-        locales = req.properties.getProperty(propertyName)
+    def uploadMulti(self):
+        self.addUploadSteps(platform='linux')
+
+    def addMultiLocaleSteps(self, requests=None, propertyName=None):
+        if self.locales:
+            locales = self.locales
+        else:
+            req = requests[-1]
+            # get the list of locales that has been added by the scheduler
+            locales = req.properties.getProperty(propertyName)
+
         # Drop all previous multi-locale steps, to fix bug 531873.
         self.steps = self.steps[:self.nonMultiLocaleStepsLength]
         # remove all packages that have been created by the single locale build
@@ -4313,7 +4483,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addPackageSteps(multiLocale=True, packageXulrunner=True)
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
                          "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
-        self.addUploadSteps(platform='linux')
+        self.uploadMulti()
 
     def compareLocalesSetup(self):
         self.addStep(ShellCommand,
@@ -4343,11 +4513,12 @@ class MaemoBuildFactory(MobileBuildFactory):
          name='get_locale_src_%s' % locale,
          command=['sh', '-c',
           WithProperties('if [ -d '+locale+' ]; then ' +
-                         'hg -R '+locale+' pull -r default ; ' +
+                         'hg -R '+locale+' pull -r '+self.l10nTag+' ; ' +
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+\
                            '/'+locale+'/ ; ' +
+                         'hg -R '+locale+' up -r '+self.l10nTag+' ; '
                          'fi ')],
          descriptionDone="locale source",
          timeout=5*60, # 5 minutes
@@ -4357,6 +4528,10 @@ class MaemoBuildFactory(MobileBuildFactory):
 
     def compareLocales(self, locale):
         objdirAbsPath = "%s/%s/%s" % (self.baseWorkDir, self.branchName, self.objdir)
+        if self.mergeLocales:
+            mergeLocaleOptions = ['-m', '%s/merged' % objdirAbsPath]
+        else:
+            mergeLocaleOptions = []
         self.addStep(ShellCommand,
          name='rm_merged_%s' % locale,
          command=['rm', '-rf', 'merged'],
@@ -4365,11 +4540,11 @@ class MaemoBuildFactory(MobileBuildFactory):
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
-         name='merge_locale_%s' % locale,
+         name='run_compare_locales_%s' % locale,
          command=['python',
-                  '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir,
-                  '-m', '%s/merged' % objdirAbsPath, 
-                  "l10n.ini",
+                  '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir] +
+                  mergeLocaleOptions +
+                  ["l10n.ini",
                   "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
                   locale],
          description='comparing %s' % locale,
@@ -4383,18 +4558,86 @@ class MaemoBuildFactory(MobileBuildFactory):
     def addChromeLocale(self, locale):
         # This is relative to scratchbox's home directory
         objdir = 'build/%s/%s/%s' % (self.baseBuildDir, self.branchName, self.objdir)
+        objdirAbsPath = '/home/cltbld/%s' % objdir
+        if self.mergeLocales:
+            mergeDirArgs = ['LOCALE_MERGEDIR=%s/merged' % objdirAbsPath]
+        else:
+            mergeDirArgs = []
         # TODO: Move '/home/cltbld' to our config files
         # the absolute path (from within scratchbox)  for the objdir
-        objdirAbsPath = '/home/cltbld/%s' % objdir
         self.addStep(ShellCommand,
             name='make_locale_chrome_%s' % locale,
             command=[self.scratchboxPath, '-p', '-d',
                      '%s/mobile/mobile/locales' % objdir,
-                     'make chrome-%s' % locale,
-                     'LOCALE_MERGEDIR=%s/merged' % objdirAbsPath],
+                     'make chrome-%s' % locale] + mergeDirArgs,
             env = self.env,
             haltOnFailure=False,
             description=['make','chrome-%s' % locale],
+        )
+
+class MaemoReleaseBuildFactory(MaemoBuildFactory):
+    def __init__(self, env, **kwargs):
+        env = env.copy()
+        MaemoBuildFactory.__init__(self, env=env, nightly=False,
+                                   clobber=True, **kwargs)
+        assert (self.stageUsername)
+
+    def uploadEnUS(self):
+        self.prepUpload(localeDir='maemo/en-US', uploadDir='maemo')
+        self.addUploadSteps(platform='linux')
+        
+    def uploadMulti(self):
+        self.prepUpload(localeDir='maemo/multi', uploadDir='maemo')
+        self.addStep(SetProperty,
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                'maemo_info.txt')],
+         workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName,
+                                           self.objdir)
+        )
+        self.packageGlob = '%s mobile/dist/maemo_info.txt' % self.packageGlob
+        self.addUploadSteps(platform='linux')
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(MozillaStageUpload,
+            objdir="%s/%s" % (self.branchName, self.objdir),
+            username=self.stageUsername,
+            milestone=self.baseUploadDir,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=False,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=False,
+            releaseToCandidates=True,
+            tinderboxBuildsDir=self.baseUploadDir,
+            remoteCandidatesPath=self.stageBasePath,
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                        self.objdir)
         )
 
 class WinmoBuildFactory(MobileBuildFactory):
@@ -5065,7 +5308,7 @@ class TryTalosFactory(TalosFactory):
 class MobileNightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
 
-    def __init__(self, enUSBinaryURL, hgHost=None, 
+    def __init__(self, enUSBinaryURL, hgHost=None,
                  nightly=True,
                  mobileRepoPath='mobile-browser',
                  project='fennec', baseWorkDir='build',
@@ -5120,10 +5363,10 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         self.addStep(ShellCommand,
          name='enUS_mobile_source',
          command=['sh', '-c', 'if [ -d mobile ]; then ' +
-                  'hg -R mobile pull -r default ; else ' +
+                  'hg -R mobile pull -r '+self.l10nTag+' ; else ' +
                   'hg clone http://' + self.hgHost + '/' + self.mobileRepoPath +
                   ' mobile ; ' +
-                  'fi && hg -R mobile update -r default'],
+                  'fi && hg -R mobile update -r '+self.l10nTag],
          descriptionDone=['en-US', 'mobile', 'source'],
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=30*60 # 30 minutes
@@ -5132,7 +5375,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
     def updateSources(self):
         self.addStep(ShellCommand,
          name='update_workdir',
-         command=['hg', 'up', '-C', '-r', 'default'],
+         command=['hg', 'up', '-C', '-r', self.l10nTag],
          description='update workdir',
          workdir=WithProperties(self.baseWorkDir + '/' + self.l10nRepoPath + \
                                 '/%(locale)s'),
@@ -5177,13 +5420,13 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         )
         self.addStep(ShellCommand,
          name='hg_update_gecko_revision',
-         command=['hg', 'update', '-r', WithProperties('%(gecko_revision)s')],
+         command=['hg', 'update', '-C', '-r', WithProperties('%(gecko_revision)s')],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
         self.addStep(ShellCommand,
          name='hg_update_fennec_revision',
-         command=['hg', 'update', '-r', WithProperties('%(fennec_revision)s')],
+         command=['hg', 'update', '-C', '-r', WithProperties('%(fennec_revision)s')],
          haltOnFailure=True,
          workdir='%s/%s/%s' % (self.baseWorkDir, self.origSrcDir, self.appName)
         )
@@ -5222,6 +5465,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
             releaseToLatest=self.nightly,
             releaseToDated=False,
             releaseToTinderboxBuilds=True,
+            remoteCandidatesPath=self.stageBasePath,
             tinderboxBuildsDir=self.baseUploadDir,
             dependToDated=False,
             workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir)
@@ -5300,12 +5544,15 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         )
 
     def doRepack(self):
+        mergeOptions = ""
+        if self.mergeLocales:
+            mergeOptions = 'LOCALE_MERGEDIR=$PWD/merged'
         self.addStep(ShellCommand,
          name='repack_debs',
          command=['sh','-c',
                   WithProperties('make installers-%(locale)s deb-%(locale)s ' +
                                  'DEB_BUILD_ARCH=armel ' +
-                                 'LOCALE_MERGEDIR=$PWD/merged')],
+                                 mergeOptions)],
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
          haltOnFailure=True,
@@ -5323,6 +5570,57 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         )
         self.addUploadSteps(platform='linux')
 
+class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
+    def __init__(self, **kwargs):
+        assert 'l10nTag' in kwargs
+        MaemoNightlyRepackFactory.__init__(self, **kwargs)
+
+    def doUpload(self):
+        self.addStep(ShellCommand,
+         name='copy_deb',
+         command=['sh', '-c', WithProperties('if [ -f %(locale)s/*.deb ] ' +
+                  '; then cp -r %(locale)s ' + '%s/%s/dist ; fi' %
+                  (self.baseWorkDir, self.origSrcDir))],
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
+                                       self.appName),
+         haltOnFailure=True,
+        )
+        self.addStep(ShellCommand,
+         name='copy_files',
+         command=['sh', '-c',
+                  WithProperties('cp fennec-*.%(locale)s.linux-gnueabi-arm.tar.bz2 ' +
+                                 'install/fennec-*.%(locale)s.langpack.xpi ' +
+                                 '%(locale)s/')],
+         workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir),
+         haltOnFailure=True,
+        )
+        self.addUploadSteps(platform='linux')
+
+    # Upload targets aren't defined in mobile/locales/Makefile,
+    # so use MozillaStageUpload for now.
+    def addUploadSteps(self, platform):
+        self.addStep(MozillaStageUpload,
+            name='upload',
+            objdir="%s/dist" % (self.origSrcDir),
+            username=self.stageUsername,
+            milestone=self.baseUploadDir,
+            platform=platform,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            group=self.stageGroup,
+            packageGlob=WithProperties('%s' % self.packageGlob),
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            uploadLangPacks=False,
+            releaseToLatest=False,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=False,
+            releaseToCandidates=True,
+            remoteCandidatesPath=self.stageBasePath,
+            tinderboxBuildsDir=self.baseUploadDir,
+            dependToDated=False,
+            workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir)
+        )
 
 class MobileDesktopNightlyRepackFactory(MobileNightlyRepackFactory):
     def doUpload(self):
