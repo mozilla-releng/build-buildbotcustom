@@ -778,7 +778,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check-valgrind",
          warnOnWarnings=True,
-         workdir="build/%s/js/src" % self.objdir,
+         workdir="build/%s/js/src" % self.mozillaObjdir,
          timeout=5*60, # 5 minutes.
         )
 
@@ -811,7 +811,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         packageFilename = self.getPackageFilename(self.platform)
         if packageFilename:
             self.addFilePropertiesSteps(filename=packageFilename, 
-                                        directory='build/%s/dist' % self.objdir,
+                                        directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
@@ -825,7 +825,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 haltOnFailure=True
             )
             self.addFilePropertiesSteps(filename='*.installer.exe', 
-                                        directory='build/%s/dist/install/sea' % self.objdir,
+                                        directory='build/%s/dist/install/sea' % self.mozillaObjdir,
                                         fileType='installer',
                                         haltOnFailure=True)
         elif self.platform.startswith("wince"):
@@ -850,31 +850,34 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 haltOnFailure=True
             )
             self.addFilePropertiesSteps(filename='*.complete.mar', 
-                                        directory='build/%s/dist/update' % self.objdir,
+                                        directory='build/%s/dist/update' % self.mozillaObjdir,
                                         fileType='completeMar',
                                         haltOnFailure=True)
 
         if self.productName == 'xulrunner':
             self.addStep(SetProperty(
-                command=['python', 'config/printconfigsetting.py',
-                         '%s/dist/bin/platform.ini' % self.objdir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                         'build/%s/dist/bin/platform.ini' % self.mozillaObjdir,
                          'Build', 'BuildID'],
                 property='buildid',
+                workdir='.',
                 name='get_build_id',
             ))
         else:
             self.addStep(SetProperty(
-                command=['python', 'config/printconfigsetting.py',
-                         '%s/dist/bin/application.ini' % self.objdir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                          'App', 'BuildID'],
                 property='buildid',
+                workdir='.',
                 name='get_build_id',
             ))
             self.addStep(SetProperty(
-                command=['python', 'config/printconfigsetting.py',
-                         '%s/dist/bin/application.ini' % self.objdir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                          'App', 'Version'],
                 property='appVersion',
+                workdir='.',
                 name='get_app_version',
             ))
 
