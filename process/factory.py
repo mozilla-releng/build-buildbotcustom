@@ -1066,7 +1066,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          command=co_command,
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=60*60 # 1 hour
         )
         if self.buildRevision and (self.cvsroot or not self.skipBlankRepos):
             # Update ChatZilla to specified revision
@@ -1718,7 +1719,8 @@ class CCBaseRepackFactory(BaseRepackFactory):
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
+         timeout=60*60 # 1 hour
         )
 
 class NightlyRepackFactory(BaseRepackFactory):
@@ -2815,7 +2817,8 @@ class CCSourceFactory(ReleaseFactory):
          command=co_command,
          workdir=self.branchName,
          description=['update to', releaseTag],
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=60*60 # 1 hour
         )
         if cvsroot:
             # Update ChatZilla to release tag
@@ -3518,7 +3521,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                   '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)],
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=60*60 # 1 hour
         )
 
         self.addPrintMozillaChangesetStep()
