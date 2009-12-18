@@ -472,29 +472,45 @@ class MozillaClobberer(ShellCommand):
     description=['checking', 'clobber', 'times']
 
     def __init__(self, branch, clobber_url, clobberer_path, clobberTime=None,
-                 timeout=3600, workdir='.', **kwargs):
+                 timeout=3600, workdir='..', **kwargs):
         command = ['python', clobberer_path, '-s', 'tools']
         if clobberTime:
             command.extend(['-t', str(clobberTime)])
-        command.extend([clobber_url, branch, WithProperties("%(buildername)s"),
-                        WithProperties("%(slavename)s")])
 
-        ShellCommand.__init__(self, command=command, timeout=timeout,
+        command.extend([
+            clobber_url,
+            branch,
+            WithProperties("%(buildername)s"),
+            WithProperties("%(builddir)s"),
+            WithProperties("%(slavename)s"),
+            WithProperties("%(master)s"),
+        ])
+
+        self.super_class = ShellCommand
+
+        self.super_class.__init__(self, command=command, timeout=timeout,
                               workdir=workdir, **kwargs)
+
         self.addFactoryArguments(branch=branch, clobber_url=clobber_url,
                                  clobberer_path=clobberer_path,
                                  clobberTime=clobberTime)
 
-    def createSummary(self, log):
+    def setBuild(self, build):
+        self.super_class.setBuild(self, build)
+        # Set the "master" property
+        master = build.builder.botmaster.parent.buildbotURL
+        self.setProperty('master', master)
 
+    def createSummary(self, log):
+        my_builder = self.getProperty("builddir")
         # Server is forcing a clobber
-        forcedClobberRe = re.compile('Server is forcing a clobber')
+        forcedClobberRe = re.compile('%s:Server is forcing a clobber' % my_builder)
         # We are looking for something like :
         #  More than 7 days, 0:00:00 have passed since our last clobber
-        periodicClobberRe = re.compile('More than \d+ days, [0-9:]+ have passed since our last clobber')
+        periodicClobberRe = re.compile('%s:More than \d+ days, [0-9:]+ have passed since our last clobber' % my_builder)
 
         # We don't have clobber data.  This usually means we've been purged before
-        purgedClobberRe = re.compile("Our last clobber date:.*None")
+        purgedClobberRe = re.compile("%s:Our last clobber date:.*None" % my_builder)
 
         self.setProperty('forced_clobber', False, 'MozillaClobberer')
         self.setProperty('periodic_clobber', False, 'MozillaClobberer')

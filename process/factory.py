@@ -198,12 +198,12 @@ class MozillaBuildFactory(BuildFactory):
          workdir='.'
         )
 
-        if self.clobberURL is not None and self.clobberTime is not None:
+        if self.clobberURL is not None:
             self.addStep(MozillaClobberer,
              name='checking_clobber_times',
              branch=self.branchName,
              clobber_url=self.clobberURL,
-             clobberer_path='tools/clobberer/clobberer.py',
+             clobberer_path=WithProperties('%(builddir)s/tools/clobberer/clobberer.py'),
              clobberTime=self.clobberTime
             )
 
