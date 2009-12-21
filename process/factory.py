@@ -4340,7 +4340,6 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addPackageSteps()
             self.uploadEnUS()
             self.useProgress = False
-            self.nonMultiLocaleStepsLength = len(self.steps)
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
             self.addBuildSteps()
             self.addPackageSteps(packageXulrunner=True)
@@ -4348,6 +4347,9 @@ class MaemoBuildFactory(MobileBuildFactory):
         
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
+
+        if self.multiLocale:
+            self.nonMultiLocaleStepsLength = len(self.steps)
 
     def newBuild(self, requests):
         if self.multiLocale:
