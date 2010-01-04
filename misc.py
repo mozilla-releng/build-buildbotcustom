@@ -203,7 +203,7 @@ def generateBranchObjects(config, name):
         nightlyBuilders.append(builder)
         if config['enable_shark'] and platform in ('macosx'):
             nightlyBuilders.append('%s shark' % base_name)
-        if config['enable_l10n'] and platform in ('linux','win32','macosx'):
+        if config['enable_l10n'] and platform in config['l10n_platforms']: 
             l10nNightlyBuilders[builder] = {}
             l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
             l10nNightlyBuilders[builder]['l10n_builder'] = \
@@ -498,7 +498,7 @@ def generateBranchObjects(config, name):
         nightly_builder = '%s nightly' % pf['base_name']
 
         triggeredSchedulers=None
-        if platform in ('linux', 'macosx', 'win32') and \
+        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            nightly_builder in l10nNightlyBuilders:
             triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
 
@@ -554,14 +554,28 @@ def generateBranchObjects(config, name):
         branchObjects['builders'].append(mozilla2_nightly_builder)
 
         if config['enable_l10n']:
-            if platform in ('linux','win32','macosx'):
+            if platform in config['l10n_platforms']:
+                # TODO Linux and mac are not working with mozconfig at this point
+                # and this will disable it for now. We will fix this in bug 518359.
+                if platform is 'wince':
+                    env = pf['env']
+                    mozconfig = pf['mozconfig']
+                else:
+                    env = {}
+                    mozconfig = None
+
                 mozilla2_l10n_nightly_factory = NightlyRepackFactory(
+                    env=env,
+                    platform=platform,
                     hgHost=config['hghost'],
                     tree=config['l10n_tree'],
                     project=config['product_name'],
                     appName=config['app_name'],
                     enUSBinaryURL=config['enUS_binaryURL'],
                     nightly=True,
+                    configRepoPath=config['config_repo_path'],
+                    configSubDir=config['config_subdir'],
+                    mozconfig=mozconfig,
                     l10nNightlyUpdate=config['l10nNightlyUpdate'],
                     l10nDatedDirs=config['l10nDatedDirs'],
                     ausBaseUploadDir=config['aus2_base_upload_dir'],
