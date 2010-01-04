@@ -1398,6 +1398,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.tree = tree
+        self.mozconfig = mozconfig
         if mozconfig and configSubDir and configRepoPath:
             self.mozconfig = 'configs/%s/%s/mozconfig' % (configSubDir,
                                                           mozconfig)
