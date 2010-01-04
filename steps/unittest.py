@@ -134,7 +134,7 @@ def summarizeLogReftest(name, log):
 def summarizeLogXpcshelltests(name, log):
     return summarizeLog(
         name, log, "Passed", "Failed", None,
-        r"INFO \| (Passed|Failed): (\d+)")
+        r"\s*INFO \| (Passed|Failed): (\d+)")
 
 def summarizeTUnit(name, log):
     # Counts and flags.
