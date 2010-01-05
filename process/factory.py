@@ -1398,7 +1398,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.tree = tree
-        self.mozconfig = mozconfig
+        # WinCE is the only platform that will do repackages with
+        # a mozconfig for now. This will be fixed in bug 518359
         if mozconfig and configSubDir and configRepoPath:
             self.mozconfig = 'configs/%s/%s/mozconfig' % (configSubDir,
                                                           mozconfig)
@@ -1488,9 +1489,9 @@ class BaseRepackFactory(MozillaBuildFactory):
          descriptionDone=['autoconf js/src'],
          workdir='%s/%s/js/src' % (self.baseWorkDir, self.origSrcDir)
         )
-        # For now let's just make the change just for wince
-        # This discrepancy to be fixed in bug 518359
-        if self.mozconfig and self.platform is 'wince':
+        # WinCE is the only platform that will do repackages with
+        # a mozconfig for now. This will be fixed in bug 518359
+        if self.platform is 'wince':
             self.addStep(ShellCommand,
              name='configure',
              command=['make -f client.mk configure'], 
