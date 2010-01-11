@@ -177,8 +177,9 @@ def generateBranchObjects(config, name):
     xulrunnerNightlyBuilders = []
     debugBuilders = []
     weeklyBuilders = []
-    # This dict provides a mapping between en-US nightly scheduler names
-    # and l10n nightly scheduler names. It's filled out just below here.
+    # These dicts provides mapping between en-US dep and  nightly scheduler names
+    # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
+    l10nBuilders = {}
     l10nNightlyBuilders = {}
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
@@ -198,18 +199,29 @@ def generateBranchObjects(config, name):
             continue
         else:
             builders.append('%s build' % base_name)
-
-        builder = '%s nightly' % base_name
-        nightlyBuilders.append(builder)
+        
+        #Fill the l10n dep dict
+        if config['enable_l10n'] and platform in config['l10n_platforms']: 
+                l10nBuilders[base_name] = {}
+                l10nBuilders[base_name]['tree'] = config['l10n_tree']
+                l10nBuilders[base_name]['l10n_builder'] = \
+                    '%s %s %s l10n dep' % (config['product_name'].capitalize(),
+                                       name, platform)
+                l10nBuilders[base_name]['platform'] = platform
+        # Check if branch wants nightly builds
+        if config['enable_nightly']:
+            builder = '%s nightly' % base_name
+            nightlyBuilders.append(builder)
+            # Fill the l10nNightly dict
+            if config['enable_l10n'] and platform in config['l10n_platforms']: 
+                l10nNightlyBuilders[builder] = {}
+                l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
+                l10nNightlyBuilders[builder]['l10n_builder'] = \
+                    '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
+                                       name, platform)
+                l10nNightlyBuilders[builder]['platform'] = platform
         if config['enable_shark'] and platform in ('macosx'):
             nightlyBuilders.append('%s shark' % base_name)
-        if config['enable_l10n'] and platform in config['l10n_platforms']: 
-            l10nNightlyBuilders[builder] = {}
-            l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
-            l10nNightlyBuilders[builder]['l10n_builder'] = \
-                '%s %s %s l10n' % (config['product_name'].capitalize(),
-                                   name, platform)
-            l10nNightlyBuilders[builder]['platform'] = platform
         # Regular unittest builds
         if pf.get('enable_unittests'):
             unittestBuilders.append('%s unit test' % base_name)
@@ -272,9 +284,9 @@ def generateBranchObjects(config, name):
 
     if config['enable_l10n']:
         l10n_builders = []
-        for b in l10nNightlyBuilders:
-            l10n_builders.append(l10nNightlyBuilders[b]['l10n_builder'])
-            l10n_builders.append(l10nNightlyBuilders[b]['l10n_builder'] + " build")
+        for b in l10nBuilders:
+            l10n_builders.append(l10nBuilders[b]['l10n_builder'])
+            l10n_builders.append(l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
         l10n_binaryURL = config['enUS_binaryURL']
         if l10n_binaryURL.endswith('/'):
             l10n_binaryURL = l10n_binaryURL[:-1]
@@ -365,7 +377,7 @@ def generateBranchObjects(config, name):
         )
         branchObjects['schedulers'].append(nightly_scheduler)
 
-        if config['enable_l10n'] and builder in l10nNightlyBuilders:
+        if config['enable_l10n'] and config['enable_nightly'] and builder in l10nNightlyBuilders:
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
             platform = l10nNightlyBuilders[builder]['platform']
             tree = l10nNightlyBuilders[builder]['tree']
@@ -495,142 +507,145 @@ def generateBranchObjects(config, name):
                         crashtestLeakThreshold))
             continue
 
-        nightly_builder = '%s nightly' % pf['base_name']
+        if config['enable_nightly']:
+            nightly_builder = '%s nightly' % pf['base_name']
 
-        triggeredSchedulers=None
-        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-           nightly_builder in l10nNightlyBuilders:
-            triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
+            triggeredSchedulers=None
+            if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+               nightly_builder in l10nNightlyBuilders:
+                triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
 
-        mozilla2_nightly_factory = NightlyBuildFactory(
-            env=pf['env'],
-            objdir=pf['platform_objdir'],
-            platform=platform,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            configRepoPath=config['config_repo_path'],
-            configSubDir=config['config_subdir'],
-            profiledBuild=pf['profiled_build'],
-            productName=config['product_name'],
-            mozconfig=pf['mozconfig'],
-            stageServer=config['stage_server'],
-            stageUsername=config['stage_username'],
-            stageGroup=config['stage_group'],
-            stageSshKey=config['stage_ssh_key'],
-            stageBasePath=config['stage_base_path'],
-            codesighs=False,
-            uploadPackages=uploadPackages,
-            uploadSymbols=uploadSymbols,
-            nightly=True,
-            createSnippet=config['create_snippet'],
-            ausBaseUploadDir=config['aus2_base_upload_dir'],
-            updatePlatform=pf['update_platform'],
-            downloadBaseURL=config['download_base_url'],
-            ausUser=config['aus2_user'],
-            ausHost=config['aus2_host'],
-            buildSpace=buildSpace,
-            clobberURL=config['base_clobber_url'],
-            clobberTime=clobberTime,
-            buildsBeforeReboot=pf['builds_before_reboot'],
-            talosMasters=talosMasters,
-            packageTests=packageTests,
-            unittestMasters=config['unittest_masters'],
-            unittestBranch=unittestBranch,
-            geriatricMasters=config['geriatric_masters'],
-            geriatricBranches=config['geriatric_branches'],
-            triggerBuilds=config['enable_l10n'],
-            triggeredSchedulers=triggeredSchedulers,
-            tinderboxBuildsDir=tinderboxBuildsDir,
-        )
+            mozilla2_nightly_factory = NightlyBuildFactory(
+                env=pf['env'],
+                objdir=pf['platform_objdir'],
+                platform=platform,
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                configRepoPath=config['config_repo_path'],
+                configSubDir=config['config_subdir'],
+                profiledBuild=pf['profiled_build'],
+                productName=config['product_name'],
+                mozconfig=pf['mozconfig'],
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username'],
+                stageGroup=config['stage_group'],
+                stageSshKey=config['stage_ssh_key'],
+                stageBasePath=config['stage_base_path'],
+                codesighs=False,
+                uploadPackages=uploadPackages,
+                uploadSymbols=uploadSymbols,
+                nightly=True,
+                createSnippet=config['create_snippet'],
+                ausBaseUploadDir=config['aus2_base_upload_dir'],
+                updatePlatform=pf['update_platform'],
+                downloadBaseURL=config['download_base_url'],
+                ausUser=config['aus2_user'],
+                ausHost=config['aus2_host'],
+                buildSpace=buildSpace,
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+                buildsBeforeReboot=pf['builds_before_reboot'],
+                talosMasters=talosMasters,
+                packageTests=packageTests,
+                unittestMasters=config['unittest_masters'],
+                unittestBranch=unittestBranch,
+                geriatricMasters=config['geriatric_masters'],
+                geriatricBranches=config['geriatric_branches'],
+                triggerBuilds=config['enable_l10n'],
+                triggeredSchedulers=triggeredSchedulers,
+                tinderboxBuildsDir=tinderboxBuildsDir,
+            )
 
-        mozilla2_nightly_builder = {
-            'name': nightly_builder,
-            'slavenames': pf['slaves'],
-            'builddir': '%s-%s-nightly' % (name, platform),
-            'factory': mozilla2_nightly_factory,
-            'category': name,
-        }
-        branchObjects['builders'].append(mozilla2_nightly_builder)
+            mozilla2_nightly_builder = {
+                'name': nightly_builder,
+                'slavenames': pf['slaves'],
+                'builddir': '%s-%s-nightly' % (name, platform),
+                'factory': mozilla2_nightly_factory,
+                'category': name,
+            }
+            branchObjects['builders'].append(mozilla2_nightly_builder)
 
-        if config['enable_l10n']:
-            if platform in config['l10n_platforms']:
-                # TODO Linux and mac are not working with mozconfig at this point
-                # and this will disable it for now. We will fix this in bug 518359.
-                if platform is 'wince':
-                    env = pf['env']
-                    mozconfig = pf['mozconfig']
-                else:
-                    env = {}
-                    mozconfig = None
+            if config['enable_l10n']:
+                if platform in config['l10n_platforms']:
+                    # TODO Linux and mac are not working with mozconfig at this point
+                    # and this will disable it for now. We will fix this in bug 518359.
+                    if platform is 'wince':
+                        env = pf['env']
+                        mozconfig = pf['mozconfig']
+                    else:
+                        env = {}
+                        mozconfig = None
 
-                mozilla2_l10n_nightly_factory = NightlyRepackFactory(
-                    env=env,
-                    platform=platform,
-                    hgHost=config['hghost'],
-                    tree=config['l10n_tree'],
-                    project=config['product_name'],
-                    appName=config['app_name'],
-                    enUSBinaryURL=config['enUS_binaryURL'],
-                    nightly=True,
-                    configRepoPath=config['config_repo_path'],
-                    configSubDir=config['config_subdir'],
-                    mozconfig=mozconfig,
-                    l10nNightlyUpdate=config['l10nNightlyUpdate'],
-                    l10nDatedDirs=config['l10nDatedDirs'],
-                    ausBaseUploadDir=config['aus2_base_upload_dir'],
-                    updatePlatform=pf['update_platform'],
-                    downloadBaseURL=config['download_base_url'],
-                    ausUser=config['aus2_user'],
-                    ausHost=config['aus2_host'],
-                    stageServer=config['stage_server'],
-                    stageUsername=config['stage_username'],
-                    stageSshKey=config['stage_ssh_key'],
-                    repoPath=config['repo_path'],
-                    l10nRepoPath=config['l10n_repo_path'],
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    compareLocalesRepoPath=config['compare_locales_repo_path'],
-                    compareLocalesTag=config['compare_locales_tag'],
-                    buildSpace=2,
-                    clobberURL=config['base_clobber_url'],
-                    clobberTime=clobberTime,
-                )
-                mozilla2_l10n_nightly_builder = {
-                    'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
-                    'slavenames': config['l10n_slaves'][platform],
-                    'builddir': '%s-%s-l10n-nightly' % (name, platform),
-                    'factory': mozilla2_l10n_nightly_factory,
-                    'category': name,
-                }
-                branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
-                mozilla2_l10n_dep_factory = NightlyRepackFactory(
-                    hgHost=config['hghost'],
-                    tree=config['l10n_tree'],
-                    project=config['product_name'],
-                    appName=config['app_name'],
-                    enUSBinaryURL=config['enUS_binaryURL'],
-                    nightly=False,
-                    l10nDatedDirs=config['l10nDatedDirs'],
-                    stageServer=config['stage_server'],
-                    stageUsername=config['stage_username'],
-                    stageSshKey=config['stage_ssh_key'],
-                    repoPath=config['repo_path'],
-                    l10nRepoPath=config['l10n_repo_path'],
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    compareLocalesRepoPath=config['compare_locales_repo_path'],
-                    compareLocalesTag=config['compare_locales_tag'],
-                    buildSpace=2,
-                    clobberURL=config['base_clobber_url'],
-                    clobberTime=clobberTime,
-                )
-                mozilla2_l10n_dep_builder = {
-                    'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'] + " build",
-                    'slavenames': config['l10n_slaves'][platform],
-                    'builddir': '%s-%s-l10n-dep' % (name, platform),
-                    'factory': mozilla2_l10n_dep_factory,
-                    'category': name,
-                }
-                branchObjects['builders'].append(mozilla2_l10n_dep_builder)
+                    mozilla2_l10n_nightly_factory = NightlyRepackFactory(
+                        env=env,
+                        platform=platform,
+                        hgHost=config['hghost'],
+                        tree=config['l10n_tree'],
+                        project=config['product_name'],
+                        appName=config['app_name'],
+                        enUSBinaryURL=config['enUS_binaryURL'],
+                        nightly=True,
+                        configRepoPath=config['config_repo_path'],
+                        configSubDir=config['config_subdir'],
+                        mozconfig=mozconfig,
+                        l10nNightlyUpdate=config['l10nNightlyUpdate'],
+                        l10nDatedDirs=config['l10nDatedDirs'],
+                        ausBaseUploadDir=config['aus2_base_upload_dir'],
+                        updatePlatform=pf['update_platform'],
+                        downloadBaseURL=config['download_base_url'],
+                        ausUser=config['aus2_user'],
+                        ausHost=config['aus2_host'],
+                        stageServer=config['stage_server'],
+                        stageUsername=config['stage_username'],
+                        stageSshKey=config['stage_ssh_key'],
+                        repoPath=config['repo_path'],
+                        l10nRepoPath=config['l10n_repo_path'],
+                        buildToolsRepoPath=config['build_tools_repo_path'],
+                        compareLocalesRepoPath=config['compare_locales_repo_path'],
+                        compareLocalesTag=config['compare_locales_tag'],
+                        buildSpace=2,
+                        clobberURL=config['base_clobber_url'],
+                        clobberTime=clobberTime,
+                    )
+                    mozilla2_l10n_nightly_builder = {
+                        'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
+                        'slavenames': config['l10n_slaves'][platform],
+                        'builddir': '%s-%s-l10n-nightly' % (name, platform),
+                        'factory': mozilla2_l10n_nightly_factory,
+                        'category': name,
+                    }
+                    branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
+        # We still want l10n_dep builds if nightlies are off
+        if config['enable_l10n'] and platform in config['l10n_platforms']:
+            mozilla2_l10n_dep_factory = NightlyRepackFactory(
+                hgHost=config['hghost'],
+                tree=config['l10n_tree'],
+                project=config['product_name'],
+                appName=config['app_name'],
+                enUSBinaryURL=config['enUS_binaryURL'],
+                nightly=False,
+                l10nDatedDirs=config['l10nDatedDirs'],
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username'],
+                stageSshKey=config['stage_ssh_key'],
+                repoPath=config['repo_path'],
+                l10nRepoPath=config['l10n_repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                compareLocalesRepoPath=config['compare_locales_repo_path'],
+                compareLocalesTag=config['compare_locales_tag'],
+                buildSpace=2,
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+            )
+            mozilla2_l10n_dep_builder = {
+                'name': l10nBuilders[pf['base_name']]['l10n_builder'],
+                'slavenames': config['l10n_slaves'][platform],
+                'builddir': '%s-%s-l10n-dep' % (name, platform),
+                'factory': mozilla2_l10n_dep_factory,
+                'category': name,
+            }
+            branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
         if pf.get('enable_unittests'):
             runA11y = True
