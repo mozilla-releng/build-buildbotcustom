@@ -4352,6 +4352,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
                     self.branchName, self.objdir),
                 description=['make', 'xr', 'package'],
                 env=self.env,
+                haltOnFailure=True,
             )
         self.addStep(ShellCommand,
             name='make_mobile_pkg',
@@ -4360,6 +4361,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
             self.branchName, self.objdir),
             description=['make', 'mobile', 'package'],
             env=self.env,
+            haltOnFailure=True,
         )
         if self.platform.startswith("linux"):
             self.addStep(ShellCommand,
@@ -4368,6 +4370,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
                 workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
                     self.branchName, self.objdir),
                 env=self.env,
+                haltOnFailure=True,
             )
 
 class MaemoBuildFactory(MobileBuildFactory):
