@@ -1343,6 +1343,11 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
         self.cvsroot = cvsroot
         ReleaseBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
+    def addFilePropertiesSteps(self, filename=None, directory=None,
+                               fileType=None, maxDepth=1, haltOnFailure=False):
+        # We don't need to do this for release builds.
+        pass
+
 
 def identToProperties(default_prop=None):
     '''Create a method that is used in a SetProperty step to map the
