@@ -1007,12 +1007,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
 class CCMercurialBuildFactory(MercurialBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
-                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
-                 **kwargs):
+                 inspectorRepoPath='', venkmanRepoPath='',
+                 chatzillaRepoPath='', cvsroot='', **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
@@ -1055,15 +1056,18 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             co_command.append('--venkman-repo=%s' % self.getRepository(self.venkmanRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-venkman')
-        if self.cvsroot:
-            co_command.append('--cvsroot=%s' % self.cvsroot)
+        if self.chatzillaRepoPath:
+            co_command.append('--chatzilla-repo=%s' % self.getRepository(self.chatzillaRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-chatzilla')
+        if self.cvsroot:
+            co_command.append('--cvsroot=%s' % self.cvsroot)
         if self.buildRevision:
             co_command.append('--comm-rev=%s' % self.buildRevision)
             co_command.append('--mozilla-rev=%s' % self.buildRevision)
             co_command.append('--inspector-rev=%s' % self.buildRevision)
             co_command.append('--venkman-rev=%s' % self.buildRevision)
+            co_command.append('--chatzilla-rev=%s' % self.buildRevision)
         # execute the checkout
         self.addStep(ShellCommand,
          command=co_command,
@@ -1072,13 +1076,6 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          haltOnFailure=True,
          timeout=60*60 # 1 hour
         )
-        if self.buildRevision and (self.cvsroot or not self.skipBlankRepos):
-            # Update ChatZilla to specified revision
-            self.addStep(ShellCommand,
-             command=['cvs', 'up', '-r', self.buildRevision],
-             workdir='build%s/extensions/irc' % self.mozillaDir,
-             description=['update ChatZilla']
-            )
 
         self.addStep(SetProperty,
          name='set_hg_revision',
@@ -1219,12 +1216,13 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
-                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
-                 **kwargs):
+                 inspectorRepoPath='', venkmanRepoPath='',
+                 chatzillaRepoPath='', cvsroot='', **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         NightlyBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
@@ -1335,11 +1333,13 @@ class ReleaseBuildFactory(MercurialBuildFactory):
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
-                 venkmanRepoPath='', cvsroot='', **kwargs):
+                 venkmanRepoPath='', chatzillaRepoPath='', cvsroot='',
+                 **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         ReleaseBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
@@ -1710,12 +1710,14 @@ class CCBaseRepackFactory(BaseRepackFactory):
     ]
 
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
-                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
-                 buildRevision='', **kwargs):
+                 inspectorRepoPath='', venkmanRepoPath='',
+                 chatzillaRepoPath='', cvsroot='', buildRevision='',
+                 **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         BaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
@@ -1735,15 +1737,18 @@ class CCBaseRepackFactory(BaseRepackFactory):
             co_command.append('--venkman-repo=%s' % self.getRepository(self.venkmanRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-venkman')
-        if self.cvsroot:
-            co_command.append('--cvsroot=%s' % self.cvsroot)
+        if self.chatzillaRepoPath:
+            co_command.append('--chatzilla-repo=%s' % self.getRepository(self.chatzillaRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-chatzilla')
+        if self.cvsroot:
+            co_command.append('--cvsroot=%s' % self.cvsroot)
         if self.buildRevision:
             co_command.append('--comm-rev=%s' % self.buildRevision)
             co_command.append('--mozilla-rev=%s' % self.buildRevision)
             co_command.append('--inspector-rev=%s' % self.buildRevision)
             co_command.append('--venkman-rev=%s' % self.buildRevision)
+            co_command.append('--chatzilla-rev=%s' % self.buildRevision)
         # execute the checkout
         self.addStep(ShellCommand,
          command=co_command,
@@ -1989,12 +1994,14 @@ class NightlyRepackFactory(BaseRepackFactory):
 
 class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
-                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
-                 buildRevision='', **kwargs):
+                 inspectorRepoPath='', venkmanRepoPath='',
+                 chatzillaRepoPath='', cvsroot='', buildRevision='',
+                 **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         NightlyRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
@@ -2253,11 +2260,13 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
 
 class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseRepackFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
-                 venkmanRepoPath='', cvsroot='', **kwargs):
+                 venkmanRepoPath='', chatzillaRepoPath='', cvsroot='',
+                 **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         ReleaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
@@ -2286,9 +2295,9 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseRepackFactory):
                           'to %s' % self.buildRevision],
              haltOnFailure=True
             )
-        if self.cvsroot:
+        if self.chatzillaRepoPath:
             self.addStep(ShellCommand,
-             command=['cvs', 'up', '-r', self.buildRevision],
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/irc',
              description=['update chatzilla',
                           'to %s' % self.buildRevision],
@@ -2596,30 +2605,6 @@ class ReleaseTaggingFactory(ReleaseFactory):
              haltOnFailure=True
             )
 
-class CCReleaseTaggingFactory(ReleaseTaggingFactory):
-    def __init__(self, chatzillaTimestamp, cvsroot, **kwargs):
-        ReleaseTaggingFactory.__init__(self, **kwargs)
-
-        if cvsroot and chatzillaTimestamp:
-            self.addStep(ShellCommand,
-             command=['cvs', '-d', cvsroot, '-q',
-                      'checkout', '-P', '-D', chatzillaTimestamp,
-                      '-d', 'chatzilla', 'mozilla/extensions/irc'],
-             workdir='.',
-             description=['check out ChatZilla'],
-             haltOnFailure=True,
-             timeout=30*60 # 30 minutes
-            )
-            for tag in (self.buildTag, self.releaseTag):
-                self.addStep(ShellCommand,
-                 command=['cvs', '-d', cvsroot, 'tag',
-                          '-D', chatzillaTimestamp,
-                          '-F', tag],
-                 workdir='chatzilla',
-                 description=['tag ChatZilla'],
-                 haltOnFailure=True
-                )
-
 
 
 class SingleSourceFactory(ReleaseFactory):
@@ -2845,8 +2830,9 @@ class MultiSourceFactory(ReleaseFactory):
 class CCSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, mozRepoPath,
-                 inspectorRepoPath='', venkmanRepoPath='', cvsroot='',
-                 autoconfDirs=['.'], buildSpace=1, **kwargs):
+                 inspectorRepoPath='', venkmanRepoPath='',
+                 chatzillaRepoPath='', cvsroot='', autoconfDirs=['.'],
+                 buildSpace=1, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
         releaseTag = '%s_RELEASE' % (baseTag)
         sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
@@ -2892,10 +2878,13 @@ class CCSourceFactory(ReleaseFactory):
             co_command.append('--venkman-rev=%s' % releaseTag)
         else:
             co_command.append('--skip-venkman')
-        if cvsroot:
-            co_command.append('--cvsroot=%s' % cvsroot)
+        if chatzillaRepoPath:
+            co_command.append('--chatzilla-repo=%s' % self.getRepository(chatzillaRepoPath))
+            co_command.append('--chatzilla-rev=%s' % releaseTag)
         else:
             co_command.append('--skip-chatzilla')
+        if cvsroot:
+            co_command.append('--cvsroot=%s' % cvsroot)
         # execute the checkout
         self.addStep(ShellCommand,
          command=co_command,
@@ -2904,14 +2893,6 @@ class CCSourceFactory(ReleaseFactory):
          haltOnFailure=True,
          timeout=60*60 # 1 hour
         )
-        if cvsroot:
-            # Update ChatZilla to release tag
-            self.addStep(ShellCommand,
-             command=['cvs', 'up', '-r', releaseTag],
-             workdir='%s/mozilla/extensions/irc' % self.branchName,
-             description=['update to', releaseTag],
-             haltOnFailure=True
-            )
         # the autoconf and actual tarring steps
         # should be replaced by calling the build target
         for dir in autoconfDirs:
