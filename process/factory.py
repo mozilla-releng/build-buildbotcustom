@@ -5188,14 +5188,13 @@ class TalosFactory(BuildFactory):
         )
 
         def check_sdk(step, cmd):
-            if self.OS == 'tiger':
-                txt = cmd.logs['stdio'].getText()
-                m = re.search("MacOSX10\.5\.sdk", txt, re.M)
-                if m :
-                    step.addCompleteLog('sdk-fail', 'TinderboxPrint: can\'t run 10.5.sdk on 10.4 slave')
-                    return FAILURE
+            txt = cmd.logs['stdio'].getText()
+            m = re.search("MacOSX10\.5\.sdk", txt, re.M)
+            if m :
+                step.addCompleteLog('sdk-fail', 'TinderboxPrint: can\'t run 10.5.sdk on 10.4 slave')
+                return FAILURE
             return SUCCESS
-        if self.OS in ("tiger", "leopard"):
+        if self.OS == "tiger":
             self.addStep(EvaluatingShellCommand(
                 command=['cat', WithProperties('%(exedir)s/chrome/toolkit.jar')],
                 workdir=os.path.join(self.workdirBase, "talos"),
