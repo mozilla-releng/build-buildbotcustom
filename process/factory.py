@@ -114,6 +114,13 @@ class BootstrapFactory(BuildFactory):
          haltOnFailure=1,
         )
 
+def getPlatformMinidumpPath(platform):
+    platform_minidump_path = {
+        'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+        'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+        'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+        }
+    return platform_minidump_path[platform]
 
 class MozillaBuildFactory(BuildFactory):
     ignore_dirs = [
@@ -137,7 +144,7 @@ class MozillaBuildFactory(BuildFactory):
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-                 branchName=None, triggerBuilds=False, 
+                 branchName=None, triggerBuilds=False,
                  triggeredSchedulers=None, hashType='sha512', **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
@@ -188,6 +195,11 @@ class MozillaBuildFactory(BuildFactory):
           'if [ ! -d tools ]; then hg clone %s tools;fi' % self.buildToolsRepo],
          description=['clone', 'build tools'],
          workdir='.'
+        )
+        self.addStep(SetProperty,
+         command=['bash', '-c', 'pwd'],
+         property='toolsdir',
+         workdir='tools'
         )
         # We need the basename of the current working dir so we can
         # ignore that dir when purging builds later.
@@ -440,7 +452,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
         self.addBuildSteps()
-        if self.uploadSymbols or self.uploadPackages:
+        if self.uploadSymbols or self.uploadPackages or self.leakTest:
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
@@ -574,17 +586,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addLeakTestSteps(self):
         # we want the same thing run a few times here, with different
         # extraArgs
+        leakEnv = self.env.copy()
+        leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         for args in [['-register'], ['-CreateProfile', 'default'],
                      ['-P', 'default']]:
             self.addStep(AliveTest,
-                env=self.env,
+                env=leakEnv,
                 workdir='build/%s/_leaktest' % self.mozillaObjdir,
                 extraArgs=args,
                 warnOnFailure=True,
                 haltOnFailure=True
             )
         # we only want this variable for this test - this sucks
-        bloatEnv = self.env.copy()
+        bloatEnv = leakEnv.copy()
         bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1'
         self.addStep(AliveTest,
          env=bloatEnv,
@@ -654,7 +668,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              resultsname=self.baseName
             )
         self.addStep(AliveTest,
-         env=self.env,
+         env=leakEnv,
          workdir='build/%s/_leaktest' % self.mozillaObjdir,
          extraArgs=['--trace-malloc', 'malloc.log',
                     '--shutdown-leaks=sdleak.log'],
@@ -766,20 +780,25 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addCheckTestSteps(self):
+        env = self.env.copy()
+        env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
          warnOnWarnings=True,
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.
-         env=self.env,
+         env=env,
         )
 
     def addValgrindCheckSteps(self):
+        env = self.env.copy()
+        env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check-valgrind",
          warnOnWarnings=True,
          workdir="build/%s/js/src" % self.mozillaObjdir,
          timeout=5*60, # 5 minutes.
+         env=env,
         )
 
     def addUploadSteps(self, pkgArgs=None):
@@ -3424,13 +3443,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          workdir='tools'
         )
 
-        platform_minidump_path = {
-            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
-            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
-            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-            }
-
-        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
         self.addPreTestSteps()
 
@@ -3703,13 +3716,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir='tools'
         )
 
-        platform_minidump_path = {
-            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
-            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
-            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-            }
-
-        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
         self.addPreTestSteps()
 
@@ -4824,15 +4831,10 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             mochitest_leak_threshold=None, crashtest_leak_threshold=None,
             totalChunks=None, thisChunk=None, chunkByDir=None,
             **kwargs):
-        platform_minidump_path = {
-            'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
-            'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
-            'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-            }
         self.platform = platform.split('-')[0]
 
         self.env = MozillaEnvironments['%s-unittest' % self.platform].copy()
-        self.env['MINIDUMP_STACKWALK'] = platform_minidump_path[self.platform]
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         self.env.update(env)
 
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
