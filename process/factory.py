@@ -4320,6 +4320,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addUploadSteps(platform=self.uploadPlatform)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
@@ -4432,6 +4434,9 @@ class MaemoBuildFactory(MobileBuildFactory):
 
         if self.multiLocale:
             self.nonMultiLocaleStepsLength = len(self.steps)
+
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def newBuild(self, requests):
         if self.multiLocale:
@@ -4595,6 +4600,8 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
                          "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
         self.uploadMulti()
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def compareLocalesSetup(self):
         self.addStep(ShellCommand,
@@ -4766,6 +4773,8 @@ class WinmoBuildFactory(MobileBuildFactory):
         self.addUploadSteps(platform='win32')
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def addPreCleanSteps(self):
         if self.clobber:
