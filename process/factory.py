@@ -5184,7 +5184,7 @@ class TalosFactory(BuildFactory):
             txt = cmd.logs['stdio'].getText()
             m = re.search("MacOSX10\.5\.sdk", txt, re.M)
             if m :
-                step.addCompleteLog('sdk-fail', 'TinderboxPrint: can\'t run 10.5.sdk on 10.4 slave')
+                step.addCompleteLog('sdk-fail', 'TinderboxPrint: Skipping tests; can\'t run 10.5 based build on 10.4 slave')
                 return FAILURE
             return SUCCESS
         if self.OS == "tiger":
@@ -5193,6 +5193,7 @@ class TalosFactory(BuildFactory):
                 workdir=os.path.join(self.workdirBase, "talos"),
                 eval_fn=check_sdk,
                 haltOnFailure=True,
+                flunkOnFailure=False,
                 name='check sdk okay'))
      
     def addSetupSteps(self):
