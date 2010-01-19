@@ -188,6 +188,20 @@ class AsyncLoader(L10nConfigParser):
     self.pendingLoads = 0
     self.type = _type
 
+  def getDepth(self, cp):
+    '''Get the depth for the comparison from the parsed l10n.ini.
+
+    Overloaded to get the source depth for fennec and friends.
+    '''
+    try:
+      depth = cp.get('general', 'source-depth')
+    except:
+      try:
+        depth = cp.get('general', 'depth')
+      except:
+        depth = '.'
+    return depth
+
   def loadConfigs(self):
     """Load the l10n.ini file asynchronously.
 
