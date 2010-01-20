@@ -633,3 +633,23 @@ class DisconnectStep(ShellCommand):
             self.step_status.setText(self.describe(True) + ["slave", "lost"])
             self.step_status.setText2(['slave', 'lost'])
         return ShellCommand.finished(self, res)
+
+class RepackPartners(ShellCommand):
+    '''This step allows a regular ShellCommand to be optionally extended
+       based on provided properties. This is useful for tweaking the command
+       to be run based on, e.g., properties supplied by the user in the 
+       force builds web interface.
+    '''
+    def start(self):
+        try:
+            properties = self.build.getProperties()
+            if properties.has_key('partner'):
+                partner = properties['partner']
+                self.command.extend(['-p',partner])
+        except:
+            # No partner was specified, so repacking all partners.
+            pass
+        ShellCommand.start(self)
+
+            
+        

@@ -31,7 +31,7 @@ reload(buildbotcustom.env)
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
-  EvaluatingShellCommand
+  EvaluatingShellCommand, RepackPartners
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -5740,3 +5740,115 @@ class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
 class MobileDesktopNightlyRepackFactory(MobileNightlyRepackFactory):
     def doUpload(self):
         self.addUploadSteps(platform=self.platform)
+
+
+class PartnerRepackFactory(ReleaseFactory):
+    def getReleaseTag(self, product, version):
+        return product.upper() + '_' + \
+               str(version).replace('.','_') + '_' + \
+               'RELEASE'
+
+    def __init__(self, productName, version, partnersRepoPath, 
+                 stagingServer, stageUsername, stageSshKey, 
+                 buildNumber=1, partnersRepoRevision='default', 
+                 **kwargs):
+        ReleaseFactory.__init__(self, **kwargs)
+        self.productName = productName
+        self.version = version
+        self.buildNumber = buildNumber
+        self.partnersRepoPath = partnersRepoPath
+        self.partnersRepoRevision = partnersRepoRevision
+        self.stagingServer = stagingServer
+        self.stageUsername = stageUsername
+        self.stageSshKey = stageSshKey
+        self.partnersRepackDir = 'partner-repacks'
+        self.candidatesDir = self.getCandidatesDir(productName,
+                                                   version,
+                                                   buildNumber)
+        self.releaseTag = self.getReleaseTag(productName, version)
+
+        self.getPartnerRepackData()
+        self.doPartnerRepacks()
+        self.uploadPartnerRepacks()
+
+    def getPartnerRepackData(self):
+        # We start fresh every time.
+        self.addStep(ShellCommand,
+            name='rm_partners_repo',
+            command=['rm', '-rf', self.partnersRepackDir],
+            description=['remove', 'partners', 'repo'],
+            workdir='.'
+        )
+        self.addStep(ShellCommand,
+            name='clone_partners_repo',
+            command=['hg', 'clone', 
+                     'http://%s/%s %s' % (self.hgHost, 
+                                          self.partnersRepoPath,
+                                          self.partnersRepackDir)
+                    ],
+            description=['clone', 'partners', 'repo'],
+            workdir='.',
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            name='update_partners_repo',
+            command=['hg', 'update', '-r', self.partnersRepoRevision],
+            description=['update', 'partners', 'repo'],
+            workdir=self.partnersRepackDir,
+            haltOnFailure=True            
+        )
+        self.addStep(ShellCommand,
+            name='download_pkg-dmg',
+            command=['bash', '-c',
+                     'wget http://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
+            description=['download', 'pkg-dmg'],
+            workdir='%s/scripts' % self.partnersRepackDir,
+            haltOnFailure=True            
+        )
+        self.addStep(ShellCommand,
+            name='chmod_pkg-dmg',
+            command=['chmod', '755', 'pkg-dmg'],
+            description=['chmod', 'pkg-dmg'],
+            workdir='%s/scripts' % self.partnersRepackDir,
+            haltOnFailure=True            
+        )
+        self.addStep(SetProperty,
+            name='set_scriptsdir',
+            command=['bash', '-c', 'pwd'],
+            property='scriptsdir',
+            workdir='%s/scripts' % self.partnersRepackDir,
+        )
+
+    def doPartnerRepacks(self):
+        self.addStep(RepackPartners,
+            name='repack_partner_builds',
+            command=['./partner-repacks.py',
+                     '--version', str(self.version),
+                     '--build-number', str(self.buildNumber),
+                     '--pkg-dmg', WithProperties('%(scriptsdir)s/pkg-dmg'),
+                     '--staging-server', self.stagingServer,
+                    ],
+            description=['repacking', 'partner', 'builds'],
+            descriptionDone=['repacked', 'partner', 'builds'],
+            workdir='%s/scripts' % self.partnersRepackDir,
+            haltOnFailure=True
+        )            
+
+    def uploadPartnerRepacks(self):
+        self.addStep(ShellCommand,
+         name='upload_partner_builds',
+         command=['rsync', '-av',
+                  '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
+                  '*',
+                  '%s@%s:%s' % (self.stageUsername,
+                                self.stagingServer,
+                                self.candidatesDir) + \
+                  'unsigned/partner-repacks'
+                  ],
+         workdir='%s/scripts/repacked_builds/%s/build%s' % (self.partnersRepackDir,
+                                                            self.version,
+                                                            str(self.buildNumber)),
+         description=['upload', 'partner', 'builds'],
+         haltOnFailure=True
+        )
+        
