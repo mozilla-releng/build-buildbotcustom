@@ -1849,7 +1849,8 @@ class NightlyRepackFactory(BaseRepackFactory):
         # 2) preparation for updates
         if l10nNightlyUpdate and self.nightly:
             self.env.update({'MOZ_MAKE_COMPLETE_MAR': '1', 
-                             'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL})
+                             'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL,
+                             'FILE_BRANCH': self.branchName})
             self.extraConfigureArgs = ['--enable-update-packaging']
 
 
