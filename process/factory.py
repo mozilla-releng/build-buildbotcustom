@@ -4267,6 +4267,7 @@ class MobileBuildFactory(MozillaBuildFactory):
 
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
+            name="get_buildid",
             command=['python', 'config/printconfigsetting.py',
                      '%s/mobile/dist/bin/application.ini' % self.objdir,
                      'App', 'BuildID'],
@@ -4276,6 +4277,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             descriptionDone=['got', 'buildid']
         )
         self.addStep(MozillaStageUpload,
+            name="upload_to_stage",
+            description=['upload','to','stage'],
             objdir="%s/%s" % (self.branchName, self.objdir),
             username=self.stageUsername,
             milestone=self.baseUploadDir,
@@ -4761,15 +4764,40 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
                  packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.exe xulrunner/dist/*.tar.bz2",
-                 **kwargs):
+                 createSnippet=False, downloadBaseURL=None,
+                 ausUser=None, ausHost=None, ausBaseUploadDir=None,
+                 updatePlatform='WINCE_arm-msvc', **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = packageGlob
+        self.createSnippet = createSnippet
+        if self.createSnippet:
+            assert downloadBaseURL and \
+                   ausUser and \
+                   ausHost and \
+                   ausBaseUploadDir and \
+                   updatePlatform
+            self.packageGlob += " mobile/dist/update/*.complete.mar"
+            self.downloadBaseURL = downloadBaseURL
+            self.ausUser = ausUser
+            self.ausHost = ausHost
+            self.ausBaseUploadDir = ausBaseUploadDir
+            self.updatePlatform = updatePlatform
+            
+            # this is a tad ugly because we need to python interpolation
+            # as well as WithProperties
+            # here's an example of what it translates to:
+            # /opt/aus2/build/0/Firefox/mozilla2/WINNT_x86-msvc/2008010103/en-US
+            self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
+              (self.ausBaseUploadDir, self.updatePlatform)
+
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
         self.getMozconfig()
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
+        if self.createSnippet:
+            self.addUpdateSteps()
         self.addUploadSteps(platform='win32')
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
@@ -4830,10 +4858,84 @@ class WinmoBuildFactory(MobileBuildFactory):
             name='make_pkg_tests',
             command=['make', 'package-tests'],
             workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir, self.branchName,
-                                         self.objdir),
+                                            self.objdir),
             description=['make', 'package-tests'],
             haltOnFailure=True
         )
+
+    def addUpdateSteps(self):
+        self.addStep(ShellCommand,
+            name='make_update_pkg',
+            command=['make', '-C', 'tools/update-packaging'],
+            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
+                                         self.objdir),
+            description=['make', 'update', 'pkg'],
+            haltOnFailure=True
+        )
+        self.addFilePropertiesSteps(filename='*.complete.mar',
+                                    directory='%s/%s/%s/mobile/dist/update' % \
+                                      (self.baseWorkDir,
+                                       self.branchName,
+                                       self.objdir),
+                                    fileType='completeMar',
+                                    haltOnFailure=True)
+        self.addStep(SetProperty,
+            name="get_buildid",
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(SetProperty(
+            name="get_app_version",
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'Version'],
+            property='appVersion',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'app', 'version'],
+            descriptionDone=['got', 'app', 'version']
+        ))
+        self.addStep(CreateCompleteUpdateSnippet,
+            objdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            milestone=self.baseUploadDir,
+            baseurl='%s/nightly' % self.downloadBaseURL,
+            hashType=self.hashType
+        )
+        self.addStep(ShellCommand,
+            name='cat_complete_snippet',
+            description=['cat','complete','snippet'],
+            command=['cat','complete.update.snippet'],
+            workdir='%s/%s/%s/dist/update' % (self.baseWorkDir, self.branchName, self.objdir),
+        )
+
+    def addUploadSteps(self, platform='win32'):
+        MobileBuildFactory.addUploadSteps(self,platform=platform) 
+        # ausFullUploadDir contains an interpolation of the buildid property.
+        # We expect the property to be set by the parent call to
+        # addUploadSteps()
+        if self.createSnippet:
+            self.addStep(ShellCommand,
+                name='create_aus_updir',
+                command=['ssh', '-l', self.ausUser, self.ausHost,
+                         WithProperties('mkdir -p %s' % self.ausFullUploadDir)],
+                description=['create', 'aus', 'upload', 'dir'],
+                haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+                name='upload_complete_snippet',
+                command=['scp', '-o', 'User=%s' % self.ausUser,
+                         'dist/update/complete.update.snippet',
+                         WithProperties('%s:%s/complete.txt' % \
+                           (self.ausHost, self.ausFullUploadDir))],
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+                description=['upload', 'complete', 'snippet'],
+                haltOnFailure=True
+            )
+
 
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, test_suites, env={},
