@@ -1864,6 +1864,7 @@ class NightlyRepackFactory(BaseRepackFactory):
             # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/fr
             self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
               (self.ausBaseUploadDir, self.updatePlatform)
+            self.env.update({'FILE_BRANCH': self.branchName})
             self.createNightlySnippet()
             self.uploadSnippet()
 
