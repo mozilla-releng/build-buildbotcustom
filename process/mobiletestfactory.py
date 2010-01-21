@@ -37,6 +37,7 @@ class MaemoUnittestFactory(BuildFactory):
         self.binaryDir = '/builds/unittest'
         self.maemkitDir = '/tools/maemkit'
         self.baseDir = '/builds'
+        self.standaloneFile = '/builds/standalone.txt'
         self.activeTests = activeTests
         self.reboot = reboot
         self.mozChangesetLink = '<a href=%(repo_path)s/rev/%(got_revision)s title="Built from Mozilla revision %(got_revision)s">moz:%(got_revision)s</a>'
@@ -49,7 +50,7 @@ class MaemoUnittestFactory(BuildFactory):
             description='hostname',
         )
         self.addStep(ShellCommand,
-            command='rm -rf %s fennec* talos* pageloader* /home/user/.mozilla /root/.mozilla /media/mmc2/.mozilla' % self.binaryDir,
+            command='rm -rf %s fennec* talos* pageloader* /home/user/.mozilla /root/.mozilla /media/mmc2/.mozilla || (echo "fs corruption at `date`" > %s && false)' % (self.binaryDir, self.standaloneFile),
             workdir=self.baseDir,
             haltOnFailure=True,
         )
@@ -335,7 +336,7 @@ class MaemoRunPerfTests(ShellCommand):
 class MaemoTalosFactory(BuildFactory):
     """Create maemo talos build factory"""
     
-    maemoClean = "rm -rf fennec fennec*.tar.bz2 talos* pageloader* /home/user/.mozilla /root/.mozilla unittest /media/mmc2/.mozilla"
+    maemoClean = 'rm -rf fennec fennec*.tar.bz2 talos* pageloader* /home/user/.mozilla /root/.mozilla unittest /media/mmc2/.mozilla || (echo "fs corruption at `date`" > /builds/standalone.txt && false)'
     mozChangesetLink = '<a href=%(repo_path)s/rev/%(got_revision)s title="Built from Mozilla revision %(got_revision)s">moz:%(got_revision)s</a>'
     mobileChangesetLink = '<a href=%(repo_path)s/rev/%(got_revision)s title="Built from Mobile revision %(got_revision)s">mobile:%(got_revision)s</a>'
 
