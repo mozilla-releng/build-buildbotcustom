@@ -5203,7 +5203,7 @@ class TalosFactory(BuildFactory):
         )
 
     def addDmgInstaller(self):
-        if self.OS in ('leopard', 'tiger'):
+        if self.OS in ('leopard', 'tiger', 'snowleopard'):
             self.addStep(FileDownload(
              mastersrc="%s/buildfarm/utils/installdmg.sh" % self.toolsDir,
              slavedest="installdmg.sh",
@@ -5229,7 +5229,7 @@ class TalosFactory(BuildFactory):
          workdir=self.workdirBase,
          name="Unpack build",
         ))
-        if self.OS in ('xp', 'vista'):
+        if self.OS in ('xp', 'vista', 'win7'):
             self.addStep(ShellCommand(
              name='chmod_files',
              workdir=os.path.join(self.workdirBase, "firefox/"),
@@ -5239,7 +5239,7 @@ class TalosFactory(BuildFactory):
              command=["chmod", "-v", "-R", "a+x", "."],
              env=MozillaEnvironments[self.envName])
             )
-        if self.OS in ('tiger', 'leopard'):
+        if self.OS in ('tiger', 'leopard', 'snowleopard'):
             self.addStep(FindFile(
              workdir=os.path.join(self.workdirBase, "talos"),
              filename="firefox-bin",
@@ -5249,7 +5249,7 @@ class TalosFactory(BuildFactory):
              name="Find executable",
              filetype="file",
             ))
-        elif self.OS in ('xp', 'vista'):
+        elif self.OS in ('xp', 'vista', 'win7'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../firefox/firefox"
