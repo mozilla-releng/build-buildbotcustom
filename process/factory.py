@@ -4939,7 +4939,7 @@ class WinmoBuildFactory(MobileBuildFactory):
 
 
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, test_suites, env={},
+    def __init__(self, platform, test_suites, env={}, productName='firefox',
             mochitest_leak_threshold=None, crashtest_leak_threshold=None,
             totalChunks=None, thisChunk=None, chunkByDir=None,
             **kwargs):
@@ -4948,6 +4948,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         self.env = MozillaEnvironments['%s-unittest' % self.platform].copy()
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         self.env.update(env)
+        self.productName = productName
 
         assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
 
@@ -5032,10 +5033,10 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          workdir='build/symbols',
         ))
 
-        # Find firefox!
+        # Find the application binary!
         if self.platform == "macosx":
             self.addStep(FindFile(
-             filename="firefox-bin",
+             filename="%s-bin" % self.productName,
              directory=".",
              filetype="file",
              max_depth=4,
@@ -5045,12 +5046,12 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         elif self.platform == "win32":
             self.addStep(SetBuildProperty(
              property_name="exepath",
-             value="firefox/firefox.exe",
+             value="%s/%s.exe" % (self.productName, self.productName),
             ))
         else:
             self.addStep(SetBuildProperty(
              property_name="exepath",
-             value="firefox/firefox-bin",
+             value="%s/%s-bin" % (self.productName, self.productName),
             ))
 
         def get_exedir(build):
