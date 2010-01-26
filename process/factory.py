@@ -4415,7 +4415,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             # before the multi-locale. This packageGlob will be used to move packages
             # into the "en-US" directory before uploading it and later on the 
             # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "mobile/dist/*.tar.bz2 mobile/mobile/*.deb mobile/dist/deb_name.txt"
+            self.packageGlob = "mobile/dist/*.tar.bz2 mobile/mobile/*.deb"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -4603,8 +4603,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True, packageXulrunner=True)
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
-                         "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb " + \
-                         "mobile/dist/en-US/deb_name.txt"
+                         "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
