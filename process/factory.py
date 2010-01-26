@@ -4389,6 +4389,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
                  packageGlob="mobile/dist/*.tar.bz2 " +
+                 "mobile/dist/deb_name.txt " +
                  "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
                  "xulrunner/dist/*.tar.bz2",
                  l10nTag='default',
@@ -5563,7 +5564,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         # unused here but needed by BaseRepackFactory
         self.postUploadCmd = None
 
-        self.env = {}
+        self.env = {'EN_US_BINARY_URL': self.enUSBinaryURL}
 
         BaseRepackFactory.__init__(self,
                                    project=project,
@@ -5616,23 +5617,25 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          name='wget_enUS',
          command=['make', 'wget-en-US'],
          descriptionDone='wget en-US',
-         env={'EN_US_BINARY_URL': self.enUSBinaryURL},
+         env=self.env,
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         )
 
-    def updateEnUS(self):
+    def updateEnUS(self, env=None):
         self.addStep(ShellCommand,
          name='make_unpack',
          command=['make', 'unpack'],
          haltOnFailure=True,
+         env=self.env,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         )
         self.addStep(SetProperty,
          command=['make', 'ident'],
          haltOnFailure=True,
+         env=self.env,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
          extract_fn=identToProperties()
@@ -5752,14 +5755,27 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
 
     def downloadBuilds(self):
         MobileNightlyRepackFactory.downloadBuilds(self)
-        self.addStep(ShellCommand,
-         name='wget_deb',
-         command=['make', 'wget-deb', 'EN_US_BINARY_URL=%s' % self.enUSBinaryURL,
-                  'DEB_BUILD_ARCH=armel'],
+        self.addStep(SetProperty,
+         name='set_debname',
+         command=['make', 'wget-DEB_PKG_NAME',
+                  'EN_US_BINARY_URL=%s' % self.enUSBinaryURL],
+         property='debname',
          workdir='%s/%s/%s/locales' % (self.baseWorkDir,
                                        self.origSrcDir, self.appName),
          haltOnFailure=True,
-         description=['wget','deb'],
+         description=['set', 'debname'],
+        )
+        self.addStep(ShellCommand,
+         name='wget_deb',
+         command=['sh', '-c',
+                  WithProperties('make wget-deb EN_US_BINARY_URL=' +
+                                 self.enUSBinaryURL + ' ' +
+                                 'DEB_PKG_NAME=%(debname)s ' +
+                                 'DEB_BUILD_ARCH=armel')],
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir,
+                                       self.origSrcDir, self.appName),
+         haltOnFailure=True,
+         description=['wget', 'deb'],
         )
 
     def doRepack(self):
@@ -5768,14 +5784,15 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
             mergeOptions = 'LOCALE_MERGEDIR=$PWD/merged'
         self.addStep(ShellCommand,
          name='repack_debs',
-         command=['sh','-c',
+         command=['sh', '-c',
                   WithProperties('make installers-%(locale)s deb-%(locale)s ' +
                                  'DEB_BUILD_ARCH=armel ' +
+                                 'DEB_PKG_NAME=%(debname)s ' +
                                  mergeOptions)],
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
          haltOnFailure=True,
-         description=['repack','deb'],
+         description=['repack', 'deb'],
         )
 
     def doUpload(self):
