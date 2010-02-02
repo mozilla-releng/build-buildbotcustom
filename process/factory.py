@@ -3507,9 +3507,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             objdir, mozRepoPath, brandName=None, mochitest_leak_threshold=None,
             mochichrome_leak_threshold=None, mochibrowser_leak_threshold=None,
             crashtest_leak_threshold=None, uploadPackages=False,
-            unittestMasters=None, stageUsername=None, stageServer=None,
-            stageSshKey=None, exec_reftest_suites=True, exec_mochi_suites=True,
-            exec_mozmill_suites=False, run_a11y=True, **kwargs):
+            unittestMasters=None, unittestBranch=None, stageUsername=None,
+            stageServer=None, stageSshKey=None, exec_xpcshell_suites=True,
+            exec_reftest_suites=True, exec_mochi_suites=True,
+            exec_mozmill_suites=False, run_a11y=True, env={}, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -3524,10 +3525,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.config_dir = config_dir
         self.objdir = objdir
         self.run_a11y = run_a11y
-        if unittestMasters is None:
-            self.unittestMasters = []
-        else:
-            self.unittestMasters = unittestMasters
+        self.unittestMasters = unittestMasters or []
+        self.unittestBranch = unittestBranch
+        if self.unittestMasters:
+            assert self.unittestBranch
         if brandName:
             self.brandName = brandName
         else:
@@ -3535,6 +3536,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.mochitest_leak_threshold = mochitest_leak_threshold
         self.mochichrome_leak_threshold = mochichrome_leak_threshold
         self.mochibrowser_leak_threshold = mochibrowser_leak_threshold
+        self.exec_xpcshell_suites = exec_xpcshell_suites
         self.exec_reftest_suites = exec_reftest_suites
         self.exec_mochi_suites = exec_mochi_suites
         self.exec_mozmill_suites = exec_mozmill_suites
@@ -3701,12 +3703,13 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              description=['upload']
             )
 
-            branch = "%s-%s-unittest" % (self.branchName, self.platform)
-            for master, warn in self.unittestMasters:
+            for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
+                 name='sendchange_%s' % master,
                  warnOnFailure=warn,
                  master=master,
-                 branch=branch,
+                 retries=retries,
+                 branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange-unittest")
                 )
@@ -3728,12 +3731,13 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          timeout=5*60, # 5 minutes.
         )
 
-        self.addStep(unittest_steps.MozillaCheck,
-         test_name="xpcshell-tests",
-         warnOnWarnings=True,
-         workdir="build/%s" % self.objdir,
-         timeout=5*60, # 5 minutes.
-        )
+        if self.exec_xpcshell_suites:
+            self.addStep(unittest_steps.MozillaCheck,
+             test_name="xpcshell-tests",
+             warnOnWarnings=True,
+             workdir="build/%s" % self.objdir,
+             timeout=5*60, # 5 minutes.
+            )
 
         if self.exec_mozmill_suites:
             mozmillEnv = self.env.copy()

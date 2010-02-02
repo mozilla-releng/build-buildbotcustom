@@ -23,7 +23,8 @@ reload(buildbotcustom.scheduler)
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
-  UnittestPackagedBuildFactory, TalosFactory
+  UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
+  CCNightlyRepackFactory, CCUnittestBuildFactory
 from buildbotcustom.scheduler import MozScheduler, NoMergeScheduler, \
   NightlyRebuild, MultiScheduler, NoMergeMultiScheduler
 from buildbotcustom.l10n import NightlyL10n
@@ -151,6 +152,64 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
         builders.append(builder)
     return builders
 
+def generateCCTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
+        suites_name, suites, mochitestLeakThreshold, mochichromeLeakThreshold,
+        mochibrowserLeakThreshold, crashtestLeakThreshold):
+    builders = []
+    pf = config['platforms'].get(platform, {})
+    if isinstance(suites, dict) and "totalChunks" in suites:
+        totalChunks = suites['totalChunks']
+        for i in range(totalChunks):
+            factory = UnittestPackagedBuildFactory(
+                platform=platform,
+                test_suites=[suites['suite']],
+                mochitest_leak_threshold=mochitestLeakThreshold,
+                #mochichrome_leak_threshold=mochichromeLeakThreshold,
+                #mochibrowser_leak_threshold=mochibrowserLeakThreshold,
+                crashtest_leak_threshold=crashtestLeakThreshold,
+                productName=config['product_name'],
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                buildSpace=1.0,
+                buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+                totalChunks=totalChunks,
+                thisChunk=i+1,
+                chunkByDir=suites.get('chunkByDir'),
+                env=pf.get('unittest-env', {}),
+            )
+            builder = {
+                'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                'slavenames': config['platforms'][platform]['slaves'],
+                'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                'factory': factory,
+                'category': branch_name,
+            }
+            builders.append(builder)
+    else:
+        factory = UnittestPackagedBuildFactory(
+            platform=platform,
+            test_suites=suites,
+            mochitest_leak_threshold=mochitestLeakThreshold,
+            #mochichrome_leak_threshold=mochichromeLeakThreshold,
+            #mochibrowser_leak_threshold=mochibrowserLeakThreshold,
+            crashtest_leak_threshold=crashtestLeakThreshold,
+            productName=config['product_name'],
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            buildSpace=1.0,
+            buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': config['platforms'][platform]['slaves'],
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'factory': factory,
+            'category': branch_name,
+        }
+        builders.append(builder)
+    return builders
 
 
 def generateBranchObjects(config, name):
@@ -829,6 +888,660 @@ def generateBranchObjects(config, name):
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
     return branchObjects
+
+def generateCCBranchObjects(config, name):
+    """name is the name of branch which is usually the last part of the path
+       to the repository. For example, 'comm-central-trunk', or 'comm-1.9.1'.
+       config is a dictionary containing all of the necessary configuration
+       information for a branch. The required keys depends greatly on what's
+       enabled for a branch (unittests, l10n, etc). The best way to figure out
+       what you need to pass is by looking at existing configs and using
+       'buildbot checkconfig' to verify.
+    """
+    # We return this at the end
+    branchObjects = {
+        'builders': [],
+        'change_source': [],
+        'schedulers': [],
+        'status': []
+    }
+    builders = []
+    unittestBuilders = []
+    triggeredUnittestBuilders = []
+    nightlyBuilders = []
+    debugBuilders = []
+    weeklyBuilders = []
+    # These dicts provides mapping between en-US dep and  nightly scheduler names
+    # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
+    l10nBuilders = {}
+    l10nNightlyBuilders = {}
+    # generate a list of builders, nightly builders (names must be different)
+    # for easy access
+    for platform in config['platforms'].keys():
+        pf = config['platforms'][platform]
+        base_name = pf['base_name']
+        if platform.endswith("-debug"):
+            debugBuilders.append('%s build' % base_name)
+            # Debug unittests
+            if pf.get('enable_unittests'):
+                test_builders = []
+                base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                for suites_name, suites in config['unittest_suites']:
+                    test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
+                triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, True))
+            # Skip l10n, unit tests and nightlies for debug builds
+            continue
+        else:
+            builders.append('%s build' % base_name)
+
+        #Fill the l10n dep dict
+        if config['enable_l10n'] and platform in config['l10n_platforms']: 
+                l10nBuilders[base_name] = {}
+                l10nBuilders[base_name]['tree'] = config['l10n_tree']
+                l10nBuilders[base_name]['l10n_builder'] = \
+                    '%s %s %s l10n dep' % (config['product_name'].capitalize(),
+                                       name, platform)
+                l10nBuilders[base_name]['platform'] = platform
+        # Check if branch wants nightly builds
+        if config['enable_nightly']:
+            builder = '%s nightly' % base_name
+            nightlyBuilders.append(builder)
+            # Fill the l10nNightly dict
+            if config['enable_l10n'] and platform in config['l10n_platforms']: 
+                l10nNightlyBuilders[builder] = {}
+                l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
+                l10nNightlyBuilders[builder]['l10n_builder'] = \
+                    '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
+                                       name, platform)
+                l10nNightlyBuilders[builder]['platform'] = platform
+        if config['enable_shark'] and platform in ('macosx'):
+            nightlyBuilders.append('%s shark' % base_name)
+        # Regular unittest builds
+        if pf.get('enable_unittests'):
+            unittestBuilders.append('%s unit test' % base_name)
+            test_builders = []
+            for suites_name, suites in config['unittest_suites']:
+                test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
+            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, True))
+        # Optimized unittest builds
+        if pf.get('enable_opt_unittests'):
+            test_builders = []
+            for suites_name, suites in config['unittest_suites']:
+                test_builders.extend(generateTestBuilderNames('%s opt test' % base_name, suites_name, suites))
+            triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
+        if config['enable_codecoverage'] and platform in ('linux',):
+            weeklyBuilders.append('%s code coverage' % base_name)
+
+    # Currently, each branch goes to a different tree
+    # If this changes in the future this may have to be
+    # moved out of the loop
+    branchObjects['status'].append(TinderboxMailNotifier(
+        fromaddr="comm.buildbot@build.mozilla.org",
+        tree=config['tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=builders + nightlyBuilders,
+        logCompression="bzip2"
+    ))
+    # Separate notifier for unittests, since they need to be run through
+    # the unittest errorparser
+    branchObjects['status'].append(TinderboxMailNotifier(
+        fromaddr="comm.buildbot@build.mozilla.org",
+        tree=config['tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=unittestBuilders + debugBuilders,
+        logCompression="bzip2",
+        errorparser="unittest"
+    ))
+    # Weekly builds (currently only code coverage) go to a different tree
+    branchObjects['status'].append(TinderboxMailNotifier(
+        fromaddr="comm.buildbot@build.mozilla.org",
+        tree=config['weekly_tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=weeklyBuilders,
+        logCompression="bzip2",
+        errorparser="unittest"
+    ))
+
+    if config['enable_l10n']:
+        l10n_builders = []
+        for b in l10nBuilders:
+            l10n_builders.append(l10nBuilders[b]['l10n_builder'])
+            l10n_builders.append(l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
+        l10n_binaryURL = config['enUS_binaryURL']
+        if l10n_binaryURL.endswith('/'):
+            l10n_binaryURL = l10n_binaryURL[:-1]
+        l10n_binaryURL += "-l10n"
+
+        # This notifies all l10n related build objects to Mozilla-l10n
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="comm.buildbot@build.mozilla.org",
+            tree=config['l10n_tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            logCompression="bzip2",
+            builders=l10n_builders,
+            binaryURL=l10n_binaryURL
+        ))
+
+        # We only want the builds from the specified builders
+        # since their builds have a build property called "locale"
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="comm.buildbot@build.mozilla.org",
+            tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            logCompression="bzip2",
+            builders=l10n_builders,
+            binaryURL=l10n_binaryURL
+        ))
+
+    # change sources
+    branchObjects['change_source'].append(HgPoller(
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
+                                              config['repo_path']),
+        pollInterval=1*60
+    ))
+    branchObjects['change_source'].append(HgPoller(
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
+                                              config['mozilla_repo_path']),
+        pollInterval=1*60
+    ))
+
+    if config['enable_l10n']:
+        hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
+                            repositoryIndex = config['l10n_repo_path'],
+                            pollInterval = 15*60)
+        hg_all_locales_poller.parallelRequests = 1
+        branchObjects['change_source'].append(hg_all_locales_poller)
+
+    # schedulers
+    # this one gets triggered by the HG Poller
+    branchObjects['schedulers'].append(MozScheduler(
+        name=name,
+        branch=config['repo_path'],
+        treeStableTimer=3*60,
+        idleTimeout=config.get('idle_timeout', None),
+        builderNames=builders + unittestBuilders + debugBuilders,
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl'])
+    ))
+
+    for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
+        scheduler_name = scheduler_branch
+        if not merge:
+            branchObjects['schedulers'].append(NoMergeScheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+        else:
+            branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+
+        branchObjects['schedulers'].append(NightlyRebuild(name=scheduler_name+"-nightly",
+            builderNames=test_builders,
+            dayOfWeek=4, # Friday
+            hour=3, minute=2, # at 3:02 am local time
+            numberOfBuildsToTrigger=2,
+            mergeBuilds=False))
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="comm.buildbot@build.mozilla.org",
+            tree=config['packaged_unittest_tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=test_builders,
+            logCompression="bzip2",
+            errorparser="unittest"
+        ))
+
+    # Now, setup the nightly en-US schedulers and maybe,
+    # their downstream l10n ones
+
+    for builder in nightlyBuilders:
+        nightly_scheduler=Nightly(
+            name=builder,
+            branch=config['repo_path'],
+            # bug 482123 - keep the minute to avoid problems with DST changes
+            hour=config['start_hour'], minute=config['start_minute'],
+            builderNames=[builder]
+        )
+        branchObjects['schedulers'].append(nightly_scheduler)
+
+        if config['enable_l10n'] and config['enable_nightly'] and builder in l10nNightlyBuilders:
+            l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
+            platform = l10nNightlyBuilders[builder]['platform']
+            tree = l10nNightlyBuilders[builder]['tree']
+            branchObjects['schedulers'].append(NightlyL10n(
+                                   name=l10n_builder,
+                                   platform=platform,
+                                   tree=tree,
+                                   builderNames=[l10n_builder],
+                                   repoType='hg',
+                                   branch=config['repo_path'],
+                                   baseTag='default',
+                                   localesFile=config['allLocalesFile']
+                                  ))
+
+    for builder in weeklyBuilders:
+        weekly_scheduler=Nightly(
+            name=builder,
+            branch=config['repo_path'],
+            dayOfWeek=5, # Saturday
+            hour=[3], minute=[02],
+            builderNames=[builder],
+        )
+        branchObjects['schedulers'].append(weekly_scheduler)
+
+    for platform in sorted(config['platforms'].keys()):
+        # shorthand
+        pf = config['platforms'][platform]
+
+        leakTest = False
+        codesighs = True
+        uploadPackages = True
+        uploadSymbols = False
+        packageTests = False
+        talosMasters = config['talos_masters']
+        unittestBranch = "%s-%s-opt-unittest" % (name, platform)
+        tinderboxBuildsDir = None
+        if platform.find('-debug') > -1:
+            leakTest = True
+            codesighs = False
+            if not pf.get('enable_unittests'):
+                uploadPackages = False
+            else:
+                packageTests = True
+            talosMasters = None
+            # Platform already has the -debug suffix
+            unittestBranch = "%s-%s-unittest" % (name, platform)
+            tinderboxBuildsDir = "%s-%s" % (name, platform)
+        elif pf.get('enable_opt_unittests'):
+            packageTests = True
+
+        # Allow for test packages on platforms that can't be tested
+        # on the same master.
+        packageTests = pf.get('packageTests', packageTests)
+
+        if platform.find('win') > -1 or platform.find('64') > -1:
+            codesighs = False
+        if 'upload_symbols' in pf and pf['upload_symbols']:
+            uploadSymbols = True
+
+        buildSpace = pf.get('build_space', config['default_build_space'])
+        clobberTime = pf.get('clobber_time', config['default_clobber_time'])
+        mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
+        mochichromeLeakThreshold = pf.get('mochichrome_leak_threshold', None)
+        mochibrowserLeakThreshold = pf.get('mochibrowser_leak_threshold', None)
+        crashtestLeakThreshold = pf.get('crashtest_leak_threshold', None)
+        checkTest = pf.get('enable_checktests', False)
+        valgrindCheck = pf.get('enable_valgrind_checktests', False)
+
+        mozilla2_dep_factory = CCNightlyBuildFactory(
+            env=pf['env'],
+            objdir=pf['platform_objdir'],
+            platform=platform,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            mozRepoPath=config['mozilla_repo_path'],
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            configRepoPath=config['config_repo_path'],
+            configSubDir=config['config_subdir'],
+            profiledBuild=pf['profiled_build'],
+            productName=config['product_name'],
+            mozconfig=pf['mozconfig_dep'],
+            branchName=name,
+            stageServer=config['stage_server'],
+            stageUsername=config['stage_username'],
+            stageGroup=config['stage_group'],
+            stageSshKey=config['stage_ssh_key'],
+            stageBasePath=config['stage_base_path'],
+            graphServer=config['graph_server'],
+            graphSelector=config['graph_selector'],
+            graphBranch=config['tinderbox_tree'],
+            baseName=pf['base_name'],
+            leakTest=leakTest,
+            checkTest=checkTest,
+            valgrindCheck=valgrindCheck,
+            codesighs=codesighs,
+            uploadPackages=uploadPackages,
+            uploadSymbols=False,
+            buildSpace=buildSpace,
+            clobberURL=config['base_clobber_url'],
+            clobberTime=clobberTime,
+            buildsBeforeReboot=pf['builds_before_reboot'],
+            talosMasters=talosMasters,
+            packageTests=packageTests,
+            unittestMasters=config['unittest_masters'],
+            unittestBranch=unittestBranch,
+            tinderboxBuildsDir=tinderboxBuildsDir,
+        )
+        mozilla2_dep_builder = {
+            'name': '%s build' % pf['base_name'],
+            'slavenames': pf['slaves'],
+            'builddir': '%s-%s' % (name, platform),
+            'factory': mozilla2_dep_factory,
+            'category': name,
+        }
+        branchObjects['builders'].append(mozilla2_dep_builder)
+
+        # skip nightlies for debug builds
+        if platform.find('debug') > -1:
+            if pf.get('enable_unittests'):
+                for suites_name, suites in config['unittest_suites']:
+                    if "macosx" in platform and 'mochitest-a11y' in suites:
+                        suites = suites[:]
+                        suites.remove('mochitest-a11y')
+
+                    base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+
+                    branchObjects['builders'].extend(generateCCTestBuilder(
+                        config, name, platform, "%s debug test" % base_name,
+                        "%s-%s-unittest" % (name, platform),
+                        suites_name, suites, mochitestLeakThreshold,
+                        mochichromeLeakThreshold, mochibrowserLeakThreshold,
+                        crashtestLeakThreshold))
+            continue
+
+        if config['enable_nightly']:
+            nightly_builder = '%s nightly' % pf['base_name']
+
+            triggeredSchedulers=None
+            if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+               nightly_builder in l10nNightlyBuilders:
+                triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
+
+            mozilla2_nightly_factory = CCNightlyBuildFactory(
+                env=pf['env'],
+                objdir=pf['platform_objdir'],
+                platform=platform,
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                mozRepoPath=config['mozilla_repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                configRepoPath=config['config_repo_path'],
+                configSubDir=config['config_subdir'],
+                profiledBuild=pf['profiled_build'],
+                productName=config['product_name'],
+                mozconfig=pf['mozconfig'],
+                branchName=name,
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username'],
+                stageGroup=config['stage_group'],
+                stageSshKey=config['stage_ssh_key'],
+                stageBasePath=config['stage_base_path'],
+                codesighs=False,
+                uploadPackages=uploadPackages,
+                uploadSymbols=uploadSymbols,
+                nightly=True,
+                createSnippet=config['create_snippet'],
+                ausBaseUploadDir=config['aus2_base_upload_dir'],
+                updatePlatform=pf['update_platform'],
+                downloadBaseURL=config['download_base_url'],
+                ausUser=config['aus2_user'],
+                ausHost=config['aus2_host'],
+                buildSpace=buildSpace,
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+                buildsBeforeReboot=pf['builds_before_reboot'],
+                talosMasters=talosMasters,
+                packageTests=packageTests,
+                unittestMasters=config['unittest_masters'],
+                unittestBranch=unittestBranch,
+                geriatricMasters=config['geriatric_masters'],
+                geriatricBranches=config['geriatric_branches'],
+                triggerBuilds=config['enable_l10n'],
+                triggeredSchedulers=triggeredSchedulers,
+                tinderboxBuildsDir=tinderboxBuildsDir,
+            )
+
+            mozilla2_nightly_builder = {
+                'name': nightly_builder,
+                'slavenames': pf['slaves'],
+                'builddir': '%s-%s-nightly' % (name, platform),
+                'factory': mozilla2_nightly_factory,
+                'category': name,
+            }
+            branchObjects['builders'].append(mozilla2_nightly_builder)
+
+            if config['enable_l10n']:
+                if platform in config['l10n_platforms']:
+                    # TODO Linux and mac are not working with mozconfig at this point
+                    # and this will disable it for now. We will fix this in bug 518359.
+                    if platform is 'wince':
+                        env = pf['env']
+                        mozconfig = pf['mozconfig']
+                    else:
+                        env = {}
+                        mozconfig = None
+
+                    mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
+                        env=env,
+                        platform=platform,
+                        hgHost=config['hghost'],
+                        tree=config['l10n_tree'],
+                        project=config['product_name'],
+                        appName=config['app_name'],
+                        enUSBinaryURL=config['enUS_binaryURL'],
+                        nightly=True,
+                        configRepoPath=config['config_repo_path'],
+                        configSubDir=config['config_subdir'],
+                        mozconfig=mozconfig,
+                        branchName=name,
+                        l10nNightlyUpdate=config['l10nNightlyUpdate'],
+                        l10nDatedDirs=config['l10nDatedDirs'],
+                        ausBaseUploadDir=config['aus2_base_upload_dir'],
+                        updatePlatform=pf['update_platform'],
+                        downloadBaseURL=config['download_base_url'],
+                        ausUser=config['aus2_user'],
+                        ausHost=config['aus2_host'],
+                        stageServer=config['stage_server'],
+                        stageUsername=config['stage_username'],
+                        stageSshKey=config['stage_ssh_key'],
+                        repoPath=config['repo_path'],
+                        mozRepoPath=config['mozilla_repo_path'],
+                        l10nRepoPath=config['l10n_repo_path'],
+                        buildToolsRepoPath=config['build_tools_repo_path'],
+                        compareLocalesRepoPath=config['compare_locales_repo_path'],
+                        compareLocalesTag=config['compare_locales_tag'],
+                        buildSpace=2,
+                        clobberURL=config['base_clobber_url'],
+                        clobberTime=clobberTime,
+                    )
+                    mozilla2_l10n_nightly_builder = {
+                        'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
+                        'slavenames': config['l10n_slaves'][platform],
+                        'builddir': '%s-%s-l10n-nightly' % (name, platform),
+                        'factory': mozilla2_l10n_nightly_factory,
+                        'category': name,
+                    }
+                    branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
+        # We still want l10n_dep builds if nightlies are off
+        if config['enable_l10n'] and platform in config['l10n_platforms']:
+            mozilla2_l10n_dep_factory = CCNightlyRepackFactory(
+                hgHost=config['hghost'],
+                tree=config['l10n_tree'],
+                project=config['product_name'],
+                appName=config['app_name'],
+                enUSBinaryURL=config['enUS_binaryURL'],
+                nightly=False,
+                branchName=name,
+                l10nDatedDirs=config['l10nDatedDirs'],
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username'],
+                stageSshKey=config['stage_ssh_key'],
+                repoPath=config['repo_path'],
+                mozRepoPath=config['mozilla_repo_path'],
+                l10nRepoPath=config['l10n_repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                compareLocalesRepoPath=config['compare_locales_repo_path'],
+                compareLocalesTag=config['compare_locales_tag'],
+                buildSpace=2,
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+            )
+            mozilla2_l10n_dep_builder = {
+                'name': l10nBuilders[pf['base_name']]['l10n_builder'],
+                'slavenames': config['l10n_slaves'][platform],
+                'builddir': '%s-%s-l10n-dep' % (name, platform),
+                'factory': mozilla2_l10n_dep_factory,
+                'category': name,
+            }
+            branchObjects['builders'].append(mozilla2_l10n_dep_builder)
+
+        if pf.get('enable_unittests'):
+            runA11y = True
+            if platform == 'macosx':
+                runA11y = config['enable_mac_a11y']
+
+            unittest_factory = CCUnittestBuildFactory(
+                env=pf.get('unittest-env', {}),
+                platform=platform,
+                productName=config['product_name'],
+                branchName=name,
+                brandName=config['brand_name'],
+                config_repo_path=config['config_repo_path'],
+                config_dir=config['config_subdir'],
+                objdir=config['objdir_unittests'],
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                mozRepoPath=config['mozilla_repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                buildSpace=config['unittest_build_space'],
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+                buildsBeforeReboot=pf['builds_before_reboot'],
+                exec_xpcshell_suites = config['unittest_exec_xpcshell_suites'],
+                exec_reftest_suites = config['unittest_exec_reftest_suites'],
+                exec_mochi_suites = config['unittest_exec_mochi_suites'],
+                exec_mozmill_suites = config['unittest_exec_mozmill_suites'],
+                run_a11y=runA11y,
+                mochitest_leak_threshold=mochitestLeakThreshold,
+                mochichrome_leak_threshold=mochichromeLeakThreshold,
+                mochibrowser_leak_threshold=mochibrowserLeakThreshold,
+                crashtest_leak_threshold=crashtestLeakThreshold,
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username'],
+                stageSshKey=config['stage_ssh_key'],
+                unittestMasters=config['unittest_masters'],
+                unittestBranch="%s-%s-unittest" % (name, platform),
+                uploadPackages=True,
+            )
+            unittest_builder = {
+                'name': '%s unit test' % pf['base_name'],
+                'slavenames': pf['slaves'],
+                'builddir': '%s-%s-unittest' % (name, platform),
+                'factory': unittest_factory,
+                'category': name,
+            }
+            branchObjects['builders'].append(unittest_builder)
+
+        for suites_name, suites in config['unittest_suites']:
+            runA11y = True
+            if platform == 'macosx':
+                runA11y = config['enable_mac_a11y']
+
+            # For the regular unittest build, run the a11y suite if
+            # enable_mac_a11y is set on mac
+            if not runA11y and 'mochitest-a11y' in suites:
+                suites = suites[:]
+                suites.remove('mochitest-a11y')
+
+            if pf.get('enable_unittests'):
+                branchObjects['builders'].extend(generateCCTestBuilder(
+                    config, name, platform, "%s test" % pf['base_name'],
+                    "%s-%s-unittest" % (name, platform),
+                    suites_name, suites, mochitestLeakThreshold,
+                    mochichromeLeakThreshold, mochibrowserLeakThreshold,
+                    crashtestLeakThreshold))
+
+            # Remove mochitest-a11y from other types of builds, since they're not
+            # built with a11y enabled
+            if platform.startswith("macosx") and 'mochitest-a11y' in suites:
+                # Create a new factory that doesn't have mochitest-a11y
+                suites = suites[:]
+                suites.remove('mochitest-a11y')
+
+            if pf.get('enable_opt_unittests'):
+                branchObjects['builders'].extend(generateCCTestBuilder(
+                    config, name, platform, "%s opt test" % pf['base_name'],
+                    "%s-%s-opt-unittest" % (name, platform),
+                    suites_name, suites, mochitestLeakThreshold,
+                    mochichromeLeakThreshold, mochibrowserLeakThreshold,
+                    crashtestLeakThreshold))
+
+        if config['enable_codecoverage']:
+            # We only do code coverage builds on linux right now
+            if platform == 'linux':
+                codecoverage_factory = CodeCoverageFactory(
+                    platform=platform,
+                    productName=config['product_name'],
+                    config_repo_path=config['config_repo_path'],
+                    config_dir=config['config_subdir'],
+                    objdir=config['objdir_unittests'],
+                    hgHost=config['hghost'],
+                    repoPath=config['repo_path'],
+                    buildToolsRepoPath=config['build_tools_repo_path'],
+                    buildSpace=5,
+                    clobberURL=config['base_clobber_url'],
+                    clobberTime=clobberTime,
+                    buildsBeforeReboot=pf['builds_before_reboot'],
+                    mochitest_leak_threshold=mochitestLeakThreshold,
+                    crashtest_leak_threshold=crashtestLeakThreshold,
+                    stageServer=config['stage_server'],
+                    stageUsername=config['stage_username'],
+                    stageSshKey=config['stage_ssh_key'],
+                )
+                codecoverage_builder = {
+                    'name': '%s code coverage' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s-codecoverage' % (name, platform),
+                    'factory': codecoverage_factory,
+                    'category': name,
+                }
+                branchObjects['builders'].append(codecoverage_builder)
+
+        if config['enable_shark'] and platform in ('macosx'):
+             mozilla2_shark_factory = CCNightlyBuildFactory(
+                 env= pf['env'],
+                 objdir=config['objdir'],
+                 platform=platform,
+                 hgHost=config['hghost'],
+                 repoPath=config['repo_path'],
+                 mozRepoPath=config['mozilla_repo_path'],
+                 buildToolsRepoPath=config['build_tools_repo_path'],
+                 configRepoPath=config['config_repo_path'],
+                 configSubDir=config['config_subdir'],
+                 profiledBuild=False,
+                 productName=config['product_name'],
+                 mozconfig='macosx/%s/shark' % name,
+                 branchName=name,
+                 stageServer=config['stage_server'],
+                 stageUsername=config['stage_username'],
+                 stageGroup=config['stage_group'],
+                 stageSshKey=config['stage_ssh_key'],
+                 stageBasePath=config['stage_base_path'],
+                 codesighs=False,
+                 uploadPackages=uploadPackages,
+                 uploadSymbols=False,
+                 nightly=True,
+                 createSnippet=False,
+                 buildSpace=buildSpace,
+                 clobberURL=config['base_clobber_url'],
+                 clobberTime=clobberTime,
+                 buildsBeforeReboot=pf['builds_before_reboot']
+             )
+             mozilla2_shark_builder = {
+                 'name': '%s shark' % pf['base_name'],
+                 'slavenames': pf['slaves'],
+                 'builddir': '%s-%s-shark' % (name, platform),
+                 'factory': mozilla2_shark_factory,
+                 'category': name,
+             }
+             branchObjects['builders'].append(mozilla2_shark_builder)
+
+    return branchObjects
+
 
 def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         factory_class=TalosFactory):
