@@ -5188,13 +5188,22 @@ class TalosFactory(BuildFactory):
         self.addRebootStep()
 
     def addCleanupSteps(self):
-        self.addStep(ShellCommand(
-         name='cleanup',
-         workdir=self.workdirBase,
-         description="Cleanup",
-         command='rm -vrf *',
-         env=MozillaEnvironments[self.envName])
-        )
+        if self.OS in ('leopard', 'tiger', 'snowleopard', 'linux64', 'fedora64', 'linux', 'fedora'):
+          self.addStep(ShellCommand(
+           name='cleanup',
+           workdir=self.workdirBase,
+           description="Cleanup",
+           command='nohup rm -vrf *',
+           env=MozillaEnvironments[self.envName])
+          )
+        else :
+          self.addStep(ShellCommand(
+           name='cleanup',
+           workdir=self.workdirBase,
+           description="Cleanup",
+           command='rm -vrf *',
+           env=MozillaEnvironments[self.envName])
+          )
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
