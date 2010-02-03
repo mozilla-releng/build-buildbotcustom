@@ -631,13 +631,16 @@ def generateBranchObjects(config, name):
                     # and this will disable it for now. We will fix this in bug 518359.
                     if platform is 'wince':
                         env = pf['env']
+                        objdir = pf['platform_objdir']
                         mozconfig = pf['mozconfig']
                     else:
                         env = {}
+                        objdir = ''
                         mozconfig = None
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=env,
+                        objdir=objdir,
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],

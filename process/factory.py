@@ -1412,11 +1412,14 @@ class BaseRepackFactory(MozillaBuildFactory):
     def __init__(self, project, appName, l10nRepoPath,
                  compareLocalesRepoPath, compareLocalesTag,
                  stageServer, stageUsername, stageSshKey=None,
+                 env={}, objdir='', platform='',
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  baseWorkDir='build', tree="notset", mozillaDir=None,
                  l10nTag='default', mergeLocales=True, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
+        self.env = env.copy()
+        self.platform = platform
         self.project = project
         self.appName = appName
         self.l10nRepoPath = l10nRepoPath
@@ -1428,12 +1431,16 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.tree = tree
+        self.mozconfig = mozconfig
+
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
         if mozconfig and configSubDir and configRepoPath:
             self.mozconfig = 'configs/%s/%s/mozconfig' % (configSubDir,
                                                           mozconfig)
             self.configRepoPath = configRepoPath
+            self.configRepo = self.getRepository(self.configRepoPath,
+                                             kwargs['hgHost'])
 
         self.addStep(SetBuildProperty(
          property_name='tree',
@@ -1446,20 +1453,26 @@ class BaseRepackFactory(MozillaBuildFactory):
 
         self.origSrcDir = self.branchName
 
-        self.objdir = ''
-        if 'MOZ_OBJDIR' in self.env:
-            self.objdir = self.env['MOZ_OBJDIR']
-
-        # Mozilla subdir and objdir
+        # Mozilla subdir
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
             self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
         else:
             self.mozillaDir = ''
-            if self.objdir is not '':
-                self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, self.objdir)
-            else:
-                self.mozillaSrcDir = self.origSrcDir
+            self.mozillaSrcDir = self.origSrcDir
+
+        # self.mozillaObjdir is used in SeaMonkey's and Thunderbird's case
+        self.objdir = objdir or self.origSrcDir
+        self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+        
+        if objdir != '':
+            # L10NBASEDIR is relative to MOZ_OBJDIR
+            self.env.update({'MOZ_OBJDIR': objdir,
+                             'L10NBASEDIR':  '../../%s' % self.l10nRepoPath})            
+
+        # Configure step gets executed before the downloadBuilds and we can't
+        # render at that point of execution the environment variable 'srcdir'
+        self.configure_env = self.env.copy()
 
         self.uploadEnv = self.env.copy() # pick up any env variables in our subclass
         self.uploadEnv.update({
@@ -1496,6 +1509,36 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.doRepack()
         self.doUpload()
 
+    def getMozconfig(self):
+        if self.mozconfig:
+            self.addStep(ShellCommand(
+             name='rm_configs',
+             command=['rm', '-rf', 'configs'],
+             description=['remove', 'configs'],
+             workdir='build/'+self.origSrcDir,
+             haltOnFailure=True
+            ))
+            self.addStep(ShellCommand(
+             name='checkout_configs',
+             command=['hg', 'clone', self.configRepo, 'configs'],
+             description=['checkout', 'configs'],
+             workdir='build/'+self.origSrcDir,
+             haltOnFailure=True
+            ))
+            self.addStep(ShellCommand(
+             # cp configs/mozilla2/$platform/$branchname/$type/mozconfig .mozconfig
+             name='copy_mozconfig',
+             command=['cp', self.mozconfig, '.mozconfig'],
+             description=['copy mozconfig'],
+             workdir='build/'+self.origSrcDir,
+             haltOnFailure=True
+            ))
+            self.addStep(ShellCommand,
+             name='cat_mozconfig',
+             command=['cat', '.mozconfig'],
+             workdir='build/'+self.origSrcDir
+            )
+
     def configure(self):
         self.addStep(ShellCommand,
          name='autoconf',
@@ -1517,18 +1560,18 @@ class BaseRepackFactory(MozillaBuildFactory):
          command=['bash', '-c', 'autoconf-2.13'],
          haltOnFailure=True,
          descriptionDone=['autoconf js/src'],
-         workdir='%s/%s/js/src' % (self.baseWorkDir, self.origSrcDir)
+         workdir='%s/%s/js/src' % (self.baseWorkDir, self.mozillaSrcDir)
         )
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
-        if self.platform is 'wince':
+        if self.platform.startswith('wince'):
             self.addStep(ShellCommand,
              name='configure',
              command=['make -f client.mk configure'], 
              description='configure',
              descriptionDone='configure done',
              haltOnFailure=True,
-             env = self.env,
+             env = self.configure_env,
              workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
             )
         else:
@@ -1547,7 +1590,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='make_config',
          command=['make'],
-         workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaSrcDir),
+         workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make config'],
          haltOnFailure=True
         )
@@ -1572,7 +1615,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='make_l10n_upload',
          command=['make', WithProperties('l10n-upload-%(locale)s')],
          env=self.uploadEnv,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.mozillaSrcDir,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
                                        self.appName),
          haltOnFailure=True,
          flunkOnFailure=True
@@ -1700,8 +1743,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='rm_dist_upload',
          command=['sh', '-c',
-                  'if [ -d '+self.mozillaSrcDir+'/dist/upload ]; then ' +
-                  'rm -rf '+self.mozillaSrcDir+'/dist/upload; ' +
+                  'if [ -d '+self.mozillaObjdir+'/dist/upload ]; then ' +
+                  'rm -rf '+self.mozillaObjdir+'/dist/upload; ' +
                   'fi'],
          description="rm dist/upload",
          workdir=self.baseWorkDir,
@@ -1711,8 +1754,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand,
          name='rm_dist_update',
          command=['sh', '-c',
-                  'if [ -d '+self.branchName+'/dist/update ]; then ' +
-                  'rm -rf '+self.branchName+'/dist/update; ' +
+                  'if [ -d '+self.mozillaObjdir+'/dist/update ]; then ' +
+                  'rm -rf '+self.mozillaObjdir+'/dist/update; ' +
                   'fi'],
          description="rm dist/update",
          workdir=self.baseWorkDir,
@@ -1787,32 +1830,19 @@ class CCBaseRepackFactory(BaseRepackFactory):
 class NightlyRepackFactory(BaseRepackFactory):
     extraConfigureArgs = []
     
-    def __init__(self, enUSBinaryURL, nightly=False, env={}, platform='', 
-                 configRepoPath=None, configSubDir=None, mozconfig=None,
+    def __init__(self, enUSBinaryURL, nightly=False, env={},
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausHost=None,
                  l10nNightlyUpdate=False, l10nDatedDirs=False, **kwargs):
         self.nightly = nightly
-        self.env = env.copy()
-        self.platform = platform
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
         self.ausUser = ausUser
         self.ausHost = ausHost
-        self.env.update({'EN_US_BINARY_URL':enUSBinaryURL})
-        self.configRepoPath = configRepoPath
-        self.configSubDir = configSubDir
-        self.mozconfig = mozconfig
-        if mozconfig:
-            self.configRepo = self.getRepository(self.configRepoPath,
-                                                 kwargs['hgHost'])
-            self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
-                                                          mozconfig)
-            # I need to use L10nBASEDIR in combination with "make -f client.mk"
-            # It is relative to env['MOZ_OBJDIR'] which is specified in config.py
-            self.env.update({'L10NBASEDIR':  '../../%s' % kwargs['l10nRepoPath']})
+
+        env.update({'EN_US_BINARY_URL':enUSBinaryURL})
 
         # Unfortunately, we can't call BaseRepackFactory.__init__() before this
         # because it needs self.postUploadCmd set
@@ -1848,12 +1878,12 @@ class NightlyRepackFactory(BaseRepackFactory):
 
         # 2) preparation for updates
         if l10nNightlyUpdate and self.nightly:
-            self.env.update({'MOZ_MAKE_COMPLETE_MAR': '1', 
-                             'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL})
+            env.update({'MOZ_MAKE_COMPLETE_MAR': '1', 
+                        'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL})
             self.extraConfigureArgs = ['--enable-update-packaging']
 
 
-        BaseRepackFactory.__init__(self, **kwargs)
+        BaseRepackFactory.__init__(self, env=env, **kwargs)
         if l10nNightlyUpdate:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
             assert ausUser and ausHost
@@ -1884,38 +1914,6 @@ class NightlyRepackFactory(BaseRepackFactory):
                                             '/%(locale)s')
                      )
 
-    def getMozconfig(self):
-        if self.mozconfig and self.mozconfig != '':
-            # TODO These steps are exactly the same as what the ReleaseRepackFactory calls.
-            # These should be moved to the parent BaseRepackFactory in bug 537287 
-            self.addStep(ShellCommand,
-             name='rm_configs',
-             command=['rm', '-rf', 'configs'],
-             description=['remove', 'configs'],
-             workdir='build/'+self.origSrcDir,
-             haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-             name='checkout_configs',
-             command=['hg', 'clone', self.configRepo, 'configs'],
-             description=['checkout', 'configs'],
-             workdir='build/'+self.origSrcDir,
-             haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-             # cp configs/mozilla2/$platform/$branchame/$type/mozconfig .mozconfig
-             name='copy_mozconfig',
-             command=['cp', self.mozconfig, '.mozconfig'],
-             description=['copy mozconfig'],
-             workdir='build/'+self.origSrcDir,
-             haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-             name='cat_mozconfig',
-             command=['cat', '.mozconfig'],
-             workdir='build/'+self.origSrcDir
-            )
-
     def downloadBuilds(self):
         self.addStep(ShellCommand,
          name='wget_enUS',
@@ -1923,7 +1921,7 @@ class NightlyRepackFactory(BaseRepackFactory):
          descriptionDone='wget en-US',
          env=self.env,
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.mozillaSrcDir, self.appName)
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName)
         )
 
     def updateEnUS(self):
@@ -1936,12 +1934,12 @@ class NightlyRepackFactory(BaseRepackFactory):
                      command=['make', 'unpack'],
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.mozillaSrcDir, self.appName),
+                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      )
         self.addStep(SetProperty,
                      command=['make', 'ident'],
                      haltOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.mozillaSrcDir, self.appName),
+                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      extract_fn=identToProperties('fx_revision')
                      )
         self.addStep(ShellCommand,
@@ -1961,14 +1959,14 @@ class NightlyRepackFactory(BaseRepackFactory):
             self.addStep(ShellCommand,
              name='make_build',
              command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaSrcDir),
+             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
              description=['make build'],
              haltOnFailure=True
             )
         self.addStep(ShellCommand,
          name='make_nsprpub',
          command=['make'],
-         workdir='%s/%s/nsprpub' % (self.baseWorkDir, self.mozillaSrcDir),
+         workdir='%s/%s/nsprpub' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make nsprpub'],
          haltOnFailure=True
         )
@@ -1976,7 +1974,7 @@ class NightlyRepackFactory(BaseRepackFactory):
             # Because we're generating updates we need to build the libmar tools
             self.addStep(ShellCommand,
              command=['make'],
-             workdir='%s/%s/modules/libmar' % (self.baseWorkDir, self.mozillaSrcDir),
+             workdir='%s/%s/modules/libmar' % (self.baseWorkDir, self.mozillaObjdir),
              description=['make', 'modules/libmar'],
              haltOnFailure=True
             )
@@ -1987,7 +1985,7 @@ class NightlyRepackFactory(BaseRepackFactory):
          env = self.env,
          haltOnFailure=True,
          description=['make','installers'],
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.mozillaSrcDir, self.appName),
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
         )
 
     def createNightlySnippet(self):
@@ -1998,7 +1996,7 @@ class NightlyRepackFactory(BaseRepackFactory):
          env = self.env,
          haltOnFailure=True,
          description=['make','snippet'],
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.mozillaSrcDir, self.appName),
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
         )
 
     def uploadSnippet(self):
@@ -2013,7 +2011,7 @@ class NightlyRepackFactory(BaseRepackFactory):
                   'dist/update/complete.update.snippet',
                   WithProperties('%s:%s/complete.txt' % \
                     (self.ausHost, self.ausFullUploadDir))],
-         workdir='build/%s' % self.mozillaSrcDir,
+         workdir='build/%s' % self.mozillaObjdir,
          description=['upload', 'complete', 'snippet'],
          haltOnFailure=True
         )
@@ -2099,11 +2097,8 @@ class ReleaseFactory(MozillaBuildFactory):
 
 
 class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
-    def __init__(self, configRepoPath, configSubDir, mozconfig, platform,
-                 buildRevision, version, buildNumber, brandName=None, **kwargs):
-        self.configRepoPath = configRepoPath
-        self.configSubDir = configSubDir
-        self.platform = platform
+    def __init__(self, platform, buildRevision, version, buildNumber,
+                 env={}, brandName=None, **kwargs):
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
@@ -2112,14 +2107,11 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         else:
             self.brandName = kwargs['project'].capitalize()
         # more vars are added in downloadBuilds
-        self.env = {'MOZ_PKG_PRETTYNAMES': '1',
-                    'MOZ_PKG_VERSION': self.version,
-                    'MOZ_MAKE_COMPLETE_MAR': '1'}
-
-        self.configRepo = self.getRepository(self.configRepoPath,
-                                             kwargs['hgHost'])
-
-        self.mozconfig = 'configs/%s/%s/mozconfig' % (configSubDir, mozconfig)
+        env.update({
+            'MOZ_PKG_PRETTYNAMES': '1',
+            'MOZ_PKG_VERSION': self.version,
+            'MOZ_MAKE_COMPLETE_MAR': '1'
+        })
 
         assert 'project' in kwargs
         # TODO: better place to put this/call this
@@ -2128,7 +2120,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
                              '-v %s ' % self.version + \
                              '-n %s ' % self.buildNumber + \
                              '--release-to-candidates-dir'
-        BaseRepackFactory.__init__(self, **kwargs)
+        BaseRepackFactory.__init__(self, env=env, platform=platform, **kwargs)
 
     def updateSources(self):
         self.addStep(ShellCommand,
@@ -2152,35 +2144,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
                      workdir=WithProperties('build/' + self.l10nRepoPath + 
                                             '/%(locale)s')
                      )
-
-    def getMozconfig(self):
-        self.addStep(ShellCommand,
-         name='rm_configs',
-         command=['rm', '-rf', 'configs'],
-         description=['remove', 'configs'],
-         workdir='build/'+self.origSrcDir,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='checkout_configs',
-         command=['hg', 'clone', self.configRepo, 'configs'],
-         description=['checkout', 'configs'],
-         workdir='build/'+self.origSrcDir,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         # cp configs/mozilla2/$platform/$branchame/$type/mozconfig .mozconfig
-         name='copy_mozconfig',
-         command=['cp', self.mozconfig, '.mozconfig'],
-         description=['copy mozconfig'],
-         workdir='build/'+self.origSrcDir,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='cat_mozconfig',
-         command=['cat', '.mozconfig'],
-         workdir='build/'+self.origSrcDir
-        )
 
     def downloadBuilds(self):
         # We need to know the absolute path to the input builds when we repack,
@@ -2226,6 +2189,11 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
+        elif self.platform.startswith('wince'):
+            platformDir = 'wince-arm'
+            filename = '%s.zip' % self.project
+            builds[filename] = '%s-%s.zip' % (self.project, self.version)
+            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         else:
             raise "Unsupported platform"
 
@@ -2262,16 +2230,25 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             self.addStep(ShellCommand,
              name='make_memory_jemalloc',
              command=['make'],
-             workdir='build/'+self.mozillaSrcDir+'/memory/jemalloc',
+             workdir='build/'+self.mozillaObjdir+'/memory/jemalloc',
              description=['make memory/jemalloc'],
              haltOnFailure=True
             )
+        # wince needs this step for nsprpub to succeed
+        if self.platform.startswith('wince'):
+            self.addStep(ShellCommand(
+             name='make_build',
+             command=['make'],
+             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
+             description=['make build'],
+             haltOnFailure=True
+            ))
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'modules/libmar'):
             self.addStep(ShellCommand,
              name='make_%s' % dir,
              command=['make'],
-             workdir='build/'+self.mozillaSrcDir+'/'+dir,
+             workdir='build/'+self.mozillaObjdir+'/'+dir,
              description=['make ' + dir],
              haltOnFailure=True
             )
@@ -2281,7 +2258,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          command=['make', WithProperties('installers-%(locale)s')],
          env=self.env,
          haltOnFailure=True,
-         workdir='build/'+self.origSrcDir+'/'+self.appName+'/locales'
+         workdir='build/'+self.objdir+'/'+self.appName+'/locales'
         )
 
 class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseRepackFactory):
@@ -5577,9 +5554,10 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         # unused here but needed by BaseRepackFactory
         self.postUploadCmd = None
 
-        self.env = {'EN_US_BINARY_URL': self.enUSBinaryURL}
+        env = {'EN_US_BINARY_URL': self.enUSBinaryURL}
 
         BaseRepackFactory.__init__(self,
+                                   env=env,
                                    project=project,
                                    appName=appName,
                                    repoPath=repoPath,
