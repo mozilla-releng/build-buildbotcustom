@@ -5057,33 +5057,21 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
              workdir='tools'
             )
 
-        # Figure out which revision we're running
+        # Figure out build ID and TinderboxPrint revisions
         def get_build_info(rc, stdout, stderr):
             retval = {}
             stdout = "\n".join([stdout, stderr])
-            m = re.search("^BuildID=(\w+)", stdout, re.M)
+            m = re.search("^buildid: (\w+)", stdout, re.M)
             if m:
                 retval['buildid'] = m.group(1)
-            m = re.search("^SourceStamp=(\w+)", stdout, re.M)
-            if m:
-                retval['revision'] = m.group(1)
-            m = re.search("^SourceRepository=(\S+)", stdout, re.M)
-            if m:
-                retval['repo_path'] = m.group(1)
             return retval
         self.addStep(SetProperty,
-         command=['cat', WithProperties('%(exedir)s/application.ini')],
+         command=['python', WithProperties('%(toolsdir)s/buildfarm/utils/printbuildrev.py'),
+                  WithProperties('%(exedir)s')],
          workdir='build',
          extract_fn=get_build_info,
          name='get build info',
         )
-
-        changesetLink = '<a href=%(repo_path)s/rev/%(revision)s' + \
-                ' title="Built from revision %(revision)s">rev:%(revision)s</a>'
-        self.addStep(OutputStep(
-         name='tinderboxprint_changeset',
-         data=['TinderboxPrint:', WithProperties(changesetLink)],
-        ))
 
         # Run them!
         for suite in self.test_suites:
