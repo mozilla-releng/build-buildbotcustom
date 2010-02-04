@@ -26,7 +26,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory
 from buildbotcustom.scheduler import MozScheduler, NoMergeScheduler, \
-  NightlyRebuild, MultiScheduler, NoMergeMultiScheduler
+  MultiScheduler, NoMergeMultiScheduler
 from buildbotcustom.l10n import NightlyL10n
 
 # This file contains misc. helper function that don't make sense to put in
@@ -258,9 +258,9 @@ def generateBranchObjects(config, name):
             continue
         else:
             builders.append('%s build' % base_name)
-        
+
         #Fill the l10n dep dict
-        if config['enable_l10n'] and platform in config['l10n_platforms']: 
+        if config['enable_l10n'] and platform in config['l10n_platforms']:
                 l10nBuilders[base_name] = {}
                 l10nBuilders[base_name]['tree'] = config['l10n_tree']
                 l10nBuilders[base_name]['l10n_builder'] = \
@@ -272,7 +272,7 @@ def generateBranchObjects(config, name):
             builder = '%s nightly' % base_name
             nightlyBuilders.append(builder)
             # Fill the l10nNightly dict
-            if config['enable_l10n'] and platform in config['l10n_platforms']: 
+            if config['enable_l10n'] and platform in config['l10n_platforms']:
                 l10nNightlyBuilders[builder] = {}
                 l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
                 l10nNightlyBuilders[builder]['l10n_builder'] = \
@@ -296,7 +296,7 @@ def generateBranchObjects(config, name):
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % base_name)
-        if config['enable_xulrunner'] and platform not in ('wince'):
+        if config['enable_xulrunner'] and platform not in ('wince',):
             xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
 
     # Currently, each branch goes to a different tree
@@ -408,12 +408,6 @@ def generateBranchObjects(config, name):
         else:
             branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
 
-        branchObjects['schedulers'].append(NightlyRebuild(name=scheduler_name+"-nightly",
-            builderNames=test_builders,
-            dayOfWeek=4, # Friday
-            hour=3, minute=2, # at 3:02 am local time
-            numberOfBuildsToTrigger=2,
-            mergeBuilds=False))
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="mozilla2.buildbot@build.mozilla.org",
             tree=config['packaged_unittest_tinderbox_tree'],
@@ -847,7 +841,7 @@ def generateBranchObjects(config, name):
              }
              branchObjects['builders'].append(mozilla2_shark_builder)
 
-        if config['enable_xulrunner'] and platform not in ('wince'):
+        if config['enable_xulrunner'] and platform not in ('wince',):
              xr_env = pf['env'].copy()
              xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
              xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
@@ -1082,12 +1076,6 @@ def generateCCBranchObjects(config, name):
         else:
             branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
 
-        branchObjects['schedulers'].append(NightlyRebuild(name=scheduler_name+"-nightly",
-            builderNames=test_builders,
-            dayOfWeek=4, # Friday
-            hour=3, minute=2, # at 3:02 am local time
-            numberOfBuildsToTrigger=2,
-            mergeBuilds=False))
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="comm.buildbot@build.mozilla.org",
             tree=config['packaged_unittest_tinderbox_tree'],
