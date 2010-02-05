@@ -5281,7 +5281,8 @@ class TalosFactory(BuildFactory):
             return SUCCESS
         if self.OS == "tiger":
             self.addStep(EvaluatingShellCommand(
-                command=['cat', WithProperties('%(exedir)s/chrome/toolkit.jar')],
+                command=['bash', '-c',
+                         WithProperties('unzip -c %(exedir)s/chrome/toolkit.jar content/global/buildconfig.html | grep sdk')],
                 workdir=os.path.join(self.workdirBase, "talos"),
                 eval_fn=check_sdk,
                 haltOnFailure=True,
