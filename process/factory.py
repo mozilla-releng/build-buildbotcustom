@@ -4746,7 +4746,7 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
 
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
-                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.exe xulrunner/dist/*.tar.bz2",
+                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.exe mobile/dist/*.cab xulrunner/dist/*.tar.bz2",
                  createSnippet=False, downloadBaseURL=None,
                  ausUser=None, ausHost=None, ausBaseUploadDir=None,
                  updatePlatform='WINCE_arm-msvc', **kwargs):
@@ -4835,6 +4835,15 @@ class WinmoBuildFactory(MobileBuildFactory):
             workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
                                          self.objdir),
             description=['make', 'installer'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            name='make_cab',
+            command=['make', 'cab'],
+            workdir='%s/%s/%s/mobile/mobile/installer' % (self.baseWorkDir,
+                                                          self.branchName,
+                                                          self.objdir),
+            description=['make', 'cab'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
