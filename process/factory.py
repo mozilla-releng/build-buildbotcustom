@@ -5157,11 +5157,21 @@ class TalosFactory(BuildFactory):
         self.addRebootStep()
 
     def addCleanupSteps(self):
+        if self.OS in ('xp', 'vista', 'win7'):
+            self.addStep(ShellCommand(
+             name='chmod_files',
+             workdir=self.workdirBase,
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="chmod files (see msys bug)",
+             command=["chmod", "-v", "-R", "a+x", "."],
+             env=MozillaEnvironments[self.envName])
+            )
         self.addStep(ShellCommand(
          name='cleanup',
          workdir=self.workdirBase,
          description="Cleanup",
-         command='nohup rm -vrf *',
+         command='rm -vrf *',
          env=MozillaEnvironments[self.envName])
         )
         self.addStep(ShellCommand(
