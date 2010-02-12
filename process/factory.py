@@ -5081,7 +5081,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
                  symbols_path='symbols',
-                 maxTime=60*60, # One Hour
+                 maxTime=120*60, # Two Hours
                 ))
             elif suite in ('reftest', 'crashtest', 'jsreftest'):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
