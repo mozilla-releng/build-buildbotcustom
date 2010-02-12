@@ -4283,14 +4283,14 @@ class MobileBuildFactory(MozillaBuildFactory):
 
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
-    def __init__(self, packageGlob="-r mobile/dist/*.tar.bz2 " +
-                 "xulrunner/dist/*.tar.bz2", uploadPlatform=None,
-                 **kwargs):
+    def __init__(self, packageGlobList=['-r', 'mobile/dist/*.tar.bz2',
+                                        'xulrunner/dist/*.tar.bz2'],
+                 uploadPlatform=None, **kwargs):
         """This class creates a desktop fennec build.  -r in package glob
         is to ensure that all files are uploaded as this is the first
         option given to scp.  hack alert!"""
         MobileBuildFactory.__init__(self, **kwargs)
-        self.packageGlob = packageGlob
+        self.packageGlob = ' '.join(packageGlobList)
         if uploadPlatform is not None:
             self.uploadPlatform = uploadPlatform
         else:
@@ -4334,16 +4334,6 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
             )
 
     def addPackageSteps(self):
-        if self.platform.startswith("linux"):
-            self.addStep(ShellCommand,
-                name='make_xr_pkg',
-                command=['make', 'package'],
-                workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
-                    self.branchName, self.objdir),
-                description=['make', 'xr', 'package'],
-                env=self.env,
-                haltOnFailure=True,
-            )
         self.addStep(ShellCommand,
             name='make_mobile_pkg',
             command=['make', 'package'],
@@ -4369,17 +4359,17 @@ class MaemoBuildFactory(MobileBuildFactory):
                  l10nRepoPath = 'l10n-central',
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
-                 packageGlob="mobile/dist/*.tar.bz2 " +
-                 "mobile/dist/deb_name.txt " +
-                 "xulrunner/xulrunner/*.deb mobile/mobile/*.deb " +
-                 "xulrunner/dist/*.tar.bz2",
+                 packageGlobList=['mobile/dist/*.tar.bz2',
+                                  'mobile/dist/deb_name.txt',
+                                  'mobile/mobile/*.deb',
+                                  'xulrunner/dist/*.tar.bz2'],
                  l10nTag='default',
                  mergeLocales=True,
                  locales=None,
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
-        self.packageGlob = packageGlob
+        self.packageGlob = ' '.join(packageGlobList)
         self.scratchboxPath = scratchboxPath
         self.multiLocale = multiLocale
         self.l10nRepoPath = l10nRepoPath
@@ -4406,13 +4396,13 @@ class MaemoBuildFactory(MobileBuildFactory):
                 description=['create', 'l10n', 'dir']
             )
             self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
-            # This will package the en-US single-locale build (no xulrunner)
+            # This will package the en-US single-locale build (no tests)
             self.addPackageSteps()
             self.uploadEnUS()
             self.useProgress = False
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
             self.addBuildSteps()
-            self.addPackageSteps(packageXulrunner=True)
+            self.addPackageSteps(packageTests=True)
             self.addUploadSteps(platform='linux')
         
         if self.triggerBuilds:
@@ -4457,8 +4447,6 @@ class MaemoBuildFactory(MobileBuildFactory):
                 name='rm_old_builds',
                 command=['bash', '-c', 'rm -rf %s/%s/mobile/dist/fennec* ' %
                          (self.branchName, self.objdir) +
-                         '%s/%s/xulrunner/xulrunner/*.deb ' %
-                         (self.branchName, self.objdir) +
                          '%s/%s/xulrunner/dist/*.tar.bz2 ' %
                          (self.branchName, self.objdir) +
                          '%s/%s/mobile/mobile/*.deb' %
@@ -4479,7 +4467,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             haltOnFailure=True
         )
 
-    def addPackageSteps(self, multiLocale=False, packageXulrunner=False):
+    def addPackageSteps(self, multiLocale=False, packageTests=False):
         extraArgs=''
         if multiLocale:
             extraArgs='AB_CD=multi'
@@ -4501,9 +4489,9 @@ class MaemoBuildFactory(MobileBuildFactory):
             description=['make', 'mobile', 'deb'],
             haltOnFailure=True
         )
-        # Build xulrunner for multi-locale nightly builds, dependent builds
+        # Build tests for multi-locale nightly builds, dependent builds
         # and nightly builds which are not multi-locale like Electrolysis and Tracemonkey 
-        if packageXulrunner or not self.nightly:
+        if packageTests or not self.nightly:
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=[self.scratchboxPath, '-p', '-d',
@@ -4511,15 +4499,6 @@ class MaemoBuildFactory(MobileBuildFactory):
                          (self.baseBuildDir, self.branchName, self.objdir),
                          'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
-                haltOnFailure=True
-            )
-            self.addStep(ShellCommand,
-                name='make_xulrunner_deb',
-                command=[self.scratchboxPath, '-p', '-d',
-                         'build/%s/%s/%s/xulrunner' % \
-                         (self.baseBuildDir, self.branchName, self.objdir),
-                         'make deb', extraArgs],
-                description=['make', 'xulrunner', 'deb'],
                 haltOnFailure=True
             )
     
@@ -4582,9 +4561,9 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.compareLocales(locale)
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
-        self.addPackageSteps(multiLocale=True, packageXulrunner=True)
+        self.addPackageSteps(multiLocale=True, packageTests=True)
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
-                         "xulrunner/dist/*.tar.bz2 xulrunner/xulrunner/xulrunner*.deb"
+                         "xulrunner/dist/*.tar.bz2"
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
@@ -4746,12 +4725,15 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
 
 class WinmoBuildFactory(MobileBuildFactory):
     def __init__(self,
-                 packageGlob="xulrunner/dist/*.zip mobile/dist/*.zip mobile/dist/*.exe xulrunner/dist/*.tar.bz2",
+                 packageGlobList=['mobile/dist/*.zip',
+                                  'mobile/dist/*.exe',
+                                  'mobile/dist/*.cab',
+                                  'xulrunner/dist/*.tar.bz2'],
                  createSnippet=False, downloadBaseURL=None,
                  ausUser=None, ausHost=None, ausBaseUploadDir=None,
                  updatePlatform='WINCE_arm-msvc', **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
-        self.packageGlob = packageGlob
+        self.packageGlob = ' '.join(packageGlobList)
         self.createSnippet = createSnippet
         if self.createSnippet:
             assert downloadBaseURL and \
@@ -4802,8 +4784,6 @@ class WinmoBuildFactory(MobileBuildFactory):
                 command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.zip ' %
                            (self.branchName, self.objdir) +
                            '%s/%s/mobile/dist/*.exe ' %
-                           (self.branchName, self.objdir) +
-                           '%s/%s/xulrunner/dist/*.zip' %
                            (self.branchName, self.objdir)],
                 workdir=self.baseWorkDir,
                 description=['removing', 'old', 'builds'],
@@ -4835,6 +4815,15 @@ class WinmoBuildFactory(MobileBuildFactory):
             workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
                                          self.objdir),
             description=['make', 'installer'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+            name='make_cab',
+            command=['make', 'cab'],
+            workdir='%s/%s/%s/mobile/mobile/installer' % (self.baseWorkDir,
+                                                          self.branchName,
+                                                          self.objdir),
+            description=['make', 'cab'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -5092,7 +5081,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
                  symbols_path='symbols',
-                 maxTime=60*60, # One Hour
+                 maxTime=120*60, # Two Hours
                 ))
             elif suite in ('reftest', 'crashtest', 'jsreftest'):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
@@ -5516,7 +5505,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                  l10nRepoPath='l10n-central',
                  stageServer=None, stageUsername=None, stageGroup=None,
                  stageSshKey=None, stageBasePath=None,
-                 packageGlob=None, platform=None,
+                 packageGlobList=None, platform=None,
                  baseUploadDir=None,
                  **kwargs):
 
@@ -5534,7 +5523,9 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         self.stageGroup = stageGroup
         self.stageSshKey = stageSshKey
         self.stageBasePath = stageBasePath
-        self.packageGlob = packageGlob
+
+        assert(packageGlobList)
+        self.packageGlob = ' '.join(packageGlobList)
 
         if baseUploadDir is None:
             self.baseUploadDir = self.mobileBranchName
