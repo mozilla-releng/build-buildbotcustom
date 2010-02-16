@@ -380,7 +380,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  graphSelector=None, graphBranch=None, baseName=None,
                  uploadPackages=True, uploadSymbols=True, createSnippet=False,
                  doCleanup=True, packageSDK=False, packageTests=False,
-                 mozillaDir=None, **kwargs):
+                 mozillaDir=None, enable_ccache=False, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -416,6 +416,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
         self.packageTests = packageTests
+        self.enable_ccache = enable_ccache
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -451,6 +452,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
+        if self.enable_ccache:
+            self.addStep(ShellCommand, command=['ccache', '-z'],
+                     name="clear_ccache_stats", warnOnFailure=False,
+                     flunkOnFailure=False, haltOnFailure=False, env=self.env)
         self.addBuildSteps()
         if self.uploadSymbols or self.uploadPackages or self.leakTest:
             self.addBuildSymbolsStep()
@@ -472,6 +477,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addTriggeredBuildsSteps()
         if self.doCleanup:
             self.addPostBuildCleanupSteps()
+        if self.enable_ccache:
+            self.addStep(ShellCommand, command=['ccache', '-s'],
+                     name="print_ccache_stats", warnOnFailure=False,
+                     flunkOnFailure=False, haltOnFailure=False, env=self.env)
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 

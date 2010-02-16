@@ -73,7 +73,9 @@ MozillaEnvironments['linux-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "CVS_RSH": 'ssh',
     "DISPLAY": ':2',
-    "NO_FAIL_ON_TEST_ERRORS": '1'   
+    "NO_FAIL_ON_TEST_ERRORS": '1',
+    "CCACHE_DIR": '/builds/ccache',
+    "CCACHE_UMASK": '002',
 }
 
 MozillaEnvironments['macosx-unittest'] = {
