@@ -117,6 +117,7 @@ class BootstrapFactory(BuildFactory):
 def getPlatformMinidumpPath(platform):
     platform_minidump_path = {
         'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+        'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         }
@@ -3278,6 +3279,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         env_map = {
                 'linux': 'linux-unittest',
+                'linux64': 'linux64-unittest',
                 'macosx': 'macosx-unittest',
                 'win32': 'win32-unittest',
                 }
@@ -3469,6 +3471,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/unittest' % self.branchName,
+                'linux64': 'linux64/%s/unittest' % self.branchName,
                 'macosx': 'macosx/%s/unittest' % self.branchName,
                 'win32': 'win32/%s/unittest' % self.branchName,
                 }

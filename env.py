@@ -78,6 +78,8 @@ MozillaEnvironments['linux-unittest'] = {
     "CCACHE_UMASK": '002',
 }
 
+MozillaEnvironments['linux64-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
+
 MozillaEnvironments['macosx-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',
