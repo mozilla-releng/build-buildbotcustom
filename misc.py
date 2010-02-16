@@ -4,6 +4,10 @@ try:
 except:
     import simplejson as json
 import collections
+import random
+import re
+
+from twisted.python import log
 
 from buildbot.scheduler import Nightly, Scheduler
 from buildbot.status.tinderbox import TinderboxMailNotifier
@@ -100,6 +104,75 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
 
     return test_builders
 
+fastRegexes = []
+
+def _partitionSlaves(slaves):
+    """Partitions the list of slaves into 'fast' and 'slow' slaves, according to
+    fastRegexes.
+    Returns two lists, 'fast' and 'slow'."""
+    fast = []
+    slow = []
+    for s in slaves:
+        name = s.slave.slavename
+        for e in fastRegexes:
+            if re.search(e, name):
+                fast.append(s)
+                break
+        else:
+            slow.append(s)
+    return fast, slow
+
+def _getLastTimeOnBuilder(builder, slavename):
+    # New builds are at the end of the buildCache, so
+    # examine it backwards
+    for build in reversed(builder.builder_status.buildCache):
+        if build.slavename == slavename:
+            return build.finished
+    return None
+
+def _recentSort(builder):
+    def sortfunc(s1, s2):
+        t1 = _getLastTimeOnBuilder(builder, s1.slave.slavename)
+        t2 = _getLastTimeOnBuilder(builder, s2.slave.slavename)
+        return cmp(t1, t2)
+    return sortfunc
+
+def _nextSlowSlave(builder, available_slaves):
+    try:
+        fast, slow = _partitionSlaves(available_slaves)
+        # Choose the slow slave that was most recently on this builder
+        # If there aren't any slow slaves, choose the slow slave that was most
+        # recently on this builder
+        if slow:
+            return sorted(slow, _recentSort(builder))[-1]
+        elif fast:
+            return sorted(fast, _recentSort(builder))[-1]
+        else:
+            log.msg("No fast or slow slaves found for builder '%s', choosing randomly instead" % builder.name)
+            return random.choice(available_slaves)
+    except:
+        log.msg("Error choosing next slow slave for builder '%s', choosing randomly instead" % builder.name)
+        log.err()
+        return random.choice(available_slaves)
+
+def _nextFastSlave(builder, available_slaves):
+    try:
+        fast, slow = _partitionSlaves(available_slaves)
+        # Choose the fast slave that was most recently on this builder
+        # If there aren't any fast slaves, choose the slow slave that was most
+        # recently on this builder
+        if fast:
+            return sorted(fast, _recentSort(builder))[-1]
+        elif slow:
+            return sorted(slow, _recentSort(builder))[-1]
+        else:
+            log.msg("No fast or slow slaves found for builder '%s', choosing randomly instead" % builder.name)
+            return random.choice(available_slaves)
+    except:
+        log.msg("Error choosing next fast slave for builder '%s', choosing randomly instead" % builder.name)
+        log.err()
+        return random.choice(available_slaves)
+
 def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
         suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold):
     builders = []
@@ -128,6 +201,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
                 'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
                 'factory': factory,
                 'category': branch_name,
+                'nextSlave': _nextSlowSlave,
             }
             builders.append(builder)
     else:
@@ -541,6 +615,7 @@ def generateBranchObjects(config, name):
             'builddir': '%s-%s' % (name, platform),
             'factory': mozilla2_dep_factory,
             'category': name,
+            'nextSlave': _nextFastSlave,
         }
         branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -618,6 +693,7 @@ def generateBranchObjects(config, name):
                 'builddir': '%s-%s-nightly' % (name, platform),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
+                'nextSlave': _nextFastSlave,
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -672,6 +748,7 @@ def generateBranchObjects(config, name):
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
+                        'nextSlave': _nextSlowSlave,
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
         # We still want l10n_dep builds if nightlies are off
@@ -702,6 +779,7 @@ def generateBranchObjects(config, name):
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
+                'nextSlave': _nextSlowSlave,
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -740,6 +818,7 @@ def generateBranchObjects(config, name):
                 'builddir': '%s-%s-unittest' % (name, platform),
                 'factory': unittest_factory,
                 'category': name,
+                'nextSlave': _nextFastSlave,
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -803,6 +882,7 @@ def generateBranchObjects(config, name):
                     'builddir': '%s-%s-codecoverage' % (name, platform),
                     'factory': codecoverage_factory,
                     'category': name,
+                    'nextSlave': _nextSlowSlave,
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -840,6 +920,7 @@ def generateBranchObjects(config, name):
                  'builddir': '%s-%s-shark' % (name, platform),
                  'factory': mozilla2_shark_factory,
                  'category': name,
+                 'nextSlave': _nextSlowSlave,
              }
              branchObjects['builders'].append(mozilla2_shark_builder)
 
@@ -883,6 +964,7 @@ def generateBranchObjects(config, name):
                  'builddir': '%s-%s-xulrunner' % (name, platform),
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
+                 'nextSlave': _nextSlowSlave,
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
