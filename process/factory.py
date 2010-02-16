@@ -5875,9 +5875,9 @@ class PartnerRepackFactory(ReleaseFactory):
         self.addStep(ShellCommand,
             name='clone_partners_repo',
             command=['hg', 'clone', 
-                     'http://%s/%s %s' % (self.hgHost, 
-                                          self.partnersRepoPath,
-                                          self.partnersRepackDir)
+                     'http://%s/%s' % (self.hgHost, 
+                                          self.partnersRepoPath),
+                     self.partnersRepackDir
                     ],
             description=['clone', 'partners', 'repo'],
             workdir='.',
