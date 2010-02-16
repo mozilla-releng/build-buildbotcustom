@@ -4924,7 +4924,7 @@ class WinmoBuildFactory(MobileBuildFactory):
 class UnittestPackagedBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, test_suites, env={}, productName='firefox',
             mochitest_leak_threshold=None, crashtest_leak_threshold=None,
-            totalChunks=None, thisChunk=None, chunkByDir=None,
+            totalChunks=None, thisChunk=None, chunkByDir=None, downloadSymbols=True,
             **kwargs):
         self.platform = platform.split('-')[0]
 
@@ -4987,12 +4987,13 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                     symbolsURL = fileURL[:-len(suffix)] + '.crashreporter-symbols.zip'
                     return symbolsURL
             raise ValueError("Couldn't determine symbols URL")
-        self.addStep(DownloadFile(
-         url_fn=get_symbolsURL,
-         filename_property='symbols_filename',
-         name='download symbols',
-         workdir='build/symbols',
-        ))
+        if downloadSymbols:
+            self.addStep(DownloadFile(
+             url_fn=get_symbolsURL,
+             filename_property='symbols_filename',
+             name='download symbols',
+             workdir='build/symbols',
+            ))
 
         # Unpack the build
         self.addStep(UnpackFile(
@@ -5009,12 +5010,13 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          name='unpack tests',
         ))
 
-        # Unpack the symbols
-        self.addStep(UnpackFile(
-         filename=WithProperties('%(symbols_filename)s'),
-         name='unpack symbols',
-         workdir='build/symbols',
-        ))
+        if downloadSymbols:
+            # Unpack the symbols
+            self.addStep(UnpackFile(
+             filename=WithProperties('%(symbols_filename)s'),
+             name='unpack symbols',
+             workdir='build/symbols',
+            ))
 
         # Find the application binary!
         if self.platform == "macosx":
