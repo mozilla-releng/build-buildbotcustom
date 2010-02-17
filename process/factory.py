@@ -5167,14 +5167,14 @@ class TalosFactory(BuildFactory):
              flunkOnFailure=False,
              warnOnFailure=False,
              description="chmod files (see msys bug)",
-             command=["chmod", "-v", "-R", "a+x", "."],
+             command=["chmod", "-v", "-R", "a+rwx", "."],
              env=MozillaEnvironments[self.envName])
             )
         self.addStep(ShellCommand(
          name='cleanup',
          workdir=self.workdirBase,
          description="Cleanup",
-         command='rm -vrf *',
+         command='nohup rm -vrf *',
          env=MozillaEnvironments[self.envName])
         )
         self.addStep(ShellCommand(
