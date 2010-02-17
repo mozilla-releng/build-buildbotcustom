@@ -4372,7 +4372,6 @@ class MaemoBuildFactory(MobileBuildFactory):
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
                  packageGlobList=['mobile/dist/*.tar.bz2',
-                                  'mobile/dist/deb_name.txt',
                                   'mobile/mobile/*.deb',
                                   'xulrunner/dist/*.tar.bz2'],
                  l10nTag='default',
