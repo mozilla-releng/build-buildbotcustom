@@ -5102,7 +5102,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  env=self.env,
                  leakThreshold=leak_threshold,
                  symbols_path='symbols',
-                 maxTime=60*60, # One Hour
+                 maxTime=2*60*60, # Two Hours
                 ))
 
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
