@@ -5161,6 +5161,15 @@ class TalosFactory(BuildFactory):
     def addCleanupSteps(self):
         if self.OS in ('xp', 'vista', 'win7'):
             self.addStep(ShellCommand(
+             name='mv tp4',
+             workdir=os.path.join(self.workdirBase),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="move tp4 out of talos dir to tp4-%random%",
+             command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
              name='chmod_files',
              workdir=self.workdirBase,
              flunkOnFailure=False,
