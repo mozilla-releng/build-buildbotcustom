@@ -367,14 +367,19 @@ class DownloadFile(ShellCommand):
     name = "download"
     
     def __init__(self, url_fn, url_property=None, filename_property=None,
-            ignore_certs=False, **kwargs):
+            ignore_certs=False, wget_args=None, **kwargs):
         self.url_fn = url_fn
         self.url_property = url_property
         self.filename_property = filename_property
         self.ignore_certs = ignore_certs
+        if wget_args:
+            self.wget_args = wget_args
+        else:
+            self.wget_args = ['--progress=dot:mega']
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(url_fn=url_fn, url_property=url_property,
-                filename_property=filename_property, ignore_certs=ignore_certs)
+                filename_property=filename_property, ignore_certs=ignore_certs,
+                wget_args=wget_args)
         self._url = None
 
     def setBuild(self, build):
@@ -387,9 +392,9 @@ class DownloadFile(ShellCommand):
 
     def start(self):
         if self.ignore_certs:
-            self.setCommand(["wget", "-nv", "-N", "--no-check-certificate", self._url])
+            self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", self._url])
         else:
-            self.setCommand(["wget", "-nv", "-N", self._url])
+            self.setCommand(["wget"] + self.wget_args + ["-N", self._url])
         ShellCommand.start(self)
     
     def evaluateCommand(self, cmd):
