@@ -327,12 +327,12 @@ class Codesighs(ShellCommand):
         ShellCommand.__init__(self, **kwargs)
         self.addFactoryArguments(objdir=objdir, platform=platform, type=type, tbPrint=tbPrint)
 
-        assert platform in ('win32', 'macosx', 'linux')
+        assert platform in ('win32', 'macosx', 'linux', 'linux64')
         assert type in ('auto', 'base')
 
         self.objdir = objdir
         self.platform = platform
-        if self.platform in ('macosx', 'linux'):
+        if self.platform in ('macosx', 'linux', 'linux64'):
             self.platform = 'unix'
         self.type = type
         self.tbPrint = tbPrint

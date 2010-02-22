@@ -563,7 +563,7 @@ def generateBranchObjects(config, name):
         # on the same master.
         packageTests = pf.get('packageTests', packageTests)
 
-        if platform.find('win') > -1 or platform.find('64') > -1:
+        if platform.find('win') > -1:
             codesighs = False
         if 'upload_symbols' in pf and pf['upload_symbols']:
             uploadSymbols = True
