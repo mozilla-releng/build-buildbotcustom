@@ -232,9 +232,9 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
 
 
     # In MaemoBuildFactory's __init__, addPackageSteps gets called
-    # with the argument 'packageXulrunner' and we have to add here
+    # with the argument 'packageTests' and we have to add here
     # even if it is not used
-    def addPackageSteps(self, packageXulrunner=False):
+    def addPackageSteps(self, multiLocale=False, packageTests=False):
         self.addStep(ShellCommand,
             command='mkdir upload',
             description=['create', 'upload', 'directory'],
@@ -263,15 +263,7 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s/%s/xulrunner' % (self.baseWorkDir,
-                                                self.objdir),
-                     'make deb'],
-            description=['make', 'xulrunner', 'deb'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            command="cp %s %s/%s" % (self.packageGlob, 
+            command="cp %s %s/%s" % (self.packageGlob,
                                      self.baseWorkDir, self.slavesrcdir),
             description=['move', 'globs', 'to', 'upload', 'directory'],
             workdir="%s/%s" % (self.baseWorkDir, self.objdir))
