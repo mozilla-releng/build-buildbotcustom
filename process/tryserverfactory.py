@@ -235,33 +235,12 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
     # with the argument 'packageTests' and we have to add here
     # even if it is not used
     def addPackageSteps(self, multiLocale=False, packageTests=False):
+        MaemoBuildFactory.addPackageSteps(self, multiLocale=False, packageTests=True)
         self.addStep(ShellCommand,
             command='mkdir upload',
             description=['create', 'upload', 'directory'],
             haltOnFailure=True,
             workdir=self.baseWorkDir)
-        self.addStep(ShellCommand,
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s/%s/mobile' % (self.baseWorkDir, self.objdir),
-                     'make package'],
-            description=['make', 'package'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s/%s/xulrunner' % (self.baseWorkDir, self.objdir),
-                     'make package-tests PYTHON=python2.5'],
-            description=['make', 'package-tests'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s/%s/mobile' % (self.baseWorkDir,
-                                                self.objdir),
-                     'make deb'],
-            description=['make', 'mobile', 'deb'],
-            haltOnFailure=True
-        )
         self.addStep(ShellCommand,
             command="cp %s %s/%s" % (self.packageGlob,
                                      self.baseWorkDir, self.slavesrcdir),
@@ -349,30 +328,12 @@ class WinmoTryBuildFactory(WinmoBuildFactory):
             flunkOnFailure=False,
         )
     def addPackageSteps(self):
+        WinmoBuildFactory.addPackageSteps(self)
         self.addStep(ShellCommand,
             command='mkdir upload',
             description=['create', 'upload', 'directory'],
             haltOnFailure=True,
             workdir=self.baseWorkDir)
-        self.addStep(ShellCommand,
-            command=['make', 'package'],
-            workdir='%s\%s\mobile' % (self.baseWorkDir, self.objdir),
-            description=['make', 'package'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            command=['make', 'installer'],
-            workdir='%s\%s\mobile' % (self.baseWorkDir, self.objdir),
-            description=['make', 'installer'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='make_pkg_tests',
-            command=['make', 'package-tests'],
-            workdir='%s/%s/xulrunner' % (self.baseWorkDir, self.objdir),
-            description=['make', 'package-tests'],
-            haltOnFailure=True
-        )
         self.addStep(ShellCommand,
             command="cp %s ../%s" % (self.packageGlob, self.slavesrcdir),
             description=['copy', 'globs', 'to', 'upload', 'directory'],
