@@ -2934,13 +2934,13 @@ class CCSourceFactory(ReleaseFactory):
 
 class ReleaseUpdatesFactory(ReleaseFactory):
     def __init__(self, cvsroot, patcherToolsTag, patcherConfig, verifyConfigs,
-                 appName, productName,
-                 version, appVersion, baseTag, buildNumber,
-                 oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
-                 ftpServer, bouncerServer, stagingServer, useBetaChannel,
-                 stageUsername, stageSshKey, ausUser, ausHost, ausServerUrl,
-                 hgSshKey, hgUsername, commitPatcherConfig=True, mozRepoPath=None,
-                 brandName=None, buildSpace=14, **kwargs):
+                 appName, productName, version, appVersion, baseTag,
+                 buildNumber, oldVersion, oldAppVersion, oldBaseTag,
+                 oldBuildNumber, ftpServer, bouncerServer, stagingServer,
+                 useBetaChannel, stageUsername, stageSshKey, ausUser, ausHost,
+                 ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
+                 mozRepoPath=None, oldRepoPath=None, brandName=None,
+                 buildSpace=14, triggerSchedulers=None, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -2963,216 +2963,254 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         """
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
-        patcherConfigFile = 'patcher-configs/%s' % patcherConfig
-        shippedLocales = self.getShippedLocales(self.repository, baseTag,
+        self.cvsroot = cvsroot
+        self.patcherToolsTag = patcherToolsTag
+        self.patcherConfig = patcherConfig
+        self.verifyConfigs = verifyConfigs
+        self.appName = appName
+        self.productName = productName
+        self.version = version
+        self.appVersion = appVersion
+        self.baseTag = baseTag
+        self.buildNumber = buildNumber
+        self.oldVersion = oldVersion
+        self.oldAppVersion = oldAppVersion
+        self.oldBaseTag = oldBaseTag
+        self.oldBuildNumber = oldBuildNumber
+        self.ftpServer = ftpServer
+        self.bouncerServer = bouncerServer
+        self.stagingServer = stagingServer
+        self.useBetaChannel = useBetaChannel
+        self.stageUsername = stageUsername
+        self.stageSshKey = stageSshKey
+        self.ausUser = ausUser
+        self.ausHost = ausHost
+        self.ausServerUrl = ausServerUrl
+        self.hgSshKey = hgSshKey
+        self.hgUsername = hgUsername
+        self.commitPatcherConfig = commitPatcherConfig
+        self.oldRepoPath = oldRepoPath or mozRepoPath
+        self.oldRepository = self.getRepository(self.oldRepoPath)
+        self.triggerSchedulers = triggerSchedulers
+
+        self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
+        self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
                                                 appName)
-        candidatesDir = self.getCandidatesDir(productName, version, buildNumber)
-        updateDir = 'build/temp/%s/%s-%s' % (productName, oldVersion, version)
-        marDir = '%s/ftp/%s/nightly/%s-candidates/build%s' % \
-          (updateDir, productName, version, buildNumber)
+        self.oldShippedLocales = self.getShippedLocales(self.oldRepository,
+                                                        self.oldBaseTag,
+                                                        self.appName)
+        self.candidatesDir = self.getCandidatesDir(productName, version, buildNumber)
+        self.updateDir = 'build/temp/%s/%s-%s' % (productName, oldVersion, version)
+        self.marDir = '%s/ftp/%s/nightly/%s-candidates/build%s' % \
+          (self.updateDir, productName, version, buildNumber)
 
         if mozRepoPath:
           self.mozRepository = self.getRepository(mozRepoPath)
         else:
           self.mozRepository = self.repository
 
-        if not brandName:
-            brandName = productName.capitalize()
 
+        self.brandName = brandName or productName.capitalize()
+
+        self.setup()
+        self.bumpPatcherConfig()
+        self.bumpVerifyConfigs()
+        self.buildTools()
+        self.downloadBuilds()
+        self.createPatches()
+        self.uploadMars()
+        self.uploadSnippets()
+        self.trigger()
+
+    def setup(self):
+        # General setup
+        self.addStep(ShellCommand(
+         name='checkout_patcher',
+         command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
+                  '-d', 'build', 'mozilla/tools/patcher'],
+         description=['checkout', 'patcher'],
+         workdir='.',
+         haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+         name='checkout_mozbuild',
+         command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
+                  '-d', 'MozBuild',
+                  'mozilla/tools/release/MozBuild'],
+         description=['checkout', 'MozBuild'],
+         haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+         name='checkout_bootstrap_util',
+         command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
+                  '-d' 'Bootstrap',
+                  'mozilla/tools/release/Bootstrap/Util.pm'],
+         description=['checkout', 'Bootstrap/Util.pm'],
+         haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+         name='checkout_patcher_configs',
+         command=['cvs', '-d', self.cvsroot, 'co', '-d' 'patcher-configs',
+                  'mozilla/tools/patcher-configs'],
+         description=['checkout', 'patcher-configs'],
+         haltOnFailure=True
+        ))
+        # Bump the patcher config
+        self.addStep(ShellCommand(
+         name='get_shipped_locales',
+         command=['wget', '-O', 'shipped-locales', self.shippedLocales],
+         description=['get', 'shipped-locales'],
+         haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+         name='get_old_shipped_locales',
+         command=['wget', '-O', 'old-shipped-locales', self.oldShippedLocales],
+         description=['get', 'old-shipped-locales'],
+         haltOnFailure=True
+        ))
+
+
+    def bumpPatcherConfig(self):
+        bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
+                       '-p', self.productName, '-r', self.brandName,
+                       '-v', self.version, '-a', self.appVersion,
+                       '-o', self.oldVersion, '-b', str(self.buildNumber),
+                       '-c', WithProperties(self.patcherConfigFile),
+                       '-t', self.stagingServer, '-f', self.ftpServer,
+                       '-d', self.bouncerServer, '-l', 'shipped-locales']
+        if self.useBetaChannel:
+            bumpCommand.append('-u')
+        self.addStep(ShellCommand(
+         name='bump',
+         command=bumpCommand,
+         description=['bump patcher config'],
+         haltOnFailure=True
+        ))
+        self.addStep(TinderboxShellCommand(
+         name='diff_patcher_config',
+         command=['cvs', 'diff', '-u', WithProperties(self.patcherConfigFile)],
+         description=['diff patcher config'],
+         ignoreCodes=[1]
+        ))
+        if self.commitPatcherConfig:
+            self.addStep(ShellCommand(
+             name='commit_patcher_config',
+             command=['cvs', 'commit', '-m',
+                      WithProperties('Automated configuration bump: ' + \
+                      '%s, from %s to %s build %s' % \
+                        (self.patcherConfig, self.oldVersion,
+                         self.version, self.buildNumber))
+                     ],
+             workdir='build/patcher-configs',
+             description=['commit patcher config'],
+             haltOnFailure=True
+            ))
+
+    def bumpVerifyConfigs(self):
+        # Bump the update verify config
+        pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
+        sshKeyOption = self.getSshKeyOption(self.hgSshKey)
+
+        for platform in sorted(self.verifyConfigs.keys()):
+            bumpCommand = self.getUpdateVerifyBumpCommand(platform)
+            self.addStep(ShellCommand(
+             name='bump_verify_configs',
+             command=bumpCommand,
+             description=['bump', self.verifyConfigs[platform]],
+            ))
+        self.addStep(ShellCommand(
+         name='commit_verify_configs',
+         command=['hg', 'commit', '-m',
+                  'Automated configuration bump: update verify configs ' + \
+                  'for %s build %s' % (self.version, self.buildNumber)],
+         description=['commit verify configs'],
+         workdir='tools',
+         haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+         name='push_verify_configs',
+         command=['hg', 'push', '-e',
+                  'ssh -l %s %s' % (self.hgUsername, sshKeyOption),
+                  '-f', pushRepo],
+         description=['push verify configs'],
+         workdir='tools',
+         haltOnFailure=True
+        ))
+
+    def buildTools(self):
+        # Generate updates from here
+        self.addStep(ShellCommand(
+         name='patcher_build_tools',
+         command=['perl', 'patcher2.pl', '--build-tools-hg',
+                  '--tools-revision=%s' % self.patcherToolsTag,
+                  '--app=%s' % self.productName,
+                  '--brand=%s' % self.brandName,
+                  WithProperties('--config=%s' % self.patcherConfigFile)],
+         description=['patcher:', 'build tools'],
+         env={'HGROOT': self.mozRepository},
+         haltOnFailure=True
+        ))
+
+    def downloadBuilds(self):
+        self.addStep(ShellCommand(
+         name='patcher_download_builds',
+         command=['perl', 'patcher2.pl', '--download',
+                  '--app=%s' % self.productName,
+                  '--brand=%s' % self.brandName,
+                  WithProperties('--config=%s' % self.patcherConfigFile)],
+         description=['patcher:', 'download builds'],
+         haltOnFailure=True
+        ))
+
+    def createPatches(self):
+        self.addStep(ShellCommand(
+         name='patcher_create_patches',
+         command=['perl', 'patcher2.pl', '--create-patches',
+                  '--partial-patchlist-file=patchlist.cfg',
+                  '--app=%s' % self.productName,
+                  '--brand=%s' % self.brandName,
+                  WithProperties('--config=%s' % self.patcherConfigFile)],
+         description=['patcher:', 'create patches'],
+         haltOnFailure=True
+        ))
+
+    def uploadMars(self):
+        self.addStep(ShellCommand(
+         name='chmod_partial_mars',
+         command=['find', self.marDir, '-type', 'f',
+                  '-exec', 'chmod', '644', '{}', ';'],
+         workdir='.',
+         description=['chmod 644', 'partial mar files']
+        ))
+        self.addStep(ShellCommand(
+         name='chmod_partial_mar_dirs',
+         command=['find', self.marDir, '-type', 'd',
+                  '-exec', 'chmod', '755', '{}', ';'],
+         workdir='.',
+         description=['chmod 755', 'partial mar dirs']
+        ))
+        self.addStep(ShellCommand(
+         name='upload_partial_mars',
+         command=['rsync', '-av',
+                  '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
+                  '--exclude=*complete.mar',
+                  'update',
+                  '%s@%s:%s' % (self.stageUsername, self.stagingServer,
+                                self.candidatesDir)],
+         workdir=self.marDir,
+         description=['upload', 'partial mars'],
+         haltOnFailure=True
+        ))
+
+    def uploadSnippets(self):
         # If useBetaChannel is False the unnamed snippet type will be
         # 'beta' channel snippets (and 'release' if we're into stable releases).
         # If useBetaChannel is True the unnamed type will be 'release'
         # channel snippets
         snippetTypes = ['', 'test']
-        if useBetaChannel:
+        if self.useBetaChannel:
             snippetTypes.append('beta')
 
-        # General setup
-        self.addStep(ShellCommand,
-         name='checkout_patcher',
-         command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
-                  '-d', 'build', 'mozilla/tools/patcher'],
-         description=['checkout', 'patcher'],
-         workdir='.',
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='checkout_mozbuild',
-         command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
-                  '-d', 'MozBuild',
-                  'mozilla/tools/release/MozBuild'],
-         description=['checkout', 'MozBuild'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='checkout_bootstrap_util',
-         command=['cvs', '-d', cvsroot, 'co', '-r', patcherToolsTag,
-                  '-d' 'Bootstrap',
-                  'mozilla/tools/release/Bootstrap/Util.pm'],
-         description=['checkout', 'Bootstrap/Util.pm'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='checkout_patcher_configs',
-         command=['cvs', '-d', cvsroot, 'co', '-d' 'patcher-configs',
-                  'mozilla/tools/patcher-configs'],
-         description=['checkout', 'patcher-configs'],
-         haltOnFailure=True
-        )
-
-        # Bump the patcher config
-        self.addStep(ShellCommand,
-         name='get_shipped_locales',
-         command=['wget', '-O', 'shipped-locales', shippedLocales],
-         description=['get', 'shipped-locales'],
-         haltOnFailure=True
-        )
-
-        bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
-                       '-p', productName, '-r', brandName, '-v', version,
-                       '-a', appVersion, '-o', oldVersion, '-b', str(buildNumber),
-                       '-c', patcherConfigFile, '-t', stagingServer,
-                       '-f', ftpServer, '-d', bouncerServer,
-                       '-l', 'shipped-locales']
-        if useBetaChannel:
-            bumpCommand.append('-u')
-        self.addStep(ShellCommand,
-         name='bump',
-         command=bumpCommand,
-         description=['bump', patcherConfig],
-         haltOnFailure=True
-        )
-        self.addStep(TinderboxShellCommand,
-         name='diff_patcher_config',
-         command=['cvs', 'diff', '-u', patcherConfigFile],
-         description=['diff', patcherConfig],
-         ignoreCodes=[1]
-        )
-        if commitPatcherConfig:
-            self.addStep(ShellCommand,
-             name='commit_patcher_config',
-             command=['cvs', 'commit', '-m',
-                      'Automated configuration bump: ' + \
-                      '%s, from %s to %s build %s' % \
-                        (patcherConfig, oldVersion, version, buildNumber)
-                     ],
-             workdir='build/patcher-configs',
-             description=['commit', patcherConfig],
-             haltOnFailure=True
-            )
-
-        # Bump the update verify config
-        oldLongVersion = self.makeLongVersion(oldVersion)
-        longVersion = self.makeLongVersion(version)
-        oldCandidatesDir = self.getCandidatesDir(productName, oldVersion,
-                                                 oldBuildNumber)
-
-        oldShippedLocales = self.getShippedLocales(self.repository, oldBaseTag,
-                                                appName)
-        pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
-        sshKeyOption = self.getSshKeyOption(hgSshKey)
-
-        self.addStep(ShellCommand,
-         name='get_old_shipped_locales',
-         command=['wget', '-O', 'old-shipped-locales', oldShippedLocales],
-         description=['get', 'old-shipped-locales'],
-         haltOnFailure=True
-        )
-        for platform in sorted(verifyConfigs.keys()):
-            verifyConfigPath = '../tools/release/updates/%s' % \
-                                verifyConfigs[platform]
-            self.addStep(ShellCommand,
-             name='bump_verify_configs',
-             command=['perl', '../tools/release/update-verify-bump.pl',
-                      '-o', platform, '-p', productName, '-r', brandName,
-                      '--old-version=%s' % oldVersion,
-                      '--old-app-version=%s' % oldAppVersion,
-                      '--old-long-version=%s' % oldLongVersion,
-                      '-v', version, '--app-version=%s' % appVersion,
-                      '--long-version=%s' % longVersion,
-                      '-n', str(buildNumber), '-a', ausServerUrl,
-                      '-s', stagingServer, '-c', verifyConfigPath,
-                      '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
-                      '--pretty-candidates-dir'],
-             description=['bump', verifyConfigs[platform]],
-            )
-        self.addStep(ShellCommand,
-         name='commit_verify_configs',
-         command=['hg', 'commit', '-m',
-                  'Automated configuration bump: update verify configs ' + \
-                  'for %s build %s' % (version, buildNumber)],
-         description=['commit verify configs'],
-         workdir='tools',
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='push_verify_configs',
-         command=['hg', 'push', '-e',
-                  'ssh -l %s %s' % (hgUsername, sshKeyOption),
-                  '-f', pushRepo],
-         description=['push verify configs'],
-         workdir='tools',
-         haltOnFailure=True
-        )
-
-        # Generate updates from here
-        self.addStep(ShellCommand,
-         name='patcher_build_tools',
-         command=['perl', 'patcher2.pl', '--build-tools-hg',
-                  '--tools-revision=%s' % patcherToolsTag,
-                  '--app=%s' % productName,
-                  '--brand=%s' % brandName,
-                  '--config=%s' % patcherConfigFile],
-         description=['patcher:', 'build tools'],
-         env={'HGROOT': self.mozRepository},
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='patcher_download_builds',
-         command=['perl', 'patcher2.pl', '--download',
-                  '--app=%s' % productName,
-                  '--brand=%s' % brandName,
-                  '--config=%s' % patcherConfigFile],
-         description=['patcher:', 'download builds'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='patcher_create_patches',
-         command=['perl', 'patcher2.pl', '--create-patches',
-                  '--partial-patchlist-file=patchlist.cfg',
-                  '--app=%s' % productName,
-                  '--brand=%s' % brandName,
-                  '--config=%s' % patcherConfigFile],
-         description=['patcher:', 'create patches'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='chmod_partial_mars',
-         command=['find', marDir, '-type', 'f',
-                  '-exec', 'chmod', '644', '{}', ';'],
-         workdir='.',
-         description=['chmod 644', 'partial mar files']
-        )
-        self.addStep(ShellCommand,
-         name='chmod_partial_mar_dirs',
-         command=['find', marDir, '-type', 'd',
-                  '-exec', 'chmod', '755', '{}', ';'],
-         workdir='.',
-         description=['chmod 755', 'partial mar dirs']
-        )
-        self.addStep(ShellCommand,
-         name='upload_partial_mars',
-         command=['rsync', '-av',
-                  '-e', 'ssh -oIdentityFile=~/.ssh/%s' % stageSshKey,
-                  '--exclude=*complete.mar',
-                  'update',
-                  '%s@%s:%s' % (stageUsername, stagingServer, candidatesDir)],
-         workdir=marDir,
-         description=['upload', 'partial mars'],
-         haltOnFailure=True
-        )
-        # It gets a little hairy down here
-        date = strftime('%Y%m%d')
         for type in snippetTypes:
             # Patcher generates an 'aus2' directory and 'aus2.snippetType'
             # directories for each snippetType. Typically, there is 'aus2',
@@ -3180,46 +3218,153 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             localDir = 'aus2'
             # On the AUS server we store each type of snippet in a directory
             # named thusly, with the snippet type appended to it
-            remoteDir = '%s-%s-%s' % (date, brandName, version)
+            remoteDir = self.getSnippetDir()
             if type != '':
                 localDir = localDir + '.%s' % type
                 remoteDir = remoteDir + '-%s' % type
             snippetDir = '/opt/aus2/snippets/staging/%s' % remoteDir
 
-            self.addStep(ShellCommand,
+            self.addStep(ShellCommand(
              name='upload_snipets',
              command=['rsync', '-av', localDir + '/',
-                      '%s@%s:%s' % (ausUser, ausHost, snippetDir)],
-             workdir=updateDir,
+                      '%s@%s:%s' % (self.ausUser, self.ausHost, snippetDir)],
+             workdir=self.updateDir,
              description=['upload', '%s snippets' % type],
              haltOnFailure=True
-            )
+            ))
 
             # We only push test channel snippets from automation.
             if type == 'test':
-                self.addStep(ShellCommand,
+                self.addStep(ShellCommand(
                  name='backupsnip',
-                 command=['ssh', '-l', ausUser, ausHost,
+                 command=['ssh', '-l', self.ausUser, self.ausHost,
                           '~/bin/backupsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
                  description=['backupsnip'],
                  haltOnFailure=True
-                )
-                self.addStep(ShellCommand,
+                ))
+                self.addStep(ShellCommand(
                  name='pushsnip',
-                 command=['ssh', '-l', ausUser, ausHost,
+                 command=['ssh', '-l', self.ausUser, self.ausHost,
                           '~/bin/pushsnip %s' % remoteDir],
                  timeout=3600, # 1 hour
                  description=['pushsnip'],
                  haltOnFailure=True
-                )
+                ))
                 # Wait for timeout on AUS's NFS caching to expire before
                 # attempting to test newly-pushed snippets
-                self.addStep(ShellCommand,
+                self.addStep(ShellCommand(
                  name='wait_live_snippets',
                  command=['sleep','360'],
                  description=['wait for live snippets']
-                )
+                ))
+
+    def trigger(self):
+        if self.triggerSchedulers:
+            self.addStep(trigger.Trigger(
+             schedulerNames=self.triggerSchedulers,
+             waitForFinish=False
+            ))
+
+    def getUpdateVerifyBumpCommand(self, platform):
+        oldLongVersion = self.makeLongVersion(self.oldVersion)
+        longVersion = self.makeLongVersion(self.version)
+        oldCandidatesDir = self.getCandidatesDir(self.productName,
+                                                 self.oldVersion,
+                                                 self.oldBuildNumber)
+        verifyConfigPath = '../tools/release/updates/%s' % \
+                            self.verifyConfigs[platform]
+
+        return ['perl', '../tools/release/update-verify-bump.pl',
+                '-o', platform, '-p', self.productName,
+                '-r', self.brandName,
+                '--old-version=%s' % self.oldVersion,
+                '--old-app-version=%s' % self.oldAppVersion,
+                '--old-long-version=%s' % oldLongVersion,
+                '-v', self.version, '--app-version=%s' % self.appVersion,
+                '--long-version=%s' % longVersion,
+                '-n', str(self.buildNumber), '-a', self.ausServerUrl,
+                '-s', self.stagingServer, '-c', verifyConfigPath,
+                '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
+                '--pretty-candidates-dir']
+
+    def getSnippetDir(self):
+        date = strftime('%Y%m%d')
+        return '%s-%s-%s' % (date, self.brandName, self.version)
+
+
+
+class MajorUpdateFactory(ReleaseUpdatesFactory):
+    def bumpPatcherConfig(self):
+        bumpCommand = ['perl', '../tools/release/patcher-config-creator.pl',
+                       '-p', self.productName, '-r', self.brandName,
+                       '-v', self.version, '-a', self.appVersion,
+                       '-o', self.oldVersion,
+                       '--old-app-version=%s' % self.oldAppVersion,
+                       '-b', str(self.buildNumber),
+                       '--old-build-number=%s' % str(self.oldBuildNumber),
+                       '-c', WithProperties(self.patcherConfigFile),
+                       '-t', self.stagingServer, '-f', self.ftpServer,
+                       '-d', self.bouncerServer, '-l', 'shipped-locales',
+                       '--old-shipped-locales=old-shipped-locales',
+                       '--update-type=major']
+        if self.useBetaChannel:
+            bumpCommand.append('-u')
+        self.addStep(ShellCommand(
+         name='create_config',
+         command=bumpCommand,
+         description=['create patcher config'],
+         env={'PERL5LIB': '../tools/lib/perl'},
+         haltOnFailure=True
+        ))
+        if self.commitPatcherConfig:
+            self.addStep(ShellCommand(
+             name='add_patcher_config',
+             command=['cvs', 'add', WithProperties(self.patcherConfigFile)],
+             description=['add patcher config'],
+            ))
+        self.addStep(TinderboxShellCommand(
+         name='diff_patcher_config',
+         command=['cvs', 'diff', '-Nu', WithProperties(self.patcherConfigFile)],
+         description=['diff patcher config'],
+         ignoreCodes=[1]
+        ))
+        if self.commitPatcherConfig:
+            self.addStep(ShellCommand(
+             name='commit_patcher_config',
+             command=['cvs', 'commit', '-m',
+                      WithProperties('Automated configuration creation: ' + \
+                      '%s, from %s to %s build %s' % \
+                        (self.patcherConfig, self.oldVersion,
+                         self.version, self.buildNumber))
+                     ],
+             workdir='build/patcher-configs',
+             description=['commit patcher config'],
+             haltOnFailure=True
+            ))
+
+    def downloadBuilds(self):
+        ReleaseUpdatesFactory.downloadBuilds(self)
+        self.addStep(ShellCommand(
+            name='symlink_mar_dir',
+            command=['ln', '-s', self.version, '%s-%s' % (self.oldVersion,
+                                                          self.version)],
+            workdir='build/temp/%s' % self.productName,
+            description=['symlink mar dir']
+        ))
+
+    def uploadMars(self):
+        pass
+
+    def getUpdateVerifyBumpCommand(self, platform):
+        cmd = ReleaseUpdatesFactory.getUpdateVerifyBumpCommand(self, platform)
+        cmd.append('--major')
+        return cmd
+
+    def getSnippetDir(self):
+        date = strftime('%Y%m%d')
+        return '%s-%s-%s-%s-MU' % (date, self.brandName, self.oldVersion,
+                                   self.version)
 
 
 
