@@ -511,8 +511,8 @@ class MozillaClobberer(ShellCommand):
         # Server is forcing a clobber
         forcedClobberRe = re.compile('%s:Server is forcing a clobber' % my_builder)
         # We are looking for something like :
-        #  More than 7 days, 0:00:00 have passed since our last clobber
-        periodicClobberRe = re.compile('%s:More than \d+ days, [0-9:]+ have passed since our last clobber' % my_builder)
+        #  More than 604800.0 seconds have passed since our last clobber
+        periodicClobberRe = re.compile('%s:More than [\d+\.]+ seconds have passed since our last clobber' % my_builder)
 
         # We don't have clobber data.  This usually means we've been purged before
         purgedClobberRe = re.compile("%s:Our last clobber date:.*None" % my_builder)
