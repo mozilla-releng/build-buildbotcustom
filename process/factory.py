@@ -4518,6 +4518,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                  compareLocalesTag = 'RELEASE_AUTOMATION',
                  packageGlobList=['mobile/dist/*.tar.bz2',
                                   'mobile/mobile/*.deb',
+                                  'mobile/dist/deb_name.txt',
                                   'xulrunner/dist/*.tar.bz2'],
                  l10nTag='default',
                  mergeLocales=True,
@@ -4542,7 +4543,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             # before the multi-locale. This packageGlob will be used to move packages
             # into the "en-US" directory before uploading it and later on the 
             # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "mobile/dist/*.tar.bz2 mobile/mobile/*.deb"
+            self.packageGlob = "mobile/dist/*.tar.bz2 mobile/mobile/*.deb mobile/dist/deb_name.txt"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -4674,8 +4675,8 @@ class MaemoBuildFactory(MobileBuildFactory):
             workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName, self.objdir)
         )
         self.addStep(ShellCommand,
-            name='mv_binaries',
-            command=['sh', '-c', 'mv %s mobile/dist/%s' % (self.packageGlob,
+            name='cp_binaries',
+            command=['sh', '-c', 'cp %s mobile/dist/%s' % (self.packageGlob,
                                                            localeDir)],
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
@@ -4719,7 +4720,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True, packageTests=True)
         self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
-                         "xulrunner/dist/*.tar.bz2"
+                         "mobile/dist/deb_name.txt xulrunner/dist/*.tar.bz2"
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
@@ -5762,7 +5763,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                                        self.appName)
         )
 
-    def updateEnUS(self, env=None):
+    def updateEnUS(self):
         self.addStep(ShellCommand,
          name='make_unpack',
          command=['make', 'unpack'],
