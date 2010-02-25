@@ -23,6 +23,10 @@ def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
         platform = 'mac'
     elif 'WINNT' in builder:
         platform = 'win32'
+    elif 'WinMo' in builder:
+        platform = 'winmo'
+    elif 'Maemo' in builder:
+        platform = 'maemo'
 
     if 'unit test' in builder:
         task = 'unit test'
