@@ -234,7 +234,7 @@ class CompareLeakLogs(ShellCommand):
             self.testnameprefix += " "
 
         if platform.startswith("win32"):
-            self.command = ['%s\\dist\\bin\\leakstats.exe' % self.objdir,
+            self.command = ['%s\\dist\\bin\\leakstats.exe' % re.sub(r'/', r'\\', self.objdir),
                              self.mallocLog]
         else:
             self.command = ['%s/dist/bin/leakstats' % self.objdir,
