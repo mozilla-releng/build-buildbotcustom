@@ -53,13 +53,6 @@ class AliveTest(ShellCommand):
     def __init__(self, extraArgs=None, logfile=None, **kwargs):
         ShellCommand.__init__(self, **kwargs)
 
-        if not isinstance(extraArgs, list):
-            extraArgs = []
-
-        if '--symbols-path' not in extraArgs:
-            extraArgs.extend(['--symbols-path', 
-                              '../dist/crashreporter-symbols'])
-
         self.addFactoryArguments(extraArgs=extraArgs,
                                  logfile=logfile)
         self.extraArgs = extraArgs
