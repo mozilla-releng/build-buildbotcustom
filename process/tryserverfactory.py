@@ -150,11 +150,19 @@ class TryBuildFactory(MercurialBuildFactory):
 
 class MaemoTryBuildFactory(MaemoBuildFactory):
     def __init__(self, scp_string=None, targetSubDir='maemo',
-                 slavesrcdir = 'upload', **kwargs):
+                 slavesrcdir='upload', baseBuildDir=None,
+                 baseWorkDir=None, objdir=None, **kwargs):
+        assert(baseWorkDir, baseBuildDir, objdir)
         self.scp_string = scp_string
         self.targetSubDir = targetSubDir
         self.slavesrcdir = slavesrcdir
-        MaemoBuildFactory.__init__(self, **kwargs)
+        MaemoBuildFactory.__init__(self,
+                                   objdirRelPath='%s/%s' % (baseBuildDir,
+                                                            objdir),
+                                   objdirAbsPath='%s/%s' % (baseWorkDir,
+                                                            objdir),
+                                   objdir=objdir, baseBuildDir=baseBuildDir,
+                                   baseWorkDir=baseWorkDir, **kwargs)
 
     def getMozconfig(self):
         self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-maemo",
@@ -227,7 +235,7 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
             targetSubDir=self.targetSubDir,
             haltOnFailure=False,
             flunkOnFailure=False,
-            workdir="%s/%s" % (self.baseWorkDir, self.objdir),
+            workdir=self.objdirAbsPath
         )
 
 
@@ -237,7 +245,7 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
     def addPackageSteps(self, multiLocale=False, packageTests=False):
         MaemoBuildFactory.addPackageSteps(self, multiLocale=False, packageTests=True)
         self.addStep(ShellCommand,
-            command='mkdir upload',
+            command=['mkdir', self.slavesrcdir],
             description=['create', 'upload', 'directory'],
             haltOnFailure=True,
             workdir=self.baseWorkDir)
@@ -245,16 +253,21 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
             command="cp %s %s/%s" % (self.packageGlob,
                                      self.baseWorkDir, self.slavesrcdir),
             description=['move', 'globs', 'to', 'upload', 'directory'],
-            workdir="%s/%s" % (self.baseWorkDir, self.objdir))
+            workdir=self.objdirAbsPath)
 
 
 class WinmoTryBuildFactory(WinmoBuildFactory):
     def __init__(self, scp_string=None, targetSubDir='winmo',
-                 slavesrcdir='upload', **kwargs):
+                 slavesrcdir='upload', baseWorkDir=None, objdir=None,
+                 **kwargs):
+        assert(baseWorkDir, objdir)
         self.scp_string = scp_string
         self.targetSubDir=targetSubDir
         self.slavesrcdir=slavesrcdir
-        WinmoBuildFactory.__init__(self, **kwargs)
+        WinmoBuildFactory.__init__(self,
+                                   objdirPath='%s/%s' % (baseWorkDir, objdir),
+                                   baseWorkDir=baseWorkDir, objdir=objdir,
+                                   **kwargs)
 
     def getMozconfig(self):
         self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-winmo",
@@ -337,4 +350,4 @@ class WinmoTryBuildFactory(WinmoBuildFactory):
         self.addStep(ShellCommand,
             command="cp %s ../%s" % (self.packageGlob, self.slavesrcdir),
             description=['copy', 'globs', 'to', 'upload', 'directory'],
-            workdir="%s\%s" % (self.baseWorkDir, self.objdir))
+            workdir=self.objdirPath)

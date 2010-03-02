@@ -4523,6 +4523,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                  l10nTag='default',
                  mergeLocales=True,
                  locales=None,
+                 objdirRelPath=None, objdirAbsPath=None,
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
@@ -4533,6 +4534,18 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.l10nTag = l10nTag
         self.locales = locales
         self.mergeLocales = mergeLocales
+        if objdirRelPath:
+            self.objdirRelPath = objdirRelPath
+        else:
+            self.objdirRelPath = 'build/%s/%s/%s' % (self.baseBuildDir,
+                                                     self.branchName,
+                                                     self.objdir),
+        if objdirAbsPath:
+            self.objdirAbsPath = objdirAbsPath
+        else:
+            self.objdirAbsPath = '%s/%s/%s' % (self.baseWorkDir,
+                                               self.branchName,
+                                               self.objdir)
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -4600,6 +4613,9 @@ class MaemoBuildFactory(MobileBuildFactory):
                     timeout=10*60
                 )
         else:
+            # Must use a workdir of self.baseWorkDir; a workdir of
+            # self.objdirAbsPath can create an empty mozilla-central
+            # dir and break hg.
             self.addStep(ShellCommand,
                 name='rm_old_builds',
                 command=['bash', '-c', 'rm -rf %s/%s/mobile/dist/fennec* ' %
@@ -4631,8 +4647,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_pkg',
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/%s/mobile' % \
-                     (self.baseBuildDir, self.branchName, self.objdir),
+                     '%s/mobile' % self.objdirRelPath,
                      'make package', extraArgs],
             description=['make', 'package'],
             haltOnFailure=True
@@ -4640,8 +4655,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_mobile_deb',
             command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s/%s/mobile' % \
-                     (self.baseBuildDir, self.branchName, self.objdir),
+                     '%s/mobile' % self.objdirRelPath,
                      'make deb', extraArgs],
             description=['make', 'mobile', 'deb'],
             haltOnFailure=True
@@ -4652,8 +4666,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=[self.scratchboxPath, '-p', '-d',
-                         'build/%s/%s/%s/xulrunner' % \
-                         (self.baseBuildDir, self.branchName, self.objdir),
+                         '%s/xulrunner' % self.objdirRelPath,
                          'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
                 haltOnFailure=True
@@ -4672,13 +4685,13 @@ class MaemoBuildFactory(MobileBuildFactory):
             name='prepare_upload',
             command=['mkdir', '-p', localeDir],
             haltOnFailure=True,
-            workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName, self.objdir)
+            workdir='%s/mobile/dist' % self.objdirAbsPath,
         )
         self.addStep(ShellCommand,
             name='cp_binaries',
             command=['sh', '-c', 'cp %s mobile/dist/%s' % (self.packageGlob,
                                                            localeDir)],
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
+            workdir=self.objdirAbsPath,
         )
         # Now that we have moved all the packages that we want under localeDir
         # let's indicate that we want to upload the whole directory
@@ -4706,9 +4719,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             name='rm_packages',
             command=['sh', '-c', 'rm %s' % self.packageGlob],
             description=['remove single-locale packages'],
-            workdir="%s/%s/%s" % (self.baseWorkDir,
-                                  self.branchName,
-                                  self.objdir),
+            workdir=self.objdirAbsPath,
             flunkOnFailure=False,
             warnOnFailure=False,
         )
@@ -4767,16 +4778,15 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
     def compareLocales(self, locale):
-        objdirAbsPath = "%s/%s/%s" % (self.baseWorkDir, self.branchName, self.objdir)
         if self.mergeLocales:
-            mergeLocaleOptions = ['-m', '%s/merged' % objdirAbsPath]
+            mergeLocaleOptions = ['-m', '%s/merged' % self.objdirAbsPath]
         else:
             mergeLocaleOptions = []
         self.addStep(ShellCommand,
          name='rm_merged_%s' % locale,
          command=['rm', '-rf', 'merged'],
          description=['remove', 'merged'],
-         workdir=objdirAbsPath,
+         workdir=self.objdirAbsPath,
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -4796,19 +4806,18 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
     def addChromeLocale(self, locale):
-        # This is relative to scratchbox's home directory
-        objdir = 'build/%s/%s/%s' % (self.baseBuildDir, self.branchName, self.objdir)
-        objdirAbsPath = '/home/cltbld/%s' % objdir
         if self.mergeLocales:
-            mergeDirArgs = ['LOCALE_MERGEDIR=%s/merged' % objdirAbsPath]
+            # TODO: Move '/home/cltbld' to our config files
+            # the absolute path (from within scratchbox) for the objdir...
+            # objdirAbsScratchboxPath ?
+            mergeDirArgs = ['LOCALE_MERGEDIR=/home/cltbld/%s/merged' %
+                            self.objdirRelPath]
         else:
             mergeDirArgs = []
-        # TODO: Move '/home/cltbld' to our config files
-        # the absolute path (from within scratchbox)  for the objdir
         self.addStep(ShellCommand,
             name='make_locale_chrome_%s' % locale,
             command=[self.scratchboxPath, '-p', '-d',
-                     '%s/mobile/mobile/locales' % objdir,
+                     '%s/mobile/mobile/locales' % self.objdirRelPath,
                      'make chrome-%s' % locale] + mergeDirArgs,
             env = self.env,
             haltOnFailure=False,
@@ -4842,8 +4851,7 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
                                 'maemo_info.txt')],
-         workdir='%s/%s/%s/mobile/dist' % (self.baseWorkDir, self.branchName,
-                                           self.objdir)
+         workdir='%s/mobile/dist' % self.objdirAbsPath
         )
         self.packageGlob = '%s mobile/dist/maemo_info.txt' % self.packageGlob
         self.addUploadSteps(platform='linux')
@@ -4876,8 +4884,7 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
             tinderboxBuildsDir=self.baseUploadDir,
             remoteCandidatesPath=self.stageBasePath,
             dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                        self.objdir)
+            workdir=self.objdirAbsPath
         )
 
 class WinmoBuildFactory(MobileBuildFactory):
@@ -4888,9 +4895,15 @@ class WinmoBuildFactory(MobileBuildFactory):
                                   'xulrunner/dist/*.tar.bz2'],
                  createSnippet=False, downloadBaseURL=None,
                  ausUser=None, ausHost=None, ausBaseUploadDir=None,
-                 updatePlatform='WINCE_arm-msvc', **kwargs):
+                 objdirPath=None, updatePlatform='WINCE_arm-msvc',
+                 **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = ' '.join(packageGlobList)
+        if objdirPath:
+            self.objdirPath = objdirPath
+        else:
+            self.objdirPath = '%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                            self.objdir)
         self.createSnippet = createSnippet
         if self.createSnippet:
             assert downloadBaseURL and \
@@ -4938,10 +4951,9 @@ class WinmoBuildFactory(MobileBuildFactory):
         else:
             self.addStep(ShellCommand,
                 name='remove_old_builds',
-                command = ['bash', '-c', 'rm -rf %s/%s/mobile/dist/*.zip ' %
-                           (self.branchName, self.objdir) +
-                           '%s/%s/mobile/dist/*.exe ' %
-                           (self.branchName, self.objdir)],
+                command = ['bash', '-c', 'rm -rf %s/mobile/dist/*.zip ' %
+                           self.objdirPath,
+                           '%s/mobile/dist/*.exe ' % self.objdirPath],
                 workdir=self.baseWorkDir,
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
@@ -4961,33 +4973,28 @@ class WinmoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_pkg',
             command=['make', 'package'],
-            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
-                                         self.objdir),
+            workdir='%s/mobile' % self.objdirPath,
             description=['make', 'package'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
             name='make_installer',
             command=['make', 'installer'],
-            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
-                                         self.objdir),
+            workdir='%s/mobile' % self.objdirPath,
             description=['make', 'installer'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
             name='make_cab',
             command=['make', 'cab'],
-            workdir='%s/%s/%s/mobile/mobile/installer' % (self.baseWorkDir,
-                                                          self.branchName,
-                                                          self.objdir),
+            workdir='%s/mobile/mobile/installer' % self.objdirPath,
             description=['make', 'cab'],
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
             name='make_pkg_tests',
             command=['make', 'package-tests'],
-            workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir, self.branchName,
-                                            self.objdir),
+            workdir='%s/xulrunner' % self.objdirPath,
             description=['make', 'package-tests'],
             haltOnFailure=True
         )
@@ -4996,16 +5003,13 @@ class WinmoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_update_pkg',
             command=['make', '-C', 'tools/update-packaging'],
-            workdir='%s/%s/%s/mobile' % (self.baseWorkDir, self.branchName,
-                                         self.objdir),
+            workdir='%s/mobile' % self.objdirPath,
             description=['make', 'update', 'pkg'],
             haltOnFailure=True
         )
         self.addFilePropertiesSteps(filename='*.complete.mar',
-                                    directory='%s/%s/%s/mobile/dist/update' % \
-                                      (self.baseWorkDir,
-                                       self.branchName,
-                                       self.objdir),
+                                    directory='%s/mobile/dist/update' % \
+                                      self.objdirPath,
                                     fileType='completeMar',
                                     haltOnFailure=True)
         self.addStep(SetProperty,
@@ -5029,7 +5033,7 @@ class WinmoBuildFactory(MobileBuildFactory):
             descriptionDone=['got', 'app', 'version']
         ))
         self.addStep(CreateCompleteUpdateSnippet,
-            objdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            objdir=self.objdirPath,
             milestone=self.baseUploadDir,
             baseurl='%s/nightly' % self.downloadBaseURL,
             hashType=self.hashType
@@ -5038,11 +5042,11 @@ class WinmoBuildFactory(MobileBuildFactory):
             name='cat_complete_snippet',
             description=['cat','complete','snippet'],
             command=['cat','complete.update.snippet'],
-            workdir='%s/%s/%s/dist/update' % (self.baseWorkDir, self.branchName, self.objdir),
+            workdir='%s/dist/update' % self.objdirPath,
         )
 
     def addUploadSteps(self, platform='win32'):
-        MobileBuildFactory.addUploadSteps(self,platform=platform) 
+        MobileBuildFactory.addUploadSteps(self,platform=platform)
         # ausFullUploadDir contains an interpolation of the buildid property.
         # We expect the property to be set by the parent call to
         # addUploadSteps()
@@ -5060,7 +5064,7 @@ class WinmoBuildFactory(MobileBuildFactory):
                          'dist/update/complete.update.snippet',
                          WithProperties('%s:%s/complete.txt' % \
                            (self.ausHost, self.ausFullUploadDir))],
-                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+                workdir=self.objdirPath,
                 description=['upload', 'complete', 'snippet'],
                 haltOnFailure=True
             )
