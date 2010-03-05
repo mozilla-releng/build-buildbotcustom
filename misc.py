@@ -18,20 +18,28 @@ import buildbotcustom.process.factory
 import buildbotcustom.log
 import buildbotcustom.l10n
 import buildbotcustom.scheduler
+import buildbotcustom.status.mail
+import buildbotcustom.status.generators
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
 reload(buildbotcustom.l10n)
 reload(buildbotcustom.scheduler)
+reload(buildbotcustom.status.mail)
+reload(buildbotcustom.status.generators)
 
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
-  CCNightlyRepackFactory, CCUnittestBuildFactory
+  CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
+  TryUnittestBuildFactory
 from buildbotcustom.scheduler import MozScheduler, NoMergeScheduler, \
   MultiScheduler, NoMergeMultiScheduler
 from buildbotcustom.l10n import NightlyL10n
+from buildbotcustom.status.mail import MercurialEmailLookup
+from buildbot.status.mail import MailNotifier
+from buildbotcustom.status.generators import buildTryCompleteMessage
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -418,6 +426,28 @@ def generateBranchObjects(config, name):
         logCompression="bzip2",
         errorparser="unittest"
     ))
+    # Try Server notifier
+    if config.get('enable_mail_notifier'):
+        packageUrl = config['package_url']
+        packageDir = config['package_dir']
+
+        notify_builders = builders + unittestBuilders + debugBuilders
+        for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
+            notify_builders.extend(test_builders)
+
+        branchObjects['status'].append(MailNotifier(
+            fromaddr="tryserver@build.mozilla.org",
+            mode="all",
+            sendToInterestedUsers=True,
+            lookup=MercurialEmailLookup(),
+            customMesg=lambda attrs: buildTryCompleteMessage(attrs, 
+            	'/'.join([packageUrl, packageDir]), config['tinderbox_url']),
+            subject="Try Server: %(result)s on %(builder)s",
+            relayhost="mail.build.mozilla.org",
+            builders=notify_builders,
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision)s>'), 
+            	"References": WithProperties('<tryserver-%(got_revision)s>')}
+        ))
 
     if config['enable_l10n']:
         l10n_builders = []
@@ -470,13 +500,16 @@ def generateBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
+    if config.get('enable_merging'):
+        mergeBuilds=config.get('enable_merging', True)
     branchObjects['schedulers'].append(MozScheduler(
         name=name,
         branch=config['repo_path'],
         treeStableTimer=3*60,
         idleTimeout=config.get('idle_timeout', None),
         builderNames=builders + unittestBuilders + debugBuilders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl'])
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
+        mergeBuilds=mergeBuilds,
     ))
 
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
@@ -575,8 +608,15 @@ def generateBranchObjects(config, name):
         checkTest = pf.get('enable_checktests', False)
         valgrindCheck = pf.get('enable_valgrind_checktests', False)
 
-        mozilla2_dep_factory = NightlyBuildFactory(
-            env=pf['env'],
+        extra_args = {}
+        if config.get('enable_try'):
+            factory_class = TryBuildFactory
+            extra_args['packageUrl'] = config['package_url']
+            extra_args['packageDir'] = config['package_dir']
+        else:
+            factory_class = NightlyBuildFactory
+
+        mozilla2_dep_factory = factory_class(env=pf['env'],
             objdir=pf['platform_objdir'],
             platform=platform,
             hgHost=config['hghost'],
@@ -612,6 +652,7 @@ def generateBranchObjects(config, name):
             unittestBranch=unittestBranch,
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
+            **extra_args
         )
         mozilla2_dep_builder = {
             'name': '%s build' % pf['base_name'],
@@ -792,7 +833,14 @@ def generateBranchObjects(config, name):
             if platform == 'macosx':
                 runA11y = config['enable_mac_a11y']
 
-            unittest_factory = UnittestBuildFactory(
+            extra_args = {}
+            if config.get('enable_try'):
+                factory_class = TryUnittestBuildFactory
+                extra_args['branchName'] = name
+            else:
+                factory_class = UnittestBuildFactory
+
+            unittest_factory = factory_class(
                 env=pf.get('unittest-env', {}),
                 platform=platform,
                 productName=config['product_name'],
@@ -815,6 +863,7 @@ def generateBranchObjects(config, name):
                 unittestMasters=config['unittest_masters'],
                 unittestBranch="%s-%s-unittest" % (name, platform),
                 uploadPackages=True,
+                **extra_args
             )
             unittest_builder = {
                 'name': '%s unit test' % pf['base_name'],

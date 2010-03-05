@@ -1034,6 +1034,104 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=5400 # 1.5 hours
             )
 
+class TryBuildFactory(MercurialBuildFactory):
+    def __init__(self,talosMasters=None, unittestMasters=None, packageUrl=None,
+                 packageDir=None, unittestBranch=None, tinderboxBuildsDir=None, 
+                 **kwargs):
+        
+        self.packageUrl = packageUrl
+        # The directory the packages go into
+        self.packageDir = packageDir
+
+        if talosMasters is None:
+            self.talosMasters = []
+        else:
+            assert packageUrl
+            self.talosMasters = talosMasters
+
+        self.unittestMasters = unittestMasters or []
+        self.unittestBranch = unittestBranch
+
+        if self.unittestMasters:
+            assert self.unittestBranch
+            assert packageUrl
+
+        self.tinderboxBuildsDir = tinderboxBuildsDir
+
+        MercurialBuildFactory.__init__(self, **kwargs)
+
+    def doUpload(self):
+        self.addStep(SetBuildProperty,
+             property_name="who",
+             value=lambda build:build.source.changes[0].who,
+             haltOnFailure=True
+        )
+
+        uploadEnv = self.env.copy()
+        uploadEnv.update({
+            'UPLOAD_HOST': self.stageServer,
+            'UPLOAD_USER': self.stageUsername,
+            'UPLOAD_TO_TEMP': '1',
+        })
+
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        # Set up the post upload to the custom tryserver tinderboxBuildsDir
+        tinderboxBuildsDir = self.packageDir
+
+        postUploadCmd =  ['post_upload.py']
+        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
+                          '-i %(buildid)s',
+                          '-p %s' % self.productName,
+                          '--revision %(got_revision)s',
+                          '--who %(who)s',
+                          '--builddir %(builddir)s',
+                          '--release-to-tryserver-builds']
+
+        uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+
+        def get_url(rc, stdout, stderr):
+            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
+                if m.endswith("crashreporter-symbols.zip"):
+                    continue
+                if m.endswith("tests.tar.bz2"):
+                    continue
+                return {'packageUrl': m}
+            return {}
+
+        self.addStep(SetProperty,
+             command=['make', 'upload'],
+             env=uploadEnv,
+             workdir='build/%s' % self.objdir,
+             extract_fn = get_url,
+             haltOnFailure=True,
+             description=["upload"]
+        )
+
+        talosBranch = "%s-%s" % (self.branchName, self.platform)
+        for master, warn in self.talosMasters:
+            self.addStep(SendChangeStep(
+             name='sendchange_%s' % master,
+             warnOnFailure=warn,
+             master=master,
+             branch=talosBranch,
+             revision=WithProperties('%(got_revision)s'),
+             files=[WithProperties('%(packageUrl)s')],
+             user=WithProperties('%(who)s'))
+            )
+        for master, warn, retries in self.unittestMasters:
+            self.addStep(SendChangeStep(
+             name='sendchange_%s' % master,
+             warnOnFailure=warn,
+             master=master,
+             retries=retries,
+             branch=self.unittestBranch,
+             revision=WithProperties('%(got_revision)s'),
+             files=[WithProperties('%(packageUrl)s')],
+             user=WithProperties('%(who)s'))
+            )
+
 class CCMercurialBuildFactory(MercurialBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
@@ -3516,6 +3614,26 @@ class UnittestBuildFactory(MozillaBuildFactory):
          timeout=60*60
         )
 
+        self.doUpload()
+
+        self.addStep(SetProperty,
+         command=['bash', '-c', 'pwd'],
+         property='toolsdir',
+         workdir='tools'
+        )
+
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+
+        self.addPreTestSteps()
+
+        self.addTestSteps()
+
+        self.addPostTestSteps()
+
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
+
+    def doUpload(self):
         if self.uploadPackages:
             self.addStep(ShellCommand,
              name='make_pkg',
@@ -3572,27 +3690,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
                  warnOnFailure=warn,
                  master=master,
                  retries=retries,
+                 revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange-unittest")
                 )
-
-        self.addStep(SetProperty,
-         command=['bash', '-c', 'pwd'],
-         property='toolsdir',
-         workdir='tools'
-        )
-
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-
-        self.addPreTestSteps()
-
-        self.addTestSteps()
-
-        self.addPostTestSteps()
-
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
 
     def addTestSteps(self):
         self.addStep(unittest_steps.MozillaCheck,
@@ -3641,6 +3743,81 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
     def addPostTestSteps(self):
         pass
+
+class TryUnittestBuildFactory(UnittestBuildFactory):
+    def __init__(self, **kwargs):
+
+        UnittestBuildFactory.__init__(self, **kwargs)
+
+    def doUpload(self):
+        if self.uploadPackages:
+            self.addStep(ShellCommand,
+             name='make_pkg',
+             command=['make', 'package'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+             name='make_pkg_tests',
+             command=['make', 'package-tests'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=True
+            )
+            self.addStep(GetBuildID,
+             name='get_build_id',
+             objdir=self.objdir,
+            )
+            self.addStepNoEnv(SetBuildProperty,
+             property_name="who",
+             value=lambda build:build.source.changes[0].who,
+             haltOnFailure=True
+            )
+
+            uploadEnv = self.env.copy()
+            uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                              'UPLOAD_USER': self.stageUsername,
+                              'UPLOAD_TO_TEMP': '1'})
+            if self.stageSshKey:
+                uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+            postUploadCmd =  ['post_upload.py']
+            postUploadCmd += ['--tinderbox-builds-dir %s-%s-unittest' %
+                                    (self.branchName, self.platform),
+                              '-i %(buildid)s',
+                              '-p %s' % self.productName,
+                              '--revision %(got_revision)s',
+                              '--who %(who)s',
+                              '--builddir %(builddir)s',
+                              '--release-to-tryserver-builds']
+
+            uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+            def get_url(rc, stdout, stderr):
+                m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
+                if m:
+                    return {'packageUrl': m.group(1)}
+                return {}
+            self.addStep(SetProperty,
+             command=['make', 'upload'],
+             env=uploadEnv,
+             workdir='build/%s' % self.objdir,
+             extract_fn = get_url,
+             haltOnFailure=True,
+             description=['upload']
+            )
+
+            for master, warn, retries in self.unittestMasters:
+                self.addStep(SendChangeStep(
+                 name='sendchange_%s' % master,
+                 warnOnFailure=warn,
+                 master=master,
+                 retries=retries,
+                 revision=WithProperties('%(got_revision)s'),
+                 branch=self.unittestBranch,
+                 files=[WithProperties('%(packageUrl)s')],
+                 user=WithProperties('%(who)s'))
+                )
 
 class CCUnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
