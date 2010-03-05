@@ -5934,8 +5934,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         ))
         self.addStep(ShellCommand, **self.processCommand(
          name='wget_deb',
-         command=['sh', '-c',
-                  WithProperties('make wget-deb EN_US_BINARY_URL=' +
+         command=[WithProperties('make wget-deb EN_US_BINARY_URL=' +
                                  self.enUSBinaryURL + ' ' +
                                  'DEB_PKG_NAME=%(debname)s ' +
                                  'DEB_BUILD_ARCH=armel')],
