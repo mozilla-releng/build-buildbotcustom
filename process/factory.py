@@ -1519,6 +1519,12 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.doRepack()
         self.doUpload()
 
+    def processCommand(self, **kwargs): 
+        '''This function is overriden by MaemoNightlyRepackFactory to
+        adjust the command and workdir approprietaly for scratchbox
+        '''
+        return kwargs
+    
     def getMozconfig(self):
         if self.mozconfig:
             self.addStep(ShellCommand(
@@ -1586,7 +1592,7 @@ class BaseRepackFactory(MozillaBuildFactory):
             )
         else:
             # For backward compatibility where there is no mozconfig
-            self.addStep(ShellCommand,
+            self.addStep(ShellCommand, **self.processCommand(
              name='configure',
              command=['sh', '--',
                       './configure', '--enable-application=%s' % self.appName,
@@ -1596,14 +1602,14 @@ class BaseRepackFactory(MozillaBuildFactory):
              descriptionDone='configure done',
              haltOnFailure=True,
              workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            )
-        self.addStep(ShellCommand,
+            ))
+        self.addStep(ShellCommand, **self.processCommand(
          name='make_config',
          command=['make'],
          workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make config'],
          haltOnFailure=True
-        )
+        ))
 
     def tinderboxPrint(self, propName, propValue):
         self.addStep(OutputStep(
@@ -5757,33 +5763,34 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
         pass
 
     def downloadBuilds(self):
-        self.addStep(ShellCommand,
+        self.addStep(ShellCommand, **self.processCommand(
          name='wget_enUS',
-         command=['make', 'wget-en-US'],
+         command=['make', 'wget-en-US',
+                  'EN_US_BINARY_URL=%s' % self.enUSBinaryURL],
          descriptionDone='wget en-US',
          env=self.env,
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
-        )
+        ))
 
     def updateEnUS(self):
-        self.addStep(ShellCommand,
+        self.addStep(ShellCommand, **self.processCommand(
          name='make_unpack',
          command=['make', 'unpack'],
          haltOnFailure=True,
          env=self.env,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
-        )
-        self.addStep(SetProperty,
+        ))
+        self.addStep(SetProperty, **self.processCommand(verbose=False,
          command=['make', 'ident'],
          haltOnFailure=True,
          env=self.env,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName),
          extract_fn=identToProperties()
-        )
+        ))
         self.addStep(ShellCommand,
          name='hg_update_gecko_revision',
          command=['hg', 'update', '-C', '-r', WithProperties('%(gecko_revision)s')],
@@ -5856,7 +5863,12 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
 class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     extraConfigureArgs = ['--target=arm-linux-gnueabi']
 
-    def __init__(self, **kwargs):
+    def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
+                 sbox_home="/scratchbox/users/cltbld/home/cltbld",
+                 **kwargs):
+        self.scratchboxPath = scratchboxPath
+        self.scratchboxHome = sbox_home
+        self.baseBuildDir = baseBuildDir
         # Only for Maemo we upload the 'en-US' binaries under an 'en-US' subdirectory
         assert 'enUSBinaryURL' in kwargs
         assert kwargs['enUSBinaryURL'] is not ''
@@ -5864,6 +5876,17 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         MobileNightlyRepackFactory.__init__(self, **kwargs)
         assert self.configRepoPath
 
+    def processCommand(self, verbose=True, **kwargs): 
+        '''It modifies a command to make it suitable for Scratchbox'''
+        if kwargs['workdir'].startswith(self.scratchboxHome):
+            kwargs['workdir'] = kwargs['workdir'].replace(self.scratchboxHome+'/','')
+        kwargs['command'] = [self.scratchboxPath,
+                             '-d', kwargs['workdir']] + kwargs['command']
+        if verbose:
+            kwargs['command'].insert(1, '-p')
+        
+        return kwargs
+    
     def getMozconfig(self):
         self.addStep(ShellCommand,
             name='rm_configs',
@@ -5899,7 +5922,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
 
     def downloadBuilds(self):
         MobileNightlyRepackFactory.downloadBuilds(self)
-        self.addStep(SetProperty,
+        self.addStep(SetProperty, **self.processCommand(verbose=False,
          name='set_debname',
          command=['make', 'wget-DEB_PKG_NAME',
                   'EN_US_BINARY_URL=%s' % self.enUSBinaryURL],
@@ -5908,8 +5931,8 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
                                        self.origSrcDir, self.appName),
          haltOnFailure=True,
          description=['set', 'debname'],
-        )
-        self.addStep(ShellCommand,
+        ))
+        self.addStep(ShellCommand, **self.processCommand(
          name='wget_deb',
          command=['sh', '-c',
                   WithProperties('make wget-deb EN_US_BINARY_URL=' +
@@ -5920,16 +5943,15 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
                                        self.origSrcDir, self.appName),
          haltOnFailure=True,
          description=['wget', 'deb'],
-        )
+        ))
 
     def doRepack(self):
         mergeOptions = ""
         if self.mergeLocales:
             mergeOptions = 'LOCALE_MERGEDIR=$PWD/merged'
-        self.addStep(ShellCommand,
+        self.addStep(ShellCommand, **self.processCommand(
          name='repack_debs',
-         command=['sh', '-c',
-                  WithProperties('make installers-%(locale)s deb-%(locale)s ' +
+         command=[WithProperties('make installers-%(locale)s deb-%(locale)s ' +
                                  'DEB_BUILD_ARCH=armel ' +
                                  'DEB_PKG_NAME=%(debname)s ' +
                                  mergeOptions)],
@@ -5937,7 +5959,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
                                        self.appName),
          haltOnFailure=True,
          description=['repack', 'deb'],
-        )
+        ))
 
     def doUpload(self):
         self.addStep(ShellCommand,
