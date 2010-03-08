@@ -500,8 +500,7 @@ def generateBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
-    if config.get('enable_merging'):
-        mergeBuilds=config.get('enable_merging', True)
+    mergeBuilds=config.get('enable_merging', True)
     branchObjects['schedulers'].append(MozScheduler(
         name=name,
         branch=config['repo_path'],
