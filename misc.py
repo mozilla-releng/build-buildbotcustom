@@ -346,7 +346,8 @@ def generateBranchObjects(config, name):
             builders.append('%s build' % base_name)
 
         #Fill the l10n dep dict
-        if config['enable_l10n'] and platform in config['l10n_platforms']:
+        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+           config['enable_l10n_onchange']:
                 l10nBuilders[base_name] = {}
                 l10nBuilders[base_name]['tree'] = config['l10n_tree']
                 l10nBuilders[base_name]['l10n_builder'] = \
@@ -452,7 +453,8 @@ def generateBranchObjects(config, name):
     if config['enable_l10n']:
         l10n_builders = []
         for b in l10nBuilders:
-            l10n_builders.append(l10nBuilders[b]['l10n_builder'])
+            if config['enable_l10n_onchange']:
+                l10n_builders.append(l10nBuilders[b]['l10n_builder'])
             l10n_builders.append(l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
         l10n_binaryURL = config['enUS_binaryURL']
         if l10n_binaryURL.endswith('/'):
@@ -491,7 +493,7 @@ def generateBranchObjects(config, name):
         pollInterval=1*60
     ))
 
-    if config['enable_l10n']:
+    if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
                             pollInterval = 15*60)
@@ -796,7 +798,8 @@ def generateBranchObjects(config, name):
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
         # We still want l10n_dep builds if nightlies are off
-        if config['enable_l10n'] and platform in config['l10n_platforms']:
+        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+           config['enable_l10n_onchange']:
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
