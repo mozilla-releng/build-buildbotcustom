@@ -232,8 +232,32 @@ if __name__ == "__main__":
     parser.add_option("-m", "--master", dest="master", help="master url (buildbotURL in the master.cfg file)")
     parser.add_option("-n", "--description", dest="name", help="human friendly name for master")
     parser.add_option("", "--times", dest="times", help="update slave connect/disconnect times", action="store_true", default=False)
+    parser.add_option("-c", "--config", dest="config", 
+                      help="read configurations from a file")
 
     options, args = parser.parse_args()
+
+    if options.config:
+
+        from ConfigParser import RawConfigParser
+        from ConfigParser import ParsingError, MissingSectionHeaderError
+
+        supported_params = ('database', 'master', 'name')
+        config = RawConfigParser()
+        try:
+            if not config.read(options.config):
+                print >> sys.stderr, "Error reading config file %s" % options.config
+                sys.exit(1)
+
+            for param in supported_params:
+                # Rewrite empty CLI params if we have them in config
+                if not getattr(options, param, None) and \
+                   config.has_option('DEFAULT', param):
+                    setattr(options, param, config.get('DEFAULT', param))
+
+        except (ParsingError, MissingSectionHeaderError):
+            print >> sys.stderr, "Error parsing config file %s" % options.config
+            sys.exit(2)
 
     if not options.database:
         parser.error("Must specify a database to connect to")
