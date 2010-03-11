@@ -446,8 +446,8 @@ def generateBranchObjects(config, name):
             subject="Try Server: %(result)s on %(builder)s",
             relayhost="mail.build.mozilla.org",
             builders=notify_builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision)s>'), 
-            	"References": WithProperties('<tryserver-%(got_revision)s>')}
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'), 
+            	"References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
         ))
 
     if config['enable_l10n']:
