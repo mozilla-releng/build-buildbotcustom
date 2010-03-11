@@ -277,6 +277,15 @@ class WinmoTryBuildFactory(WinmoBuildFactory):
     def addPreCleanSteps(self):
         self.addStep(MozillaTryProcessing)
         self.addStep(ShellCommand,
+            name="pacify rmdir",
+            description="Pacify rmdir",
+            descriptionDone="Pacified rmdir",
+            command=["bash", "-c",
+                     "if [ ! -d %(base)s ]; then mkdir -v %(base)s; fi" %
+                        {'base': self.baseWorkDir}],
+            workdir="."
+        )
+        self.addStep(ShellCommand,
             name="remove source and obj dirs",
             command=["rmdir", "/s", "/q", "%s" % self.baseWorkDir],
             haltOnFailure=True,
