@@ -30,8 +30,7 @@ class MozScheduler(Scheduler):
                      'fileIsImportant', 'properties', 'idleTimeout')
     
     def __init__(self, name, branch, treeStableTimer, builderNames,
-                 idleTimeout=None, fileIsImportant=None, mergeBuilds=True, 
-                 properties={}):
+                 idleTimeout=None, fileIsImportant=None, properties={}):
         """
         @param name: the name of this Scheduler
         @param branch: The branch name that the Scheduler should pay
@@ -58,9 +57,6 @@ class MozScheduler(Scheduler):
                                 build is triggered by an important change.
                                 The default value of None means that all
                                 Changes are important.
-                                
-        @param mergeBuilds: set to True by default since most schedulers expect merged 
-                            builds, if set to false there will be no merging of builds
 
         @param properties: properties to apply to all builds started from this 
                            scheduler
@@ -87,19 +83,7 @@ class MozScheduler(Scheduler):
             self.idleTimer = None
 
     def fireTimer(self):
-        if self.mergeBuilds:
-            Scheduler.fireTimer(self)
-        else:
-            for change in self.importantChanges:
-                changes = [change]
-                if self.unimportantChanges:
-                    changes.extend(self.unimportantChanges)
-                    self.unimportantChanges = []
-                # submit
-                ss = NoMergeSourceStamp(changes=changes)
-                bs = buildset.BuildSet(self.builderNames, ss)
-                self.submitBuildSet(bs)
-            self.importantChanges = []
+        Scheduler.fireTimer(self)
         self.setIdleTimer()
 
     def doIdleBuild(self):

@@ -502,15 +502,20 @@ def generateBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
-    mergeBuilds=config.get('enable_merging', True)
-    branchObjects['schedulers'].append(MozScheduler(
+    extra_args = {}
+    if config.get('enable_merging'):
+        schedulerClass = MozScheduler
+        extra_args['idleTimeout'] = config.get('idle_timeout', None)
+    else:
+        schedulerClass = NoMergeScheduler
+
+    branchObjects['schedulers'].append(schedulerClass(
         name=name,
         branch=config['repo_path'],
         treeStableTimer=3*60,
-        idleTimeout=config.get('idle_timeout', None),
         builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
-        mergeBuilds=mergeBuilds,
+        **extra_args
     ))
 
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
