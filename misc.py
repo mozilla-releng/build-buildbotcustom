@@ -503,7 +503,7 @@ def generateBranchObjects(config, name):
     # schedulers
     # this one gets triggered by the HG Poller
     extra_args = {}
-    if config.get('enable_merging'):
+    if config.get('enable_merging', True):
         schedulerClass = MozScheduler
         extra_args['idleTimeout'] = config.get('idle_timeout', None)
     else:
