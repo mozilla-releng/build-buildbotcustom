@@ -453,6 +453,20 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
+
+        if self.platform == 'win32':
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd -W'],
+             property='toolsdir',
+             workdir='tools'
+            )
+        else:
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd'],
+             property='toolsdir',
+             workdir='tools'
+            )
+
         if self.enable_ccache:
             self.addStep(ShellCommand, command=['ccache', '-z'],
                      name="clear_ccache_stats", warnOnFailure=False,
@@ -3616,11 +3630,18 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.doUpload()
 
-        self.addStep(SetProperty,
-         command=['bash', '-c', 'pwd'],
-         property='toolsdir',
-         workdir='tools'
-        )
+        if self.platform == 'win32':
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd -W'],
+             property='toolsdir',
+             workdir='tools'
+            )
+        else:
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd'],
+             property='toolsdir',
+             workdir='tools'
+            )
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
@@ -4031,11 +4052,18 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  user="sendchange-unittest")
                 )
 
-        self.addStep(SetProperty,
-         command=['bash', '-c', 'pwd'],
-         property='toolsdir',
-         workdir='tools'
-        )
+        if self.platform == 'win32':
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd -W'],
+             property='toolsdir',
+             workdir='tools'
+            )
+        else:
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd'],
+             property='toolsdir',
+             workdir='tools'
+            )
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
