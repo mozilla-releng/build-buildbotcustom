@@ -517,7 +517,7 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
                 self.command.append("--chunk-by-dir=%d" % chunkByDir)
 
         if variant == 'ipcplugins':
-            self.command.append('--setpref=dom.ipc.plugins.enabled=true')
+            self.command.append('--setpref=dom.ipc.plugins.enabled=false')
             self.command.append('--test-path=modules/plugin/test')
         elif variant != 'plain':
             self.command.append("--%s" % variant)
