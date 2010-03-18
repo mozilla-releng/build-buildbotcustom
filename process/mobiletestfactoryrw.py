@@ -358,7 +358,7 @@ class MobileUnittestFactory(MobileTalosFactory):
         self.known_fail_count = known_fail_count
         self.clients = clients
         self.maemkit_repo_path = maemkit_repo_path
-        MaemoTalosFactory.__init__(self, **kwargs)
+        MobileTalosFactory.__init__(self, **kwargs)
 
     def addSetupSteps(self):
         self.addStep(ShellCommand(
@@ -369,7 +369,7 @@ class MobileUnittestFactory(MobileTalosFactory):
         self.addSteps(simpleHG(self.hg_host, self.maemkit_repo_path, self.base_dir, 'maemkit'))
 
     def addObtainBuildSteps(self):
-        MaemoTalosFactory.addObtainBuildSteps(self)
+        MobileTalosFactory.addObtainBuildSteps(self)
         self.addStep(SetProperty(
             command=['echo', WithProperties("%(fileURL)s")],
             property='download_dir',
