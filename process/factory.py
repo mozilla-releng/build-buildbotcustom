@@ -5273,7 +5273,7 @@ class WinmoBuildFactory(MobileBuildFactory):
                 name='upload_complete_snippet',
                 command=['scp', '-o', 'User=%s' % self.ausUser,
                          'dist/update/complete.update.snippet',
-                         WithProperties('%s:%s/complete.txt' % \
+                         WithProperties("%s:'%s/complete.txt'" % \
                            (self.ausHost, self.ausFullUploadDir))],
                 workdir=self.objdirPath,
                 description=['upload', 'complete', 'snippet'],
