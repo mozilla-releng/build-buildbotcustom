@@ -365,7 +365,7 @@ class SendChangeStep(BuildStep):
 class DownloadFile(ShellCommand):
     haltOnFailure = True
     name = "download"
-    
+
     def __init__(self, url_fn, url_property=None, filename_property=None,
             ignore_certs=False, wget_args=None, **kwargs):
         self.url_fn = url_fn
@@ -380,23 +380,21 @@ class DownloadFile(ShellCommand):
         self.addFactoryArguments(url_fn=url_fn, url_property=url_property,
                 filename_property=filename_property, ignore_certs=ignore_certs,
                 wget_args=wget_args)
-        self._url = None
-
-    def setBuild(self, build):
-        ShellCommand.setBuild(self, build)
-        self._url = self.url_fn(build)
-        if self.url_property:
-            self.setProperty(self.url_property, self._url)
-        if self.filename_property:
-            self.setProperty(self.filename_property, os.path.basename(self._url))
 
     def start(self):
+        url = self.url_fn(self.build)
+        if self.url_property:
+            self.setProperty(self.url_property, url, "DownloadFile")
+        if self.filename_property:
+            self.setProperty(self.filename_property,
+                    os.path.basename(url), "DownloadFile")
+
         if self.ignore_certs:
-            self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", self._url])
+            self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", url])
         else:
-            self.setCommand(["wget"] + self.wget_args + ["-N", self._url])
+            self.setCommand(["wget"] + self.wget_args + ["-N", url])
         ShellCommand.start(self)
-    
+
     def evaluateCommand(self, cmd):
         superResult = ShellCommand.evaluateCommand(self, cmd)
         if SUCCESS != superResult:

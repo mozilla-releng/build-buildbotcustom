@@ -5304,11 +5304,11 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         # Download the build
         def get_fileURL(build):
             fileURL = build.source.changes[-1].files[0]
-            build.setProperty('fileURL', fileURL, 'DownloadFile')
             return fileURL
         self.addStep(DownloadFile(
          url_fn=get_fileURL,
          filename_property='build_filename',
+         url_property='fileURL',
          haltOnFailure=True,
          name="download build",
         ))
@@ -5333,6 +5333,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         self.addStep(DownloadFile(
          url_fn=get_testURL,
          filename_property='tests_filename',
+         url_property='tests_url',
          haltOnFailure=True,
          name='download tests',
         ))
@@ -5351,6 +5352,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             self.addStep(DownloadFile(
              url_fn=get_symbolsURL,
              filename_property='symbols_filename',
+             url_property='symbols_url',
              name='download symbols',
              workdir='build/symbols',
             ))
