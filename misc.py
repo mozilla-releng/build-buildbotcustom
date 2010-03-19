@@ -588,7 +588,7 @@ def generateBranchObjects(config, name):
             leakTest = True
             codesighs = False
             if not pf.get('enable_unittests'):
-                uploadPackages = False
+                uploadPackages = pf.get('packageTests', False) 
             else:
                 packageTests = True
             talosMasters = None
