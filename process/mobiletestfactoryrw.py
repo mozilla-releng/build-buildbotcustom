@@ -1,3 +1,4 @@
+
 import re
 
 from buildbot.process.factory import BuildFactory
@@ -38,10 +39,7 @@ def parse_build_info(output, repo_type):
 
 def download_dir(rc, stdout, stderr):
     m = re.search("^(?P<download_dir>.*/)[^/]*$", stdout)
-    retval = m.groupdict()
-    retval['stdout'] = stdout
-    retval['stderr'] = stderr
-    return retval
+    return m.groupdict()
 
 def simpleCVS(cvsroot, module, path, workdir):
     #TODO: Add ability to pull up to a certain date (-D)
@@ -366,21 +364,21 @@ class MobileUnittestFactory(MobileTalosFactory):
             name='mkdir_maemkit_logs',
             description=['make', 'maemkit', 'log', 'dir'],
         ))
-        self.addSteps(simpleHG(self.hg_host, self.maemkit_repo_path, self.base_dir, 'maemkit'))
+        self.addSteps(simpleHG(self.hg_host,
+                      self.maemkit_repo_path, self.base_dir, 'maemkit'))
 
     def addObtainBuildSteps(self):
         MobileTalosFactory.addObtainBuildSteps(self)
         self.addStep(SetProperty(
             command=['echo', WithProperties("%(fileURL)s")],
-            property='download_dir',
             extract_fn=download_dir,
             name='download_dir',
             description=['download', 'directory', 'property'],
         ))
         self.addStep(ShellCommand(
             command=['wget',
-                     WithProperties("%(download_dir)sxulrunner-%(milestone)s.multi.linux-gnueabi-arm.tar.bz2"),
-                     '-o', 'xulrunner-tests.tar.bz2'],
+                     WithProperties("%(download_dir)s/xulrunner-%(milestone)s.multi.linux-gnueabi-arm.tests.tar.bz2"),
+                     '-O', 'xulrunner-tests.tar.bz2'],
             workdir=self.base_dir,
             haltOnFailure=True,
             name="get_tests",
