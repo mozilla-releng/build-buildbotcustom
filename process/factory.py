@@ -36,7 +36,8 @@ from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
 from buildbotcustom.steps.transfer import MozillaStageUpload
-from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet
+from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
+  CreatePartialUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
 
 import buildbotcustom.steps.unittest as unittest_steps
@@ -145,7 +146,7 @@ class MozillaBuildFactory(BuildFactory):
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-                 branchName=None, triggerBuilds=False,
+                 branchName=None, baseWorkDir='build', triggerBuilds=False,
                  triggeredSchedulers=None, hashType='sha512', **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
@@ -159,6 +160,7 @@ class MozillaBuildFactory(BuildFactory):
         self.clobberURL = clobberURL
         self.clobberTime = clobberTime
         self.buildsBeforeReboot = buildsBeforeReboot
+        self.baseWorkDir = baseWorkDir
         self.triggerBuilds = triggerBuilds
         self.triggeredSchedulers = triggeredSchedulers
         self.hashType = hashType
@@ -184,6 +186,20 @@ class MozillaBuildFactory(BuildFactory):
         self.addInitialSteps()
 
     def addInitialSteps(self):
+        self.addStep(SetProperty(
+            name='set_basedir',
+            command=['bash', '-c', 'pwd'],
+            property='basedir',
+            workdir='.',
+        ))
+        # We need the basename of the current working dir so we can
+        # ignore that dir when purging builds later.
+        self.addStep(SetProperty(
+            name='set_builddir',
+            command=['bash', '-c', 'basename "$PWD"'],
+            property='builddir',
+            workdir='.',
+        ))
         self.addStep(ShellCommand,
          name='rm_buildtools',
          command=['rm', '-rf', 'tools'],
@@ -192,24 +208,16 @@ class MozillaBuildFactory(BuildFactory):
         )
         self.addStep(ShellCommand,
          name='clone_buildtools',
-         command=['bash', '-c',
-          'if [ ! -d tools ]; then hg clone %s tools;fi' % self.buildToolsRepo],
+         command=['hg', 'clone', self.buildToolsRepo, 'tools'],
          description=['clone', 'build tools'],
          workdir='.'
         )
-        self.addStep(SetProperty,
-         command=['bash', '-c', 'pwd'],
-         property='toolsdir',
-         workdir='tools'
-        )
-        # We need the basename of the current working dir so we can
-        # ignore that dir when purging builds later.
-        self.addStep(SetProperty,
-         name='basename_pwd',
-         command=['bash', '-c', 'basename "$PWD"'],
-         property='builddir',
-         workdir='.'
-        )
+        self.addStep(SetProperty(
+            name='set_toolsdir',
+            command=['bash', '-c', 'pwd'],
+            property='toolsdir',
+            workdir='tools',
+        ))
 
         if self.clobberURL is not None:
             self.addStep(MozillaClobberer,
@@ -372,16 +380,18 @@ class MozillaBuildFactory(BuildFactory):
 
 class MercurialBuildFactory(MozillaBuildFactory):
     def __init__(self, env, objdir, platform, configRepoPath, configSubDir,
-                 profiledBuild, mozconfig, productName=None, buildRevision=None,
-                 stageServer=None, stageUsername=None, stageGroup=None,
-                 stageSshKey=None, stageBasePath=None, ausBaseUploadDir=None,
-                 updatePlatform=None, downloadBaseURL=None, ausUser=None,
-                 ausHost=None, nightly=False, leakTest=False, checkTest=False,
-                 valgrindCheck=False, codesighs=True, graphServer=None,
-                 graphSelector=None, graphBranch=None, baseName=None,
-                 uploadPackages=True, uploadSymbols=True, createSnippet=False,
-                 doCleanup=True, packageSDK=False, packageTests=False,
-                 mozillaDir=None, enable_ccache=False, **kwargs):
+                 profiledBuild, mozconfig, productName=None,
+                 buildRevision=None, stageServer=None, stageUsername=None,
+                 stageGroup=None, stageSshKey=None, stageBasePath=None,
+                 ausBaseUploadDir=None, updatePlatform=None,
+                 downloadBaseURL=None, ausUser=None, ausSshKey=None,
+                 ausHost=None, nightly=False, leakTest=False,
+                 checkTest=False, valgrindCheck=False, codesighs=True,
+                 graphServer=None, graphSelector=None, graphBranch=None,
+                 baseName=None, uploadPackages=True, uploadSymbols=True,
+                 createSnippet=False, createPartial=False, doCleanup=True,
+                 packageSDK=False, packageTests=False, mozillaDir=None,
+                 enable_ccache=False, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -401,6 +411,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
         self.ausUser = ausUser
+        self.ausSshKey = ausSshKey
         self.ausHost = ausHost
         self.nightly = nightly
         self.leakTest = leakTest
@@ -414,6 +425,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.uploadPackages = uploadPackages
         self.uploadSymbols = uploadSymbols
         self.createSnippet = createSnippet
+        self.createPartial = createPartial
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
         self.packageTests = packageTests
@@ -424,14 +436,23 @@ class MercurialBuildFactory(MozillaBuildFactory):
             assert stageBasePath
         if self.createSnippet:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
-            assert ausUser and ausHost
+            assert ausUser and ausSshKey and ausHost
 
-            # this is a tad ugly because we need to python interpolation
-            # as well as WithProperties
-            # here's an example of what it translates to:
-            # /opt/aus2/build/0/Firefox/mozilla2/WINNT_x86-msvc/2008010103/en-US
-            self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
-              (self.ausBaseUploadDir, self.updatePlatform)
+            # To preserve existing behavior, we need to set the 
+            # ausFullUploadDir differently for when we are create all the
+            # mars (complete+partial) ourselves. 
+            if self.createPartial:
+                # e.g.:
+                # /opt/aus2/incoming/2/Firefox/mozilla-central/WINNT_x86-msvc
+                self.ausFullUploadDir = '%s/%s' % (self.ausBaseUploadDir,
+                                                   self.updatePlatform)
+            else:
+                # this is a tad ugly because we need python interpolation
+                # as well as WithProperties, e.g.:
+                # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/en-US
+                self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
+                                          (self.ausBaseUploadDir, 
+                                           self.updatePlatform)
 
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
@@ -442,8 +463,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         else:
             self.tbPrint = True
 
-
-        # Mozilla subdir and objdir
+        # SeaMonkey/Thunderbird make use of mozillaDir. Firefox does not.
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
             self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
@@ -451,20 +471,29 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.mozillaDir = ''
             self.mozillaObjdir = self.objdir
 
+        # These following variables are useful for sharing build steps (e.g.
+        # update generation) with subclasses that don't use object dirs (e.g.
+        # l10n repacks).
+        # 
+        # We also concatenate the baseWorkDir at the outset to avoid having to
+        # do that everywhere.
+        self.mozillaSrcDir = '.%s' % self.mozillaDir
+        self.absMozillaSrcDir = '%s%s' % (self.baseWorkDir, self.mozillaDir)
+        self.absMozillaObjDir = '%s/%s' % (self.baseWorkDir, self.mozillaObjdir)
+
+        self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
+                         '/nightly/latest-%s' % self.branchName
+
         self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                          self.platform)
 
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths.
         if self.platform == 'win32':
             self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd -W'],
-             property='toolsdir',
-             workdir='tools'
-            )
-        else:
-            self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd'],
-             property='toolsdir',
-             workdir='tools'
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
             )
 
         if self.enable_ccache:
@@ -825,6 +854,21 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=env,
         )
 
+    def addCreateUpdateSteps(self):
+        self.addStep(ShellCommand(
+            name='make_complete_mar',
+            command=['make', '-C',
+                     '%s/tools/update-packaging' % self.mozillaObjdir],
+            env=self.env,
+            haltOnFailure=True,
+        ))
+        self.addFilePropertiesSteps(
+            filename='*.complete.mar',
+            directory='%s/dist/update' % self.absMozillaObjDir,
+            fileType='completeMar',
+            haltOnFailure=True,
+        )
+
     def addUploadSteps(self, pkgArgs=None):
         pkgArgs = pkgArgs or []
         if self.packageSDK:
@@ -884,18 +928,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                         fileType='installer',
                                         maxDepth=3,
                                         haltOnFailure=True)
-        if self.createSnippet:
-            self.addStep(ShellCommand,
-                name='make_update_pkg',
-                command=['make', '-C',
-                         '%s/tools/update-packaging' % self.mozillaObjdir],
-                env=self.env,
-                haltOnFailure=True
-            )
-            self.addFilePropertiesSteps(filename='*.complete.mar', 
-                                        directory='build/%s/dist/update' % self.mozillaObjdir,
-                                        fileType='completeMar',
-                                        haltOnFailure=True)
 
         if self.productName == 'xulrunner':
             self.addStep(SetProperty(
@@ -923,6 +955,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 workdir='.',
                 name='get_app_version',
             ))
+
+        if self.createSnippet:
+            self.addCreateUpdateSteps();
 
         # Call out to a subclass to do the actual uploading
         self.doUpload()
@@ -994,30 +1029,45 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='build%s' % self.mozillaDir
         )
 
+    def addCreateSnippetsSteps(self):
+        self.addStep(CreateCompleteUpdateSnippet(
+            name='create_complete_snippet',
+            objdir=self.absMozillaObjDir,
+            milestone=self.branchName,
+            baseurl='%s/nightly' % self.downloadBaseURL,
+            hashType=self.hashType,
+        ))
+        self.addStep(ShellCommand(
+            name='cat_complete_snippet',
+            command=['cat', 'complete.update.snippet'],
+            workdir='%s/dist/update' % self.absMozillaObjDir,
+        ))
+
+    def addUploadSnippetsSteps(self):
+        self.addStep(ShellCommand(
+            name='create_aus_updir',
+            command=['bash', '-c',
+                     WithProperties('ssh -l %s ' % self.ausUser +
+                                    '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
+                                    'mkdir -p %s' % self.ausFullUploadDir)],
+            description=['create', 'aus', 'upload', 'dir'],
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='upload_complete_snippet',
+            command=['scp', '-o', 'User=%s' % self.ausUser,
+                     '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
+                     'dist/update/complete.update.snippet',
+                     WithProperties('%s:%s/complete.txt' % (self.ausHost,
+                                                            self.ausFullUploadDir))],
+             workdir=self.absMozillaObjDir,
+             description=['upload', 'complete', 'snippet'],
+             haltOnFailure=True,
+        ))
+ 
     def addUpdateSteps(self):
-        self.addStep(CreateCompleteUpdateSnippet,
-         objdir='build/%s' % self.mozillaObjdir,
-         milestone=self.branchName,
-         baseurl='%s/nightly' % self.downloadBaseURL,
-         hashType=self.hashType
-        )
-        self.addStep(ShellCommand,
-         name='create_aus_updir',
-         command=['ssh', '-l', self.ausUser, self.ausHost,
-                  WithProperties('mkdir -p %s' % self.ausFullUploadDir)],
-         description=['create', 'aus', 'upload', 'dir'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='upload_complete_snippet',
-         command=['scp', '-o', 'User=%s' % self.ausUser,
-                  'dist/update/complete.update.snippet',
-                  WithProperties('%s:%s/complete.txt' % \
-                    (self.ausHost, self.ausFullUploadDir))],
-         workdir='build/%s' % self.mozillaObjdir,
-         description=['upload', 'complete', 'snippet'],
-         haltOnFailure=True
-        )
+        self.addCreateSnippetsSteps()
+        self.addUploadSnippetsSteps()
 
     def addBuildSymbolsStep(self):
         self.addStep(ShellCommand,
@@ -1240,6 +1290,20 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         )
 
 
+def marFilenameToProperty(prop_name=None):
+    '''Parse a file listing and return the first mar filename found as
+       a named property.
+    '''
+    def parseMarFilename(rc, stdout, stderr):
+        if prop_name is not None:
+            for line in filter(None, stdout.split('\n')):
+                line = line.strip()
+                if re.search(r'\.mar$', line):
+                    return {prop_name: line}
+        return {}
+    return parseMarFilename
+
+
 class NightlyBuildFactory(MercurialBuildFactory):
     def __init__(self, talosMasters=None, unittestMasters=None,
             unittestBranch=None, tinderboxBuildsDir=None, 
@@ -1266,6 +1330,264 @@ class NightlyBuildFactory(MercurialBuildFactory):
             assert self.geriatricBranches
             assert self.platform
 
+    def makePartialTools(self):
+        '''The mar and bsdiff tools are created by default when 
+           --enable-update-packaging is specified, but some subclasses may 
+           need to explicitly build the tools.
+        '''
+        pass
+
+    def getCompleteMarPatternMatch(self):
+        if self.platform.startswith("linux64"):
+            marPattern = 'linux-x86_64'
+        elif self.platform.startswith("linux"):
+            marPattern = 'linux-i686'
+        elif self.platform.startswith("macosx"):
+            marPattern = 'mac'
+        elif self.platform.startswith("win32"):
+            marPattern = 'win32'
+        elif self.platform.startswith("wince"):
+            marPattern = 'wince-arm'
+        else:
+            return False
+        marPattern += '.complete.mar'
+        return marPattern
+
+    def addCreatePartialUpdateSteps(self, extraArgs=None):
+        '''This function expects that the following build properties are
+           already set: buildid, completeMarFilename
+        '''
+        self.makePartialTools()
+        # These tools (mar+mbsdiff) should now be built.
+        mar='../dist/host/bin/mar'
+        mbsdiff='../dist/host/bin/mbsdiff'
+        # Unpack the current complete mar we just made.
+        updateEnv = self.env.copy()
+        updateEnv['MAR'] = mar
+        updateEnv['MBSDIFF'] = mbsdiff
+        self.addStep(ShellCommand(
+            name='rm_unpack_dirs',
+            command=['rm', '-rf', 'current', 'previous'],
+            env=updateEnv,
+            workdir=self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='make_unpack_dirs',
+            command=['mkdir', 'current', 'previous'],
+            env=updateEnv,
+            workdir=self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='unpack_current_mar',
+            command=['bash', '-c',
+                     WithProperties('%(basedir)s/' +
+                                    self.absMozillaSrcDir +
+                                    '/tools/update-packaging/unwrap_full_update.sh ' +
+                                    '../dist/update/%(completeMarFilename)s')],
+            env=updateEnv,
+            haltOnFailure=True,
+            workdir='%s/current' % self.absMozillaObjDir,
+        ))
+        # The mar file name will be the same from one day to the next,
+        # *except* when we do a version bump for a release. To cope with
+        # this, we get the name of the previous complete mar directly
+        # from staging. Version bumps can also often involve multiple mars
+        # living in the latest dir, so we grab the latest one.            
+        marPattern = self.getCompleteMarPatternMatch()
+        self.addStep(SetProperty(
+            name='get_previous_mar_filename',
+            command=['bash', '-c',
+                     WithProperties('ssh -l %s -i ~/.ssh/%s %s ' % (self.stageUsername,
+                                                                    self.stageSshKey,
+                                                                    self.stageServer) +
+                                    'ls -1t %s | grep %s' % (self.latestDir,
+                                                             marPattern))
+                     ],
+            extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
+            haltOnFailure=True,
+        ))
+        previousMarURL = WithProperties('http://%s' % self.stageServer + \
+                          '%s' % self.latestDir + \
+                          '/%(previousMarFilename)s')
+        self.addStep(ShellCommand(
+            name='get_previous_mar',
+            command=['wget', '-O', 'previous.mar', '--no-check-certificate',
+                     previousMarURL],
+            workdir='%s/dist/update' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        # Unpack the previous complete mar.                                    
+        self.addStep(ShellCommand(
+            name='unpack_previous_mar',
+            command=['bash', '-c',
+                     WithProperties('%(basedir)s/' +
+                                    self.absMozillaSrcDir +
+                                    '/tools/update-packaging/unwrap_full_update.sh ' +
+                                    '../dist/update/previous.mar')],
+            env=updateEnv,
+            workdir='%s/previous' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        # Extract the build ID from the unpacked previous complete mar.
+        self.addStep(FindFile(
+            name='find_inipath',
+            filename='application.ini',
+            directory='previous',
+            filetype='file',
+            max_depth=4,
+            property_name='previous_inipath',
+            workdir=self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        self.addStep(SetProperty(
+            name='set_previous_buildid',
+            command=['python',
+                     '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties(self.absMozillaObjDir + '/%(previous_inipath)s'),
+                     'App', 'BuildID'],
+            property='previous_buildid',
+            workdir='.',
+            haltOnFailure=True,
+        ))
+        # Generate the partial patch from the two unpacked complete mars.
+        partialMarCommand=['make', '-C',
+                           'tools/update-packaging', 'partial-patch',
+                           'STAGE_DIR=../../dist/update',
+                           'SRC_BUILD=../../previous',
+                           'DST_BUILD=../../current',
+                           WithProperties('DST_BUILD_ID=%(buildid)s')]
+        if extraArgs is not None:
+            partialMarCommand.extend(extraArgs)
+        self.addStep(ShellCommand(
+            name='make_partial_mar',
+            command=partialMarCommand,
+            env=updateEnv,
+            workdir=self.absMozillaObjDir,
+            flunkOnFailure=True,
+            haltOnFailure=False,
+        ))
+        self.addStep(ShellCommand(
+            name='rm_previous_mar',
+            command=['rm', '-rf', 'previous.mar'],
+            env=self.env,
+            workdir='%s/dist/update' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        # Update the build properties to pickup information about the partial.
+        self.addFilePropertiesSteps(
+            filename='*.partial.*.mar',
+            directory='%s/dist/update' % self.absMozillaObjDir,
+            fileType='partialMar',
+            haltOnFailure=True,
+        )
+
+    def addCreateUpdateSteps(self):
+        self.addStep(ShellCommand(
+            name='rm_existing_mars',
+            command=['bash', '-c', 'rm -rvf *.mar'],
+            env=self.env,
+            workdir='%s/dist/update' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        # Run the parent steps to generate the complete mar.
+        MercurialBuildFactory.addCreateUpdateSteps(self)
+        if self.createPartial:
+            self.addCreatePartialUpdateSteps()
+
+    def addCreateSnippetsSteps(self):
+        MercurialBuildFactory.addCreateSnippetsSteps(self)
+        if self.createPartial:
+            self.addStep(CreatePartialUpdateSnippet(
+                name='create_partial_snippet',
+                objdir=self.absMozillaObjDir,
+                milestone=self.branchName,
+                baseurl='%s/nightly' % self.downloadBaseURL,
+                hashType=self.hashType,
+            ))
+            self.addStep(ShellCommand(
+                name='cat_partial_snippet',
+                command=['cat', 'partial.update.snippet'],
+                workdir='%s/dist/update' % self.absMozillaObjDir,
+            ))
+
+    def getPreviousBuildUploadDir(self):
+        # Uploading the complete snippet occurs regardless of whether we are
+        # generating partials on the slave or not, it just goes to a different
+        # path for eventual consumption by the central update generation 
+        # server.
+
+        # ausFullUploadDir is expected to point to the correct base path on the
+        # AUS server for each case:
+        #
+        # updates generated centrally: /opt/aus2/build/0/...
+        # updates generated on slave:  /opt/aus2/incoming/2/...
+        if self.createPartial:
+            return "%s/%%(previous_buildid)s/en-US" % \
+                                         self.ausFullUploadDir
+        else:
+            return self.ausFullUploadDir
+
+    def addUploadSnippetsSteps(self):
+        ausPreviousBuildUploadDir = self.getPreviousBuildUploadDir()
+        self.addStep(ShellCommand(
+            name='create_aus_previous_updir',
+            command=['bash', '-c',
+                     WithProperties('ssh -l %s ' %  self.ausUser +
+                                    '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
+                                    'mkdir -p %s' % ausPreviousBuildUploadDir)],
+            description=['create', 'aus', 'previous', 'upload', 'dir'],
+            haltOnFailure=True,
+            ))
+        self.addStep(ShellCommand(
+            name='upload_complete_snippet',
+            command=['scp', '-o', 'User=%s' % self.ausUser,
+                     '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
+                     'dist/update/complete.update.snippet',
+                     WithProperties('%s:%s/complete.txt' % (self.ausHost,
+                                                            ausPreviousBuildUploadDir))],
+            workdir=self.absMozillaObjDir,
+            description=['upload', 'complete', 'snippet'],
+            haltOnFailure=True,
+        ))
+
+        # We only need to worry about empty snippets (and partials obviously)
+        # if we are creating partial patches on the slaves.
+        if self.createPartial:
+            self.addStep(ShellCommand(
+                name='upload_partial_snippet',
+                command=['scp', '-o', 'User=%s' % self.ausUser,
+                         '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
+                         'dist/update/partial.update.snippet',
+                         WithProperties('%s:%s/partial.txt' % (self.ausHost,
+                                                               ausPreviousBuildUploadDir))],
+                workdir=self.absMozillaObjDir,
+                description=['upload', 'partial', 'snippet'],
+                haltOnFailure=True,
+            ))
+            ausCurrentBuildUploadDir = "%s/%%(buildid)s/en-US" % \
+                                         self.ausFullUploadDir
+            self.addStep(ShellCommand(
+                name='create_aus_current_updir',
+                command=['bash', '-c',
+                         WithProperties('ssh -l %s ' %  self.ausUser +
+                                        '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
+                                        'mkdir -p %s' % ausCurrentBuildUploadDir)],
+                description=['create', 'aus', 'current', 'upload', 'dir'],
+                haltOnFailure=True,
+            ))
+            # Create remote empty complete/partial snippets for current build.
+            self.addStep(ShellCommand(
+                name='create_empty_snippets',
+                command=['bash', '-c',
+                         WithProperties('ssh -l %s ' %  self.ausUser +
+                                        '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
+                                        'touch %s/complete.txt %s/partial.txt' % (ausCurrentBuildUploadDir,
+                                                                                  ausCurrentBuildUploadDir))],
+                description=['create', 'empty', 'snippets'],
+                haltOnFailure=True,
+            ))
 
     def doUpload(self):
         uploadEnv = self.env.copy()
@@ -1313,14 +1635,15 @@ class NightlyBuildFactory(MercurialBuildFactory):
              description=["upload"]
             )
         else:
-            self.addStep(SetProperty,
-             command=['make', 'upload'],
-             env=uploadEnv,
-             workdir='build/%s' % self.objdir,
-             extract_fn = get_url,
-             haltOnFailure=True,
-             description=["upload"]
-            )
+            self.addStep(SetProperty(
+                name='make_upload',
+                command=['make', 'upload'],
+                env=uploadEnv,
+                workdir=self.absMozillaObjDir,
+                extract_fn = get_url,
+                haltOnFailure=True,
+                description=['make', 'upload'],
+            ))
 
         talosBranch = "%s-%s" % (self.branchName, self.platform)
         for master, warn in self.talosMasters:
@@ -1354,10 +1677,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
                   branch=branch,
                   revision=WithProperties("%(got_revision)s"),
                   files=[WithProperties('%(packageUrl)s')],
-                  user='sendchange-geriatric',)
+                  user='sendchange-geriatric')
                 )
               
-            
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
@@ -1370,7 +1692,6 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         NightlyBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
-
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
@@ -1444,6 +1765,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             return {'packageUrl': ''}
 
         self.addStep(SetProperty,
+         name='make_upload',
          command=['make', 'upload'],
          env=uploadEnv,
          workdir='build/%s' % self.objdir,
@@ -1536,13 +1858,14 @@ class BaseRepackFactory(MozillaBuildFactory):
                  stageServer, stageUsername, stageSshKey=None,
                  env={}, objdir='', platform='',
                  mozconfig=None, configRepoPath=None, configSubDir=None,
-                 baseWorkDir='build', tree="notset", mozillaDir=None,
-                 l10nTag='default', mergeLocales=True, **kwargs):
+                 tree="notset", mozillaDir=None, l10nTag='default',
+                 mergeLocales=True, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.env = env.copy()
         self.platform = platform
         self.project = project
+        self.productName = project
         self.appName = appName
         self.l10nRepoPath = l10nRepoPath
         self.l10nTag = l10nTag
@@ -1570,9 +1893,6 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=True
         ))
 
-        # Needed for scratchbox
-        self.baseWorkDir = baseWorkDir
-
         self.origSrcDir = self.branchName
 
         # Mozilla subdir
@@ -1586,6 +1906,18 @@ class BaseRepackFactory(MozillaBuildFactory):
         # self.mozillaObjdir is used in SeaMonkey's and Thunderbird's case
         self.objdir = objdir or self.origSrcDir
         self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+
+        # These following variables are useful for sharing build steps (e.g.
+        # update generation) from classes that use object dirs (e.g. nightly
+        # repacks).
+        # 
+        # We also concatenate the baseWorkDir at the outset to avoid having to
+        # do that everywhere.
+        self.absMozillaSrcDir = "%s/%s" % (self.baseWorkDir, self.mozillaSrcDir)
+        self.absMozillaObjDir = '%s/%s' % (self.baseWorkDir, self.mozillaObjdir)
+
+        self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
+                         '/nightly/latest-%s-l10n' % self.branchName
         
         if objdir != '':
             # L10NBASEDIR is relative to MOZ_OBJDIR
@@ -1773,7 +2105,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                          'hg -R %(locale)s pull -r default ; ' +
                          'else ' +
                          'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.l10nRepoPath+\
+                         'http://'+self.hgHost+'/'+self.l10nRepoPath+ 
                            '/%(locale)s/ ; ' +
                          'fi ' +
                          '&& hg -R %(locale)s update -r %(l10n_revision)s')],
@@ -1955,20 +2287,24 @@ class CCBaseRepackFactory(BaseRepackFactory):
          timeout=60*60 # 1 hour
         )
 
-class NightlyRepackFactory(BaseRepackFactory):
+class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     extraConfigureArgs = []
     
     def __init__(self, enUSBinaryURL, nightly=False, env={},
                  ausBaseUploadDir=None, updatePlatform=None,
-                 downloadBaseURL=None, ausUser=None, ausHost=None,
-                 l10nNightlyUpdate=False, l10nDatedDirs=False, **kwargs):
+                 downloadBaseURL=None, ausUser=None, ausSshKey=None,
+                 ausHost=None, l10nNightlyUpdate=False, l10nDatedDirs=False,
+                 createPartial=False, **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
         self.ausUser = ausUser
+        self.ausSshKey = ausSshKey
         self.ausHost = ausHost
+        self.createPartial = createPartial
+        self.geriatricMasters = []
 
         env.update({'EN_US_BINARY_URL':enUSBinaryURL})
 
@@ -2012,19 +2348,34 @@ class NightlyRepackFactory(BaseRepackFactory):
 
 
         BaseRepackFactory.__init__(self, env=env, **kwargs)
+
         if l10nNightlyUpdate:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
-            assert ausUser and ausHost
+            assert ausUser and ausSshKey and ausHost
 
-            # this is a tad ugly because we need to python interpolation
-            # as well as WithProperties
-            # here's an example of what it translates to:
-            # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/fr
-            self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
-              (self.ausBaseUploadDir, self.updatePlatform)
-            self.env.update({'FILE_BRANCH': self.branchName})
-            self.createNightlySnippet()
-            self.uploadSnippet()
+            # To preserve existing behavior, we need to set the
+            # ausFullUploadDir differently for when we are create all the
+            # mars (complete+partial) ourselves.
+            if self.createPartial:
+                # e.g.:
+                # /opt/aus2/incoming/2/Firefox/mozilla-central/WINNT_x86-msvc
+                self.ausFullUploadDir = '%s/%s' % (self.ausBaseUploadDir,
+                                                   self.updatePlatform)
+            else:
+                # this is a tad ugly because we need python interpolation
+                # as well as WithProperties, e.g.:
+                # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/en-US
+                self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
+                  (self.ausBaseUploadDir, self.updatePlatform)
+            NightlyBuildFactory.addCreateSnippetsSteps(self)
+            NightlyBuildFactory.addUploadSnippetsSteps(self)
+
+    def getPreviousBuildUploadDir(self):
+        if self.createPartial:
+            return "%s/%%(previous_buildid)s/%%(locale)s" % \
+                                         self.ausFullUploadDir
+        else:
+            return self.ausFullUploadDir
 
     def updateSources(self):
         self.addStep(ShellCommand,
@@ -2081,6 +2432,27 @@ class NightlyRepackFactory(BaseRepackFactory):
         self.tinderboxPrint('fx_revision',WithProperties('%(fx_revision)s'))
         self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
 
+    def makePartialTools(self):
+        # Build the tools we need for update-packaging, specifically bsdiff.
+        # Configure can take a while.
+        self.addStep(ShellCommand(
+            name='make_bsdiff',
+            command=['sh', '-c',
+                     'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
+                     'make -C nsprpub; make -C config;' +
+                     'make -C modules/libmar; make -C modules/libbz2;' +
+                     'make -C other-licenses/bsdiff;'
+                     'fi'],
+            description=['make', 'bsdiff'],
+            workdir=self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+
+    # The parent class gets us most of the way there, we just need to add the
+    # locale.
+    def getCompleteMarPatternMatch(self):
+        return '.%(locale)s.' + NightlyBuildFactory.getCompleteMarPatternMatch(self)
+
     def doRepack(self):
         # wince needs this step for nsprpub to succeed
         if self.platform is 'wince':
@@ -2101,6 +2473,7 @@ class NightlyRepackFactory(BaseRepackFactory):
         if self.l10nNightlyUpdate:
             # Because we're generating updates we need to build the libmar tools
             self.addStep(ShellCommand,
+             name='make_libmar',
              command=['make'],
              workdir='%s/%s/modules/libmar' % (self.baseWorkDir, self.mozillaObjdir),
              description=['make', 'modules/libmar'],
@@ -2115,34 +2488,51 @@ class NightlyRepackFactory(BaseRepackFactory):
          description=['make','installers'],
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
         )
+        self.addStep(FindFile(
+            name='find_inipath',
+            filename='application.ini',
+            directory='dist/l10n-stage',
+            filetype='file',
+            max_depth=5,
+            property_name='inipath',
+            workdir=self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        self.addStep(SetProperty(
+            command=['python', 'config/printconfigsetting.py',
+                     WithProperties('%(inipath)s'),
+                     'App', 'BuildID'],
+            property='buildid',
+            name='get_build_id',
+            workdir=self.absMozillaSrcDir,
+        ))
+        if self.l10nNightlyUpdate:
+            # We need the appVersion to create snippets
+            self.addStep(SetProperty(
+                command=['python', 'config/printconfigsetting.py',
+                         WithProperties('%(inipath)s'),
+                         'App', 'Version'],
+                property='appVersion',
+                name='get_app_version',
+                workdir=self.absMozillaSrcDir,
+            ))
+            self.addFilePropertiesSteps(filename='*.complete.mar',
+                                        directory='%s/dist/update' % self.absMozillaSrcDir,
+                                        fileType='completeMar',
+                                        haltOnFailure=True)
 
-    def createNightlySnippet(self):
-        self.addStep(ShellCommand,
-         name='make_locale_snippet',
-         command=['sh','-c',
-                  WithProperties('make generate-snippet-%(locale)s')],
-         env = self.env,
-         haltOnFailure=True,
-         description=['make','snippet'],
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
-        )
+        # Remove the source (en-US) package so as not to confuse later steps
+        # that look up build details.
+        self.addStep(ShellCommand(name='rm_en-US_build',
+                                  command=['bash', '-c', 'rm -rvf *.en-US.*'],
+                                  description=['remove','en-US','build'],
+                                  env=self.env,
+                                  workdir='%s/dist' % self.absMozillaObjDir,
+                                  haltOnFailure=True)
+         )
+        if self.l10nNightlyUpdate and self.createPartial:
+            self.addCreatePartialUpdateSteps(extraArgs=[WithProperties('AB_CD=%(locale)s')])
 
-    def uploadSnippet(self):
-        self.addStep(ShellCommand,
-         command=['ssh', '-l', self.ausUser, self.ausHost,
-                  WithProperties('mkdir -p %s' % self.ausFullUploadDir)],
-         description=['create', 'aus', 'upload', 'dir'],
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         command=['scp', '-o', 'User=%s' % self.ausUser,
-                  'dist/update/complete.update.snippet',
-                  WithProperties('%s:%s/complete.txt' % \
-                    (self.ausHost, self.ausFullUploadDir))],
-         workdir='build/%s' % self.mozillaObjdir,
-         description=['upload', 'complete', 'snippet'],
-         haltOnFailure=True
-        )
 
 class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
@@ -2737,7 +3127,6 @@ class ReleaseTaggingFactory(ReleaseFactory):
             )
 
 
-
 class SingleSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
@@ -3052,10 +3441,11 @@ class CCSourceFactory(ReleaseFactory):
 
 class ReleaseUpdatesFactory(ReleaseFactory):
     def __init__(self, cvsroot, patcherToolsTag, patcherConfig, verifyConfigs,
-                 appName, productName, version, appVersion, baseTag,
-                 buildNumber, oldVersion, oldAppVersion, oldBaseTag,
-                 oldBuildNumber, ftpServer, bouncerServer, stagingServer,
-                 useBetaChannel, stageUsername, stageSshKey, ausUser, ausHost,
+                 appName, productName,
+                 version, appVersion, baseTag, buildNumber,
+                 oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
+                 ftpServer, bouncerServer, stagingServer, useBetaChannel,
+                 stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
                  ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=14, triggerSchedulers=None, **kwargs):
@@ -3102,6 +3492,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.ausUser = ausUser
+        self.ausSshKey = ausSshKey
         self.ausHost = ausHost
         self.ausServerUrl = ausServerUrl
         self.hgSshKey = hgSshKey
@@ -3342,20 +3733,24 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 remoteDir = remoteDir + '-%s' % type
             snippetDir = '/opt/aus2/snippets/staging/%s' % remoteDir
 
-            self.addStep(ShellCommand(
-             name='upload_snipets',
-             command=['rsync', '-av', localDir + '/',
+            self.addStep(ShellCommand,
+             name='upload_snippets',
+             command=['rsync', '-av',
+                      '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.ausSshKey,
+                      localDir + '/',
                       '%s@%s:%s' % (self.ausUser, self.ausHost, snippetDir)],
              workdir=self.updateDir,
              description=['upload', '%s snippets' % type],
              haltOnFailure=True
-            ))
+            )
 
             # We only push test channel snippets from automation.
             if type == 'test':
                 self.addStep(ShellCommand(
                  name='backupsnip',
-                 command=['ssh', '-l', self.ausUser, self.ausHost,
+                 command=['bash', '-c',
+                          'ssh -l %s ' %  self.ausUser +
+                          '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
                           '~/bin/backupsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
                  description=['backupsnip'],
@@ -3363,7 +3758,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 ))
                 self.addStep(ShellCommand(
                  name='pushsnip',
-                 command=['ssh', '-l', self.ausUser, self.ausHost,
+                 command=['bash', '-c',
+                          'ssh -l %s ' %  self.ausUser +
+                          '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
                           '~/bin/pushsnip %s' % remoteDir],
                  timeout=3600, # 1 hour
                  description=['pushsnip'],
@@ -3485,7 +3882,6 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                                    self.version)
 
 
-
 class UpdateVerifyFactory(ReleaseFactory):
     def __init__(self, verifyConfig, buildSpace=.3, **kwargs):
         ReleaseFactory.__init__(self, repoPath='nothing',
@@ -3495,6 +3891,7 @@ class UpdateVerifyFactory(ReleaseFactory):
          workdir='tools/release/updates',
          description=['./verify.sh', verifyConfig]
         )
+
 
 class ReleaseFinalVerification(ReleaseFactory):
     def __init__(self, verifyConfigs, **kwargs):
@@ -3509,6 +3906,7 @@ class ReleaseFinalVerification(ReleaseFactory):
          description=['final-verification.sh'],
          workdir='tools/release'
         )
+
 
 class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
@@ -3630,17 +4028,13 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.doUpload()
 
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths.
         if self.platform == 'win32':
             self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd -W'],
-             property='toolsdir',
-             workdir='tools'
-            )
-        else:
-            self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd'],
-             property='toolsdir',
-             workdir='tools'
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
             )
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
@@ -3697,6 +4091,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                     return {'packageUrl': m.group(1)}
                 return {}
             self.addStep(SetProperty,
+             name='make_upload',
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
@@ -4033,6 +4428,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                     return {'packageUrl': m.group(1)}
                 return {}
             self.addStep(SetProperty,
+             name='make_upload',
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
@@ -4052,17 +4448,13 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  user="sendchange-unittest")
                 )
 
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths.
         if self.platform == 'win32':
             self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd -W'],
-             property='toolsdir',
-             workdir='tools'
-            )
-        else:
-            self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd'],
-             property='toolsdir',
-             workdir='tools'
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
             )
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
@@ -4978,7 +5370,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                          'hg -R '+locale+' pull -r '+self.l10nTag+' ; ' +
                          'else ' +
                          'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.l10nRepoPath+\
+                         'http://'+self.hgHost+'/'+self.l10nRepoPath+
                            '/'+locale+'/ ; ' +
                          'hg -R '+locale+' up -r '+self.l10nTag+' ; '
                          'fi ')],
@@ -5132,7 +5524,7 @@ class WinmoBuildFactory(MobileBuildFactory):
             # this is a tad ugly because we need to python interpolation
             # as well as WithProperties
             # here's an example of what it translates to:
-            # /opt/aus2/build/0/Firefox/mozilla2/WINNT_x86-msvc/2008010103/en-US
+            # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/en-US
             self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
               (self.ausBaseUploadDir, self.updatePlatform)
 
@@ -5243,11 +5635,12 @@ class WinmoBuildFactory(MobileBuildFactory):
             description=['getting', 'app', 'version'],
             descriptionDone=['got', 'app', 'version']
         ))
-        self.addStep(CreateCompleteUpdateSnippet,
+        self.addStep(CreateCompleteUpdateSnippet(
+            name='create_complete_update_snippet',
             objdir=self.objdirPath,
             milestone=self.baseUploadDir,
             baseurl='%s/nightly' % self.downloadBaseURL,
-            hashType=self.hashType
+            hashType=self.hashType)
         )
         self.addStep(ShellCommand,
             name='cat_complete_snippet',
@@ -5408,16 +5801,11 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          value=get_exedir,
         ))
 
-        # Set up the stack walker
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths for the stack walker.
         if self.platform == 'win32':
             self.addStep(SetProperty,
              command=['bash', '-c', 'pwd -W'],
-             property='toolsdir',
-             workdir='tools'
-            )
-        else:
-            self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd'],
              property='toolsdir',
              workdir='tools'
             )

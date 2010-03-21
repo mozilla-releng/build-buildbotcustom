@@ -8,11 +8,11 @@ from buildbot.status.builder import SUCCESS, FAILURE
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.transfer import _FileReader, StatusRemoteCommand
 
-
-class CreateCompleteUpdateSnippet(BuildStep):
-    def __init__(self, objdir, milestone, baseurl, hashType='sha512', 
-                 appendDatedDir=True):
-        BuildStep.__init__(self)
+class CreateUpdateSnippet(BuildStep):
+    def __init__(self, objdir, milestone, baseurl, appendDatedDir=True,
+                 snippetType='complete', hashType='sha512',
+                 name='create_update_snippet'):
+        BuildStep.__init__(self, name=name)
 
         self.addFactoryArguments(
           objdir=objdir,
@@ -27,6 +27,10 @@ class CreateCompleteUpdateSnippet(BuildStep):
         self.baseurl = baseurl
         self.hashType = hashType
         self.appendDatedDir = appendDatedDir
+        assert snippetType in ['complete', 'partial']
+        self.snippetType = snippetType
+        assert hashType in ['md5','sha1','sha256','sha384','sha512']
+        self.hashType = hashType
         self.maxsize = 16384
         self.mode = None
         self.blocksize = 4096
@@ -52,24 +56,25 @@ class CreateCompleteUpdateSnippet(BuildStep):
         downloadURL = self.baseurl + '/'
         if self.appendDatedDir:
             downloadURL += self._getDatedDirPath() + '/'
-        downloadURL += self.getProperty('completeMarFilename')
+        downloadURL += self.getProperty(self.snippetType + 'MarFilename')
 
         # type of update (partial vs complete)
-        snippet = "complete\n"
+        snippet = "version=1\n"
+        snippet += "type=%s\n" % self.snippetType
         # download URL
-        snippet += "%s\n" % (downloadURL)
+        snippet += "url=%s\n" % (downloadURL)
         # hash type
-        snippet += "%s\n" % (self.hashType)
+        snippet += "hashFunction=%s\n" % self.hashType
         # hash of mar
-        snippet += "%s\n" % self.getProperty('completeMarHash')
+        snippet += "hashValue=%s\n" % self.getProperty(self.snippetType + 'MarHash')
         # size (bytes) of mar
-        snippet += "%s\n" % self.getProperty('completeMarSize')
+        snippet += "size=%s\n" % self.getProperty(self.snippetType + 'MarSize')
         # buildid
-        snippet += "%s\n" % self.getProperty('buildid') # double check case
+        snippet += "build=%s\n" % self.getProperty('buildid') # double check case
         # app version
-        snippet += "%s\n" % self.getProperty('appVersion')
+        snippet += "appv=%s\n" % self.getProperty('appVersion')
         # extension version (same as app version)
-        snippet += "%s\n" % self.getProperty('appVersion')
+        snippet += "extv=%s\n" % self.getProperty('appVersion')
         return StringIO(snippet)
 
     def start(self):
@@ -83,17 +88,17 @@ class CreateCompleteUpdateSnippet(BuildStep):
         self.stdio_log = self.addLog("stdio")
         self.stdio_log.addStdout("Starting snippet generation\n")
 
-        d = self.makeComplete()
+        d = self.makeSnippet()
         d.addCallback(self.finished).addErrback(self.failed)
 
-    def makeComplete(self):
+    def makeSnippet(self):
         fp = self.generateSnippet()
         fileReader = _FileReader(fp)
 
-        self.completeSnippetFilename = 'complete.update.snippet'
+        self.snippetFilename = self.snippetType + '.update.snippet'
 
         args = {
-            'slavedest': self.completeSnippetFilename,
+            'slavedest': self.snippetFilename,
             'maxsize': self.maxsize,
             'reader': fileReader,
             'blocksize': self.blocksize,
@@ -101,8 +106,9 @@ class CreateCompleteUpdateSnippet(BuildStep):
             'mode': self.mode
         }
 
-        msg = "Generating complete update in: %s/%s\n" % (self.updateDir,
-          self.completeSnippetFilename)
+        msg = "Generating %s update in: %s/%s\n" % (self.snippetType,
+                                                    self.updateDir,
+                                                    self.snippetFilename)
         self.stdio_log.addStdout(msg)
 
         self.cmd = StatusRemoteCommand('downloadFile', args)
@@ -110,7 +116,7 @@ class CreateCompleteUpdateSnippet(BuildStep):
         return d.addErrback(self.failed)
 
     def finished(self, result):
-        self.step_status.setText(['create', 'snippet'])
+        self.step_status.setText(['create', self.snippetType, 'snippet'])
         if self.cmd.stderr != '':
             self.addCompleteLog('stderr', self.cmd.stderr)
 
@@ -118,8 +124,18 @@ class CreateCompleteUpdateSnippet(BuildStep):
 
         if self.cmd.rc is None or self.cmd.rc == 0:
             # Other BuildSteps will probably want this data.
-            self.setProperty('completeSnippetFilename',
-              path.join(self.updateDir, self.completeSnippetFilename))
+            self.setProperty(self.snippetType + 'snippetFilename',
+              path.join(self.updateDir, self.snippetFilename))
 
             return BuildStep.finished(self, SUCCESS)
         return BuildStep.finished(self, FAILURE)
+
+
+class CreateCompleteUpdateSnippet(CreateUpdateSnippet):
+    def __init__(self, **kwargs):
+        CreateUpdateSnippet.__init__(self, snippetType='complete', **kwargs)
+        
+
+class CreatePartialUpdateSnippet(CreateUpdateSnippet):
+    def __init__(self, **kwargs):
+        CreateUpdateSnippet.__init__(self, snippetType='partial', **kwargs)
