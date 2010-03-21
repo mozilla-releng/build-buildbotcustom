@@ -1029,11 +1029,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir='build%s' % self.mozillaDir
         )
 
-    def addCreateSnippetsSteps(self):
+    def addCreateSnippetsSteps(self, milestone_extra=''):
+        milestone = self.branchName + milestone_extra
         self.addStep(CreateCompleteUpdateSnippet(
             name='create_complete_snippet',
             objdir=self.absMozillaObjDir,
-            milestone=self.branchName,
+            milestone=milestone,
             baseurl='%s/nightly' % self.downloadBaseURL,
             hashType=self.hashType,
         ))
@@ -1496,13 +1497,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
         if self.createPartial:
             self.addCreatePartialUpdateSteps()
 
-    def addCreateSnippetsSteps(self):
-        MercurialBuildFactory.addCreateSnippetsSteps(self)
+    def addCreateSnippetsSteps(self, milestone_extra=''):
+        MercurialBuildFactory.addCreateSnippetsSteps(self, milestone_extra)
+        milestone = self.branchName + milestone_extra
         if self.createPartial:
             self.addStep(CreatePartialUpdateSnippet(
                 name='create_partial_snippet',
                 objdir=self.absMozillaObjDir,
-                milestone=self.branchName,
+                milestone=milestone,
                 baseurl='%s/nightly' % self.downloadBaseURL,
                 hashType=self.hashType,
             ))
@@ -2367,7 +2369,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                 # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/en-US
                 self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
                   (self.ausBaseUploadDir, self.updatePlatform)
-            NightlyBuildFactory.addCreateSnippetsSteps(self)
+            NightlyBuildFactory.addCreateSnippetsSteps(self,
+                                                       milestone_extra='-l10n')
             NightlyBuildFactory.addUploadSnippetsSteps(self)
 
     def getPreviousBuildUploadDir(self):
