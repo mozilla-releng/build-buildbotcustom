@@ -1457,6 +1457,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                            'tools/update-packaging', 'partial-patch',
                            'STAGE_DIR=../../dist/update',
                            'SRC_BUILD=../../previous',
+                           WithProperties('SRC_BUILD_ID=%(previous_buildid)s'),
                            'DST_BUILD=../../current',
                            WithProperties('DST_BUILD_ID=%(buildid)s')]
         if extraArgs is not None:
