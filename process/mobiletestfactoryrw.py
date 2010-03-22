@@ -377,7 +377,7 @@ class MobileUnittestFactory(MobileTalosFactory):
         ))
         self.addStep(ShellCommand(
             command=['wget',
-                     WithProperties("%(download_dir)s/xulrunner-%(milestone)s.multi.linux-gnueabi-arm.tests.tar.bz2"),
+                     WithProperties("%(download_dir)s/xulrunner-%(milestone)s.en-US.linux-gnueabi-arm.tests.tar.bz2"),
                      '-O', 'xulrunner-tests.tar.bz2'],
             workdir=self.base_dir,
             haltOnFailure=True,
