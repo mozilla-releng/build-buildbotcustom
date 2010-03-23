@@ -1635,7 +1635,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
              workdir='build',
              extract_fn = get_url,
              haltOnFailure=True,
-             description=["upload"]
+             description=["upload"],
+             timeout=60*60 # 60 minutes
             )
         else:
             self.addStep(SetProperty(
@@ -1774,7 +1775,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          workdir='build/%s' % self.objdir,
          extract_fn = get_url,
          haltOnFailure=True,
-         description=['upload']
+         description=['upload'],
+         timeout=60*60 # 60 minutes
         )
 
         # Send to the "release" branch on talos, it will do
@@ -4101,7 +4103,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = get_url,
              haltOnFailure=True,
-             description=['upload']
+             description=['upload'],
+             timeout=60*60 # 60 minutes
             )
 
             for master, warn, retries in self.unittestMasters:
@@ -4438,7 +4441,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = get_url,
              haltOnFailure=True,
-             description=['upload']
+             description=['upload'],
+             timeout=60*60 # 60 minutes
             )
 
             for master, warn, retries in self.unittestMasters:
