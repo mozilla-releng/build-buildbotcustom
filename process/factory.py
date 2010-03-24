@@ -1581,13 +1581,16 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 haltOnFailure=True,
             ))
             # Create remote empty complete/partial snippets for current build.
+            # Also touch the remote platform dir to defeat NFS caching on the
+            # AUS webheads.
             self.addStep(ShellCommand(
                 name='create_empty_snippets',
                 command=['bash', '-c',
                          WithProperties('ssh -l %s ' %  self.ausUser +
                                         '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
-                                        'touch %s/complete.txt %s/partial.txt' % (ausCurrentBuildUploadDir,
-                                                                                  ausCurrentBuildUploadDir))],
+                                        'touch %s/complete.txt %s/partial.txt %s' % (ausCurrentBuildUploadDir,
+                                                                                     ausCurrentBuildUploadDir,
+                                                                                     self.ausFullUploadDir))],
                 description=['create', 'empty', 'snippets'],
                 haltOnFailure=True,
             ))
