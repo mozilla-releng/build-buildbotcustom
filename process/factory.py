@@ -4032,7 +4032,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStepNoEnv(Mercurial, 
+        self.addStep(Mercurial,
          name='hg_update',
          mode='update',
          baseURL='http://%s/' % self.hgHost,
@@ -4185,13 +4185,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
          data=['TinderboxPrint:', WithProperties(changesetLink)],
         ))
 
-    def addStep(self, *args, **kw):
-        kw.setdefault('env', self.env)
-        return BuildFactory.addStep(self, *args, **kw)
-
-    def addStepNoEnv(self, *args, **kw):
-        return BuildFactory.addStep(self, *args, **kw)
-
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/unittest' % self.branchName,
@@ -4241,7 +4234,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
              name='get_build_id',
              objdir=self.objdir,
             )
-            self.addStepNoEnv(SetBuildProperty,
+            self.addStep(SetBuildProperty,
              property_name="who",
              value=lambda build:build.source.changes[0].who,
              haltOnFailure=True
@@ -4380,7 +4373,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStepNoEnv(Mercurial, mode='update',
+        self.addStep(Mercurial, mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          alwaysUseLatest=True,
@@ -4389,7 +4382,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         self.addPrintChangesetStep()
 
-        self.addStepNoEnv(ShellCommand,
+        self.addStep(ShellCommand,
          name='checkout_client.py',
          command=['python', 'client.py', 'checkout',
                   '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)],
@@ -4599,9 +4592,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
     def addStep(self, *args, **kw):
         kw.setdefault('env', self.env)
-        return BuildFactory.addStep(self, *args, **kw)
-
-    def addStepNoEnv(self, *args, **kw):
         return BuildFactory.addStep(self, *args, **kw)
 
     def addCopyMozconfigStep(self):
@@ -5710,11 +5700,16 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          value=get_exedir,
         ))
 
-        # Need to override toolsdir as set by MozillaBuildFactory because
-        # we need Windows-style paths for the stack walker.
+        # Set up the stack walker
         if self.platform == 'win32':
             self.addStep(SetProperty,
              command=['bash', '-c', 'pwd -W'],
+             property='toolsdir',
+             workdir='tools'
+            )
+        else:
+            self.addStep(SetProperty,
+             command=['bash', '-c', 'pwd'],
              property='toolsdir',
              workdir='tools'
             )

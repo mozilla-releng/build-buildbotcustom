@@ -54,7 +54,7 @@ from twisted.internet import defer, reactor
 from buildbot import interfaces
 from buildbot.changes import changes
 from buildbot.sourcestamp import SourceStamp
-from buildbot.test.runutils import RunMixin
+from buildbot.broken_test.runutils import RunMixin
 
 class BuildTestCase(RunMixin, unittest.TestCase):
   """Base class that defines a few callbacks to be used by test cases.

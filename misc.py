@@ -34,9 +34,8 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
   TryUnittestBuildFactory
-from buildbotcustom.scheduler import MozScheduler, NoMergeScheduler, \
-  MultiScheduler, NoMergeMultiScheduler
-from buildbotcustom.l10n import NightlyL10n
+from buildbotcustom.scheduler import MultiScheduler
+from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup
 from buildbot.status.mail import MailNotifier
 from buildbotcustom.status.generators import buildTryCompleteMessage
@@ -100,6 +99,13 @@ def isHgPollerTriggered(change, hgUrl):
         return True
     return False
 
+def isImportantL10nFile(change, l10nModules):
+    for f in change.files:
+        for basepath in l10nModules:
+            if f.startswith(basepath):
+                return True
+    return False
+
 def generateTestBuilderNames(name_prefix, suites_name, suites):
     test_builders = []
     if isinstance(suites, dict) and "totalChunks" in suites:
@@ -133,9 +139,14 @@ def _partitionSlaves(slaves):
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so
     # examine it backwards
-    for build in reversed(builder.builder_status.buildCache):
-        if build.slavename == slavename:
-            return build.finished
+    buildNumbers = reversed(sorted(builder.builder_status.buildCache.keys()))
+    for buildNumber in buildNumbers:
+        try:
+            build = builder.builder_status.buildCache[buildNumber]
+            if build.slavename == slavename:
+                return build.finished
+        except KeyError:
+            continue
     return None
 
 def _recentSort(builder):
@@ -180,6 +191,12 @@ def _nextFastSlave(builder, available_slaves):
         log.msg("Error choosing next fast slave for builder '%s', choosing randomly instead" % builder.name)
         log.err()
         return random.choice(available_slaves)
+
+nomergeBuilders = []
+def mergeRequests(builder, req1, req2):
+    if builder.name in nomergeBuilders:
+        return False
+    return req1.canBeMergedWith(req2)
 
 def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
         suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold, slaves=None):
@@ -327,7 +344,7 @@ def generateBranchObjects(config, name):
     xulrunnerNightlyBuilders = []
     debugBuilders = []
     weeklyBuilders = []
-    # These dicts provides mapping between en-US dep and  nightly scheduler names
+    # These dicts provides mapping between en-US dep and nightly scheduler names
     # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
     l10nBuilders = {}
     l10nNightlyBuilders = {}
@@ -350,7 +367,7 @@ def generateBranchObjects(config, name):
         else:
             builders.append('%s build' % base_name)
 
-        #Fill the l10n dep dict
+        # Fill the l10n dep dict
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
                 l10nBuilders[base_name] = {}
@@ -446,13 +463,13 @@ def generateBranchObjects(config, name):
             mode="all",
             sendToInterestedUsers=True,
             lookup=MercurialEmailLookup(),
-            customMesg=lambda attrs: buildTryCompleteMessage(attrs, 
-            	'/'.join([packageUrl, packageDir]), config['tinderbox_url']),
+            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
+                '/'.join([packageUrl, packageDir]), config['tinderbox_url']),
             subject="Try Server: %(result)s on %(builder)s",
             relayhost="mail.build.mozilla.org",
             builders=notify_builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'), 
-            	"References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'),
+                "References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
         ))
 
     if config['enable_l10n']:
@@ -465,6 +482,7 @@ def generateBranchObjects(config, name):
         if l10n_binaryURL.endswith('/'):
             l10n_binaryURL = l10n_binaryURL[:-1]
         l10n_binaryURL += "-l10n"
+        nomergeBuilders.extend(l10n_builders)
 
         # This notifies all l10n related build objects to Mozilla-l10n
         branchObjects['status'].append(TinderboxMailNotifier(
@@ -507,28 +525,41 @@ def generateBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
-    extra_args = {}
-    if config.get('enable_merging', True):
-        schedulerClass = MozScheduler
-        extra_args['idleTimeout'] = config.get('idle_timeout', None)
-    else:
-        schedulerClass = NoMergeScheduler
+    if not config.get('enable_merging', True):
+        nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
 
-    branchObjects['schedulers'].append(schedulerClass(
+    branchObjects['schedulers'].append(Scheduler(
         name=name,
         branch=config['repo_path'],
         treeStableTimer=3*60,
         builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
-        **extra_args
     ))
+
+    if config['enable_l10n']:
+        l10n_builders = []
+        for b in l10nBuilders:
+            l10n_builders.append(l10nBuilders[b]['l10n_builder'])
+        # This L10n scheduler triggers only the builders of its own branch
+        branchObjects['schedulers'].append(Scheduler(
+            name="%s l10n" % name,
+            branch=config['l10n_repo_path'],
+            treeStableTimer=3*60,
+            builderNames=l10n_builders,
+            fileIsImportant=lambda c: isImportantL10nFile(c, config['l10n_modules']),
+            properties={
+                'app': 'browser',
+                'en_revision': 'default',
+                'l10n_revision': 'default',
+                }
+        ))
+
 
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
         scheduler_name = scheduler_branch
         if not merge:
-            branchObjects['schedulers'].append(NoMergeScheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
-        else:
-            branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+            nomergeBuilders.extend(test_builders)
+        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
 
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="mozilla2.buildbot@build.mozilla.org",
@@ -555,13 +586,10 @@ def generateBranchObjects(config, name):
         if config['enable_l10n'] and config['enable_nightly'] and builder in l10nNightlyBuilders:
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
             platform = l10nNightlyBuilders[builder]['platform']
-            tree = l10nNightlyBuilders[builder]['tree']
-            branchObjects['schedulers'].append(NightlyL10n(
+            branchObjects['schedulers'].append(TriggerableL10n(
                                    name=l10n_builder,
                                    platform=platform,
-                                   tree=tree,
                                    builderNames=[l10n_builder],
-                                   repoType='hg',
                                    branch=config['repo_path'],
                                    baseTag='default',
                                    localesFile=config['allLocalesFile']
@@ -813,6 +841,7 @@ def generateBranchObjects(config, name):
                         'nextSlave': _nextSlowSlave,
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
+
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
@@ -1215,11 +1244,13 @@ def generateCCBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
-    branchObjects['schedulers'].append(MozScheduler(
+    mergeBuilds=config.get('enable_merging', True)
+    if not mergeBuilds:
+        nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
+    branchObjects['schedulers'].append(Scheduler(
         name=name,
         branch=config['repo_path'],
         treeStableTimer=3*60,
-        idleTimeout=config.get('idle_timeout', None),
         builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl'])
     ))
@@ -1227,9 +1258,10 @@ def generateCCBranchObjects(config, name):
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
         scheduler_name = scheduler_branch
         if not merge:
-            branchObjects['schedulers'].append(NoMergeScheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
-        else:
-            branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+            nomergeBuilders.extend(test_builders)
+        branchObjects['schedulers'].append(Scheduler(name=scheduler_name,
+            branch=scheduler_branch, builderNames=test_builders,
+            treeStableTimer=None))
 
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="comm.buildbot@build.mozilla.org",
@@ -1258,12 +1290,11 @@ def generateCCBranchObjects(config, name):
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
             platform = l10nNightlyBuilders[builder]['platform']
             tree = l10nNightlyBuilders[builder]['tree']
-            branchObjects['schedulers'].append(NightlyL10n(
+            branchObjects['schedulers'].append(TriggerableL10n(
                                    name=l10n_builder,
                                    platform=platform,
                                    tree=tree,
                                    builderNames=[l10n_builder],
-                                   repoType='hg',
                                    branch=config['repo_path'],
                                    baseTag='default',
                                    localesFile=config['allLocalesFile']
@@ -1739,16 +1770,15 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     'factory': factory,
                     'category': branch,
                 }
-                if merge:
-                    scheduler_class = MultiScheduler
-                else:
-                    scheduler_class = NoMergeMultiScheduler
-                s = scheduler_class(name='%s %s %s scheduler' % (branch, slave_platform, suite),
-                              branch='%s-%s' % (branch, platform),
-                              treeStableTimer=0,
-                              builderNames=[builder['name']],
-                              numberOfBuildsToTrigger=tests,
-                              )
+                if not merge:
+                    nomergeBuilders.append(builder['name'])
+                s = MultiScheduler(
+                        name='%s %s %s scheduler' % (branch, slave_platform, suite),
+                        branch='%s-%s' % (branch, platform),
+                        treeStableTimer=None,
+                        builderNames=[builder['name']],
+                        numberOfBuildsToTrigger=tests,
+                        )
                 branchObjects['schedulers'].append(s)
                 branchObjects['builders'].append(builder)
                 branch_builders.append(builder['name'])

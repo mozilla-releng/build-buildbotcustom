@@ -365,6 +365,7 @@ class SendChangeStep(BuildStep):
 class DownloadFile(ShellCommand):
     haltOnFailure = True
     name = "download"
+    description = ["download"]
 
     def __init__(self, url_fn, url_property=None, filename_property=None,
             ignore_certs=False, wget_args=None, **kwargs):
@@ -409,6 +410,8 @@ class DownloadFile(ShellCommand):
         return SUCCESS
 
 class UnpackFile(ShellCommand):
+    description = ["unpack"]
+
     def __init__(self, filename, scripts_dir=".", **kwargs):
         self.filename = filename
         self.scripts_dir = scripts_dir

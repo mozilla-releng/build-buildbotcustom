@@ -20,6 +20,7 @@
 #
 # Contributor(s):
 #	Axel Hecht <l10n@mozilla.com>
+#       Chris AtLee <catlee@mozilla.com>
 #
 # Alternatively, the contents of this file may be used under the terms of
 # either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -40,144 +41,174 @@
 The tests in this module use the helpers from utils to test
 the l10n build logic. For each scenario, a number of changes is
 fed to the system, and after the dummy builds are completed,
-both the buildbot status and the database are checked for 
+both the buildbot status and the database are checked for
 expected results.
 '''
 
-import utils
-from utils import Request
+from twisted.trial import unittest
+from twisted.internet import defer
 
-__all__ = ['L10nTest', 'EnTest', 'ChangeCoalescenceTest']
+from buildbot.broken_test.runutils import MasterMixin, StallMixin
+from buildbot.changes.changes import Change
 
-config = """
-import buildbotcustom.l10n
-import buildbotcustom.log
-buildbotcustom.log.init(scheduler = buildbotcustom.log.DEBUG,
-                        dispatcher = buildbotcustom.log.DEBUG)
+from buildbotcustom.l10n import ParseLocalesFile, L10nMixin
+from buildbotcustom.test.utils import startHTTPServer
 
-from buildbot.process import factory
-from buildbot.steps import dummy
+locales1 = """\
+en-US
+ja
+ja-JP-mac osx
+"""
+class TestLocales(unittest.TestCase):
+    def setUp(self):
+        self.server, self.port = startHTTPServer(locales1)
+
+    def tearDown(self):
+        self.server.server_close()
+
+    def testParseLocales(self):
+        self.failUnlessEqual(ParseLocalesFile(locales1),
+            {'en-US': [], 'ja': [], 'ja-JP-mac': ['osx']})
+
+    def testGetLocales(self):
+        l = L10nMixin('linux', repo='http://localhost:%s/' % self.port)
+        d = defer.maybeDeferred(l.getLocales)
+        def _check(locales):
+            self.failUnlessEqual(locales,
+                {'en-US': [], 'ja': [], 'ja-JP-mac': ['osx']})
+        d.addCallback(_check)
+        return d
+
+depend_config = """\
 from buildbot.buildslave import BuildSlave
-s = factory.s
-
-f = factory.BuildFactory([
-    s(dummy.Dummy, timeout=%(timeout)i),
-    ])
-
+from buildbot.steps import dummy
+from buildbot.process import factory
+from buildbot.config import BuilderConfig
+from buildbot.scheduler import Scheduler
 BuildmasterConfig = c = {}
+
 c['slaves'] = [BuildSlave('bot1', 'sekrit')]
-c['schedulers'] = []
-
-from buildbotcustom.l10n import Scheduler, L10nDispatcher, EnDispatcher
-
-s = Scheduler("l10n", "")
-c['schedulers'].append(s)
-
-paths = ['browser', 'toolkit']
-locales = ['af', 'ar']
-s.addDispatcher(L10nDispatcher(paths, 'HEAD', 'fx_tree'))
-s.addDispatcher(EnDispatcher(paths, 'HEAD', 'fx_tree', 'mozilla/'))
-s.locales['fx_tree'] = locales
-s.builders['fx_tree'] = ['dummy']
-s.apps['fx_tree'] = 'browser'
-
-c['builders'] = []
-c['builders'].append({'name': 'dummy', 'slavename': 'bot1',
-                      'builddir': 'dummy1', 'factory': f})
 c['slavePortnum'] = 0
+c['builders'] = []
+
+dummy_factory = factory.BuildFactory([dummy.Dummy(timeout=1)])
+c['builders'].append(BuilderConfig('dummy1', slavename='bot1', factory=dummy_factory))
+c['builders'].append(BuilderConfig('dummy2', slavename='bot1', factory=dummy_factory))
+
+locales = {'en-US': [],
+           'fr': ['linux'],
+           'es': ['osx'],
+           'en-GB': [],
+          }
+
+from buildbotcustom.l10n import DependentL10n
+s1 = Scheduler('upstream', None, None, ['dummy1'])
+s2 = DependentL10n('downstream', s1, ['dummy2'], 'linux', locales=locales)
+
+c['schedulers'] = [s1, s2]
+c['mergeRequests'] = lambda builder, req1, req2: False
 """
 
-testconfig = config
+class TestDependentL10n(MasterMixin, StallMixin, unittest.TestCase):
+    def testParse(self):
+        self.basedir = "l10n/dependent/parse"
+        self.create_master()
+        d = self.master.loadConfig(depend_config)
+        return d
 
-class L10nTest(utils.TimedChangesQueue):
-  """Test case to verify that a single l10n check-in actually
-  triggers a single l10n build.
-  
-  """
-  config = testconfig % dict(timeout=1)
-  requests = (
-    Request(when = 1200000000,
-            delay = 0,
-            branch = 'HEAD',
-            files = "l10n/af/browser/file"),
-  )
-  def allBuildsDone(self):
-    # buildbot data tests
-    #  None
-    # database tests
-    bs = self.status.getBuilder('dummy')
-    self.assertEquals(bs.nextBuildNumber, 1)
-    build = bs.getBuild(-1)
-    self.assertEquals(build.getProperty('locale'), 'af')
-    self.assertEquals(build.getProperty('app'), 'browser')
-    self.assertEquals(build.getChanges()[0].number, 1)
+    def testRun(self):
+        self.basedir = "l10n/dependent/run"
+        self.create_master()
+        d = self.master.loadConfig(depend_config)
 
+        d.addCallback(lambda ign: self.connectSlave(['dummy1', 'dummy2']))
 
-class EnTest(utils.TimedChangesQueue):
-  """Test case to verify that a single en-US check-in actually
-  triggers a single l10n build for all locales.
-  
-  """
-  config = testconfig % dict(timeout=1)
-  requests = (
-    Request(when = 1200000000,
-            delay = 0,
-            branch = 'HEAD',
-            files = "mozilla/browser/locales/en-US/file"),
-  )
-  def allBuildsDone(self):
-    """twisted callback running the tests"""
-    # buildbot data tests
-    #  None
-    # database tests
-    bs = self.status.getBuilder('dummy')
-    self.assertEquals(bs.nextBuildNumber, 2)
-    builds = [bs.getBuild(n) for n in xrange(2)]
-    locales = [b.getProperty('locale') for b in builds]
-    locales.sort()
-    self.assertEquals(locales, ['af', 'ar'])
-    self.assertEquals(builds[0].getProperty('app'), 'browser')
-    self.assertEquals(map(lambda c: c.number,
-                          builds[1].getChanges()),
-                      [1])
-    self.assertEquals(map(lambda c: c.number,
-                          builds[0].getChanges()),
-                      [1])
+        def _connected(ign):
+            c = Change("foo", [], "bar")
+            self.master.change_svc.addChange(c)
+        d.addCallback(_connected)
 
-# disable test, we're not coalescing builds right now
-#class ChangeCoalescenceTest(utils.TimedChangesQueue):
-class __Ignore:
-  '''Test case to verify that a single check-in to en-US, 
-  followed by a single check-in to one locale that wasn't built
-  yet actually merges the second check-in into the build queue.
-  Result should be first locale built against the first change,
-  and the second locale built against both the first and the
-  second change, and really just two builds.
-  '''
-  config = testconfig % dict(timeout=2)
-  requests = (
-    Request(when = 1200000000,
-            delay = 0,
-            branch = 'HEAD',
-            files = "mozilla/browser/locales/en-US/file"),
-    Request(when = 1200000001,
-            delay = 1,
-            files = "l10n/ar/browser/file"),
-  )
-  def allBuildsDone(self):
-    # buildbot data tests
-    builder = self.status.getBuilder('dummy')
-    build = builder.getBuildByNumber(0)
-    self.assertEquals(len(build.getChanges()), 1)
-    build = builder.getBuildByNumber(1)
-    self.assertEquals(len(build.getChanges()), 2)
-    self.assertEquals(Build.objects.count(), 2)
-    # database tests
-    builds = list(Build.objects.all())
-    self.assertEquals(builds[0].getProperty('app'), 'browser')
-    self.assertEquals(builds[0].getProperty('locale'), 'af')
-    self.assertEquals(builds[1].getProperty('locale'), 'ar')
-    self.assertEquals(list(builds[0].changes.values('id')),
-                      [dict(id = 1)])
-    self.assertEquals(list(builds[1].changes.values('id')),
-                      [dict(id = 1), dict(id = 2)])
+        d.addCallback(self.stall, 5)
+
+        def _check(ign):
+            # dummy1 should have one build
+            b = self.status.getBuilder('dummy1').getLastFinishedBuild()
+            self.failUnless(b)
+            self.failUnlessEqual(b.getNumber(), 0)
+
+            # dummy2 should have 2 builds (en-GB, fr, but not en-US or es)
+            # en-US doesn't need repacking, and es doesn't have linux
+            b = self.status.getBuilder('dummy2').getLastFinishedBuild()
+            self.failUnless(b)
+            self.failUnlessEqual(b.getNumber(), 1)
+
+        d.addCallback(_check)
+
+        return d
+
+trigger_config = """\
+from buildbot.buildslave import BuildSlave
+from buildbot.steps import dummy, trigger
+from buildbot.process import factory
+from buildbot.config import BuilderConfig
+from buildbot.scheduler import Scheduler
+BuildmasterConfig = c = {}
+
+c['slaves'] = [BuildSlave('bot1', 'sekrit')]
+c['slavePortnum'] = 0
+c['builders'] = []
+
+trigger_factory = factory.BuildFactory([trigger.Trigger(schedulerNames=['downstream'])])
+dummy_factory = factory.BuildFactory([dummy.Dummy(timeout=1)])
+c['builders'].append(BuilderConfig('dummy1', slavename='bot1', factory=trigger_factory))
+c['builders'].append(BuilderConfig('dummy2', slavename='bot1', factory=dummy_factory))
+
+locales = {'en-US': [],
+           'fr': ['linux'],
+           'es': ['osx'],
+           'en-GB': [],
+          }
+
+from buildbotcustom.l10n import TriggerableL10n
+s1 = Scheduler('upstream', None, None, ['dummy1'])
+s2 = TriggerableL10n('downstream', ['dummy2'], 'linux', locales=locales)
+
+c['schedulers'] = [s1, s2]
+c['mergeRequests'] = lambda builder, req1, req2: False
+"""
+class TestTriggerableL10n(MasterMixin, StallMixin, unittest.TestCase):
+    def testParse(self):
+        self.basedir = "l10n/triggerable/parse"
+        self.create_master()
+        d = self.master.loadConfig(trigger_config)
+        return d
+
+    def testRun(self):
+        self.basedir = "l10n/triggerable/run"
+        self.create_master()
+        d = self.master.loadConfig(trigger_config)
+
+        d.addCallback(lambda ign: self.connectSlave(['dummy1', 'dummy2']))
+
+        def _connected(ign):
+            c = Change("foo", [], "bar")
+            self.master.change_svc.addChange(c)
+        d.addCallback(_connected)
+
+        d.addCallback(self.stall, 5)
+
+        def _check(ign):
+            # dummy1 should have one build
+            b = self.status.getBuilder('dummy1').getLastFinishedBuild()
+            self.failUnless(b)
+            self.failUnlessEqual(b.getNumber(), 0)
+
+            # dummy2 should have 2 builds (en-GB, fr, but not en-US or es)
+            # en-US doesn't need repacking, and es doesn't have linux
+            b = self.status.getBuilder('dummy2').getLastFinishedBuild()
+            self.failUnless(b)
+            self.failUnlessEqual(b.getNumber(), 1)
+
+        d.addCallback(_check)
+
+        return d
