@@ -14,7 +14,7 @@ reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.tryserver)
 
 from buildbotcustom.process.factory import MercurialBuildFactory, \
-  WinmoBuildFactory, MaemoBuildFactory
+  MaemoBuildFactory
 from buildbotcustom.steps.misc import SendChangeStep
 from buildbotcustom.steps.tryserver import MozillaTryProcessing, \
   MozillaDownloadMozconfig, MozillaPatchDownload, MozillaTryServerHgClone, \
@@ -254,109 +254,3 @@ class MaemoTryBuildFactory(MaemoBuildFactory):
                                      self.baseWorkDir, self.slavesrcdir),
             description=['move', 'globs', 'to', 'upload', 'directory'],
             workdir=self.objdirAbsPath)
-
-
-class WinmoTryBuildFactory(WinmoBuildFactory):
-    def __init__(self, scp_string=None, targetSubDir='winmo',
-                 slavesrcdir='upload', baseWorkDir=None, objdir=None,
-                 **kwargs):
-        assert(baseWorkDir, objdir)
-        self.scp_string = scp_string
-        self.targetSubDir=targetSubDir
-        self.slavesrcdir=slavesrcdir
-        WinmoBuildFactory.__init__(self,
-                                   objdirPath='%s/%s' % (baseWorkDir, objdir),
-                                   baseWorkDir=baseWorkDir, objdir=objdir,
-                                   **kwargs)
-
-    def getMozconfig(self):
-        self.addStep(MozillaDownloadMozconfig, mastersrc="mozconfig-winmo",
-                                               patchDir="patches/",
-                                               workdir=self.baseWorkDir)
-
-    def addPreCleanSteps(self):
-        self.addStep(MozillaTryProcessing)
-        self.addStep(ShellCommand,
-            name="pacify rmdir",
-            description="Pacify rmdir",
-            descriptionDone="Pacified rmdir",
-            command=["bash", "-c",
-                     "if [ ! -d %(base)s ]; then mkdir -v %(base)s; fi" %
-                        {'base': self.baseWorkDir}],
-            workdir="."
-        )
-        self.addStep(ShellCommand,
-            name="remove source and obj dirs",
-            command=["rmdir", "/s", "/q", "%s" % self.baseWorkDir],
-            haltOnFailure=True,
-            flunkOnFailure=True,
-            workdir=".",
-            timeout=60*60, # 1 hour
-        )
-        
-    def addBaseRepoSteps(self):
-        self.addStep(MozillaTryServerHgClone, workdir=self.baseWorkDir)
-        self.addHgPullSteps(repository=self.mobileRepository,
-                            workdir=self.baseWorkDir,
-                            changesetLink=self.mobileChangesetLink,
-                            targetDirectory='mobile')
-
-    def addPreBuildSteps(self):
-        self.addStep(MozillaPatchDownload,
-            patchDir="patches/",
-            haltOnFailure=False,
-            flunkOnFailure=True,
-            workdir=self.baseWorkDir,
-            isOptional=True,
-        )
-        self.addStep(MozillaCustomPatch,
-            workdir=self.baseWorkDir,
-            haltOnFailure=True,
-            flunkOnFailure=True,
-            isOptional=True
-        )
-        self.addStep(ShellCommand,
-            name="mozconfig contents",
-            command=["cat", ".mozconfig"],
-            workdir=self.baseWorkDir,
-            description=["mozconfig", "contents"]
-        )
-
-    def addBuildSteps(self):
-        self.addStep(ShellCommand,
-            command=['make', '-f', 'client.mk', 'build'],
-            description=['compile'],
-            workdir=self.baseWorkDir,
-            env=self.env,
-            haltOnFailure=True
-        )
-        
-    def addUploadSteps(self, platform=None):
-        self.addStep(MozillaCreateUploadDirectory,
-            scpString=self.scp_string,
-            haltOnFailure=False,
-            flunkOnFailure=False,
-            targetSubDir=self.targetSubDir,
-            workdir='.'
-        )
-        
-        self.addStep(MozillaUploadTryBuild,
-            slavedir=self.baseWorkDir,
-            baseFilename="",
-            slavesrcdir=r"%s/*" % self.slavesrcdir,
-            scpString=self.scp_string,
-            targetSubDir=self.targetSubDir,
-            haltOnFailure=False,
-            flunkOnFailure=False,
-        )
-    def addPackageSteps(self):
-        WinmoBuildFactory.addPackageSteps(self)
-        self.addStep(ShellCommand,
-            command='mkdir upload',
-            description=['create', 'upload', 'directory'],
-            haltOnFailure=True,
-            workdir=self.baseWorkDir)
-        self.addStep(ShellCommand,
-            command="cp %s ../%s" % (self.packageGlob, self.slavesrcdir),
-            description=['copy', 'globs', 'to', 'upload', 'directory'],
-            workdir=self.objdirPath)
