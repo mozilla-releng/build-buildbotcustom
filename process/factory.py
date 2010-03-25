@@ -2094,7 +2094,8 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='get_enUS_src',
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
-                         'hg -R '+self.origSrcDir+' pull -r default ;'+
+                         'hg -R '+self.origSrcDir+' pull ;'+
+                         'hg -R '+self.origSrcDir+' up ;'+
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.repoPath+' ' +
