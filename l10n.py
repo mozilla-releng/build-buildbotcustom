@@ -902,9 +902,9 @@ class L10nMixin(object):
       self.tree = tree
       # Make sure a supported platform is passed. Allow variations, but make
       # sure to convert them to the form the locales files ues.
-      assert platform in ('linux', 'win32', 'macosx', 'osx', 'maemo', 'wince')
+      assert platform in ('linux', 'win32', 'macosx', 'osx', 'maemo', 'wince', 'macosx64')
       self.platform = platform
-      if self.platform == 'macosx':
+      if self.platform.startswith('macosx'):
         self.platform = 'osx'
 
   class NoMergeStamp(SourceStamp):

@@ -366,7 +366,7 @@ def generateBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-        if config['enable_shark'] and platform in ('macosx'):
+        if config['enable_shark'] and platform.startswith('macosx'):
             nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
@@ -843,7 +843,7 @@ def generateBranchObjects(config, name):
 
         if pf.get('enable_unittests'):
             runA11y = True
-            if platform == 'macosx':
+            if platform.startswith('macosx'):
                 runA11y = config['enable_mac_a11y']
 
             extra_args = {}
@@ -890,7 +890,7 @@ def generateBranchObjects(config, name):
 
         for suites_name, suites in config['unittest_suites']:
             runA11y = True
-            if platform == 'macosx':
+            if platform.startswith('macosx'):
                 runA11y = config['enable_mac_a11y']
 
             # For the regular unittest build, run the a11y suite if
@@ -952,7 +952,7 @@ def generateBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
-        if config['enable_shark'] and platform in ('macosx'):
+        if config['enable_shark'] and platform.startswith('macosx'):
              mozilla2_shark_factory = NightlyBuildFactory(
                  env= pf['env'],
                  objdir=config['objdir'],
@@ -1101,7 +1101,7 @@ def generateCCBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-        if config['enable_shark'] and platform in ('macosx'):
+        if config['enable_shark'] and platform.startswith('macosx'):
             nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
@@ -1538,7 +1538,7 @@ def generateCCBranchObjects(config, name):
 
         if pf.get('enable_unittests'):
             runA11y = True
-            if platform == 'macosx':
+            if platform.startswith('macosx'):
                 runA11y = config['enable_mac_a11y']
 
             unittest_factory = CCUnittestBuildFactory(
@@ -1585,7 +1585,7 @@ def generateCCBranchObjects(config, name):
 
         for suites_name, suites in config['unittest_suites']:
             runA11y = True
-            if platform == 'macosx':
+            if platform.startswith('macosx'):
                 runA11y = config['enable_mac_a11y']
 
             # For the regular unittest build, run the a11y suite if
@@ -1648,7 +1648,7 @@ def generateCCBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
-        if config['enable_shark'] and platform in ('macosx'):
+        if config['enable_shark'] and platform.startswith('macosx'):
              mozilla2_shark_factory = CCNightlyBuildFactory(
                  env= pf['env'],
                  objdir=config['objdir'],

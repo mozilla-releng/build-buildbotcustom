@@ -121,6 +121,7 @@ def getPlatformMinidumpPath(platform):
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+        'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
         }
     return platform_minidump_path[platform]
 
@@ -456,7 +457,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'wince', 'macosx')
+        assert self.platform in ('linux', 'linux64', 'win32', 'wince', 'macosx', 'macosx64')
 
         if self.graphServer is not None:
             self.tbPrint = False
@@ -3957,7 +3958,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 }
 
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
+        assert self.platform in ('linux', 'linux64', 'win32', 'macosx', 'macosx64')
 
         self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
@@ -4154,6 +4155,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 'linux': 'linux/%s/unittest' % self.branchName,
                 'linux64': 'linux64/%s/unittest' % self.branchName,
                 'macosx': 'macosx/%s/unittest' % self.branchName,
+                'macosx64': 'macosx/%s/unittest' % self.branchName,
                 'win32': 'win32/%s/unittest' % self.branchName,
                 }
         mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
@@ -4295,7 +4297,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                 }
 
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
+        assert self.platform in ('linux', 'linux64', 'win32', 'macosx', 'macosx64')
 
         # Mozilla subdir and objdir
         self.mozillaDir = '/mozilla'
@@ -5515,7 +5517,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         self.env.update(env)
         self.productName = productName
 
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx')
+        assert self.platform in ('linux', 'linux64', 'win32', 'macosx', 'macosx64')
 
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -5603,7 +5605,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             ))
 
         # Find the application binary!
-        if self.platform == "macosx":
+        if self.platform.startswith('macosx'):
             self.addStep(FindFile(
              filename="%s-bin" % self.productName,
              directory=".",

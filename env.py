@@ -88,6 +88,8 @@ MozillaEnvironments['macosx-unittest'] = {
     "NO_FAIL_ON_TEST_ERRORS": '1'  
 }
 
+MozillaEnvironments['macosx64-unittest'] = MozillaEnvironments['macosx-unittest'].copy() 
+
 MozillaEnvironments['win32-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',

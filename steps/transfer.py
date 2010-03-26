@@ -204,7 +204,7 @@ class MozillaStageUpload(ShellCommand):
         if self.platform == "win32":
             return '%s/dist/*.zip %s/dist/install/sea/*.exe' % (self.objdir,
                                                                 self.objdir)
-        if self.platform == "macosx":
+        if self.platform.startswith('macosx'):
             return '%s/dist/*.dmg' % self.objdir
         if self.platform == "linux":
             return '%s/dist/*.tar.bz2' % self.objdir
