@@ -101,7 +101,8 @@ class Property(Base):
 
         retval = []
         for prop in all:
-            if props[prop.name] == prop.value and props.getPropertySource(prop.name) == prop.source:
+            if props.has_key(prop.name) and props[prop.name] == prop.value and \
+                    props.getPropertySource(prop.name) == prop.source:
                 retval.append(prop)
 
         new_props = set(names) - set([p.name for p in retval])
