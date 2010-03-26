@@ -2601,11 +2601,12 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
 
 
 class ReleaseFactory(MozillaBuildFactory):
-    def getCandidatesDir(self, product, version, buildNumber):
+    def getCandidatesDir(self, product, version, buildNumber,
+                         nightlyDir="nightly"):
         # can be used with rsync, eg host + ':' + getCandidatesDir()
         # and "http://' + host + getCandidatesDir()
-        return '/pub/mozilla.org/' + product + '/nightly/' + str(version) + \
-               '-candidates/build' + str(buildNumber) + '/'
+        return '/pub/mozilla.org/' + product + '/' + nightlyDir + '/' + \
+               str(version) + '-candidates/build' + str(buildNumber) + '/'
 
     def getShippedLocales(self, sourceRepo, baseTag, appName):
         return '%s/raw-file/%s_RELEASE/%s/locales/shipped-locales' % \
@@ -6457,11 +6458,14 @@ class PartnerRepackFactory(ReleaseFactory):
                str(version).replace('.','_') + '_' + \
                'RELEASE'
 
-    def __init__(self, productName, version, partnersRepoPath, 
-                 stagingServer, stageUsername, stageSshKey, 
-                 buildNumber=1, partnersRepoRevision='default', 
-                 **kwargs):
-        ReleaseFactory.__init__(self, **kwargs)
+    def __init__(self, productName, version, partnersRepoPath,
+                 stagingServer, stageUsername, stageSshKey,
+                 buildNumber=1, partnersRepoRevision='default',
+                 nightlyDir="nightly", platformList=None, packageDmg=True,
+                 partnerUploadDir='unsigned/partner-repacks',
+                 baseWorkDir='.', python='python',
+                 createRemoteStageDir=False, **kwargs):
+        ReleaseFactory.__init__(self, baseWorkDir=baseWorkDir, **kwargs)
         self.productName = productName
         self.version = version
         self.buildNumber = buildNumber
@@ -6470,11 +6474,26 @@ class PartnerRepackFactory(ReleaseFactory):
         self.stagingServer = stagingServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
-        self.partnersRepackDir = 'partner-repacks'
+        self.partnersRepackDir = '%s/partner-repacks' % self.baseWorkDir
+        self.partnerUploadDir = partnerUploadDir
+        self.packageDmg = packageDmg
+        self.python = python
+        self.createRemoteStageDir = createRemoteStageDir
         self.candidatesDir = self.getCandidatesDir(productName,
                                                    version,
-                                                   buildNumber)
+                                                   buildNumber,
+                                                   nightlyDir=nightlyDir)
         self.releaseTag = self.getReleaseTag(productName, version)
+        self.extraRepackArgs = []
+        if nightlyDir:
+            self.extraRepackArgs.extend(['--nightly-dir', '%s/%s' % \
+                                        (productName, nightlyDir)])
+        if self.packageDmg:
+            self.extraRepackArgs.extend(['--pkg-dmg',
+                                        WithProperties('%(scriptsdir)s/pkg-dmg')])
+        if platformList:
+            for platform in platformList:
+                self.extraRepackArgs.extend(['--platform', platform])
 
         self.getPartnerRepackData()
         self.doPartnerRepacks()
@@ -6486,17 +6505,17 @@ class PartnerRepackFactory(ReleaseFactory):
             name='rm_partners_repo',
             command=['rm', '-rf', self.partnersRepackDir],
             description=['remove', 'partners', 'repo'],
-            workdir='.'
+            workdir=self.baseWorkDir,
         )
         self.addStep(ShellCommand,
             name='clone_partners_repo',
-            command=['hg', 'clone', 
-                     'http://%s/%s' % (self.hgHost, 
+            command=['hg', 'clone',
+                     'http://%s/%s' % (self.hgHost,
                                           self.partnersRepoPath),
                      self.partnersRepackDir
                     ],
             description=['clone', 'partners', 'repo'],
-            workdir='.',
+            workdir=self.baseWorkDir,
             haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -6506,53 +6525,64 @@ class PartnerRepackFactory(ReleaseFactory):
             workdir=self.partnersRepackDir,
             haltOnFailure=True            
         )
-        self.addStep(ShellCommand,
-            name='download_pkg-dmg',
-            command=['bash', '-c',
-                     'wget http://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
-            description=['download', 'pkg-dmg'],
-            workdir='%s/scripts' % self.partnersRepackDir,
-            haltOnFailure=True            
-        )
-        self.addStep(ShellCommand,
-            name='chmod_pkg-dmg',
-            command=['chmod', '755', 'pkg-dmg'],
-            description=['chmod', 'pkg-dmg'],
-            workdir='%s/scripts' % self.partnersRepackDir,
-            haltOnFailure=True            
-        )
-        self.addStep(SetProperty,
-            name='set_scriptsdir',
-            command=['bash', '-c', 'pwd'],
-            property='scriptsdir',
-            workdir='%s/scripts' % self.partnersRepackDir,
-        )
+        if self.packageDmg:
+            self.addStep(ShellCommand,
+                name='download_pkg-dmg',
+                command=['bash', '-c',
+                         'wget http://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
+                description=['download', 'pkg-dmg'],
+                workdir='%s/scripts' % self.partnersRepackDir,
+                haltOnFailure=True            
+            )
+            self.addStep(ShellCommand,
+                name='chmod_pkg-dmg',
+                command=['chmod', '755', 'pkg-dmg'],
+                description=['chmod', 'pkg-dmg'],
+                workdir='%s/scripts' % self.partnersRepackDir,
+                haltOnFailure=True            
+            )
+            self.addStep(SetProperty,
+                name='set_scriptsdir',
+                command=['bash', '-c', 'pwd'],
+                property='scriptsdir',
+                workdir='%s/scripts' % self.partnersRepackDir,
+            )
 
     def doPartnerRepacks(self):
         self.addStep(RepackPartners,
             name='repack_partner_builds',
-            command=['./partner-repacks.py',
+            command=[self.python, './partner-repacks.py',
                      '--version', str(self.version),
                      '--build-number', str(self.buildNumber),
-                     '--pkg-dmg', WithProperties('%(scriptsdir)s/pkg-dmg'),
                      '--staging-server', self.stagingServer,
-                    ],
+                    ] + self.extraRepackArgs,
             description=['repacking', 'partner', 'builds'],
             descriptionDone=['repacked', 'partner', 'builds'],
             workdir='%s/scripts' % self.partnersRepackDir,
             haltOnFailure=True
-        )            
+        )
 
     def uploadPartnerRepacks(self):
+        if self.createRemoteStageDir:
+            self.addStep(ShellCommand(
+                name='create_remote_stage_dir',
+                command=['bash', '-c', 'ssh -i ~/.ssh/%s %s@%s mkdir -p %s/%s' % \
+                         (self.stageSshKey, self.stageUsername,
+                          self.stagingServer, self.candidatesDir,
+                          self.partnerUploadDir)],
+                description=['create', 'remote', 'upload', 'dir'],
+                haltOnFailure=True,
+            ))
+            
         self.addStep(ShellCommand,
          name='upload_partner_builds',
          command=['rsync', '-av',
                   '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
-                  '*',
+                  '.',
                   '%s@%s:%s' % (self.stageUsername,
                                 self.stagingServer,
                                 self.candidatesDir) + \
-                  'unsigned/partner-repacks'
+                  self.partnerUploadDir,
                   ],
          workdir='%s/scripts/repacked_builds/%s/build%s' % (self.partnersRepackDir,
                                                             self.version,
@@ -6560,4 +6590,3 @@ class PartnerRepackFactory(ReleaseFactory):
          description=['upload', 'partner', 'builds'],
          haltOnFailure=True
         )
-        
