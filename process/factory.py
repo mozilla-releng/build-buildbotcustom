@@ -6152,6 +6152,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                                    stageSshKey=stageSshKey,
                                    baseWorkDir=baseWorkDir,
                                    hgHost=hgHost,
+                                   platform=platform,
                                    **kwargs)
 
     def getSources(self):
@@ -6209,7 +6210,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         ))
-        self.addStep(SetProperty, **self.processCommand(verbose=False,
+        self.addStep(SetProperty, **self.processCommand(
          command=['make', 'ident'],
          haltOnFailure=True,
          env=self.env,
