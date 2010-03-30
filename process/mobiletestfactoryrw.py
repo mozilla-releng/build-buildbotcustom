@@ -1,4 +1,3 @@
-
 import re
 
 from buildbot.process.factory import BuildFactory
@@ -349,7 +348,7 @@ class MobileTalosFactory(BuildFactory):
 #
 class MobileUnittestFactory(MobileTalosFactory):
     def __init__(self, test_type, known_fail_count=0, clients=None,
-                 maemkit_repo_path='users/jford_mozilla.com/maemkit', **kwargs):
+                 maemkit_repo_path='qa/maemkit', **kwargs):
         ''' clients is a tuple of (clientnumber, totalclients), e.g. (1,4).
         being hopeful about default 0 for known fail count'''
         self.test_type = test_type
@@ -411,14 +410,13 @@ class MobileUnittestFactory(MobileTalosFactory):
             haltOnFailure=True,
             timeout=self.timeout,
         ))
-        #This is commented out while we figure out what is going on
-        # self.addStep(MobileParseTestLog(
-        #         log_name,
-        #         known_fail_count=self.known_fail_count,
-        #         workdir="%s/fennec" % self.base_dir,
-        #         description=['parse', self.test],
-        #         name='parse_%s' % self.test,
-        #         timeout=120,
-        #         flunkOnFailure=False,
-        #         haltOnFailure=False,
-        # ))
+        self.addStep(MobileParseTestLog,
+            name=self.test_type,
+            command=['cat', log_name],
+            knownFailCount=self.known_fail_count,
+            workdir="/builds/fennec",
+            description=['parse', self.test_type, 'log'],
+            timeout=120,
+            flunkOnFailure=False,
+            haltOnFailure=False,
+       )

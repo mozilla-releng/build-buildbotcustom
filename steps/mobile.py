@@ -1,7 +1,13 @@
-from buildbot.steps.shell import ShellCommand
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, \
-    EXCEPTION
+import re
 
+from buildbot.steps.shell import ShellCommand
+  
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, \
+  EXCEPTION
+
+import buildbotcustom.steps.unittest
+reload(buildbotcustom.steps.unittest)
+from buildbotcustom.steps.unittest import emphasizeFailureText, summaryText
 
 # Wasn't able to get ShellCommandReportTimeout working; may try again
 # later.
@@ -9,17 +15,20 @@ class MobileParseTestLog(ShellCommand):
     warnOnFailure = True
     warnOnWarnings = True
 
-    def __init__(self, log, known_fail_count=0,
+    def __init__(self, name=None, command=None, knownFailCount=0,
                  timeout=60, **kwargs):
         self.super_class = ShellCommand
-        self.log = log
-        self.known_fail_count = known_fail_count
-        command = ['cat', self.log]
+        self.name = name
+        self.knownFailCount = knownFailCount
+
+        if not command:
+            command = ['python', 'maemkit-chunked.py',
+                          '--testtype=%s' % name],
 
         ShellCommand.__init__(self, timeout=timeout, command=command, **kwargs)
 
         self.addFactoryArguments(command=command, timeout=timeout,
-                                 known_fail_count=known_fail_count)
+                                 knownFailCount=knownFailCount)
 
     def createSummary(self, log):
         summary = ""
@@ -57,9 +66,9 @@ class MobileParseTestLog(ShellCommand):
         if (failCount):
             summary = "Orig fail count: %d\nOrig known count: %d\n" % (
                     failCount, knownCount)
-            if failCount > self.known_fail_count:
-                failCount = failCount - self.known_fail_count
-                knownCount = knownCount + self.known_fail_count
+            if failCount > self.knownFailCount:
+                failCount = failCount - self.knownFailCount
+                knownCount = knownCount + self.knownFailCount
             else:
                 knownCount = knownCount + failCount
                 failCount = 0
@@ -70,7 +79,7 @@ class MobileParseTestLog(ShellCommand):
                     self.name, summaryText(passCount, failCount,
                                            knownCount, crashed=crashed,
                                            leaked=leaked),
-                    self.known_fail_count)
+                    self.knownFailCount)
         else:
             summary = emphasizeFailureText("T-FAIL")
 
@@ -86,7 +95,7 @@ class MobileParseTestLog(ShellCommand):
             return WARNINGS
 
         m = re.findall('TEST-UNEXPECTED-', cmdText)
-        if len(m) > self.known_fail_count:
+        if len(m) > self.knownFailCount:
             return WARNINGS
         if re.search('FAIL Exited', cmdText):
             return WARNINGS
