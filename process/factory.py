@@ -1532,6 +1532,12 @@ class NightlyBuildFactory(MercurialBuildFactory):
                                          self.ausFullUploadDir
         else:
             return self.ausFullUploadDir
+        
+    def getCurrentBuildUploadDir(self):
+        if self.createPartial:
+            return "%s/%%(buildid)s/en-US" % self.ausFullUploadDir
+        else:
+            return self.ausFullUploadDir
 
     def addUploadSnippetsSteps(self):
         ausPreviousBuildUploadDir = self.getPreviousBuildUploadDir()
@@ -1570,8 +1576,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 description=['upload', 'partial', 'snippet'],
                 haltOnFailure=True,
             ))
-            ausCurrentBuildUploadDir = "%s/%%(buildid)s/en-US" % \
-                                         self.ausFullUploadDir
+            ausCurrentBuildUploadDir = self.getCurrentBuildUploadDir()
             self.addStep(ShellCommand(
                 name='create_aus_current_updir',
                 command=['bash', '-c',
@@ -2397,6 +2402,12 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         if self.createPartial:
             return "%s/%%(previous_buildid)s/%%(locale)s" % \
                                          self.ausFullUploadDir
+        else:
+            return self.ausFullUploadDir
+
+    def getCurrentBuildUploadDir(self):
+        if self.createPartial:
+            return "%s/%%(buildid)s/%%(locale)s" % self.ausFullUploadDir
         else:
             return self.ausFullUploadDir
 
