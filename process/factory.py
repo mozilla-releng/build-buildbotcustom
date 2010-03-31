@@ -1647,7 +1647,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 name='make_upload',
                 command=['make', 'upload'],
                 env=uploadEnv,
-                workdir=self.absMozillaObjDir,
+                workdir='%s/%s' % (self.baseWorkDir, self.objdir),
                 extract_fn = get_url,
                 haltOnFailure=True,
                 description=['make', 'upload'],
@@ -1700,6 +1700,18 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         NightlyBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+
+    # MercurialBuildFactory defines those, and our inheritance chain makes us
+    # look there before NightlyBuildFactory, so we need to define them here and
+    # call the actually wanted implementation.
+    def addCreateUpdateSteps(self):
+        NightlyBuildFactory.addCreateUpdateSteps(self)
+
+    def addCreateSnippetsSteps(self, milestone_extra=''):
+        NightlyBuildFactory.addCreateSnippetsSteps(self, milestone_extra)
+
+    def addUploadSnippetsSteps(self):
+        NightlyBuildFactory.addUploadSnippetsSteps(self)
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):
@@ -2595,8 +2607,9 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.tinderboxPrint('moz_revision',WithProperties('%(moz_revision)s'))
         self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
 
-    # unsure why we need to explicitely do this but after bug 478436 we stopped
-    # executing the actual repackaging without this def here
+    # BaseRepackFactory defines that, and our inheritance chain makes us look
+    # there before NightlyRepackFactory, so we need to define it here and call
+    # the actually wanted implementation.
     def doRepack(self):
         NightlyRepackFactory.doRepack(self)
 
