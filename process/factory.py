@@ -1656,6 +1656,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 extract_fn = get_url,
                 haltOnFailure=True,
                 description=['make', 'upload'],
+                timeout=40*60 # 40 minutes
             ))
 
         talosBranch = "%s-%s" % (self.branchName, self.platform)
