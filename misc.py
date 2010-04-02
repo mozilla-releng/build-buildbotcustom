@@ -182,9 +182,13 @@ def _nextFastSlave(builder, available_slaves):
         return random.choice(available_slaves)
 
 def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
-        suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold):
+        suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold, slaves=None):
     builders = []
     pf = config['platforms'].get(platform, {})
+    if slaves == None:
+        slavenames = config['platforms'][platform]['slaves']
+    else:
+        slavenames = slaves
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
         for i in range(totalChunks):
@@ -206,7 +210,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             )
             builder = {
                 'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
-                'slavenames': config['platforms'][platform]['slaves'],
+                'slavenames': slavenames,
                 'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
                 'factory': factory,
                 'category': branch_name,
@@ -225,10 +229,11 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             buildSpace=1.0,
             buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
             downloadSymbols=pf.get('download_symbols', True),
+            env=pf.get('unittest-env', {}),
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': config['platforms'][platform]['slaves'],
+            'slavenames': slavenames,
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
             'factory': factory,
             'category': branch_name,
@@ -1690,10 +1695,11 @@ def generateCCBranchObjects(config, name):
     return branchObjects
 
 
-def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-        factory_class=TalosFactory):
+def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, 
+        ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branchObjects = {'schedulers': [], 'builders': [], 'status': []}
     branch_builders = []
+    test_builders = []
 
     branchName = branch_config['branch_name']
     buildBranch = branch_config['build_branch']
@@ -1747,6 +1753,42 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 branchObjects['builders'].append(builder)
                 branch_builders.append(builder['name'])
 
+            if platform in ACTIVE_UNITTEST_PLATFORMS.keys():
+                testTypes = []
+
+                if branch_config['platforms'][platform].get('enable_opt_unittests'):
+                    testTypes.append('opt')
+                if branch_config['platforms'][platform].get('enable_debug_unittests'):
+                    testTypes.append('debug')
+
+                for test_type in testTypes:
+                    test_builders = []
+                    triggeredUnittestBuilders = []
+                    unittest_suites = "%s_unittest_suites" % test_type
+
+                    # create builder names for TinderboxMailNotifier
+                    for suites_name, suites in branch_config['platforms'][platform][unittest_suites]:
+                        test_builders.extend(generateTestBuilderNames(
+                            '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
+
+                    triggeredUnittestBuilders.append(('%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, True))
+
+                    for suites_name, suites in branch_config['platforms'][platform][unittest_suites]:
+                        # create the builders
+                        branchObjects['builders'].extend(generateTestBuilder(
+                                branch_config, branch, platform, "%s %s %s test" % (platform_name, branch, test_type),
+                                "%s-%s-%s-u" % (branch, slave_platform, test_type),
+                                suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
+                                branch_config.get('crashtest_leak_threshold', None),
+                                platform_config[slave_platform]['slaves']))
+
+                    for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
+                        scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
+                        if not merge:
+                            branchObjects['schedulers'].append(NoMergeScheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+                        else:
+                            branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+
     branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
                            tree=branch_config['tinderbox_tree'],
@@ -1755,16 +1797,26 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            builders=branch_builders,
                            useChangeTime=False,
                            logCompression="bzip2"))
+    ###  Unittests need specific errorparser
+    branchObjects['status'].append(TinderboxMailNotifier(
+                           fromaddr="talos.buildbot@build.mozilla.org",
+                           tree=branch_config['tinderbox_tree'],
+                           extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+                           relayhost="smtp.mozilla.org",
+                           builders=test_builders,
+                           useChangeTime=False,
+                           errorparser="unittest",
+                           logCompression="bzip2"))
 
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
-                branch_config, PLATFORMS, SUITES, factory_class)
+                branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
         for k,v in releaseObjects.items():
             branchObjects[k].extend(v)
     return branchObjects
 
 def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-        factory_class=TalosFactory):
+        ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branch_config = branch_config.copy()
     release_tests = branch_config['release_tests']
 
@@ -1786,4 +1838,5 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     # Don't fetch symbols
     branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
-    return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, factory_class)
+    return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, 
+        ACTIVE_UNITTEST_PLATFORMS, factory_class)
