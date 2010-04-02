@@ -4918,6 +4918,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
                  clobber=False, env=None,
                  mobileRevision='default',
+                 mobileObjdir='mobile', xulrunnerObjdir='xulrunner',
                  mozRevision='default', **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -4941,6 +4942,8 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageGroup = stageGroup
         self.mobileRevision = mobileRevision
         self.mozRevision = mozRevision
+        self.mobileObjdir=mobileObjdir
+        self.xulrunnerObjdir=xulrunnerObjdir
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
 
@@ -5051,7 +5054,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.addStep(SetProperty,
             name="get_buildid",
             command=['python', 'config/printconfigsetting.py',
-                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     '%s/%s/dist/bin/application.ini' % (self.objdir ,self.mobileObjdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -5137,8 +5140,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_mobile_pkg',
             command=['make', 'package'],
-            workdir='%s/%s/%s/mobile' % (self.baseWorkDir,
-            self.branchName, self.objdir),
+            workdir='%s/%s/%s/%s' % (self.baseWorkDir,
+            self.branchName, self.objdir, self.mobileObjdir),
             description=['make', 'mobile', 'package'],
             env=self.env,
             haltOnFailure=True,
@@ -5147,14 +5150,15 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=['make', 'package-tests'],
-                workdir='%s/%s/%s/xulrunner' % (self.baseWorkDir,
-                    self.branchName, self.objdir),
+                workdir='%s/%s/%s/%s' % (self.baseWorkDir,
+                    self.branchName, self.objdir, self.xulrunnerObjdir),
                 env=self.env,
                 haltOnFailure=True,
             )
 
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
+                 sb_target='CHINOOK-ARMEL-2007',
                  multiLocale = False,
                  l10nRepoPath = 'l10n-central',
                  compareLocalesRepoPath = 'build/compare-locales',
@@ -5164,6 +5168,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                                   'mobile/dist/deb_name.txt',
                                   'xulrunner/dist/*.tar.bz2'],
                  l10nTag='default',
+                 debs=True,
                  mergeLocales=True,
                  locales=None,
                  objdirRelPath=None, objdirAbsPath=None,
@@ -5177,12 +5182,27 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.l10nTag = l10nTag
         self.locales = locales
         self.mergeLocales = mergeLocales
+        self.sb_target = sb_target
+        self.debs = debs
+        self.addStep(ShellCommand(
+            name='set-target',
+            command=[self.scratchboxPath, '-p', 'sb-conf', 'select', self.sb_target],
+            description=['set-target'],
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='show-target',
+            command=[self.scratchboxPath, '-p',
+            "echo -n TinderboxPrint: && sb-conf current | sed 's/ARMEL// ; s/_// ; s/-//'"],
+            description=['show-target'],
+            haltOnFailure=False,
+        ))
         if objdirRelPath:
             self.objdirRelPath = objdirRelPath
         else:
             self.objdirRelPath = 'build/%s/%s/%s' % (self.baseBuildDir,
                                                      self.branchName,
-                                                     self.objdir),
+                                                     self.objdir)
         if objdirAbsPath:
             self.objdirAbsPath = objdirAbsPath
         else:
@@ -5261,12 +5281,12 @@ class MaemoBuildFactory(MobileBuildFactory):
             # dir and break hg.
             self.addStep(ShellCommand,
                 name='rm_old_builds',
-                command=['bash', '-c', 'rm -rf %s/%s/mobile/dist/fennec* ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/xulrunner/dist/*.tar.bz2 ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/mobile/mobile/*.deb' %
-                         (self.branchName, self.objdir)],
+                command=['bash', '-c', 'rm -rf %s/%s/%s/dist/fennec* ' %
+                         (self.branchName, self.objdir, self.mobileObjdir) +
+                         '%s/%s/%s/dist/*.tar.bz2 ' %
+                         (self.branchName, self.objdir, self.xulrunnerObjdir) +
+                         '%s/%s/%s/mobile/*.deb' %
+                         (self.branchName, self.objdir, self.mobileObjdir)],
                 workdir=self.baseWorkDir,
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
@@ -5290,26 +5310,27 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_pkg',
             command=[self.scratchboxPath, '-p', '-d',
-                     '%s/mobile' % self.objdirRelPath,
+                     '%s/%s' % (self.objdirRelPath, self.mobileObjdir),
                      'make package', extraArgs],
             description=['make', 'package'],
             haltOnFailure=True
         )
-        self.addStep(ShellCommand,
-            name='make_mobile_deb',
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s/mobile' % self.objdirRelPath,
-                     'make deb', extraArgs],
-            description=['make', 'mobile', 'deb'],
-            haltOnFailure=True
-        )
+        if self.debs:
+            self.addStep(ShellCommand,
+                         name='make_mobile_deb',
+                         command=[self.scratchboxPath, '-p', '-d',
+                                  '%s/%s' % (self.objdirRelPath, self.mobileObjdir),
+                                  'make deb', extraArgs],
+                         description=['make', 'mobile', 'deb'],
+                         haltOnFailure=True
+            )
         # Build tests for multi-locale nightly builds, dependent builds
         # and nightly builds which are not multi-locale like Electrolysis and Tracemonkey 
         if packageTests or not self.nightly:
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=[self.scratchboxPath, '-p', '-d',
-                         '%s/xulrunner' % self.objdirRelPath,
+                         '%s/%s' % (self.objdirRelPath, self.xulrunnerObjdir),
                          'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
                 haltOnFailure=True
@@ -5328,12 +5349,13 @@ class MaemoBuildFactory(MobileBuildFactory):
             name='prepare_upload',
             command=['mkdir', '-p', localeDir],
             haltOnFailure=True,
-            workdir='%s/mobile/dist' % self.objdirAbsPath,
+            workdir='%s/%s/dist' % (self.objdirAbsPath, self.mobileObjdir)
         )
         self.addStep(ShellCommand,
             name='cp_binaries',
-            command=['sh', '-c', 'cp %s mobile/dist/%s' % (self.packageGlob,
-                                                           localeDir)],
+            command=['sh', '-c', 'cp %s %s/dist/%s' % (self.packageGlob,
+                                                       self.mobileObjdir,
+                                                       localeDir)],
             workdir=self.objdirAbsPath,
         )
         # Now that we have moved all the packages that we want under localeDir
