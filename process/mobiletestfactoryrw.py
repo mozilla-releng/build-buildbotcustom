@@ -82,7 +82,7 @@ class MobileTalosFactory(BuildFactory):
                  hg_host='http://hg.mozilla.org', tools_repo_path='build/tools',
                  talos_tarball=None, pageloader_tarball=None,
                  cleanup_glob='tools talos fennec* xul* *.tar.bz2',
-                 tp4_source='/tools/tp4', **kwargs):
+                 tp4_source='/tools/tp4', browser_wait=7, **kwargs):
         BuildFactory.__init__(self, **kwargs)
         self.test = test
         self.timeout = timeout
@@ -100,6 +100,7 @@ class MobileTalosFactory(BuildFactory):
         self.pageloader_tarball = pageloader_tarball
         self.cleanup_glob = cleanup_glob
         self.tp4_source = tp4_source
+        self.browser_wait = browser_wait
 
         self.addStartupSteps()
         self.addCleanupSteps()
@@ -269,7 +270,7 @@ class MobileTalosFactory(BuildFactory):
                       '--branchName', self.branch,
                       '--activeTests', self.test,
                       '--sampleConfig', self.talos_config_file,
-                      '--browserWait', '7', #str(self.timeout),
+                      '--browserWait', str(self.browser_wait),
                       '--resultsServer', self.results_server,
                       self.nochrome,
                       '--resultsLink', '/server/collect.cgi',
