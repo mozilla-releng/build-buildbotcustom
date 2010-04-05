@@ -1699,7 +1699,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branchObjects = {'schedulers': [], 'builders': [], 'status': []}
     branch_builders = []
-    test_builders = []
+    all_test_builders = []
 
     branchName = branch_config['branch_name']
     buildBranch = branch_config['build_branch']
@@ -1770,6 +1770,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     for suites_name, suites in branch_config['platforms'][platform][unittest_suites]:
                         test_builders.extend(generateTestBuilderNames(
                             '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
+                    # Collect test builders for the TinderboxMailNotifier
+                    all_test_builders.extend(test_builders)
 
                     triggeredUnittestBuilders.append(('%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, True))
 
@@ -1803,7 +1805,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            tree=branch_config['tinderbox_tree'],
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
                            relayhost="smtp.mozilla.org",
-                           builders=test_builders,
+                           builders=all_test_builders,
                            useChangeTime=False,
                            errorparser="unittest",
                            logCompression="bzip2"))
