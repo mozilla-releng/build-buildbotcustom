@@ -382,7 +382,12 @@ class DownloadFile(ShellCommand):
                 wget_args=wget_args)
 
     def start(self):
-        url = self.url_fn(self.build)
+        try:
+            url = self.url_fn(self.build)
+        except Exception, e:
+            self.addCompleteLog("errors", "Automation Error: %s" % str(e))
+            return self.finished(FAILURE)
+
         if self.url_property:
             self.setProperty(self.url_property, url, "DownloadFile")
         if self.filename_property:

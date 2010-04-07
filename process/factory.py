@@ -45,6 +45,21 @@ import buildbotcustom.steps.unittest as unittest_steps
 import buildbotcustom.steps.talos as talos_steps
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
 
+def parse_make_upload(rc, stdout, stderr):
+    ''' This function takes the output and return code from running
+    the upload make target and returns a dictionary of important
+    file urls.'''
+    retval = {}
+    for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", 
+                        "\n".join([stdout, stderr]), re.M):
+        if m.endswith("crashreporter-symbols.zip"):
+            retval['symbolsUrl'] = m
+        elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
+            retval['testsUrl'] = m
+        else:
+            retval['packageUrl'] = m
+    return retval
+
 class BootstrapFactory(BuildFactory):
     def __init__(self, automation_tag, logdir, bootstrap_config,
                  cvsroot="pserver:anonymous@cvs-mirror.mozilla.org",
@@ -1157,20 +1172,11 @@ class TryBuildFactory(MercurialBuildFactory):
 
         uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
 
-        def get_url(rc, stdout, stderr):
-            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
-                if m.endswith("crashreporter-symbols.zip"):
-                    continue
-                if m.endswith("tests.tar.bz2"):
-                    continue
-                return {'packageUrl': m}
-            return {}
-
         self.addStep(SetProperty,
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = get_url,
+             extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=["upload"]
         )
@@ -1628,21 +1634,13 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
 
-        def get_url(rc, stdout, stderr):
-            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
-                if m.endswith("crashreporter-symbols.zip"):
-                    continue
-                if m.endswith("tests.tar.bz2"):
-                    continue
-                return {'packageUrl': m}
-            return {}
-
+        
         if self.productName == 'xulrunner':
             self.addStep(SetProperty,
              command=['make', '-f', 'client.mk', 'upload'],
              env=uploadEnv,
              workdir='build',
-             extract_fn = get_url,
+             extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=["upload"],
              timeout=60*60 # 60 minutes
@@ -1653,7 +1651,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 command=['make', 'upload'],
                 env=uploadEnv,
                 workdir='%s/%s' % (self.baseWorkDir, self.objdir),
-                extract_fn = get_url,
+                extract_fn = parse_make_upload,
                 haltOnFailure=True,
                 description=['make', 'upload'],
                 timeout=40*60 # 40 minutes
@@ -1678,7 +1676,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
              retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
-             files=[WithProperties('%(packageUrl)s')],
+             files=[WithProperties('%(packageUrl)s'),
+                    WithProperties('%(testsUrl)s')],
              user="sendchange-unittest")
             )
         for master, warn in self.geriatricMasters:
@@ -1690,7 +1689,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                   master=master,
                   branch=branch,
                   revision=WithProperties("%(got_revision)s"),
-                  files=[WithProperties('%(packageUrl)s')],
+                  files=[WithProperties('%(packageUrl)s'),
+                         WithProperties('%(testsUrl)s')],
                   user='sendchange-geriatric')
                 )
               
@@ -1781,21 +1781,12 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                                        '-v %s ' % self.version + \
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
-        def get_url(rc, stdout, stderr):
-            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
-                if m.endswith("crashreporter-symbols.zip"):
-                    continue
-                if m.endswith("tests.tar.bz2"):
-                    continue
-                return {'packageUrl': m}
-            return {'packageUrl': ''}
-
         self.addStep(SetProperty,
          name='make_upload',
          command=['make', 'upload'],
          env=uploadEnv,
          workdir='build/%s' % self.objdir,
-         extract_fn = get_url,
+         extract_fn = parse_make_upload,
          haltOnFailure=True,
          description=['upload'],
          timeout=60*60 # 60 minutes
@@ -1823,7 +1814,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
-             files=[WithProperties('%(packageUrl)s')],
+             files=[WithProperties('%(packageUrl)s'),
+                    WithProperties('%(testsUrl)s')],
              user="sendchange-unittest")
             )
 
@@ -4122,17 +4114,13 @@ class UnittestBuildFactory(MozillaBuildFactory):
                               '--release-to-tinderbox-dated-builds']
 
             uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
-            def get_url(rc, stdout, stderr):
-                m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
-                if m:
-                    return {'packageUrl': m.group(1)}
-                return {}
+            
             self.addStep(SetProperty,
              name='make_upload',
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = get_url,
+             extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
              timeout=60*60 # 60 minutes
@@ -4146,7 +4134,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
                  retries=retries,
                  revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
-                 files=[WithProperties('%(packageUrl)s')],
+                 files=[WithProperties('%(packageUrl)s'),
+                        WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest")
                 )
 
@@ -4248,16 +4237,12 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
                               '--release-to-tryserver-builds']
 
             uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
-            def get_url(rc, stdout, stderr):
-                m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
-                if m:
-                    return {'packageUrl': m.group(1)}
-                return {}
+
             self.addStep(SetProperty,
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = get_url,
+             extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload']
             )
@@ -4461,17 +4446,13 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                               '--release-to-tinderbox-dated-builds']
 
             uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
-            def get_url(rc, stdout, stderr):
-                m = re.search("^(http://.*?\.(tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M)
-                if m:
-                    return {'packageUrl': m.group(1)}
-                return {}
+
             self.addStep(SetProperty,
              name='make_upload',
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = get_url,
+             extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
              timeout=60*60 # 60 minutes
@@ -4835,6 +4816,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=unsigned',
                   '--exclude=update',
                   '--exclude=*.crashreporter-symbols.zip',
+                  '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer, productName, version, str(buildNumber)),
@@ -4861,6 +4843,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=unsigned',
                   '--exclude=update',
                   '--exclude=*.crashreporter-symbols.zip',
+                  '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
                    (stagingServer,
@@ -5572,56 +5555,73 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
                                 'crashtest': crashtest_leak_threshold}
 
-        # Download the build
-        def get_fileURL(build):
-            fileURL = build.source.changes[-1].files[0]
-            return fileURL
+        def get_url(build, include_substr='', exclude_substrs=[]):
+            '''Given a build object, figure out which files have the include_substr
+            in them, then exclude files that have one of the exclude_substrs. This
+            function uses substring pattern matching instead of regular expressions
+            as it meets the need without incurring as much overhead.'''
+            potential_files=[]
+            for file in build.source.changes[-1].files:
+                if include_substr in file and file not in potential_files:
+                    potential_files.append(file)
+            assert len(potential_files) > 0, 'sendchange missing this archive type'
+            for substring in exclude_substrs:
+                for f in potential_files:
+                    if substring in f:
+                        potential_files.remove(f)
+            assert len(potential_files) == 1, 'Ambiguous unittest sendchange!'
+            return potential_files[0]
+
+        def get_build_url(build):
+            '''Make sure that there is at least one build in the file list'''
+            assert len(build.source.changes[-1].files) > 0, 'Unittest sendchange has no files'
+            return get_url(build, exclude_substrs=['.crashreporter-symbols.',
+                                                   '.tests.'])
+
+        def get_tests_url(build):
+            '''If there is only one file, we assume that the tests package is at
+            the same location with the file extension of the browser replaced with
+            .tests.tar.bz2, otherwise we try to find the explicit file'''
+            if len(build.source.changes[-1].files) < 2:
+                build_url = build.getProperty('build_url')
+                for suffix in ('.tar.bz2', '.zip', '.dmg', '.exe'):
+                    if build_url.endswith(suffix):
+                        return build_url[:-len(suffix)] + '.tests.tar.bz2'
+            else:
+                return get_url(build, include_substr='.tests.')
+
+        def get_symbols_url(build):
+            '''If there are two files, we assume that the second file is the tests tarball
+            and use the same location as the build, with the build's file extension replaced
+            with .crashreporter-symbols.zip.  If there are three or more files then we figure
+            out which is the real file'''
+            if len(build.source.changes[-1].files) < 3:
+                build_url = build.getProperty('build_url')
+                for suffix in ('.tar.bz2', '.zip', '.dmg', '.exe'):
+                    if build_url.endswith(suffix):
+                        return build_url[:-len(suffix)] + '.crashreporter-symbols.zip'
+            else:
+                return get_url(build, include_substr='.crashreporter-symbols.')
+
         self.addStep(DownloadFile(
-         url_fn=get_fileURL,
+         url_fn=get_build_url,
          filename_property='build_filename',
-         url_property='fileURL',
+         url_property='build_url',
          haltOnFailure=True,
-         name="download build",
+         name='download build',
         ))
 
-        # Download the tests
-        def get_testURL(build):
-            # If there is a second file in the changes object,
-            # use that as the test harness to download
-            if len(build.source.changes[-1].files) > 1:
-                testURL = build.source.changes[-1].files[1]
-                return testURL
-            else:
-                fileURL = build.getProperty('fileURL')
-                suffixes = ('.tar.bz2', '.dmg', '.zip')
-                testsURL = None
-                for suffix in suffixes:
-                    if fileURL.endswith(suffix):
-                        testsURL = fileURL[:-len(suffix)] + '.tests.tar.bz2'
-                        return testsURL
-                if testsURL is None:
-                    raise ValueError("Couldn't determine tests URL")
         self.addStep(DownloadFile(
-         url_fn=get_testURL,
+         url_fn=get_tests_url,
          filename_property='tests_filename',
          url_property='tests_url',
          haltOnFailure=True,
          name='download tests',
         ))
 
-        # Download the crash symbols
-        def get_symbolsURL(build):
-            fileURL = build.getProperty('fileURL')
-            suffixes = ('.tar.bz2', '.dmg', '.zip')
-            symbolsURL = None
-            for suffix in suffixes:
-                if fileURL.endswith(suffix):
-                    symbolsURL = fileURL[:-len(suffix)] + '.crashreporter-symbols.zip'
-                    return symbolsURL
-            raise ValueError("Couldn't determine symbols URL")
         if downloadSymbols:
             self.addStep(DownloadFile(
-             url_fn=get_symbolsURL,
+             url_fn=get_symbols_url,
              filename_property='symbols_filename',
              url_property='symbols_url',
              name='download symbols',
