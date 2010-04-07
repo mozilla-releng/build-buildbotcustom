@@ -437,10 +437,6 @@ class UnpackFile(ShellCommand):
         superResult = ShellCommand.evaluateCommand(self, cmd)
         if superResult != SUCCESS:
             return superResult
-
-        if self.filename.endswith(".zip"):
-            if None != re.search('ERROR', cmd.logs['stdio'].getText()):
-                return FAILURE
         if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
             return FAILURE
 
