@@ -586,7 +586,7 @@ def generateBranchObjects(config, name):
         uploadPackages = True
         uploadSymbols = False
         packageTests = False
-        talosMasters = config['talos_masters']
+        talosMasters = pf['talos_masters']
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
@@ -1288,7 +1288,7 @@ def generateCCBranchObjects(config, name):
         uploadPackages = True
         uploadSymbols = False
         packageTests = False
-        talosMasters = config['talos_masters']
+        talosMasters = pf['talos_masters']
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
