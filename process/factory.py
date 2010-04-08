@@ -3551,8 +3551,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.brandName = brandName or productName.capitalize()
 
         self.setup()
-        self.bumpPatcherConfig()
-        self.bumpVerifyConfigs()
+        #self.bumpPatcherConfig()
+        #self.bumpVerifyConfigs()
         self.buildTools()
         self.downloadBuilds()
         self.createPatches()
