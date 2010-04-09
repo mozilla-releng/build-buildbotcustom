@@ -216,11 +216,13 @@ class MozillaBuildFactory(BuildFactory):
             property='builddir',
             workdir='.',
         ))
+        # XX remove flunkOnFailure after bug 558430 is fixed
         self.addStep(ShellCommand,
          name='rm_buildtools',
          command=['rm', '-rf', 'tools'],
          description=['clobber', 'build tools'],
-         workdir='.'
+         workdir='.',
+         flunkOnFailure=False,
         )
         self.addStep(ShellCommand,
          name='clone_buildtools',
@@ -5745,10 +5747,12 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             self.addPeriodicRebootSteps()
 
     def addInitialSteps(self):
+        # XX remove flunkOnFailure after bug 558430 is fixed
         self.addStep(ShellCommand,
          name='rm_builddir',
          command=['rm', '-rf', 'build'],
-         workdir='.'
+         workdir='.',
+         flunkOnFailure=False,
         )
         MozillaBuildFactory.addInitialSteps(self)
 
