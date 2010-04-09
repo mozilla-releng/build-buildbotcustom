@@ -3477,7 +3477,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
                  ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
-                 buildSpace=14, triggerSchedulers=None, **kwargs):
+                 buildSpace=14, triggerSchedulers=None, releaseNotesUrl=None,
+                 **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -3549,6 +3550,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
 
         self.brandName = brandName or productName.capitalize()
+        self.releaseNotesUrl = releaseNotesUrl
 
         self.setup()
         self.bumpPatcherConfig()
@@ -3618,10 +3620,13 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                        '-d', self.bouncerServer, '-l', 'shipped-locales']
         if self.useBetaChannel:
             bumpCommand.append('-u')
+        if self.releaseNotesUrl:
+            bumpCommand.extend(['-n', self.releaseNotesUrl])
         self.addStep(ShellCommand(
          name='bump',
          command=bumpCommand,
          description=['bump patcher config'],
+         env={'PERL5LIB': '../tools/lib/perl'},
          haltOnFailure=True
         ))
         self.addStep(TinderboxShellCommand(
@@ -3854,6 +3859,8 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                        '--update-type=major']
         if self.useBetaChannel:
             bumpCommand.append('-u')
+        if self.releaseNotesUrl:
+            bumpCommand.extend(['-n', self.releaseNotesUrl])
         self.addStep(ShellCommand(
          name='create_config',
          command=bumpCommand,
