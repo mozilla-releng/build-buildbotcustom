@@ -1982,7 +1982,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.doRepack()
         self.doUpload()
 
-    def processCommand(self, **kwargs): 
+    def processCommand(self, **kwargs):
         '''This function is overriden by MaemoNightlyRepackFactory to
         adjust the command and workdir approprietaly for scratchbox
         '''
@@ -6339,10 +6339,12 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
 
     def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
                  sbox_home="/scratchbox/users/cltbld/home/cltbld",
+                 sb_target='CHINOOK-ARMEL-2007',
                  **kwargs):
         self.scratchboxPath = scratchboxPath
         self.scratchboxHome = sbox_home
         self.baseBuildDir = baseBuildDir
+        self.sb_target = sb_target
         # Only for Maemo we upload the 'en-US' binaries under an 'en-US' subdirectory
         assert 'enUSBinaryURL' in kwargs
         assert kwargs['enUSBinaryURL'] is not ''
@@ -6350,7 +6352,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
         MobileNightlyRepackFactory.__init__(self, **kwargs)
         assert self.configRepoPath
 
-    def processCommand(self, verbose=True, **kwargs): 
+    def processCommand(self, verbose=True, **kwargs):
         '''It modifies a command to make it suitable for Scratchbox'''
         if kwargs['workdir'].startswith(self.scratchboxHome):
             kwargs['workdir'] = kwargs['workdir'].replace(self.scratchboxHome+'/','')
@@ -6360,6 +6362,22 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
             kwargs['command'].insert(1, '-p')
         
         return kwargs
+
+    def preClean(self):
+        self.addStep(ShellCommand(
+            name='set-target',
+            command=[self.scratchboxPath, '-p', 'sb-conf', 'select', self.sb_target],
+            description=['set-target'],
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='show-target',
+            command=[self.scratchboxPath, '-p',
+            "echo -n TinderboxPrint: && sb-conf current | sed 's/ARMEL// ; s/_// ; s/-//'"],
+            description=['show-target'],
+            haltOnFailure=False,
+        ))
+        MobileNightlyRepackFactory.preClean(self)
     
     def getMozconfig(self):
         self.addStep(ShellCommand,
