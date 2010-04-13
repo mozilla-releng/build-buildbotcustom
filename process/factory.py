@@ -3530,7 +3530,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.hgSshKey = hgSshKey
         self.hgUsername = hgUsername
         self.commitPatcherConfig = commitPatcherConfig
-        self.oldRepoPath = oldRepoPath or mozRepoPath
+        self.oldRepoPath = oldRepoPath or kwargs['repoPath']
         self.oldRepository = self.getRepository(self.oldRepoPath)
         self.triggerSchedulers = triggerSchedulers
 
