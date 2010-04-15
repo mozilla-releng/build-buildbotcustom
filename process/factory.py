@@ -2876,7 +2876,6 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
-            pushRepo = self.getRepository(repoPath, push=True)
             repoName = self.getRepoName(repoPath)
 
             # test for existence
@@ -2885,12 +2884,25 @@ class StagingRepositorySetupFactory(ReleaseFactory):
             # if it exists, delete it
             command += 'ssh -l %s -i %s %s edit %s delete YES' % \
               (username, sshKey, self.hgHost, repoName)
-            command += '; '
-            # either way, try to create it again
-            # this kindof sucks, but if we '&&' we can't create repositories
-            # that don't already exist, which is a huge pain when adding new
-            # locales or repositories.
-            command += 'ssh -l %s -i %s %s clone %s %s' % \
+
+            self.addStep(ShellCommand,
+             name='delete_repo',
+             command=['bash', '-c', command],
+             description=['delete', repoName],
+             timeout=30*60 # 30 minutes
+            )
+
+        # Wait for hg.m.o to catch up
+        self.addStep(ShellCommand,
+         name='wait_for_hg',
+         command=['sleep', '600'],
+         description=['wait', 'for', 'hg'],
+        )
+
+        for repoPath in sorted(repositories.keys()):
+            repo = self.getRepository(repoPath)
+            repoName = self.getRepoName(repoPath)
+            command = 'ssh -l %s -i %s %s clone %s %s' % \
               (username, sshKey, self.hgHost, repoName, repoPath)
 
             self.addStep(ShellCommand,
@@ -2899,6 +2911,13 @@ class StagingRepositorySetupFactory(ReleaseFactory):
              description=['recreate', repoName],
              timeout=30*60 # 30 minutes
             )
+
+        # Wait for hg.m.o to catch up
+        self.addStep(ShellCommand,
+         name='wait_for_hg',
+         command=['sleep', '600'],
+         description=['wait', 'for', 'hg'],
+        )
 
 
 
@@ -5496,7 +5515,8 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
         self.prepUpload(localeDir='maemo/multi', uploadDir='maemo')
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
-                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     '%s/%s/dist/bin/application.ini' % (self.objdir,
+                                                         self.mobileObjdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -5508,15 +5528,17 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
                                 'maemo_info.txt')],
-         workdir='%s/mobile/dist' % self.objdirAbsPath
+         workdir='%s/%s/dist' % (self.objdirAbsPath, self.mobileObjdir)
         )
-        self.packageGlob = '%s mobile/dist/maemo_info.txt' % self.packageGlob
+        self.packageGlob = '%s %s/dist/maemo_info.txt' % (self.packageGlob,
+                                                          self.mobileObjdir)
         self.addUploadSteps(platform='linux')
 
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
-                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     '%s/%s/dist/bin/application.ini' % (self.objdir,
+                                                         self.mobileObjdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -6668,4 +6690,40 @@ class PartnerRepackFactory(ReleaseFactory):
                                                             str(self.buildNumber)),
          description=['upload', 'partner', 'builds'],
          haltOnFailure=True
+        )
+
+class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
+    def __init__(self, **kwargs):
+        MobileDesktopBuildFactory.__init__(self, **kwargs)
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(MozillaStageUpload,
+            objdir="%s/%s" % (self.branchName, self.objdir),
+            username=self.stageUsername,
+            milestone=self.baseUploadDir,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=False,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=False,
+            releaseToCandidates=True,
+            tinderboxBuildsDir=self.baseUploadDir,
+            remoteCandidatesPath=self.stageBasePath,
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                  self.objdir)
         )
