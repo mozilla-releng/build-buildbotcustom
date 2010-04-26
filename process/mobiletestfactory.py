@@ -78,7 +78,7 @@ class MaemoUnittestFactory(BuildFactory):
             haltOnFailure=True
         )
         self.addStep(SetProperty,
-            command=['cat', 'xulrunner/platform.ini'],
+            command=['cat', 'platform.ini'],
             workdir='%s/fennec' % self.binaryDir,
             extract_fn=self.get_build_info,
             description=['get', 'moz', 'revision'],
@@ -352,8 +352,8 @@ class MaemoTalosFactory(BuildFactory):
                      'tsspider': 60,
                      'tgfx':     60,
                  },
-                 talosTarball='http://mobile-master.mv.mozilla.com/maemo/talos.tar.bz2',
-                 pageloaderTarball='http://mobile-master.mv.mozilla.com/maemo/pageloader.tar.bz2',
+                 talosTarball='http://staging-mobile-master.build.mozilla.org/maemo/talos.tar.bz2',
+                 pageloaderTarball='http://staging-mobile-master.build.mozilla.org/maemo/pageloader.tar.bz2',
                  nochrome=False
     ):
         BuildFactory.__init__(self)
@@ -381,7 +381,7 @@ class MaemoTalosFactory(BuildFactory):
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
         self.addStep(SetProperty,
-            command=['cat', 'xulrunner/platform.ini'],
+            command=['cat', 'platform.ini'],
             workdir='%s/fennec' % self.baseDir,
             extract_fn=self.get_build_info,
             description=['get', 'moz', 'revision'],
