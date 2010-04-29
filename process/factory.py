@@ -4919,7 +4919,6 @@ class MobileBuildFactory(MozillaBuildFactory):
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
                  clobber=False, env=None,
                  mobileRevision='default',
-                 mobileObjdir='mobile', xulrunnerObjdir='xulrunner',
                  mozRevision='default', **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -4943,8 +4942,6 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageGroup = stageGroup
         self.mobileRevision = mobileRevision
         self.mozRevision = mozRevision
-        self.mobileObjdir=mobileObjdir
-        self.xulrunnerObjdir=xulrunnerObjdir
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
 
@@ -5055,7 +5052,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.addStep(SetProperty,
             name="get_buildid",
             command=['python', 'config/printconfigsetting.py',
-                     '%s/%s/dist/bin/application.ini' % (self.objdir ,self.mobileObjdir),
+                     '%s/dist/bin/application.ini' % (self.objdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -5141,8 +5138,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_mobile_pkg',
             command=['make', 'package'],
-            workdir='%s/%s/%s/%s' % (self.baseWorkDir,
-            self.branchName, self.objdir, self.mobileObjdir),
+            workdir='%s/%s/%s' % (self.baseWorkDir,
+            self.branchName, self.objdir),
             description=['make', 'mobile', 'package'],
             env=self.env,
             haltOnFailure=True,
@@ -5151,8 +5148,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=['make', 'package-tests'],
-                workdir='%s/%s/%s/%s' % (self.baseWorkDir,
-                    self.branchName, self.objdir, self.xulrunnerObjdir),
+                workdir='%s/%s/%s' % (self.baseWorkDir,
+                    self.branchName, self.objdir),
                 env=self.env,
                 haltOnFailure=True,
             )
@@ -5164,10 +5161,10 @@ class MaemoBuildFactory(MobileBuildFactory):
                  l10nRepoPath = 'l10n-central',
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
-                 packageGlobList=['mobile/dist/*.tar.bz2',
-                                  'mobile/mobile/*.deb',
-                                  'mobile/dist/deb_name.txt',
-                                  'xulrunner/dist/*.tar.bz2'],
+                 packageGlobList=['dist/*.tar.bz2',
+                                  'mobile/*.deb',
+                                  'dist/deb_name.txt',
+                                  'dist/*.zip'],
                  l10nTag='default',
                  debs=True,
                  mergeLocales=True,
@@ -5220,7 +5217,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             # before the multi-locale. This packageGlob will be used to move packages
             # into the "en-US" directory before uploading it and later on the 
             # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "mobile/dist/*.tar.bz2 mobile/mobile/*.deb mobile/dist/deb_name.txt"
+            self.packageGlob = "dist/*.tar.bz2 mobile/*.deb dist/deb_name.txt"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -5229,7 +5226,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 workdir='%s' % self.baseWorkDir,
                 description=['create', 'l10n', 'dir']
             )
-            self.addBuildSteps(extraEnv="L10NBASEDIR='../../../%s'" % self.l10nRepoPath)
+            self.addBuildSteps(extraEnv="L10NBASEDIR='../../%s'" % self.l10nRepoPath)
             # This will package the en-US single-locale build (no tests)
             self.addPackageSteps()
             self.uploadEnUS()
@@ -5282,12 +5279,10 @@ class MaemoBuildFactory(MobileBuildFactory):
             # dir and break hg.
             self.addStep(ShellCommand,
                 name='rm_old_builds',
-                command=['bash', '-c', 'rm -rf %s/%s/%s/dist/fennec* ' %
-                         (self.branchName, self.objdir, self.mobileObjdir) +
-                         '%s/%s/%s/dist/*.tar.bz2 ' %
-                         (self.branchName, self.objdir, self.xulrunnerObjdir) +
-                         '%s/%s/%s/mobile/*.deb' %
-                         (self.branchName, self.objdir, self.mobileObjdir)],
+                command=['bash', '-c', 'rm -rf %s/%s/dist/fennec* ' %
+                         (self.branchName, self.objdir) +
+                         '%s/%s/mobile/*.deb' %
+                         (self.branchName, self.objdir)],
                 workdir=self.baseWorkDir,
                 description=['removing', 'old', 'builds'],
                 descriptionDone=['removed', 'old', 'builds']
@@ -5311,7 +5306,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_pkg',
             command=[self.scratchboxPath, '-p', '-d',
-                     '%s/%s' % (self.objdirRelPath, self.mobileObjdir),
+                     '%s' % (self.objdirRelPath),
                      'make package', extraArgs],
             description=['make', 'package'],
             haltOnFailure=True
@@ -5320,7 +5315,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addStep(ShellCommand,
                          name='make_mobile_deb',
                          command=[self.scratchboxPath, '-p', '-d',
-                                  '%s/%s' % (self.objdirRelPath, self.mobileObjdir),
+                                  '%s' % (self.objdirRelPath),
                                   'make deb', extraArgs],
                          description=['make', 'mobile', 'deb'],
                          haltOnFailure=True
@@ -5331,7 +5326,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addStep(ShellCommand,
                 name='make_pkg_tests',
                 command=[self.scratchboxPath, '-p', '-d',
-                         '%s/%s' % (self.objdirRelPath, self.xulrunnerObjdir),
+                         '%s' % (self.objdirRelPath),
                          'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
                 haltOnFailure=True
@@ -5350,18 +5345,17 @@ class MaemoBuildFactory(MobileBuildFactory):
             name='prepare_upload',
             command=['mkdir', '-p', localeDir],
             haltOnFailure=True,
-            workdir='%s/%s/dist' % (self.objdirAbsPath, self.mobileObjdir)
+            workdir='%s/dist' % (self.objdirAbsPath)
         )
         self.addStep(ShellCommand,
             name='cp_binaries',
-            command=['sh', '-c', 'cp %s %s/dist/%s' % (self.packageGlob,
-                                                       self.mobileObjdir,
+            command=['sh', '-c', 'cp %s dist/%s' % (self.packageGlob,
                                                        localeDir)],
             workdir=self.objdirAbsPath,
         )
         # Now that we have moved all the packages that we want under localeDir
         # let's indicate that we want to upload the whole directory
-        self.packageGlob = '-r mobile/dist/%s' % uploadDir
+        self.packageGlob = '-r dist/%s' % uploadDir
 
     def uploadEnUS(self):
         self.prepUpload(localeDir='en-US')
@@ -5396,8 +5390,8 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True, packageTests=True)
-        self.packageGlob="mobile/dist/fennec*.tar.bz2 mobile/mobile/fennec*.deb " + \
-                         "mobile/dist/deb_name.txt xulrunner/dist/*.tar.bz2"
+        self.packageGlob="dist/fennec*.tar.bz2 mobile/fennec*.deb " + \
+                         "dist/deb_name.txt dist/fennec*.zip"
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
@@ -5483,7 +5477,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand,
             name='make_locale_chrome_%s' % locale,
             command=[self.scratchboxPath, '-p', '-d',
-                     '%s/mobile/mobile/locales' % self.objdirRelPath,
+                     '%s/mobile/locales' % self.objdirRelPath,
                      'make chrome-%s' % locale] + mergeDirArgs,
             env = self.env,
             haltOnFailure=False,
@@ -5505,8 +5499,7 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
         self.prepUpload(localeDir='maemo/multi', uploadDir='maemo')
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
-                     '%s/%s/dist/bin/application.ini' % (self.objdir,
-                                                         self.mobileObjdir),
+                     '%s/dist/bin/application.ini' % (self.objdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -5518,17 +5511,15 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
                                 'maemo_info.txt')],
-         workdir='%s/%s/dist' % (self.objdirAbsPath, self.mobileObjdir)
+         workdir='%s/dist' % (self.objdirAbsPath)
         )
-        self.packageGlob = '%s %s/dist/maemo_info.txt' % (self.packageGlob,
-                                                          self.mobileObjdir)
+        self.packageGlob = '%s dist/maemo_info.txt' % (self.packageGlob)
         self.addUploadSteps(platform='linux')
 
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
-                     '%s/%s/dist/bin/application.ini' % (self.objdir,
-                                                         self.mobileObjdir),
+                     '%s/dist/bin/application.ini' % (self.objdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -5808,7 +5799,7 @@ class TalosFactory(BuildFactory):
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
         self.addGetBuildInfoStep()
-        if fetchSymbols and (self.OS not in ('linux64', 'fedora64', 'snowleopard')):
+        if fetchSymbols and (self.OS not in ('snowleopard',)):
             self.addDownloadSymbolsStep()
         self.addSetupSteps()
         self.addUpdateConfigStep()
@@ -6694,7 +6685,7 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
-                     '%s/mobile/dist/bin/application.ini' % self.objdir,
+                     '%s/dist/bin/application.ini' % self.objdir,
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),

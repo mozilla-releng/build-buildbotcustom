@@ -28,6 +28,7 @@ def parse_build_info(output, repo_type):
               "^SourceStamp=(?P<%s_changeset>.*)$" % repo_type,
               "^SourceRepository=(?P<%s_repository>\S+)$" % repo_type,
               "^Milestone=(?P<milestone>.*)$",
+              "^Version=(?P<version>.*)$",
              ]
 
     for pattern in patterns:
@@ -81,7 +82,7 @@ class MobileTalosFactory(BuildFactory):
                  cvsroot=":pserver:anonymous@63.245.209.14:/cvsroot",
                  hg_host='http://hg.mozilla.org', tools_repo_path='build/tools',
                  talos_tarball=None, pageloader_tarball=None,
-                 cleanup_glob='tools talos fennec* xul* *.tar.bz2',
+                 cleanup_glob='tools talos fennec* *.tar.bz2 *.zip',
                  tp4_source='/tools/tp4', browser_wait=7, **kwargs):
         BuildFactory.__init__(self, **kwargs)
         self.test = test
@@ -153,7 +154,7 @@ class MobileTalosFactory(BuildFactory):
         mozilla_fn = lambda x,y,z: parse_build_info(' '.join([y,z]), 'mozilla')
         mobile_fn = lambda x,y,z: parse_build_info(' '.join([y,z]), 'mobile')
         self.addStep(SetProperty(
-            command=['cat', 'xulrunner/platform.ini'],
+            command=['cat', 'platform.ini'],
             workdir='%s/fennec' % self.base_dir,
             extract_fn=mozilla_fn,
             description=['get', 'mobile', 'revision'],
@@ -377,16 +378,15 @@ class MobileUnittestFactory(MobileTalosFactory):
         ))
         self.addStep(ShellCommand(
             command=['wget',
-                     WithProperties("%(download_dir)s/xulrunner-%(milestone)s.en-US.linux-gnueabi-arm.tests.tar.bz2"),
-                     '-O', 'xulrunner-tests.tar.bz2'],
+                     WithProperties("%(download_dir)s/fennec-%(version)s.en-US.linux-gnueabi-arm.tests.zip"),
+                     '-O', 'fennec-tests.zip'],
             workdir=self.base_dir,
             haltOnFailure=True,
             name="get_tests",
             description=['get', 'unit', 'tests'],
         ))
         self.addStep(ShellCommand(
-            command=['tar', 'jxvf',
-                     '%s/xulrunner-tests.tar.bz2' % self.base_dir],
+            command=['unzip', '%s/fennec-tests.zip' % self.base_dir],
             workdir="%s/fennec" % self.base_dir,
             name='unpack_test',
             description=['unpack', 'tests'],
