@@ -651,7 +651,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          description=['compile'],
          env=self.env,
          haltOnFailure=True,
-         timeout=5400 # 90 minutes, because windows PGO builds take a long time
+         timeout=7200 # 120 minutes, because windows PGO builds take a long time,
+                      # and because 10.6 builds on minis with 1 GB RAM take a REALLY
+                      # long time.
         )
 
     def addLeakTestSteps(self):
