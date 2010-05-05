@@ -6720,3 +6720,73 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
                                   self.objdir)
         )
+
+
+class AndroidBuildFactory(MobileBuildFactory):
+    def __init__(self, uploadPlatform='linux',
+                       packageGlobList=['dist/*.apk',], **kwargs):
+        """This class creates an Android build.
+        """
+        MobileBuildFactory.__init__(self, **kwargs)
+        self.packageGlob = ' '.join(packageGlobList)
+        if uploadPlatform is not None:
+            self.uploadPlatform = uploadPlatform
+        else:
+            self.uploadPlatform = self.platform
+
+        self.objdir = 'objdir'
+
+        self.addPreCleanSteps()
+        self.addBaseRepoSteps()
+        self.getMozconfig()
+        self.addPreBuildSteps()
+        self.addBuildSteps()
+        self.addPackageSteps()
+        self.addUploadSteps(platform=self.uploadPlatform)
+        if self.triggerBuilds:
+            self.addTriggeredBuildsSteps()
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
+
+    def addPreCleanSteps(self):
+        self.addStep(ShellCommand,
+                name='rm_cltbld_logs',
+                command='rm -f /tmp/*_cltbld.log',
+                description=['removing', 'log', 'file'],
+                workdir=self.baseWorkDir
+            )
+        self.addStep(ShellCommand,
+                name='clobber_%s_dir' % self.branchName,
+                command=['rm', '-rf', self.branchName],
+                description=['clobber', 'build'],
+                timeout=60*60,
+                workdir=self.baseWorkDir
+            )
+
+    def addBuildSteps(self):
+        self.addStep(ShellCommand,
+                name='compile',
+                command=['make', '-f', 'client.mk', 'build'],
+                description=['compile'],
+                workdir=self.baseWorkDir + "/" +  self.branchName,
+                env=self.env,
+                haltOnFailure=True
+            )
+
+    def addPackageSteps(self):
+        self.addStep(ShellCommand,
+           name='make_android_pkg',
+           command=['make', 'package'],
+           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+           description=['make', 'android', 'package'],
+           env=self.env,
+           haltOnFailure=True,
+        )
+        self.addStep(ShellCommand,
+           name='make_pkg_tests',
+           command=['make', 'package-tests'],
+           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+           env=self.env,
+           haltOnFailure=True,
+        )
+
