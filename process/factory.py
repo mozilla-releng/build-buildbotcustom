@@ -5501,15 +5501,14 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
             env=self.env,
             haltOnFailure=True,
         )
-        if self.platform.startswith("linux"):
-            self.addStep(ShellCommand,
-                name='make_pkg_tests',
-                command=['make', 'package-tests'],
-                workdir='%s/%s/%s' % (self.baseWorkDir,
-                    self.branchName, self.objdir),
-                env=self.env,
-                haltOnFailure=True,
-            )
+        self.addStep(ShellCommand,
+            name='make_pkg_tests',
+            command=['make', 'package-tests'],
+            workdir='%s/%s/%s' % (self.baseWorkDir,
+                self.branchName, self.objdir),
+            env=self.env,
+            haltOnFailure=True,
+        )
 
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
