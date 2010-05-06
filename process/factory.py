@@ -170,7 +170,11 @@ class MozillaBuildFactory(BuildFactory):
             'win32_repack',
             'linux_update_verify',
             'linux_build',
-            'linux_repack'
+            'linux_repack',
+            'xulrunner_source',
+            'xulrunner_linux_build',
+            'xulrunner_win32_build',
+            'xulrunner_macosx_build',
             ]
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
@@ -2131,6 +2135,38 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                     WithProperties('%(testsUrl)s')],
              user="sendchange-unittest")
             )
+
+class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
+    def doUpload(self):
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1'})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
+                                       '-p %s ' % self.productName + \
+                                       '-v %s ' % self.version + \
+                                       '-n %s ' % self.buildNumber + \
+                                       '--release-to-candidates-dir'
+        def get_url(rc, stdout, stderr):
+            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
+                if m.endswith("crashreporter-symbols.zip"):
+                    continue
+                if m.endswith("tests.tar.bz2"):
+                    continue
+                return {'packageUrl': m}
+            return {'packageUrl': ''}
+
+        self.addStep(SetProperty,
+         command=['make', '-f', 'client.mk', 'upload'],
+         env=uploadEnv,
+         workdir='build',
+         extract_fn = get_url,
+         haltOnFailure=True,
+         description=['upload']
+        )
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
