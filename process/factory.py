@@ -60,6 +60,19 @@ def parse_make_upload(rc, stdout, stderr):
             retval['packageUrl'] = m
     return retval
 
+def parse_email(rc, stdout, stderr):
+    ''' This function takes the output of hg parent --template author
+    and returns a clean email address'''
+    retval = {}
+    retval['who'] = stdout[stdout.find("<")+1:stdout.find(">")]
+    return retval
+
+def short_hash(rc, stdout, stderr):
+    ''' This function takes an hg changeset id and returns just the first 12 chars'''
+    retval = {}
+    retval['got_revision'] = stdout[:12]
+    return retval
+
 class BootstrapFactory(BuildFactory):
     def __init__(self, automation_tag, logdir, bootstrap_config,
                  cvsroot="pserver:anonymous@cvs-mirror.mozilla.org",
@@ -1145,10 +1158,304 @@ class TryBuildFactory(MercurialBuildFactory):
 
         MercurialBuildFactory.__init__(self, **kwargs)
 
+    def addSourceSteps(self):
+        self.addStep(Mercurial,
+         name='hg_update',
+         mode='clobber',
+         baseURL='http://%s/' % self.hgHost,
+         defaultBranch=self.repoPath,
+         timeout=60*60, # 1 hour
+        )
+        if self.buildRevision:
+            self.addStep(ShellCommand,
+             name='hg_update',
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             haltOnFailure=True
+            )
+        self.addStep(SetProperty,
+         name = 'set_got_revision',
+         command=['hg', 'parent', '--template={node}'],
+         extract_fn = short_hash
+        )
+        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+                                                      self.repoPath)
+        changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
+        self.addStep(OutputStep(
+         name='tinderboxprint_changeset',
+         data=['TinderboxPrint:', WithProperties(changesetLink)]
+        ))
+
+    def addLeakTestSteps(self):
+        self.logUploadDir = '%s/%s-%s-debug' % (self.packageDir, self.branchName,
+                        self.platform)
+        # we want the same thing run a few times here, with different
+        # extraArgs
+        leakEnv = self.env.copy()
+        leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        for args in [['-register'], ['-CreateProfile', 'default'],
+                     ['-P', 'default']]:
+            self.addStep(AliveTest,
+                env=leakEnv,
+                workdir='build/%s/_leaktest' % self.mozillaObjdir,
+                extraArgs=args,
+                warnOnFailure=True,
+                haltOnFailure=True
+            )
+        # we only want this variable for this test - this sucks
+        bloatEnv = leakEnv.copy()
+        bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1'
+        self.addStep(AliveTest,
+         env=bloatEnv,
+         workdir='build/%s/_leaktest' % self.mozillaObjdir,
+         logfile='bloat.log',
+         warnOnFailure=True,
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='get_bloat_log',
+         env=self.env,
+         workdir='.',
+         command=['wget', '-O', 'bloat.log.old',
+                 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/bloat.log' % \
+                     (self.stageServer, self.productName, self.platform)],
+         warnOnFailure=True,
+         flunkOnFailure=False
+        )
+        self.addStep(ShellCommand,
+         name='mv_bloat_log',
+         env=self.env,
+         command=['mv', '%s/_leaktest/bloat.log' % self.mozillaObjdir,
+                  '../bloat.log'],
+        )
+        self.addStep(ShellCommand,
+         name='upload_bloat_log',
+         env=self.env,
+         command=['scp', '-o', 'User=%s' % self.stageUsername,
+                  '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
+                  '../bloat.log',
+                  WithProperties('%s:%s/%s' % (self.stageServer, self.stageBasePath, 
+                      self.logUploadDir))]
+        )
+        self.addStep(CompareBloatLogs,
+         name='compare_bloat_log',
+         bloatLog='bloat.log',
+         env=self.env,
+         workdir='.',
+         mozillaDir=self.mozillaDir,
+         tbPrint=self.tbPrint,
+         warnOnFailure=True,
+         haltOnFailure=False
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+          'App', 'BuildID'],
+          property='buildid',
+          workdir='.',
+          description=['getting', 'buildid'],
+          descriptionDone=['got', 'buildid']
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+          'App', 'SourceStamp'],
+          property='sourcestamp',
+          workdir='.',
+          description=['getting', 'sourcestamp'],
+          descriptionDone=['got', 'sourcestamp']
+        )
+        if self.graphServer:
+            self.addStep(GraphServerPost,
+             server=self.graphServer,
+             selector=self.graphSelector,
+             branch=self.graphBranch,
+             resultsname=self.baseName
+            )
+        self.addStep(AliveTest,
+         env=leakEnv,
+         workdir='build/%s/_leaktest' % self.mozillaObjdir,
+         extraArgs=['--trace-malloc', 'malloc.log',
+                    '--shutdown-leaks=sdleak.log'],
+         timeout=3600, # 1 hour, because this takes a long time on win32
+         warnOnFailure=True,
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='get_malloc_log',
+         env=self.env,
+         workdir='.',
+         command=['wget', '-O', 'malloc.log.old',
+                  'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/malloc.log' % \
+                     (self.stageServer, self.productName, self.platform)],
+        )
+        self.addStep(ShellCommand,
+         name='get_sdleak_log',
+         env=self.env,
+         workdir='.',
+         command=['wget', '-O', 'sdleak.tree.old',
+                  'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/sdleak.tree' % \
+                     (self.stageServer, self.productName, self.platform)],
+        )
+        self.addStep(ShellCommand,
+         name='mv_malloc_log',
+         env=self.env,
+         command=['mv',
+                  '%s/_leaktest/malloc.log' % self.mozillaObjdir,
+                  '../malloc.log'],
+        )
+        self.addStep(ShellCommand,
+         name='mv_sdleak_log',
+         env=self.env,
+         command=['mv',
+                  '%s/_leaktest/sdleak.log' % self.mozillaObjdir,
+                  '../sdleak.log'],
+        )
+        self.addStep(CompareLeakLogs,
+         name='compare_current_leak_log',
+         mallocLog='../malloc.log',
+         platform=self.platform,
+         env=self.env,
+         objdir=self.mozillaObjdir,
+         testname='current',
+         tbPrint=self.tbPrint,
+         warnOnFailure=True,
+         haltOnFailure=True
+        )
+        if self.graphServer:
+            self.addStep(GraphServerPost,
+             server=self.graphServer,
+             selector=self.graphSelector,
+             branch=self.graphBranch,
+             resultsname=self.baseName
+            )
+        self.addStep(CompareLeakLogs,
+         name='compare_previous_leak_log',
+         mallocLog='../malloc.log.old',
+         platform=self.platform,
+         env=self.env,
+         objdir=self.mozillaObjdir,
+         testname='previous'
+        )
+        self.addStep(ShellCommand,
+         name='create_sdleak_tree',
+         env=self.env,
+         workdir='.',
+         command=['bash', '-c',
+                  'perl build%s/tools/trace-malloc/diffbloatdump.pl '
+                  '--depth=15 --use-address /dev/null sdleak.log '
+                  '> sdleak.tree' % self.mozillaDir],
+         warnOnFailure=True,
+         haltOnFailure=True
+        )
+        if self.platform in ('macosx', 'linux'):
+            self.addStep(ShellCommand,
+             name='create_sdleak_raw',
+             env=self.env,
+             workdir='.',
+             command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
+            )
+            self.addStep(ShellCommand,
+             name='get_fix_stack',
+             env=self.env,
+             workdir='.',
+             command=['/bin/bash', '-c',
+                      'perl '
+                      'build%s/tools/rb/fix-%s-stack.pl '
+                      'sdleak.tree.raw '
+                      '> sdleak.tree' % (self.mozillaDir, self.platform)],
+             warnOnFailure=True,
+             haltOnFailure=True
+            )
+        self.addStep(ShellCommand,
+         name='upload_logs',
+         env=self.env,
+         command=['scp', '-o', 'User=%s' % self.stageUsername,
+                  '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
+                  '../malloc.log', '../sdleak.tree',
+                  WithProperties('%s:%s/%s' % (self.stageServer, self.stageBasePath,
+                                self.logUploadDir))]
+        )
+        self.addStep(ShellCommand,
+         name='compare_sdleak_tree',
+         env=self.env,
+         workdir='.',
+         command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
+                  '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
+        )
+
+    def addCodesighsSteps(self):
+        self.logUploadDir = '%s/%s-%s' % (self.packageDir, self.branchName,
+                        self.platform)
+        self.addStep(ShellCommand,
+         name='make_codesighs',
+         command=['make'],
+         workdir='build/%s/tools/codesighs' % self.mozillaObjdir
+        )
+        self.addStep(ShellCommand,
+         name='get_codesize_log',
+         command=['wget', '-O', 'codesize-auto-old.log',
+         'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/codesize-auto.log' % \
+           (self.stageServer, self.productName, self.platform)],
+         workdir='.',
+         env=self.env
+        )
+        if self.mozillaDir == '':
+            codesighsObjdir = self.objdir
+        else:
+            codesighsObjdir = '../%s' % self.mozillaObjdir
+
+        self.addStep(Codesighs,
+         name='get_codesighs_diff',
+         objdir=codesighsObjdir,
+         platform=self.platform,
+         workdir='build%s' % self.mozillaDir,
+         env=self.env,
+         tbPrint=self.tbPrint,
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+          'App', 'BuildID'],
+          property='buildid',
+          workdir='.',
+          description=['getting', 'buildid'],
+          descriptionDone=['got', 'buildid']
+        )
+        self.addStep(SetProperty,
+          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+          'App', 'SourceStamp'],
+          property='sourcestamp',
+          workdir='.',
+          description=['getting', 'sourcestamp'],
+          descriptionDone=['got', 'sourcestamp']
+        )
+        if self.graphServer:
+            self.addStep(GraphServerPost,
+             server=self.graphServer,
+             selector=self.graphSelector,
+             branch=self.graphBranch,
+             resultsname=self.baseName
+            )
+        self.addStep(ShellCommand,
+         name='echo_codesize_log',
+         command=['cat', '../codesize-auto-diff.log'],
+         workdir='build%s' % self.mozillaDir
+        )
+        self.addStep(ShellCommand,
+         name='upload_codesize_log',
+         command=['scp', '-o', 'User=%s' % self.stageUsername,
+          '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
+          '../codesize-auto.log',
+          WithProperties('%s:%s/%s' % (self.stageServer, self.stageBasePath, self.logUploadDir))],
+         workdir='build%s' % self.mozillaDir
+        )
+
     def doUpload(self):
-        self.addStep(SetBuildProperty,
-             property_name="who",
-             value=lambda build:build.source.changes[0].who,
+        self.addStep(SetProperty,
+             name = 'set_who',
+             command=['hg', 'parent', '--template={author}'],
+             extract_fn = parse_email,
              haltOnFailure=True
         )
 
@@ -1193,7 +1500,8 @@ class TryBuildFactory(MercurialBuildFactory):
              master=master,
              branch=talosBranch,
              revision=WithProperties('%(got_revision)s'),
-             files=[WithProperties('%(packageUrl)s')],
+             files=[WithProperties('%(packageUrl)s'),
+                     WithProperties('%(testsUrl)s')],
              user=WithProperties('%(who)s'))
             )
         for master, warn, retries in self.unittestMasters:
@@ -1204,7 +1512,8 @@ class TryBuildFactory(MercurialBuildFactory):
              retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties('%(got_revision)s'),
-             files=[WithProperties('%(packageUrl)s')],
+             files=[WithProperties('%(packageUrl)s'),
+                     WithProperties('%(testsUrl)s')],
              user=WithProperties('%(who)s'))
             )
 

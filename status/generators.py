@@ -4,14 +4,14 @@ import os.path
 def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
     platform = ''
     task = ''
-    identifier = ''
+    got_revision = ''
     who = ''
     builder = attrs['builderName']
 
     try:
-        identifier = attrs['buildProperties']['identifier']
+        got_revision = attrs['buildProperties']['got_revision']
     except KeyError:
-        identifier = 'unknown'
+        got_revision = 'unknown'
     try:
         who = attrs['buildProperties']['who']
     except KeyError:
@@ -26,8 +26,8 @@ def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
     elif 'Maemo' in builder:
         platform = 'maemo'
 
-    if 'unit test' in builder:
-        task = 'unit test'
+    if 'test' in builder:
+        task = 'test'
     elif 'talos' in builder:
         task = 'talos'
     else:
@@ -37,22 +37,25 @@ def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
 
     if attrs['result'] == 'success':
         text = """\
-Your Try Server %(task)s (%(identifier)s) was successfully completed on \
-%(platform)s.  """ % locals()
+Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
+%(platform)s on builder: %(builder)s.\n\n""" % locals()
     elif attrs['result'] == 'warnings':
         text = """\
-Your Try Server %(task)s (%(identifier)s) completed with warnings on \
-%(platform)s.  """ % locals()
+Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
+%(platform)s on builder: %(builder)s.\n\n""" % locals()
     else:
         text = """\
-Your Try Server %(task)s (%(identifier)s) failed to complete on \
-%(platform)s.\n\n""" % locals()
+Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
+%(platform)s on builder: %(builder)s.\n\n""" % locals()
 
     if attrs['result'] in ('success', 'warnings') and packageDir:
         text += "It should be available for download at %(url)s\n\n" % locals()
+    if attrs['result'] in ('failure', 'warnings') and 'unknown' not in who:
+        text += "While some of the build steps haven't succeeded, your build package might have been \
+        successfully created and could be available for download at %(url)s\n\n" % locals()
 
-    if task == 'unit test':
-        text += "Summary of unittest results:\n"
+    if task == 'test':
+        text += "Summary of test results:\n"
         for log in attrs['logs']:
             if 'summary' not in log[0]:
                 continue
