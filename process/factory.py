@@ -4213,6 +4213,16 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
 class MajorUpdateFactory(ReleaseUpdatesFactory):
     def bumpPatcherConfig(self):
+        if self.commitPatcherConfig:
+            self.addStep(ShellCommand(
+             name='add_patcher_config',
+             command=['bash', '-c', 
+                      WithProperties('if [ ! -f ' + self.patcherConfigFile + 
+                                     ' ]; then touch ' + self.patcherConfigFile + 
+                                     ' && cvs add ' + self.patcherConfigFile + 
+                                     '; fi')],
+             description=['add patcher config'],
+            ))
         bumpCommand = ['perl', '../tools/release/patcher-config-creator.pl',
                        '-p', self.productName, '-r', self.brandName,
                        '-v', self.version, '-a', self.appVersion,
@@ -4236,12 +4246,6 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
          env={'PERL5LIB': '../tools/lib/perl'},
          haltOnFailure=True
         ))
-        if self.commitPatcherConfig:
-            self.addStep(ShellCommand(
-             name='add_patcher_config',
-             command=['cvs', 'add', WithProperties(self.patcherConfigFile)],
-             description=['add patcher config'],
-            ))
         self.addStep(TinderboxShellCommand(
          name='diff_patcher_config',
          command=['cvs', 'diff', '-Nu', WithProperties(self.patcherConfigFile)],
