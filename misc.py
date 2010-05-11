@@ -507,12 +507,14 @@ def generateBranchObjects(config, name):
             binaryURL=l10n_binaryURL
         ))
 
-    # change sources
+    # change sources - if try is enabled, tipsOnly will be true which  makes 
+    # every push only show up as one changeset
     branchObjects['change_source'].append(HgPoller(
         hgURL=config['hgurl'],
         branch=config['repo_path'],
         pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
                                               config['repo_path']),
+        tipsOnly=config.get('enable_try', False),
         pollInterval=1*60
     ))
 
@@ -637,8 +639,6 @@ def generateBranchObjects(config, name):
 
         if platform.find('win') > -1:
             codesighs = False
-        if 'upload_symbols' in pf and pf['upload_symbols']:
-            uploadSymbols = True
 
         buildSpace = pf.get('build_space', config['default_build_space'])
         clobberTime = pf.get('clobber_time', config['default_clobber_time'])
@@ -652,8 +652,11 @@ def generateBranchObjects(config, name):
             factory_class = TryBuildFactory
             extra_args['packageUrl'] = config['package_url']
             extra_args['packageDir'] = config['package_dir']
+            extra_args['branchName'] = name
+            uploadSymbols = pf.get('upload_symbols', False)
         else:
             factory_class = NightlyBuildFactory
+            uploadSymbols = False
 
         mozilla2_dep_factory = factory_class(env=pf['env'],
             objdir=pf['platform_objdir'],
@@ -680,7 +683,7 @@ def generateBranchObjects(config, name):
             valgrindCheck=valgrindCheck,
             codesighs=codesighs,
             uploadPackages=uploadPackages,
-            uploadSymbols=False,
+            uploadSymbols=uploadSymbols,
             buildSpace=buildSpace,
             clobberURL=config['base_clobber_url'],
             clobberTime=clobberTime,
@@ -747,7 +750,7 @@ def generateBranchObjects(config, name):
                 stageBasePath=config['stage_base_path'],
                 codesighs=False,
                 uploadPackages=uploadPackages,
-                uploadSymbols=uploadSymbols,
+                uploadSymbols=pf.get('upload_symbols', False),
                 nightly=True,
                 createSnippet=config['create_snippet'],
                 createPartial=config['create_partial'],
