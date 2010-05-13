@@ -447,7 +447,8 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
 
         self.addFactoryArguments(symbols_path=symbols_path)
 
-        script = """cp bin/xpcshell %(exedir)s
+        script = """if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi
+cp bin/xpcshell %(exedir)s
 cp -R bin/components/* %(exedir)s/components/
 cp -R bin/plugins/* %(exedir)s/plugins/
 python -u xpcshell/runxpcshelltests.py""".replace("\n", " && ")
