@@ -6173,6 +6173,15 @@ class TalosFactory(BuildFactory):
              env=MozillaEnvironments[self.envName])
             )
             self.addStep(ShellCommand(
+             name='mv symbols',
+             workdir=os.path.join(self.workdirBase),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="move symbols out of work dir to s-%random%",
+             command=["if", "exist", "symbols", "mv", "symbols", "s-%random%"],
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
              name='chmod_files',
              workdir=self.workdirBase,
              flunkOnFailure=False,
