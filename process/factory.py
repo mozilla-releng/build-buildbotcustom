@@ -5278,6 +5278,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
+                 uploadSymbols=False, productName='mobile',
                  clobber=False, env=None,
                  mobileRevision='default',
                  mozRevision='default', **kwargs):
@@ -5296,6 +5297,8 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.nightly = nightly
         self.objdir = objdir
         self.platform = platform
+        self.productName = productName
+        self.uploadSymbols = uploadSymbols
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.stageServer = stageServer
@@ -5409,6 +5412,26 @@ class MobileBuildFactory(MozillaBuildFactory):
                             revision=self.mobileRevision,
                             targetDirectory='mobile')
 
+    def addSymbolSteps(self):
+        if self.uploadSymbols:
+            self.addStep(ShellCommand,
+                name='make_buildsymbols',
+                command=['make', 'buildsymbols'],
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                      self.objdir),
+                env=self.env,
+                haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+                name='make_uploadsymbols',
+                command=['make', 'uploadsymbols'],
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                      self.objdir),
+                env=self.env,
+                haltOnFailure=True
+            )
+
+
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
             name="get_buildid",
@@ -5464,6 +5487,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
+        self.addSymbolSteps()
         self.addUploadSteps(platform=self.uploadPlatform)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
@@ -5595,7 +5619,9 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addBuildSteps()
             self.addPackageSteps(packageTests=True)
             self.addUploadSteps(platform='linux')
-        
+
+        self.addSymbolSteps()
+
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
 
@@ -5689,6 +5715,27 @@ class MaemoBuildFactory(MobileBuildFactory):
                          '%s' % (self.objdirRelPath),
                          'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
+                haltOnFailure=True
+            )
+
+    def addSymbolSteps(self):
+        if self.uploadSymbols:
+            self.addStep(ShellCommand,
+                name='make_buildsymbols',
+                command=[self.scratchboxPath, '-p', '-d',
+                         self.objdirRelPath,
+                         'make buildsymbols'],
+                description=['make', 'buildsymbols'],
+                env=self.env,
+                haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+                name='make_uploadsymbols',
+                command=[self.scratchboxPath, '-p', '-k', '-d',
+                         self.objdirRelPath,
+                         'make uploadsymbols'],
+                description=['make', 'uploadsymbols'],
+                env=self.env,
                 haltOnFailure=True
             )
     
@@ -7099,6 +7146,7 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
+        self.addSymbolSteps()
         self.addUploadSteps(platform=self.uploadPlatform)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
