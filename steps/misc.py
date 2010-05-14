@@ -265,6 +265,7 @@ class SetMozillaBuildProperties(LoggingBuildStep):
 
 class SendChangeStep(ShellCommand):
     warnOnFailure = True
+    failOnFailure = False
     def __init__(self, master, branch, files, revision=None, user=None,
                  comments="", timeout=1800, retries=5, **kwargs):
 
