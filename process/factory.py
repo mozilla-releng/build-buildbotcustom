@@ -4434,8 +4434,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
          timeout=60*60
         )
 
-        self.doUpload()
-
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
         if self.platform == 'win32':
@@ -4444,6 +4442,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 property='toolsdir',
                 workdir='tools'
             )
+
+        self.doUpload()
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
