@@ -1268,13 +1268,6 @@ class TryBuildFactory(MercurialBuildFactory):
           description=['getting', 'sourcestamp'],
           descriptionDone=['got', 'sourcestamp']
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
         self.addStep(AliveTest,
          env=leakEnv,
          workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -1325,13 +1318,6 @@ class TryBuildFactory(MercurialBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
         self.addStep(CompareLeakLogs,
          name='compare_previous_leak_log',
          mallocLog='../malloc.log.old',
@@ -1434,13 +1420,6 @@ class TryBuildFactory(MercurialBuildFactory):
           description=['getting', 'sourcestamp'],
           descriptionDone=['got', 'sourcestamp']
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
         self.addStep(ShellCommand,
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
