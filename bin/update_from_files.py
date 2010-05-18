@@ -297,8 +297,11 @@ if __name__ == "__main__":
     except:
         last_time = 0
 
+    print "\n" + "-"*75
+    print "Starting update at", time.ctime(started)
+
     updated = updateFromFiles(session, options.master, options.name, builders, last_time, options.times)
 
-    print "Updated", updated, "builds"
+    print "Updated", updated, "builds in:"
 
     open("last_time.txt", "w").write(str(started))
