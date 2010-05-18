@@ -7158,19 +7158,68 @@ class AndroidBuildFactory(MobileBuildFactory):
             )
 
     def addPackageSteps(self):
+        # forcing of PATH to contain jdk6 is only required while bug #562461 is active
+        if self.env is None:
+            envJava = {}
+        else:
+            envJava = self.env.copy()
+        envJava['PATH']      = '/tools/jdk6/bin:%s' % envJava.get('PATH', os.environ['PATH'])
+        envJava['JARSIGNER'] = '../../../../../tools/release/signing/mozpass.py'
+
         self.addStep(ShellCommand,
-           name='make_android_pkg',
-           command=['make', 'package'],
-           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-           description=['make', 'android', 'package'],
-           env=self.env,
-           haltOnFailure=True,
+            name='make_android_pkg',
+            command=['make', '-C', 'embedding/android'],
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['make', 'android', 'package'],
+            env=envJava,
+            haltOnFailure=True,
         )
-        self.addStep(ShellCommand,
-           name='make_pkg_tests',
-           command=['make', 'package-tests'],
-           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-           env=self.env,
-           haltOnFailure=True,
+        # self.addStep(ShellCommand,
+        #    name='make_android_pkg',
+        #    command=['make', 'package'],
+        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+        #    description=['make', 'android', 'package'],
+        #    env=self.env,
+        #    haltOnFailure=True,
+        # )
+        # self.addStep(ShellCommand,
+        #    name='make_pkg_tests',
+        #    command=['make', 'package-tests'],
+        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+        #    env=self.env,
+        #    haltOnFailure=True,
+        # )
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            name="get_buildid",
+            command=['python', '../config/printconfigsetting.py',
+                     'dist/bin/application.ini',
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(MozillaStageUpload,
+            name="upload_to_stage",
+            description=['upload','to','stage'],
+            objdir=self.branchName,
+            username=self.stageUsername,
+            milestone=self.baseUploadDir,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=self.nightly,
+            releaseToDated=self.nightly,
+            releaseToTinderboxBuilds=True,
+            tinderboxBuildsDir=self.baseUploadDir,
+            remoteCandidatesPath=self.stageBasePath,
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
 
