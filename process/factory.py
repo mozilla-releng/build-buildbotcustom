@@ -6848,7 +6848,8 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     def doRepack(self):
         mergeOptions = ""
         if self.mergeLocales:
-            mergeOptions = 'LOCALE_MERGEDIR=$PWD/merged'
+            mergeOptions = 'LOCALE_MERGEDIR=/home/cltbld/build/%s/%s/merged' % \
+                           (self.baseBuildDir, self.origSrcDir)
         self.addStep(ShellCommand, **self.processCommand(
          name='repack_debs',
          command=[WithProperties('make installers-%(locale)s deb-%(locale)s ' +
