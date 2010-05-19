@@ -1472,7 +1472,8 @@ class TryBuildFactory(MercurialBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
-             description=["upload"]
+             description=["upload"],
+             timeout=40*60 # 40 minutes
         )
 
         talosBranch = "%s-%s" % (self.branchName, self.platform)
