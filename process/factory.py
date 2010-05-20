@@ -1484,8 +1484,7 @@ class TryBuildFactory(MercurialBuildFactory):
              master=master,
              branch=talosBranch,
              revision=WithProperties('%(got_revision)s'),
-             files=[WithProperties('%(packageUrl)s'),
-                     WithProperties('%(testsUrl)s')],
+             files=[WithProperties('%(packageUrl)s')],
              user=WithProperties('%(who)s'))
             )
         for master, warn, retries in self.unittestMasters:
