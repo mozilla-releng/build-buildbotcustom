@@ -5869,11 +5869,13 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
         assert (self.stageUsername)
 
     def uploadEnUS(self):
-        self.prepUpload(localeDir='maemo/en-US', uploadDir='maemo')
+        self.prepUpload(localeDir='%s/en-US' % self.platform,
+                        uploadDir=self.platform)
         self.addUploadSteps(platform='linux')
         
     def uploadMulti(self):
-        self.prepUpload(localeDir='maemo/multi', uploadDir='maemo')
+        self.prepUpload(localeDir='%s/multi' % self.platform,
+                        uploadDir=self.platform)
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
                      '%s/dist/bin/application.ini' % (self.objdir),
@@ -5887,10 +5889,11 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
          name='echo_buildID',
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
-                                'maemo_info.txt')],
+                                self.platform + '_info.txt')],
          workdir='%s/dist' % (self.objdirAbsPath)
         )
-        self.packageGlob = '%s dist/maemo_info.txt' % (self.packageGlob)
+        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
+                                                    self.platform)
         self.addUploadSteps(platform='linux')
 
     def addUploadSteps(self, platform):
