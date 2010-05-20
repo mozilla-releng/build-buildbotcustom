@@ -1976,7 +1976,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
               warnOnFailure=warn,
               master=master,
               branch=self.platform,
-              revision=WithProperties("%(got_revision)"),
+              revision=WithProperties("%(got_revision)s"),
               files=[WithProperties('%(packageUrl)s'),
                      WithProperties('%(testsUrl)s')],
               user='sendchange-geriatric')
