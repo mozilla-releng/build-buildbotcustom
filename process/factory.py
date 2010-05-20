@@ -1268,13 +1268,6 @@ class TryBuildFactory(MercurialBuildFactory):
           description=['getting', 'sourcestamp'],
           descriptionDone=['got', 'sourcestamp']
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
         self.addStep(AliveTest,
          env=leakEnv,
          workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -1325,13 +1318,6 @@ class TryBuildFactory(MercurialBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
         self.addStep(CompareLeakLogs,
          name='compare_previous_leak_log',
          mallocLog='../malloc.log.old',
@@ -1434,13 +1420,6 @@ class TryBuildFactory(MercurialBuildFactory):
           description=['getting', 'sourcestamp'],
           descriptionDone=['got', 'sourcestamp']
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
         self.addStep(ShellCommand,
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
@@ -1493,7 +1472,8 @@ class TryBuildFactory(MercurialBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
-             description=["upload"]
+             description=["upload"],
+             timeout=40*60 # 40 minutes
         )
 
         talosBranch = "%s-%s" % (self.branchName, self.platform)
@@ -1632,7 +1612,7 @@ def marFilenameToProperty(prop_name=None):
 class NightlyBuildFactory(MercurialBuildFactory):
     def __init__(self, talosMasters=None, unittestMasters=None,
             unittestBranch=None, tinderboxBuildsDir=None, 
-            geriatricMasters=None, geriatricBranches=None, **kwargs):
+            geriatricMasters=None, **kwargs):
 
         self.talosMasters = talosMasters or []
 
@@ -1645,15 +1625,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
         self.tinderboxBuildsDir = tinderboxBuildsDir
 
         self.geriatricMasters = geriatricMasters or []
-        #geriatricBranches is a mapping between MozillaBF platform
-        #and geriatric master branches that are applicable to that MBF platform
-        self.geriatricBranches = geriatricBranches
 
         MercurialBuildFactory.__init__(self, **kwargs)
-        
-        if len(self.geriatricMasters) > 0:
-            assert self.geriatricBranches
-            assert self.platform
 
     def makePartialTools(self):
         '''The mar and bsdiff tools are created by default when 
@@ -1998,18 +1971,16 @@ class NightlyBuildFactory(MercurialBuildFactory):
              user="sendchange-unittest")
             )
         for master, warn in self.geriatricMasters:
-            if self.platform in self.geriatricBranches:
-              for branch in self.geriatricBranches[self.platform]:
-                self.addStep(SendChangeStep(
-                  name='sendchange_geriatric',
-                  warnOnFailure=warn,
-                  master=master,
-                  branch=branch,
-                  revision=WithProperties("%(got_revision)s"),
-                  files=[WithProperties('%(packageUrl)s'),
-                         WithProperties('%(testsUrl)s')],
-                  user='sendchange-geriatric')
-                )
+            self.addStep(SendChangeStep(
+              name='sendchange_%s' % master,
+              warnOnFailure=warn,
+              master=master,
+              branch=self.platform,
+              revision=WithProperties("%(got_revision)s"),
+              files=[WithProperties('%(packageUrl)s'),
+                     WithProperties('%(testsUrl)s')],
+              user='sendchange-geriatric')
+            )
               
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
@@ -4434,8 +4405,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
          timeout=60*60
         )
 
-        self.doUpload()
-
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
         if self.platform == 'win32':
@@ -4444,6 +4413,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 property='toolsdir',
                 workdir='tools'
             )
+
+        self.doUpload()
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
@@ -5268,6 +5239,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
+                 uploadSymbols=False, productName='mobile',
                  clobber=False, env=None,
                  mobileRevision='default',
                  mozRevision='default', **kwargs):
@@ -5286,6 +5258,8 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.nightly = nightly
         self.objdir = objdir
         self.platform = platform
+        self.productName = productName
+        self.uploadSymbols = uploadSymbols
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.stageServer = stageServer
@@ -5399,6 +5373,26 @@ class MobileBuildFactory(MozillaBuildFactory):
                             revision=self.mobileRevision,
                             targetDirectory='mobile')
 
+    def addSymbolSteps(self):
+        if self.uploadSymbols:
+            self.addStep(ShellCommand,
+                name='make_buildsymbols',
+                command=['make', 'buildsymbols'],
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                      self.objdir),
+                env=self.env,
+                haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+                name='make_uploadsymbols',
+                command=['make', 'uploadsymbols'],
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                      self.objdir),
+                env=self.env,
+                haltOnFailure=True
+            )
+
+
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
             name="get_buildid",
@@ -5454,6 +5448,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
+        self.addSymbolSteps()
         self.addUploadSteps(platform=self.uploadPlatform)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
@@ -5585,7 +5580,9 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addBuildSteps()
             self.addPackageSteps(packageTests=True)
             self.addUploadSteps(platform='linux')
-        
+
+        self.addSymbolSteps()
+
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
 
@@ -5679,6 +5676,27 @@ class MaemoBuildFactory(MobileBuildFactory):
                          '%s' % (self.objdirRelPath),
                          'make package-tests PYTHON=python2.5', extraArgs],
                 description=['make', 'package-tests'],
+                haltOnFailure=True
+            )
+
+    def addSymbolSteps(self):
+        if self.uploadSymbols:
+            self.addStep(ShellCommand,
+                name='make_buildsymbols',
+                command=[self.scratchboxPath, '-p', '-d',
+                         self.objdirRelPath,
+                         'make buildsymbols'],
+                description=['make', 'buildsymbols'],
+                env=self.env,
+                haltOnFailure=True
+            )
+            self.addStep(ShellCommand,
+                name='make_uploadsymbols',
+                command=[self.scratchboxPath, '-p', '-k', '-d',
+                         self.objdirRelPath,
+                         'make uploadsymbols'],
+                description=['make', 'uploadsymbols'],
+                env=self.env,
                 haltOnFailure=True
             )
     
@@ -6165,6 +6183,15 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
+             name='mv symbols',
+             workdir=os.path.join(self.workdirBase),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="move symbols out of work dir to s-%random%",
+             command=["if", "exist", "symbols", "mv", "symbols", "s-%random%"],
              env=MozillaEnvironments[self.envName])
             )
             self.addStep(ShellCommand(
@@ -6808,7 +6835,8 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     def doRepack(self):
         mergeOptions = ""
         if self.mergeLocales:
-            mergeOptions = 'LOCALE_MERGEDIR=$PWD/merged'
+            mergeOptions = 'LOCALE_MERGEDIR=/home/cltbld/build/%s/%s/merged' % \
+                           (self.baseBuildDir, self.origSrcDir)
         self.addStep(ShellCommand, **self.processCommand(
          name='repack_debs',
          command=[WithProperties('make installers-%(locale)s deb-%(locale)s ' +
@@ -7085,6 +7113,7 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
+        self.addSymbolSteps()
         self.addUploadSteps(platform=self.uploadPlatform)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
@@ -7117,19 +7146,68 @@ class AndroidBuildFactory(MobileBuildFactory):
             )
 
     def addPackageSteps(self):
+        # forcing of PATH to contain jdk6 is only required while bug #562461 is active
+        if self.env is None:
+            envJava = {}
+        else:
+            envJava = self.env.copy()
+        envJava['PATH']      = '/tools/jdk6/bin:%s' % envJava.get('PATH', os.environ['PATH'])
+        envJava['JARSIGNER'] = '../../../../../tools/release/signing/mozpass.py'
+
         self.addStep(ShellCommand,
-           name='make_android_pkg',
-           command=['make', 'package'],
-           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-           description=['make', 'android', 'package'],
-           env=self.env,
-           haltOnFailure=True,
+            name='make_android_pkg',
+            command=['make', '-C', 'embedding/android'],
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['make', 'android', 'package'],
+            env=envJava,
+            haltOnFailure=True,
         )
-        self.addStep(ShellCommand,
-           name='make_pkg_tests',
-           command=['make', 'package-tests'],
-           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-           env=self.env,
-           haltOnFailure=True,
+        # self.addStep(ShellCommand,
+        #    name='make_android_pkg',
+        #    command=['make', 'package'],
+        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+        #    description=['make', 'android', 'package'],
+        #    env=self.env,
+        #    haltOnFailure=True,
+        # )
+        # self.addStep(ShellCommand,
+        #    name='make_pkg_tests',
+        #    command=['make', 'package-tests'],
+        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+        #    env=self.env,
+        #    haltOnFailure=True,
+        # )
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            name="get_buildid",
+            command=['python', '../config/printconfigsetting.py',
+                     'dist/bin/application.ini',
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(MozillaStageUpload,
+            name="upload_to_stage",
+            description=['upload','to','stage'],
+            objdir=self.branchName,
+            username=self.stageUsername,
+            milestone=self.baseUploadDir,
+            remoteHost=self.stageServer,
+            remoteBasePath=self.stageBasePath,
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=self.nightly,
+            releaseToDated=self.nightly,
+            releaseToTinderboxBuilds=True,
+            tinderboxBuildsDir=self.baseUploadDir,
+            remoteCandidatesPath=self.stageBasePath,
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
 
