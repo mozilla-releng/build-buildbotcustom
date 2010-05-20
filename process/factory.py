@@ -6840,7 +6840,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     def doRepack(self):
         mergeOptions = ""
         if self.mergeLocales:
-            mergeOptions = 'LOCALE_MERGEDIR=/home/cltbld/build/%s/%s/merged' % \
+            mergeOptions = 'LOCALE_MERGEDIR=/home/cltbld/build/%s/%s/mobile/locales/merged' % \
                            (self.baseBuildDir, self.origSrcDir)
         self.addStep(ShellCommand, **self.processCommand(
          name='repack_debs',
