@@ -447,7 +447,7 @@ def generateBranchObjects(config, name):
             sendToInterestedUsers=True,
             lookup=MercurialEmailLookup(),
             customMesg=lambda attrs: buildTryCompleteMessage(attrs, 
-            	'/'.join([packageUrl, packageDir]), config['tinderbox_url']),
+            	'/'.join([packageUrl, packageDir]), config['tinderbox_tree']),
             subject="Try Server: %(result)s on %(builder)s",
             relayhost="mail.build.mozilla.org",
             builders=notify_builders,
