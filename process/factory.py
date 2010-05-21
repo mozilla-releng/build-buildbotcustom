@@ -1484,8 +1484,7 @@ class TryBuildFactory(MercurialBuildFactory):
              master=master,
              branch=talosBranch,
              revision=WithProperties('%(got_revision)s'),
-             files=[WithProperties('%(packageUrl)s'),
-                     WithProperties('%(testsUrl)s')],
+             files=[WithProperties('%(packageUrl)s')],
              user=WithProperties('%(who)s'))
             )
         for master, warn, retries in self.unittestMasters:
@@ -5860,11 +5859,13 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
         assert (self.stageUsername)
 
     def uploadEnUS(self):
-        self.prepUpload(localeDir='maemo/en-US', uploadDir='maemo')
+        self.prepUpload(localeDir='%s/en-US' % self.platform,
+                        uploadDir=self.platform)
         self.addUploadSteps(platform='linux')
         
     def uploadMulti(self):
-        self.prepUpload(localeDir='maemo/multi', uploadDir='maemo')
+        self.prepUpload(localeDir='%s/multi' % self.platform,
+                        uploadDir=self.platform)
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
                      '%s/dist/bin/application.ini' % (self.objdir),
@@ -5878,10 +5879,11 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
          name='echo_buildID',
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
-                                'maemo_info.txt')],
+                                self.platform + '_info.txt')],
          workdir='%s/dist' % (self.objdirAbsPath)
         )
-        self.packageGlob = '%s dist/maemo_info.txt' % (self.packageGlob)
+        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
+                                                    self.platform)
         self.addUploadSteps(platform='linux')
 
     def addUploadSteps(self, platform):
@@ -6835,7 +6837,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
     def doRepack(self):
         mergeOptions = ""
         if self.mergeLocales:
-            mergeOptions = 'LOCALE_MERGEDIR=/home/cltbld/build/%s/%s/merged' % \
+            mergeOptions = 'LOCALE_MERGEDIR=/home/cltbld/build/%s/%s/mobile/locales/merged' % \
                            (self.baseBuildDir, self.origSrcDir)
         self.addStep(ShellCommand, **self.processCommand(
          name='repack_debs',

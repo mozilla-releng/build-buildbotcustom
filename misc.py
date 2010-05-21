@@ -361,7 +361,7 @@ def generateBranchObjects(config, name):
                 base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
                 for suites_name, suites in config['unittest_suites']:
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
-                triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, True))
+                triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
             # Skip l10n, unit tests and nightlies for debug builds
             continue
         else:
@@ -396,13 +396,13 @@ def generateBranchObjects(config, name):
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
                 test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
-            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, True))
+            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         # Optimized unittest builds
         if pf.get('enable_opt_unittests'):
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
                 test_builders.extend(generateTestBuilderNames('%s opt test' % base_name, suites_name, suites))
-            triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
+            triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % base_name)
         if config['enable_xulrunner'] and platform not in ('wince',):

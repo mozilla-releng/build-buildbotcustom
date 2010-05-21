@@ -75,7 +75,7 @@ Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
                     text += '%s\n' % test
         text += '\n'
 
-    text += """Visit %(tinderboxTree)s to view the full logs.""" % locals()
+    text += """Visit http://tinderbox.mozilla.org/showbuilds.cgi?tree=%(tinderboxTree)s to view the full logs.""" % locals()
 
     return (text, 'plain')
 
