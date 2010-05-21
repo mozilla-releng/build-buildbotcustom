@@ -11,11 +11,14 @@ def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
     try:
         got_revision = attrs['buildProperties']['got_revision']
     except KeyError:
-        got_revision = 'unknown'
+        try:
+            got_revision = attrs['buildProperties']['revision']
+        except KeyError:
+            got_revision = 'revision-not-set'
     try:
         who = attrs['buildProperties']['who']
     except KeyError:
-        who = 'unknown'
+        who = 'who-not-set'
 
     if 'Linux' in builder:
         platform = 'linux'
