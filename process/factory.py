@@ -1435,10 +1435,10 @@ class TryBuildFactory(MercurialBuildFactory):
         )
 
     def doUpload(self):
-        self.addStep(SetProperty,
-             name = 'set_who',
-             command=['hg', 'parent', '--template={author}'],
-             extract_fn = parse_email,
+        self.addStep(SetBuildProperty,
+             name='set_who',
+             property_name='who',
+             value=lambda build:build.source.changes[0].who,
              haltOnFailure=True
         )
 
