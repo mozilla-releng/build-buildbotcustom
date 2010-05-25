@@ -44,18 +44,26 @@ Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
 %(platform)s on builder: %(builder)s.\n\n""" % locals()
     elif attrs['result'] == 'warnings':
         text = """\
-Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
+Your Try Server %(task)s (%(got_revision)s) completed with warnings on \
+%(platform)s on builder: %(builder)s.\n\n""" % locals()
+    elif attrs['result'] == 'exception':
+        text = """\
+Your Try Server %(task)s (%(got_revision)s) hit an exception on \
+%(platform)s on builder: %(builder)s.\n\n""" % locals()
+    elif attrs['result'] == 'failure':
+        text = """\
+Your Try Server %(task)s (%(got_revision)s) failed to complete on \
 %(platform)s on builder: %(builder)s.\n\n""" % locals()
     else:
         text = """\
-Your Try Server %(task)s (%(got_revision)s) was successfully completed on \
-%(platform)s on builder: %(builder)s.\n\n""" % locals()
+Unknown issues arose during %(task)s (%(got_revision)s) on \
+%(platform)s on builder: %(builder)s. Check with RelEng if you have questions.\n\n""" % locals()
 
-    if attrs['result'] in ('success', 'warnings') and packageDir:
+    if attrs['result'] in ('success', 'warnings') and packageDir and 'who-not-set' not in who:
         text += "It should be available for download at %(url)s\n\n" % locals()
-    if attrs['result'] in ('failure', 'warnings') and 'unknown' not in who:
+    if attrs['result'] in ('failure', 'exception') and 'who-not-set' not in who:
         text += "While some of the build steps haven't succeeded, your build package might have been \
-        successfully created and could be available for download at %(url)s\n\n" % locals()
+successfully created and could be available for download at %(url)s\n\n" % locals()
 
     if task == 'test':
         text += "Summary of test results:\n"
