@@ -1438,7 +1438,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(SetBuildProperty,
              name='set_who',
              property_name='who',
-             value=lambda build:build.source.changes[0].who,
+             value=lambda build:str(build.source.changes[0].who),
              haltOnFailure=True
         )
 
