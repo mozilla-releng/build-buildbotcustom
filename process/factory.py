@@ -1435,10 +1435,10 @@ class TryBuildFactory(MercurialBuildFactory):
         )
 
     def doUpload(self):
-        self.addStep(SetProperty,
-             name = 'set_who',
-             command=['hg', 'parent', '--template={author}'],
-             extract_fn = parse_email,
+        self.addStep(SetBuildProperty,
+             name='set_who',
+             property_name='who',
+             value=lambda build:str(build.source.changes[0].who),
              haltOnFailure=True
         )
 
@@ -6132,6 +6132,31 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          workdir='.',
          flunkOnFailure=False,
         )
+
+        def get_revision(build):
+            try:
+                revision = build.source.changes[-1].revision
+                return revision
+            except:
+                return "not-set"
+
+        self.addStep(SetBuildProperty(
+         property_name="revision",
+         value=get_revision,
+        ))
+
+        def get_who(build):
+            try:
+                revision = build.source.changes[-1].who
+                return revision
+            except:
+                return "not-set"
+
+        self.addStep(SetBuildProperty(
+         property_name="who",
+         value=get_who,
+        ))
+
         MozillaBuildFactory.addInitialSteps(self)
 
 class TalosFactory(BuildFactory):
