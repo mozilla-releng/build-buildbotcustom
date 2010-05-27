@@ -1639,6 +1639,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
             marPattern = 'linux-x86_64'
         elif self.platform.startswith("linux"):
             marPattern = 'linux-i686'
+        elif self.platform.startswith("macosx64"):
+            marPattern = 'mac64'
         elif self.platform.startswith("macosx"):
             marPattern = 'mac'
         elif self.platform.startswith("win32"):
