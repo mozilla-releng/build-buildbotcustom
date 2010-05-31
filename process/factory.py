@@ -6168,7 +6168,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
 class TalosFactory(BuildFactory):
     """Create working talos build factory"""
-    def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
+    def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             talosAddOns=[],
@@ -6182,7 +6182,7 @@ class TalosFactory(BuildFactory):
         self.workdirBase = workdirBase
         self.envName = envName
         self.OS = OS
-        self.toolsDir = toolsDir
+        self.supportUrlBase = supportUrlBase
         self.buildBranch = buildBranch
         self.branchName = branchName
         self.configOptions = configOptions
@@ -6254,9 +6254,8 @@ class TalosFactory(BuildFactory):
 
     def addDmgInstaller(self):
         if self.OS in ('leopard', 'tiger', 'snowleopard'):
-            self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/installdmg.sh" % self.toolsDir,
-             slavedest="installdmg.sh",
+            self.addStep(DownloadFile(
+             url="%s/tools/buildfarm/utils/installdmg.sh" % self.supportUrlBase,
              workdir=self.workdirBase,
             ))
 
@@ -6359,11 +6358,10 @@ class TalosFactory(BuildFactory):
                 haltOnFailure=True,
                 flunkOnFailure=False,
                 name='check sdk okay'))
-     
+
     def addSetupSteps(self):
-        self.addStep(FileDownload(
-         mastersrc="%s/buildfarm/maintenance/count_and_reboot.py" % self.toolsDir,
-         slavedest="count_and_reboot.py",
+        self.addStep(DownloadFile(
+         url="%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase,
          workdir=self.workdirBase,
         ))
 
@@ -6385,9 +6383,8 @@ class TalosFactory(BuildFactory):
              flunkOnFailure=True,
              env=MozillaEnvironments[self.envName])
             )
-            self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/generate-tpcomponent.py" % self.toolsDir,
-             slavedest="generate-tpcomponent.py",
+            self.addStep(DownloadFile(
+             url="%s/tools/buildfarm/utils/generate-tpcomponent.py" % self.supportUrlBase,
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
             )
             self.addStep(ShellCommand(
@@ -6411,11 +6408,9 @@ class TalosFactory(BuildFactory):
             ))
 
         if self.plugins:
-            self.addStep(FileDownload(
-             mastersrc=self.plugins,
-             slavedest=os.path.basename(self.plugins),
+            self.addStep(DownloadFile(
+             url="%s/%s" % (self.supportUrlBase, self.plugins),
              workdir=os.path.join(self.workdirBase, "talos/base_profile"),
-             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(self.plugins),
@@ -6423,11 +6418,9 @@ class TalosFactory(BuildFactory):
             ))
 
         if self.pageset:
-            self.addStep(FileDownload(
-             mastersrc=self.pageset,
-             slavedest=os.path.basename(self.pageset),
+            self.addStep(DownloadFile(
+             url="%s/%s" % (self.supportUrlBase, self.pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
-             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(self.pageset),
@@ -6435,11 +6428,9 @@ class TalosFactory(BuildFactory):
             ))
 
         for addOn in self.talosAddOns:
-            self.addStep(FileDownload(
-             mastersrc=addOn,
-             slavedest=os.path.basename(addOn),
+            self.addStep(DownloadFile(
+             url="%s/%s" % (self.supportUrlBase, addOn),
              workdir=os.path.join(self.workdirBase, "talos"),
-             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(addOn),

@@ -366,24 +366,30 @@ class DownloadFile(ShellCommand):
     haltOnFailure = True
     name = "download"
 
-    def __init__(self, url_fn, url_property=None, filename_property=None,
+    def __init__(self, url_fn=None, url=None, url_property=None, filename_property=None,
             ignore_certs=False, wget_args=None, **kwargs):
+        self.url = url
         self.url_fn = url_fn
         self.url_property = url_property
         self.filename_property = filename_property
         self.ignore_certs = ignore_certs
+        assert bool(self.url) ^ bool(self.url_fn), \
+                "One of url_fn or url must be set, not both (%s %s)"
         if wget_args:
             self.wget_args = wget_args
         else:
             self.wget_args = ['--progress=dot:mega']
         ShellCommand.__init__(self, **kwargs)
-        self.addFactoryArguments(url_fn=url_fn, url_property=url_property,
-                filename_property=filename_property, ignore_certs=ignore_certs,
-                wget_args=wget_args)
+        self.addFactoryArguments(url_fn=url_fn, url=url,
+                url_property=url_property, filename_property=filename_property,
+                ignore_certs=ignore_certs, wget_args=wget_args)
 
     def start(self):
         try:
-            url = self.url_fn(self.build)
+            if self.url_fn:
+                url = self.url_fn(self.build)
+            else:
+                url = self.url
         except Exception, e:
             self.addCompleteLog("errors", "Automation Error: %s" % str(e))
             return self.finished(FAILURE)

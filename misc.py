@@ -1715,7 +1715,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                 factory = factory_class(
                     OS=slave_platform,
-                    toolsDir="tools",
+                    supportUrlBase=branch_config['support_url_base'],
                     envName=platform_config['env_name'],
                     workdirBase="../talos-data",
                     buildBranch=buildBranch,
