@@ -6210,6 +6210,7 @@ class TalosFactory(BuildFactory):
 
     def addCleanupSteps(self):
         if self.OS in ('xp', 'vista', 'win7'):
+            #required step due to long filename length in tp4
             self.addStep(ShellCommand(
              name='mv tp4',
              workdir=os.path.join(self.workdirBase),
@@ -6217,15 +6218,6 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
-             env=MozillaEnvironments[self.envName])
-            )
-            self.addStep(ShellCommand(
-             name='mv symbols',
-             workdir=os.path.join(self.workdirBase),
-             flunkOnFailure=False,
-             warnOnFailure=False,
-             description="move symbols out of work dir to s-%random%",
-             command=["if", "exist", "symbols", "mv", "symbols", "s-%random%"],
              env=MozillaEnvironments[self.envName])
             )
             self.addStep(ShellCommand(
@@ -6237,13 +6229,36 @@ class TalosFactory(BuildFactory):
              command=["chmod", "-v", "-R", "a+rwx", "."],
              env=MozillaEnvironments[self.envName])
             )
-        self.addStep(ShellCommand(
-         name='cleanup',
-         workdir=self.workdirBase,
-         description="Cleanup",
-         command='nohup rm -vrf *',
-         env=MozillaEnvironments[self.envName])
-        )
+            #on windows move the whole working dir out of the way, saves us trouble later
+            self.addStep(ShellCommand(
+             name='move old working dir out of the way',
+             workdir=os.path.dirname(self.workdirBase),
+             description="move working dir",
+             command=["if", "exist", os.path.basename(self.workdirBase), "mv", os.path.basename(self.workdirBase), "t-%random%"],
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
+             name='remove any old working dirs',
+             workdir=os.path.dirname(self.workdirBase),
+             description="remove old working dirs",
+             command='if exist t-* nohup rm -vrf t-*',
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
+             name='create new working dir',
+             workdir=os.path.dirname(self.workdirBase),
+             description="create new working dir",
+             command='mkdir ' + os.path.basename(self.workdirBase),
+             env=MozillaEnvironments[self.envName])
+            )
+        else:
+            self.addStep(ShellCommand(
+             name='cleanup',
+             workdir=self.workdirBase,
+             description="Cleanup",
+             command='nohup rm -vrf *',
+             env=MozillaEnvironments[self.envName])
+            )
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
