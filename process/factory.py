@@ -4272,6 +4272,60 @@ class ReleaseFinalVerification(ReleaseFactory):
          workdir='tools/release'
         )
 
+class TuxedoEntrySubmitterFactory(ReleaseFactory):
+    def __init__(self, baseTag, appName, config, productName, version,
+                 tuxedoServerUrl, enUSPlatforms, l10nPlatforms,
+                 bouncerProductName=None, brandName=None, oldVersion=None,
+                 credentialsFile=None, verbose=True, dryRun=False,
+                 **kwargs):
+        ReleaseFactory.__init__(self, **kwargs)
+
+        cmd = ['python', 'tuxedo-add.py',
+               '--config', config,
+               '--product', productName,
+               '--version', version,
+               '--tuxedo-server-url', tuxedoServerUrl]
+
+        if l10nPlatforms:
+            cmd.extend(['--shipped-locales', 'shipped-locales'])
+            shippedLocales = self.getShippedLocales(self.repository, baseTag,
+                                                    appName)
+            self.addStep(ShellCommand(
+             name='get_shipped_locales',
+             command=['wget', '-O', 'shipped-locales', shippedLocales],
+             description=['get', 'shipped-locales'],
+             haltOnFailure=True,
+             workdir='tools/release'
+            ))
+
+        bouncerProductName = bouncerProductName or productName.capitalize()
+        cmd.extend(['--bouncer-product-name', bouncerProductName])
+        brandName = brandName or productName.capitalize()
+        cmd.extend(['--brand-name', brandName])
+
+        if oldVersion:
+            cmd.append('--add-mars')
+            cmd.extend(['--old-version', oldVersion])
+
+        for platform in sorted(enUSPlatforms):
+            cmd.extend(['--platform', platform])
+
+        if credentialsFile:
+            target_file_name = os.path.basename(credentialsFile)
+            cmd.extend(['--credentials-file', target_file_name])
+            self.addStep(FileDownload(
+             mastersrc=credentialsFile,
+             slavedest=target_file_name,
+             workdir='tools/release',
+            ))
+
+        self.addStep(ShellCommand(
+         name='tuxedo_add',
+         command=cmd,
+         description=['tuxedo-add.py'],
+         env={'PYTHONPATH': ['../lib/python']},
+         workdir='tools/release',
+        ))
 
 class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
