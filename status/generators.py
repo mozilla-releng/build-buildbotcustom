@@ -20,9 +20,13 @@ def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
     except KeyError:
         who = 'who-not-set'
 
-    if 'Linux' in builder:
+    if 'Linux x86-64' in builder:
+        platform = 'linux64'
+    elif 'Linux' in builder:
         platform = 'linux'
-    elif 'OS X' in builder:
+    elif 'OS X 10.6' in builder:
+        platform = 'mac64'
+    elif 'OS X 10.5' in builder:
         platform = 'mac'
     elif 'WINNT' in builder:
         platform = 'win32'
