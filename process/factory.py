@@ -1639,6 +1639,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
             marPattern = 'linux-x86_64'
         elif self.platform.startswith("linux"):
             marPattern = 'linux-i686'
+        elif self.platform.startswith("macosx64"):
+            marPattern = 'mac64'
         elif self.platform.startswith("macosx"):
             marPattern = 'mac'
         elif self.platform.startswith("win32"):
@@ -6161,7 +6163,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
 class TalosFactory(BuildFactory):
     """Create working talos build factory"""
-    def __init__(self, OS, toolsDir, envName, buildBranch, branchName,
+    def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             talosAddOns=[],
@@ -6175,7 +6177,7 @@ class TalosFactory(BuildFactory):
         self.workdirBase = workdirBase
         self.envName = envName
         self.OS = OS
-        self.toolsDir = toolsDir
+        self.supportUrlBase = supportUrlBase
         self.buildBranch = buildBranch
         self.branchName = branchName
         self.configOptions = configOptions
@@ -6203,6 +6205,7 @@ class TalosFactory(BuildFactory):
 
     def addCleanupSteps(self):
         if self.OS in ('xp', 'vista', 'win7'):
+            #required step due to long filename length in tp4
             self.addStep(ShellCommand(
              name='mv tp4',
              workdir=os.path.join(self.workdirBase),
@@ -6210,15 +6213,6 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
-             env=MozillaEnvironments[self.envName])
-            )
-            self.addStep(ShellCommand(
-             name='mv symbols',
-             workdir=os.path.join(self.workdirBase),
-             flunkOnFailure=False,
-             warnOnFailure=False,
-             description="move symbols out of work dir to s-%random%",
-             command=["if", "exist", "symbols", "mv", "symbols", "s-%random%"],
              env=MozillaEnvironments[self.envName])
             )
             self.addStep(ShellCommand(
@@ -6230,13 +6224,36 @@ class TalosFactory(BuildFactory):
              command=["chmod", "-v", "-R", "a+rwx", "."],
              env=MozillaEnvironments[self.envName])
             )
-        self.addStep(ShellCommand(
-         name='cleanup',
-         workdir=self.workdirBase,
-         description="Cleanup",
-         command='nohup rm -vrf *',
-         env=MozillaEnvironments[self.envName])
-        )
+            #on windows move the whole working dir out of the way, saves us trouble later
+            self.addStep(ShellCommand(
+             name='move old working dir out of the way',
+             workdir=os.path.dirname(self.workdirBase),
+             description="move working dir",
+             command=["if", "exist", os.path.basename(self.workdirBase), "mv", os.path.basename(self.workdirBase), "t-%random%"],
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
+             name='remove any old working dirs',
+             workdir=os.path.dirname(self.workdirBase),
+             description="remove old working dirs",
+             command='if exist t-* nohup rm -vrf t-*',
+             env=MozillaEnvironments[self.envName])
+            )
+            self.addStep(ShellCommand(
+             name='create new working dir',
+             workdir=os.path.dirname(self.workdirBase),
+             description="create new working dir",
+             command='mkdir ' + os.path.basename(self.workdirBase),
+             env=MozillaEnvironments[self.envName])
+            )
+        else:
+            self.addStep(ShellCommand(
+             name='cleanup',
+             workdir=self.workdirBase,
+             description="Cleanup",
+             command='nohup rm -vrf *',
+             env=MozillaEnvironments[self.envName])
+            )
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
@@ -6247,9 +6264,8 @@ class TalosFactory(BuildFactory):
 
     def addDmgInstaller(self):
         if self.OS in ('leopard', 'tiger', 'snowleopard'):
-            self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/installdmg.sh" % self.toolsDir,
-             slavedest="installdmg.sh",
+            self.addStep(DownloadFile(
+             url="%s/tools/buildfarm/utils/installdmg.sh" % self.supportUrlBase,
              workdir=self.workdirBase,
             ))
 
@@ -6352,11 +6368,10 @@ class TalosFactory(BuildFactory):
                 haltOnFailure=True,
                 flunkOnFailure=False,
                 name='check sdk okay'))
-     
+
     def addSetupSteps(self):
-        self.addStep(FileDownload(
-         mastersrc="%s/buildfarm/maintenance/count_and_reboot.py" % self.toolsDir,
-         slavedest="count_and_reboot.py",
+        self.addStep(DownloadFile(
+         url="%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase,
          workdir=self.workdirBase,
         ))
 
@@ -6378,9 +6393,8 @@ class TalosFactory(BuildFactory):
              flunkOnFailure=True,
              env=MozillaEnvironments[self.envName])
             )
-            self.addStep(FileDownload(
-             mastersrc="%s/buildfarm/utils/generate-tpcomponent.py" % self.toolsDir,
-             slavedest="generate-tpcomponent.py",
+            self.addStep(DownloadFile(
+             url="%s/tools/buildfarm/utils/generate-tpcomponent.py" % self.supportUrlBase,
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
             )
             self.addStep(ShellCommand(
@@ -6404,11 +6418,9 @@ class TalosFactory(BuildFactory):
             ))
 
         if self.plugins:
-            self.addStep(FileDownload(
-             mastersrc=self.plugins,
-             slavedest=os.path.basename(self.plugins),
+            self.addStep(DownloadFile(
+             url="%s/%s" % (self.supportUrlBase, self.plugins),
              workdir=os.path.join(self.workdirBase, "talos/base_profile"),
-             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(self.plugins),
@@ -6416,11 +6428,9 @@ class TalosFactory(BuildFactory):
             ))
 
         if self.pageset:
-            self.addStep(FileDownload(
-             mastersrc=self.pageset,
-             slavedest=os.path.basename(self.pageset),
+            self.addStep(DownloadFile(
+             url="%s/%s" % (self.supportUrlBase, self.pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
-             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(self.pageset),
@@ -6428,11 +6438,9 @@ class TalosFactory(BuildFactory):
             ))
 
         for addOn in self.talosAddOns:
-            self.addStep(FileDownload(
-             mastersrc=addOn,
-             slavedest=os.path.basename(addOn),
+            self.addStep(DownloadFile(
+             url="%s/%s" % (self.supportUrlBase, addOn),
              workdir=os.path.join(self.workdirBase, "talos"),
-             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(addOn),
