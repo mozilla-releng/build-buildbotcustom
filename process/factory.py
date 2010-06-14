@@ -4277,7 +4277,7 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
                  tuxedoServerUrl, enUSPlatforms, l10nPlatforms,
                  bouncerProductName=None, brandName=None, oldVersion=None,
                  credentialsFile=None, verbose=True, dryRun=False,
-                 **kwargs):
+                 milestone=None, **kwargs):
         ReleaseFactory.__init__(self, **kwargs)
 
         cmd = ['python', 'tuxedo-add.py',
@@ -4306,6 +4306,9 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
         if oldVersion:
             cmd.append('--add-mars')
             cmd.extend(['--old-version', oldVersion])
+
+        if milestone:
+            cmd.extend(['--milestone', milestone])
 
         for platform in sorted(enUSPlatforms):
             cmd.extend(['--platform', platform])
