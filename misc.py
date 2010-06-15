@@ -513,13 +513,14 @@ def generateBranchObjects(config, name):
     if config.get('enable_merging', True):
         schedulerClass = MozScheduler
         extra_args['idleTimeout'] = config.get('idle_timeout', None)
+        extra_args['treeStableTimer'] = 3*60
     else:
         schedulerClass = NoMergeScheduler
+        extra_args['treeStableTimer'] = 3
 
     branchObjects['schedulers'].append(schedulerClass(
         name=name,
         branch=config['repo_path'],
-        treeStableTimer=3*60,
         builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
         **extra_args
