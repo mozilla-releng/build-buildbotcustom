@@ -463,13 +463,13 @@ def generateBranchObjects(config, name):
             mode="all",
             sendToInterestedUsers=True,
             lookup=MercurialEmailLookup(),
-            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
-                '/'.join([packageUrl, packageDir]), config['tinderbox_url']),
+            customMesg=lambda attrs: buildTryCompleteMessage(attrs, 
+            	'/'.join([packageUrl, packageDir]), config['tinderbox_tree']),
             subject="Try Server: %(result)s on %(builder)s",
             relayhost="mail.build.mozilla.org",
             builders=notify_builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'),
-                "References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'), 
+            	"References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
         ))
 
     if config['enable_l10n']:
