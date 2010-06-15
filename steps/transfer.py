@@ -3,6 +3,7 @@ from time import strftime, strptime
 
 import buildbot
 from buildbot.steps.shell import ShellCommand
+from buildbotcustom.common import getSupportedPlatforms
 
 class MozillaStageUpload(ShellCommand):
     def __init__(self, objdir, username, milestone, platform, remoteHost,
@@ -27,7 +28,7 @@ class MozillaStageUpload(ShellCommand):
 
         @type  platform: string
         @param platform: The platform we are uploading for. One of 'win32',
-                         'linux', or 'macosx'.
+                         'linux', 'linux64', 'macosx' or 'macosx64'.
 
         @type  remoteHost: string
         @param remoteHost: The server to upload the builds to.
@@ -137,7 +138,7 @@ class MozillaStageUpload(ShellCommand):
                                  uploadCompleteMar=uploadCompleteMar,
                                  uploadLangPacks=uploadLangPacks)
 
-        assert platform in ('win32', 'linux', 'macosx')
+        assert platform in getSupportedPlatforms()
         if releaseToCandidates:
             assert remoteCandidatesPath
         self.objdir = objdir
@@ -206,7 +207,7 @@ class MozillaStageUpload(ShellCommand):
                                                                 self.objdir)
         if self.platform.startswith('macosx'):
             return '%s/dist/*.dmg' % self.objdir
-        if self.platform == "linux":
+        if self.platform.startswith('linux'):
             return '%s/dist/*.tar.bz2' % self.objdir
 
     def getLongDatedPath(self):

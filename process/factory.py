@@ -19,6 +19,7 @@ import buildbotcustom.steps.updates
 import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
 import buildbotcustom.env
+import buildbotcustom.common
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.release)
 reload(buildbotcustom.steps.test)
@@ -27,6 +28,7 @@ reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
+reload(buildbotcustom.common)
 
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
@@ -39,6 +41,7 @@ from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
+from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -162,20 +165,12 @@ class MozillaBuildFactory(BuildFactory):
             'updates',
             'final_verification',
             'l10n_verification',
-            'macosx_update_verify',
-            'macosx_build',
-            'macosx_repack',
-            'win32_update_verify',
-            'win32_build',
-            'win32_repack',
-            'linux_update_verify',
-            'linux_build',
-            'linux_repack',
             'xulrunner_source',
-            'xulrunner_linux_build',
-            'xulrunner_win32_build',
-            'xulrunner_macosx_build',
             ]
+    ignore_dirs.extend(['%s_update_verify' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['%s_build' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['%s_repack' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['xulrunner_%s_build' % p for p in getSupportedPlatforms()])
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
@@ -491,7 +486,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'wince', 'macosx', 'macosx64')
+        assert self.platform in getSupportedPlatforms()
 
         if self.graphServer is not None:
             self.tbPrint = False
@@ -833,7 +828,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
-        if self.platform in ('macosx', 'linux'):
+        if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
             self.addStep(ShellCommand,
              name='create_sdleak_raw',
              env=self.env,
@@ -848,7 +843,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                       'perl '
                       'build%s/tools/rb/fix-%s-stack.pl '
                       'sdleak.tree.raw '
-                      '> sdleak.tree' % (self.mozillaDir, self.platform)],
+                      '> sdleak.tree' % (self.mozillaDir, self.platform.replace("64", ""))],
              warnOnFailure=True,
              haltOnFailure=True
             )
@@ -1337,7 +1332,7 @@ class TryBuildFactory(MercurialBuildFactory):
          warnOnFailure=True,
          haltOnFailure=True
         )
-        if self.platform in ('macosx', 'linux'):
+        if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
             self.addStep(ShellCommand,
              name='create_sdleak_raw',
              env=self.env,
@@ -1352,7 +1347,7 @@ class TryBuildFactory(MercurialBuildFactory):
                       'perl '
                       'build%s/tools/rb/fix-%s-stack.pl '
                       'sdleak.tree.raw '
-                      '> sdleak.tree' % (self.mozillaDir, self.platform)],
+                      '> sdleak.tree' % (self.mozillaDir, self.platform.replace("64", ""))],
              warnOnFailure=True,
              haltOnFailure=True
             )
@@ -1635,19 +1630,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
         pass
 
     def getCompleteMarPatternMatch(self):
-        if self.platform.startswith("linux64"):
-            marPattern = 'linux-x86_64'
-        elif self.platform.startswith("linux"):
-            marPattern = 'linux-i686'
-        elif self.platform.startswith("macosx64"):
-            marPattern = 'mac64'
-        elif self.platform.startswith("macosx"):
-            marPattern = 'mac'
-        elif self.platform.startswith("win32"):
-            marPattern = 'win32'
-        elif self.platform.startswith("wince"):
-            marPattern = 'wince-arm'
-        else:
+        marPattern = getPlatformFtpDir(self.platform)
+        if not marPattern:
             return False
         marPattern += '.complete.mar'
         return marPattern
@@ -2182,14 +2166,10 @@ def identToProperties(default_prop=None):
 class BaseRepackFactory(MozillaBuildFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs + [
-            'mozilla-central-macosx-l10n-nightly',
-            'mozilla-central-linux-l10n-nightly',
-            'mozilla-central-win32-l10n-nightly',
-            'mozilla-1.9.1-macosx-l10n-nightly',
-            'mozilla-1.9.1-linux-l10n-nightly',
-            'mozilla-1.9.1-win32-l10n-nightly',
-    ]
+    ignore_dirs = MozillaBuildFactory.ignore_dirs
+    ignore_dirs.extend(['mozilla-central-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['mozilla-1.9.1-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['mozilla-1.9.2-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
 
     extraConfigureArgs = []
 
@@ -2566,17 +2546,10 @@ class BaseRepackFactory(MozillaBuildFactory):
 class CCBaseRepackFactory(BaseRepackFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs + [
-            'comm-central-macosx-l10n-nightly',
-            'comm-central-linux-l10n-nightly',
-            'comm-central-win32-l10n-nightly',
-            'comm-central-trunk-macosx-l10n-nightly',
-            'comm-central-trunk-linux-l10n-nightly',
-            'comm-central-trunk-win32-l10n-nightly',
-            'comm-1.9.1-macosx-l10n-nightly',
-            'comm-1.9.1-linux-l10n-nightly',
-            'comm-1.9.1-win32-l10n-nightly',
-    ]
+    ignore_dirs = MozillaBuildFactory.ignore_dirs
+    ignore_dirs.extend(['comm-central-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['comm-1.9.1-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['comm-1.9.2-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
 
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
@@ -3035,20 +3008,18 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
         # This block also sets the necessary environment variables that the
         # doRepack() steps rely on to locate their source build.
         builds = {}
-        platformDir = None
+        platformDir = getPlatformFtpDir(self.platform.split("-")[0])
         if self.platform.startswith('linux'):
-            platformDir = 'linux-i686'
             filename = '%s.tar.bz2' % self.project
             builds[filename] = '%s-%s.tar.bz2' % (self.project, self.version)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('macosx'):
-            platformDir = 'mac'
             filename = '%s.dmg' % self.project
             builds[filename] = '%s %s.dmg' % (self.brandName,
                                               longVersion)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('win32'):
-            platformDir = 'unsigned/win32'
+            platformDir = 'unsigned/' + platformDir
             filename = '%s.zip' % self.project
             instname = '%s.exe' % self.project
             builds[filename] = '%s-%s.zip' % (self.project, self.version)
@@ -3058,7 +3029,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
         elif self.platform.startswith('wince'):
-            platformDir = 'wince-arm'
             filename = '%s.zip' % self.project
             builds[filename] = '%s-%s.zip' % (self.project, self.version)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
@@ -3818,7 +3788,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=14, triggerSchedulers=None, releaseNotesUrl=None,
-                 **kwargs):
+                 binaryName=None, oldBinaryName=None, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -3871,6 +3841,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.oldRepoPath = oldRepoPath or kwargs['repoPath']
         self.oldRepository = self.getRepository(self.oldRepoPath)
         self.triggerSchedulers = triggerSchedulers
+        self.binaryName = binaryName
+        self.oldBinaryName = oldBinaryName
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -3958,6 +3930,12 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                        '-c', WithProperties(self.patcherConfigFile),
                        '-t', self.stagingServer, '-f', self.ftpServer,
                        '-d', self.bouncerServer, '-l', 'shipped-locales']
+        for platform in sorted(self.verifyConfigs.keys()):
+            bumpCommand.extend(['--platform', platform])
+        if self.binaryName:
+            bumpCommand.extend(['--marname', self.binaryName.lower()])
+        if self.oldBinaryName:
+            bumpCommand.extend(['--oldmarname', self.oldBinaryName.lower()])
         if self.useBetaChannel:
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
@@ -4164,7 +4142,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         verifyConfigPath = '../tools/release/updates/%s' % \
                             self.verifyConfigs[platform]
 
-        return ['perl', '../tools/release/update-verify-bump.pl',
+        bcmd = ['perl', '../tools/release/update-verify-bump.pl',
                 '-o', platform, '-p', self.productName,
                 '-r', self.brandName,
                 '--old-version=%s' % self.oldVersion,
@@ -4176,6 +4154,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 '-s', self.stagingServer, '-c', verifyConfigPath,
                 '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
                 '--pretty-candidates-dir']
+        if self.binaryName:
+            bcmd.extend(['--binary-name', self.binaryName])
+        if self.oldBinaryName:
+            bcmd.extend(['--old-binary-name', self.oldBinaryName])
+        return bcmd
 
     def getSnippetDir(self):
         date = strftime('%Y%m%d')
@@ -4207,6 +4190,8 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                        '-d', self.bouncerServer, '-l', 'shipped-locales',
                        '--old-shipped-locales=old-shipped-locales',
                        '--update-type=major']
+        for platform in sorted(self.verifyConfigs.keys()):
+            bumpCommand.extend(['--platform', platform])
         if self.useBetaChannel:
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
@@ -4287,6 +4272,63 @@ class ReleaseFinalVerification(ReleaseFactory):
          workdir='tools/release'
         )
 
+class TuxedoEntrySubmitterFactory(ReleaseFactory):
+    def __init__(self, baseTag, appName, config, productName, version,
+                 tuxedoServerUrl, enUSPlatforms, l10nPlatforms,
+                 bouncerProductName=None, brandName=None, oldVersion=None,
+                 credentialsFile=None, verbose=True, dryRun=False,
+                 milestone=None, **kwargs):
+        ReleaseFactory.__init__(self, **kwargs)
+
+        cmd = ['python', 'tuxedo-add.py',
+               '--config', config,
+               '--product', productName,
+               '--version', version,
+               '--tuxedo-server-url', tuxedoServerUrl]
+
+        if l10nPlatforms:
+            cmd.extend(['--shipped-locales', 'shipped-locales'])
+            shippedLocales = self.getShippedLocales(self.repository, baseTag,
+                                                    appName)
+            self.addStep(ShellCommand(
+             name='get_shipped_locales',
+             command=['wget', '-O', 'shipped-locales', shippedLocales],
+             description=['get', 'shipped-locales'],
+             haltOnFailure=True,
+             workdir='tools/release'
+            ))
+
+        bouncerProductName = bouncerProductName or productName.capitalize()
+        cmd.extend(['--bouncer-product-name', bouncerProductName])
+        brandName = brandName or productName.capitalize()
+        cmd.extend(['--brand-name', brandName])
+
+        if oldVersion:
+            cmd.append('--add-mars')
+            cmd.extend(['--old-version', oldVersion])
+
+        if milestone:
+            cmd.extend(['--milestone', milestone])
+
+        for platform in sorted(enUSPlatforms):
+            cmd.extend(['--platform', platform])
+
+        if credentialsFile:
+            target_file_name = os.path.basename(credentialsFile)
+            cmd.extend(['--credentials-file', target_file_name])
+            self.addStep(FileDownload(
+             mastersrc=credentialsFile,
+             slavedest=target_file_name,
+             workdir='tools/release',
+            ))
+
+        self.addStep(ShellCommand(
+         name='tuxedo_add',
+         command=cmd,
+         description=['tuxedo-add.py'],
+         env={'PYTHONPATH': ['../lib/python']},
+         workdir='tools/release',
+        ))
 
 class UnittestBuildFactory(MozillaBuildFactory):
     def __init__(self, platform, productName, config_repo_path, config_dir,
@@ -4322,11 +4364,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 'linux': 'linux-unittest',
                 'linux64': 'linux64-unittest',
                 'macosx': 'macosx-unittest',
+                'macosx64': 'macosx64-unittest',
                 'win32': 'win32-unittest',
                 }
 
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx', 'macosx64')
+        assert self.platform in getSupportedPlatforms()
 
         self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
@@ -4513,7 +4556,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 'linux': 'linux/%s/unittest' % self.branchName,
                 'linux64': 'linux64/%s/unittest' % self.branchName,
                 'macosx': 'macosx/%s/unittest' % self.branchName,
-                'macosx64': 'macosx/%s/unittest' % self.branchName,
+                'macosx64': 'macosx64/%s/unittest' % self.branchName,
                 'win32': 'win32/%s/unittest' % self.branchName,
                 }
         mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
@@ -4646,12 +4689,14 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         env_map = {
                 'linux': 'linux-unittest',
+                'linux64': 'linux64-unittest',
                 'macosx': 'macosx-unittest',
+                'macosx64': 'macosx64-unittest',
                 'win32': 'win32-unittest',
                 }
 
         self.platform = platform.split('-')[0]
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx', 'macosx64')
+        assert self.platform in getSupportedPlatforms()
 
         # Mozilla subdir and objdir
         self.mozillaDir = '/mozilla'
@@ -4920,7 +4965,9 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/unittest' % self.branchName,
+                'linux64': 'linux64/%s/unittest' % self.branchName,
                 'macosx': 'macosx/%s/unittest' % self.branchName,
+                'macosx64': 'macosx64/%s/unittest' % self.branchName,
                 'win32': 'win32/%s/unittest' % self.branchName,
                 }
         mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
@@ -4943,7 +4990,9 @@ class CodeCoverageFactory(UnittestBuildFactory):
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/codecoverage' % self.branchName,
+                'linux64': 'linux64/%s/codecoverage' % self.branchName,
                 'macosx': 'macosx/%s/codecoverage' % self.branchName,
+                'macosx64': 'macosx64/%s/codecoverage' % self.branchName,
                 'win32': 'win32/%s/codecoverage' % self.branchName,
                 }
         mozconfig = 'mozconfigs/%s/%s/mozconfig' % \
@@ -5116,8 +5165,9 @@ class CodeCoverageFactory(UnittestBuildFactory):
 
 class L10nVerifyFactory(ReleaseFactory):
     def __init__(self, cvsroot, stagingServer, productName, version,
-                 buildNumber, oldVersion, oldBuildNumber, verifyDir='verify',
-                 linuxExtension='bz2', buildSpace=14, **kwargs):
+                 buildNumber, oldVersion, oldBuildNumber,
+                 l10nPlatforms, verifyDir='verify', linuxExtension='bz2',
+                 buildSpace=14, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
                                 **kwargs)
@@ -5221,7 +5271,9 @@ class L10nVerifyFactory(ReleaseFactory):
                          description=['verify', 'l10n', product],
                          descriptionDone=['verified', 'l10n', product],
                          command=["bash", "-c",
-                                  "./verify_l10n.sh " + product],
+                                  "./verify_l10n.sh " + product + " " +
+                                  " ".join(map(getPlatformFtpDir,
+                                               l10nPlatforms))],
                          workdir=verifyDirVersion,
                          haltOnFailure=True,
                         )
@@ -5931,7 +5983,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         self.env.update(env)
         self.productName = productName
 
-        assert self.platform in ('linux', 'linux64', 'win32', 'macosx', 'macosx64')
+        assert self.platform in getSupportedPlatforms()
 
         MozillaBuildFactory.__init__(self, **kwargs)
 
