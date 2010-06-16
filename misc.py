@@ -266,6 +266,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
                 'factory': factory,
                 'category': branch_name,
                 'nextSlave': _nextSlowSlave,
+                'properties': {'branch': branch_name, 'platform': platform},
             }
             builders.append(builder)
     else:
@@ -288,6 +289,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
             'factory': factory,
             'category': branch_name,
+            'properties': {'branch': branch_name, 'platform': platform},
         }
         builders.append(builder)
     return builders
@@ -737,6 +739,7 @@ def generateBranchObjects(config, name):
             'factory': mozilla2_dep_factory,
             'category': name,
             'nextSlave': _nextFastSlave,
+            'properties': {'branch': name, 'platform': platform},
         }
         branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -817,6 +820,7 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
+                'properties': {'branch': name, 'platform': platform},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -875,6 +879,7 @@ def generateBranchObjects(config, name):
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
+                        'properties': {'branch': name, 'platform': platform},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
@@ -908,6 +913,7 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
+                'properties': {'branch': name, 'platform': platform},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -955,6 +961,7 @@ def generateBranchObjects(config, name):
                 'factory': unittest_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
+                'properties': {'branch': name, 'platform': platform},
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -1019,6 +1026,7 @@ def generateBranchObjects(config, name):
                     'factory': codecoverage_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
+                    'properties': {'branch': name, 'platform': platform},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -1057,6 +1065,7 @@ def generateBranchObjects(config, name):
                  'factory': mozilla2_shark_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
+                'properties': {'branch': name, 'platform': platform},
              }
              branchObjects['builders'].append(mozilla2_shark_builder)
 
@@ -1101,6 +1110,7 @@ def generateBranchObjects(config, name):
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
+                 'properties': {'branch': name, 'platform': platform},
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
@@ -1804,6 +1814,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     'builddir': "%s-%s%s" % (branch, slave_platform, builddir_suffix),
                     'factory': factory,
                     'category': branch,
+                    'properties': {'branch': branch, 'platform': slave_platform},
                 }
                 if not merge:
                     nomergeBuilders.append(builder['name'])
