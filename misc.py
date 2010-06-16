@@ -1364,6 +1364,7 @@ def generateCCBranchObjects(config, name):
             unittestMasters=config['unittest_masters'],
             unittestBranch=unittestBranch,
             tinderboxBuildsDir=tinderboxBuildsDir,
+            enable_ccache=pf.get('enable_ccache', False),
         )
         mozilla2_dep_builder = {
             'name': '%s build' % pf['base_name'],
@@ -1444,6 +1445,7 @@ def generateCCBranchObjects(config, name):
                 triggerBuilds=config['enable_l10n'],
                 triggeredSchedulers=triggeredSchedulers,
                 tinderboxBuildsDir=tinderboxBuildsDir,
+                enable_ccache=pf.get('enable_ccache', False),
             )
 
             mozilla2_nightly_builder = {
