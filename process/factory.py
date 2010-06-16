@@ -4439,14 +4439,16 @@ class UnittestBuildFactory(MozillaBuildFactory):
          command=["make", "-f", "client.mk", "build"],
          description=['compile'],
          timeout=60*60, # 1 hour
-         haltOnFailure=1
+         haltOnFailure=1,
+         env=self.env,
         )
 
         self.addStep(ShellCommand,
          name='make_buildsymbols',
          command=['make', 'buildsymbols'],
          workdir='build/%s' % self.objdir,
-         timeout=60*60
+         timeout=60*60,
+         env=self.env,
         )
 
         # Need to override toolsdir as set by MozillaBuildFactory because
