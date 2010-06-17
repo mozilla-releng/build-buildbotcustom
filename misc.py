@@ -563,15 +563,19 @@ def generateBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
+    extra_args = {}
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
+        extra_args['treeStableTimer'] = 3
+    else:
+        extra_args['treeStableTimer'] = 3*60
 
     branchObjects['schedulers'].append(Scheduler(
         name=name,
         branch=config['repo_path'],
-        treeStableTimer=3*60,
         builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
+        **extra_args
     ))
 
     if config['enable_l10n']:
@@ -1438,6 +1442,7 @@ def generateCCBranchObjects(config, name):
             unittestMasters=config['unittest_masters'],
             unittestBranch=unittestBranch,
             tinderboxBuildsDir=tinderboxBuildsDir,
+            enable_ccache=pf.get('enable_ccache', False),
         )
         mozilla2_dep_builder = {
             'name': '%s build' % pf['base_name'],
@@ -1518,6 +1523,7 @@ def generateCCBranchObjects(config, name):
                 triggerBuilds=config['enable_l10n'],
                 triggeredSchedulers=triggeredSchedulers,
                 tinderboxBuildsDir=tinderboxBuildsDir,
+                enable_ccache=pf.get('enable_ccache', False),
             )
 
             mozilla2_nightly_builder = {
