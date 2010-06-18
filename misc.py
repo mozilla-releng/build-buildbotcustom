@@ -566,7 +566,7 @@ def generateBranchObjects(config, name):
     extra_args = {}
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
-        extra_args['treeStableTimer'] = 3
+        extra_args['treeStableTimer'] = None
     else:
         extra_args['treeStableTimer'] = 3*60
 
@@ -601,7 +601,7 @@ def generateBranchObjects(config, name):
         scheduler_name = scheduler_branch
         if not merge:
             nomergeBuilders.extend(test_builders)
-        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=None))
 
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="mozilla2.buildbot@build.mozilla.org",
