@@ -6219,11 +6219,12 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         MozillaBuildFactory.addInitialSteps(self)
 
 class TalosFactory(BuildFactory):
+    extName = 'addon.xpi'
     """Create working talos build factory"""
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
-            talosAddOns=[],
+            talosAddOns=[], addonTester=False,
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
 
         BuildFactory.__init__(self)
@@ -6232,12 +6233,11 @@ class TalosFactory(BuildFactory):
             workdirBase = "."
 
         self.workdirBase = workdirBase
-        self.envName = envName
         self.OS = OS
         self.supportUrlBase = supportUrlBase
         self.buildBranch = buildBranch
         self.branchName = branchName
-        self.configOptions = configOptions
+        self.configOptions = configOptions[:]
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
@@ -6247,6 +6247,8 @@ class TalosFactory(BuildFactory):
         self.pageset = pageset
         self.talosAddOns = talosAddOns[:]
         self.exepath = None
+        self.env = MozillaEnvironments[envName]
+        self.addonTester = addonTester
 
         self.addCleanupSteps()
         self.addDmgInstaller()
@@ -6255,6 +6257,8 @@ class TalosFactory(BuildFactory):
         self.addGetBuildInfoStep()
         if fetchSymbols and (self.OS not in ('snowleopard',)):
             self.addDownloadSymbolsStep()
+        if self.addonTester:
+            self.addDownloadExtensionStep()
         self.addSetupSteps()
         self.addUpdateConfigStep()
         self.addRunTestStep()
@@ -6270,7 +6274,7 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(ShellCommand(
              name='chmod_files',
@@ -6279,7 +6283,7 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="chmod files (see msys bug)",
              command=["chmod", "-v", "-R", "a+rwx", "."],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             #on windows move the whole working dir out of the way, saves us trouble later
             self.addStep(ShellCommand(
@@ -6287,21 +6291,21 @@ class TalosFactory(BuildFactory):
              workdir=os.path.dirname(self.workdirBase),
              description="move working dir",
              command=["if", "exist", os.path.basename(self.workdirBase), "mv", os.path.basename(self.workdirBase), "t-%random%"],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(ShellCommand(
              name='remove any old working dirs',
              workdir=os.path.dirname(self.workdirBase),
              description="remove old working dirs",
              command='if exist t-* nohup rm -vrf t-*',
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(ShellCommand(
              name='create new working dir',
              workdir=os.path.dirname(self.workdirBase),
              description="create new working dir",
              command='mkdir ' + os.path.basename(self.workdirBase),
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         else:
             self.addStep(ShellCommand(
@@ -6309,14 +6313,14 @@ class TalosFactory(BuildFactory):
              workdir=self.workdirBase,
              description="Cleanup",
              command='nohup rm -vrf *',
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
          description="talos dir creation",
          command='mkdir talos',
-         env=MozillaEnvironments[self.envName])
+         env=self.env)
         )
 
     def addDmgInstaller(self):
@@ -6353,7 +6357,7 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="chmod files (see msys bug)",
              command=["chmod", "-v", "-R", "a+x", "."],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         if self.OS in ('tiger', 'leopard', 'snowleopard'):
             self.addStep(FindFile(
@@ -6448,7 +6452,7 @@ class TalosFactory(BuildFactory):
              description="checking out talos",
              haltOnFailure=True,
              flunkOnFailure=True,
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(DownloadFile(
              url="%s/tools/buildfarm/utils/generate-tpcomponent.py" % self.supportUrlBase,
@@ -6461,13 +6465,14 @@ class TalosFactory(BuildFactory):
              description="setting up pageloader",
              haltOnFailure=True,
              flunkOnFailure=True,
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         else:
             self.addStep(FileDownload(
              mastersrc=self.customTalos,
              slavedest=self.customTalos,
              workdir=self.workdirBase,
+             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=self.customTalos,
@@ -6530,6 +6535,20 @@ class TalosFactory(BuildFactory):
          name="Unpack symbols",
         ))
 
+    def addDownloadExtensionStep(self):
+        def get_addon_url(build):
+            addon = build.getProperty('addon')
+            ext, prefix = addon
+            return ext
+
+        self.addStep(DownloadFile(
+         url_fn=get_addon_url,
+         workdir=os.path.join(self.workdirBase, "talos"),
+         name="Download extension",
+         ignore_certs=True, 
+         wget_args=['-O', TalosFactory.extName],
+        ))
+
     def addUpdateConfigStep(self):
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(self.workdirBase, "talos/"),
@@ -6538,7 +6557,9 @@ class TalosFactory(BuildFactory):
          haltOnFailure=True,
          executablePath=self.exepath,
          addOptions=self.configOptions,
-         env=MozillaEnvironments[self.envName],
+         env=self.env,
+         extName=TalosFactory.extName,
+         addonTester=self.addonTester,
          useSymbols=self.fetchSymbols)
         )
 
@@ -6549,7 +6570,7 @@ class TalosFactory(BuildFactory):
          timeout=21600,
          haltOnFailure=False,
          command=self.talosCmd,
-         env=MozillaEnvironments[self.envName])
+         env=self.env)
         )
 
     def addRebootStep(self):
@@ -6569,7 +6590,7 @@ class TalosFactory(BuildFactory):
          description="reboot after 1 test run",
          command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
          force_disconnect=do_disconnect,
-         env=MozillaEnvironments[self.envName],
+         env=self.env,
         ))
 
 class TryTalosFactory(TalosFactory):

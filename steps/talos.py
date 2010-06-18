@@ -7,7 +7,7 @@ class MozillaUpdateConfig(ShellCommand):
     name = "Update config"
 
     def __init__(self, branch, branchName, executablePath, addOptions=None,
-            useSymbols=False, **kwargs):
+            useSymbols=False, addonTester=False, extName=None, **kwargs):
 
         if addOptions is None:
             self.addOptions = []
@@ -18,17 +18,26 @@ class MozillaUpdateConfig(ShellCommand):
         self.branchName = branchName
         self.exePath = executablePath
         self.useSymbols = useSymbols
+        self.extName = extName
+        self.addonTester = addonTester
+
 
         ShellCommand.__init__(self, **kwargs)
 
         self.addFactoryArguments(branch=branch, addOptions=addOptions,
                 branchName=branchName, executablePath=executablePath,
-                useSymbols=useSymbols)
+                useSymbols=useSymbols, extName=extName, addonTester=addonTester)
 
     def setBuild(self, build):
         ShellCommand.setBuild(self, build)
         title = build.slavename
         buildid = time.strftime("%Y%m%d%H%M", time.localtime(build.source.changes[-1].when))
+        #if we are an addonTester then the addon build property should be set
+        #  if it's not set this will throw a key error and the run will go red - which should be the expected result
+        if self.addonTester: 
+            addon = self.build.getProperty('addon')
+            ext, prefix = addon
+            self.addOptions += ['--testPrefix', prefix, '--extension', self.extName]
 
         extraopts = copy.copy(self.addOptions)
         if self.useSymbols:
