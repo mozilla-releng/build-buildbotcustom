@@ -95,8 +95,8 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
 # allows us to have the release builder ignore HgPoller triggered changse
 # and the dep builders only obey HgPoller/Force Build triggered ones.
 
-def isHgPollerTriggered(change, hgUrl):
-    if change.comments.find(hgUrl) > -1:
+def isHgPollerTriggered(change, repo_path):
+    if change.comments.find(repo_path) > -1:
         return True
     return False
 
@@ -522,7 +522,7 @@ def generateBranchObjects(config, name):
         name=name,
         branch=config['repo_path'],
         builderNames=builders + unittestBuilders + debugBuilders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config['repo_path']),
         **extra_args
     ))
 
