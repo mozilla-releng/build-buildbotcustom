@@ -835,18 +835,27 @@ class MercurialBuildFactory(MozillaBuildFactory):
              workdir='.',
              command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
             )
-            self.addStep(ShellCommand,
-             name='get_fix_stack',
-             env=self.env,
-             workdir='.',
-             command=['/bin/bash', '-c',
-                      'perl '
-                      'build%s/tools/rb/fix-%s-stack.pl '
-                      'sdleak.tree.raw '
-                      '> sdleak.tree' % (self.mozillaDir, self.platform.replace("64", ""))],
-             warnOnFailure=True,
-             haltOnFailure=True
-            )
+            # Bug 571443 - disable fix-macosx-stack.pl
+            if self.platform == 'macosx64':
+                self.addStep(ShellCommand(
+                 workdir='.',
+                 command=['cp', 'sdleak.tree.raw', 'sdleak.tree'],
+                ))
+            else:
+                self.addStep(ShellCommand,
+                 name='get_fix_stack',
+                 env=self.env,
+                 workdir='.',
+                 command=['/bin/bash', '-c',
+                          'perl '
+                          'build%s/tools/rb/fix-%s-stack.pl '
+                          'sdleak.tree.raw '
+                          '> sdleak.tree' % (self.mozillaDir,
+                                             self.platform.replace("64", "")),
+                          ],
+                 warnOnFailure=True,
+                 haltOnFailure=True
+                )
         self.addStep(ShellCommand,
          name='upload_logs',
          env=self.env,
@@ -1339,18 +1348,27 @@ class TryBuildFactory(MercurialBuildFactory):
              workdir='.',
              command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
             )
-            self.addStep(ShellCommand,
-             name='get_fix_stack',
-             env=self.env,
-             workdir='.',
-             command=['/bin/bash', '-c',
-                      'perl '
-                      'build%s/tools/rb/fix-%s-stack.pl '
-                      'sdleak.tree.raw '
-                      '> sdleak.tree' % (self.mozillaDir, self.platform.replace("64", ""))],
-             warnOnFailure=True,
-             haltOnFailure=True
-            )
+            # Bug 571443 - disable fix-macosx-stack.pl
+            if self.platform == 'macosx64':
+                self.addStep(ShellCommand(
+                 workdir='.',
+                 command=['cp', 'sdleak.tree.raw', 'sdleak.tree'],
+                ))
+            else:
+                self.addStep(ShellCommand,
+                 name='get_fix_stack',
+                 env=self.env,
+                 workdir='.',
+                 command=['/bin/bash', '-c',
+                          'perl '
+                          'build%s/tools/rb/fix-%s-stack.pl '
+                          'sdleak.tree.raw '
+                          '> sdleak.tree' % (self.mozillaDir,
+                                             self.platform.replace("64", ""))
+                          ],
+                 warnOnFailure=True,
+                 haltOnFailure=True
+                )
         self.addStep(ShellCommand,
          name='upload_logs',
          env=self.env,
