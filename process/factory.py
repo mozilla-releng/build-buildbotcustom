@@ -151,6 +151,7 @@ def getPlatformMinidumpPath(platform):
         'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+        'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
         }
@@ -6107,7 +6108,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
              property_name="exepath",
              name="Find executable",
             ))
-        elif self.platform == "win32":
+        elif self.platform.startswith('win'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="%s/%s.exe" % (self.productName, self.productName),
@@ -6127,7 +6128,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths for the stack walker.
-        if self.platform == 'win32':
+        if self.platform.startswith('win'):
             self.addStep(SetProperty,
              command=['bash', '-c', 'pwd -W'],
              property='toolsdir',
@@ -6255,7 +6256,7 @@ class TalosFactory(BuildFactory):
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
         self.addGetBuildInfoStep()
-        if fetchSymbols and (self.OS not in ('snowleopard',)):
+        if fetchSymbols and (self.OS not in ('snowleopard','w764')):
             self.addDownloadSymbolsStep()
         if self.addonTester:
             self.addDownloadExtensionStep()
@@ -6265,7 +6266,7 @@ class TalosFactory(BuildFactory):
         self.addRebootStep()
 
     def addCleanupSteps(self):
-        if self.OS in ('xp', 'vista', 'win7'):
+        if self.OS in ('xp', 'vista', 'win7', 'w764'):
             #required step due to long filename length in tp4
             self.addStep(ShellCommand(
              name='mv tp4',
@@ -6349,7 +6350,7 @@ class TalosFactory(BuildFactory):
          workdir=self.workdirBase,
          name="Unpack build",
         ))
-        if self.OS in ('xp', 'vista', 'win7'):
+        if self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(ShellCommand(
              name='chmod_files',
              workdir=os.path.join(self.workdirBase, "firefox/"),
@@ -6369,7 +6370,7 @@ class TalosFactory(BuildFactory):
              name="Find executable",
              filetype="file",
             ))
-        elif self.OS in ('xp', 'vista', 'win7'):
+        elif self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../firefox/firefox"

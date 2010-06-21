@@ -115,6 +115,15 @@ MozillaEnvironments['win32-unittest'] = {
                'D:\\msvs8\\VC\\ATLMFC\\LIB'
 }
 
+MozillaEnvironments['win64-unittest'] = {
+    "MOZ_NO_REMOTE": '1',
+    "NO_EM_RESTART": '1',
+    "MOZ_CRASHREPORTER_NO_REPORT": '1',
+    "XPCOM_DEBUG_BREAK": 'warn',
+    "CVS_RSH": 'ssh',
+    "NO_FAIL_ON_TEST_ERRORS": '1',
+}
+
 ### Talos environments
 # platform SDK location.  we can build both from one generic template.
 # modified from vc8 environment
@@ -130,6 +139,13 @@ MozillaEnvironments['win32-perf'] = {
             'C:\\WINDOWS\\System32;' + \
             'C:\\program files\\gnuwin32\\bin;' + \
             'C:\\WINDOWS;'
+}
+
+MozillaEnvironments['win64-perf'] = {
+    "MOZ_CRASHREPORTER_NO_REPORT": '1',
+    "MOZ_NO_REMOTE": '1',
+    "NO_EM_RESTART": '1',
+    "XPCOM_DEBUG_BREAK": 'warn',
 }
 
 MozillaEnvironments['linux-perf'] = {
