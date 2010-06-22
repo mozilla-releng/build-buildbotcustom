@@ -7184,6 +7184,15 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                '%s_info.txt' % self.platform)],
+         workdir='%s/dist' % (self.objdirAbsPath)
+        )
+        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
+                                                    self.platform)
         self.addStep(MozillaStageUpload,
             objdir="%s/%s" % (self.branchName, self.objdir),
             username=self.stageUsername,
