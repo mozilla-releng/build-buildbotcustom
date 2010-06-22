@@ -7250,12 +7250,19 @@ class AndroidBuildFactory(MobileBuildFactory):
             )
 
     def addBuildSteps(self):
+        # forcing of PATH to contain jdk6 is only required while bug #567945 is active
+        if self.env is None:
+            envJava = {}
+        else:
+            envJava = self.env.copy()
+        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH')
+
         self.addStep(ShellCommand,
                 name='compile',
                 command=['make', '-f', 'client.mk', 'build'],
                 description=['compile'],
                 workdir=self.baseWorkDir + "/" +  self.branchName,
-                env=self.env,
+                env=envJava,
                 haltOnFailure=True
             )
 
