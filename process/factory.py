@@ -7255,7 +7255,7 @@ class AndroidBuildFactory(MobileBuildFactory):
             envJava = {}
         else:
             envJava = self.env.copy()
-        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH')
+        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH', '/opt/local/bin:/tools/python/bin:/tools/buildbot/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/cltbld/bin')
 
         self.addStep(ShellCommand,
                 name='compile',
