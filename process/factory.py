@@ -5570,7 +5570,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                  l10nRepoPath = 'l10n-central',
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
-                 packageGlobList=['dist/*.tar.bz2',
+                 packageGlobList=['dist/*.tar.*',
                                   'mobile/*.deb',
                                   'dist/deb_name.txt',
                                   'dist/*.zip'],
@@ -5626,7 +5626,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             # before the multi-locale. This packageGlob will be used to move packages
             # into the "en-US" directory before uploading it and later on the 
             # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "dist/*.tar.bz2 mobile/*.deb dist/deb_name.txt"
+            self.packageGlob = "dist/*.tar.* mobile/*.deb dist/deb_name.txt"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -5822,7 +5822,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True, packageTests=True)
-        self.packageGlob="dist/fennec*.tar.bz2 mobile/fennec*.deb " + \
+        self.packageGlob="dist/fennec*.tar.* mobile/fennec*.deb " + \
                          "dist/deb_name.txt dist/fennec*.zip"
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
