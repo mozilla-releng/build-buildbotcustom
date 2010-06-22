@@ -6,6 +6,7 @@ except:
 import collections
 import random
 import re
+from copy import deepcopy
 
 from twisted.python import log
 
@@ -34,6 +35,10 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
   TryUnittestBuildFactory
+from buildbotcustom.process.factory import MaemoBuildFactory, \
+   MaemoNightlyRepackFactory, MobileDesktopBuildFactory, \
+   MobileDesktopNightlyRepackFactory, \
+   AndroidBuildFactory
 from buildbotcustom.scheduler import MultiScheduler
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup
@@ -1118,6 +1123,10 @@ def generateBranchObjects(config, name):
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
+    #Call out for mobile objects
+    mobile_objects = generateMobileBranchObjects(config, name)
+    for key in mobile_objects.keys():
+        branchObjects[key].extend(mobile_objects[key])
     return branchObjects
 
 def generateCCBranchObjects(config, name):
@@ -1924,3 +1933,218 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
     return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, 
         ACTIVE_UNITTEST_PLATFORMS, factory_class)
+
+
+def generateMobileBranchObjects(config, name):
+    '''Call the same way as generateBranchObjects'''
+    mobile_objects = {'builders': [], 'schedulers': [],
+                      'change_source': [], 'status': []
+    }
+    #If there are no mobile platforms, don't create 
+    #status plugins, changesources and schedulers that would do nothing
+    if config.get('mobile_platforms'):
+        if len(config['mobile_platforms']) < 1:
+            return mobile_objects
+    else:
+        return mobile_objects
+    builders = []
+    nightlyBuilders = []
+    mobile_repo_name = config.get('mobile_repo_path').split('/')[-1]
+
+    #We could also make mobile_repo_path a list and iterate over that lise
+    #here to allow for more than one mobile repository to be built against
+    #one mozilla repository.  As there is currently a n:1 mapping between
+    #mozilla repository and mobile repository I (jhford) choose not to 
+    #implement this.
+    for platform in config.get('mobile_platforms', {}).keys():
+        render = {'branch': name,
+                  'mobile_branch': mobile_repo_name,
+                  'platform': platform,
+        }
+        pf=config['mobile_platforms'][platform]
+        base_name = pf.get('base_name') % render
+
+        factory_kwargs={
+            'hgHost': pf.get('hghost', config.get('hghost')),
+            'repoPath': pf.get('repo_path', config.get('repo_path')),
+            'configRepoPath': pf.get('config_repo_path', config.get('config_repo_path')),
+            'configSubDir': pf.get('config_subdir', config.get('config_subdir')),
+            'mozconfig':pf.get('mozconfig'),
+            'env': pf.get('env'),
+            'stageUsername':pf.get('stage_username', config.get('stage_username_mobile')),
+            'stageGroup': pf.get('stage_group', config.get('stage_group')),
+            'stageSshKey': pf.get('stage_ssh_key', config.get('stage_ssh_mobile_key')),
+            'stageServer': pf.get('stage_server', config.get('stage_server')),
+            'stageBasePath': pf.get('stage_base_path', config.get('stage_base_path_mobile')),
+            'mobileRepoPath': pf.get('mobile_repo_path', config.get('mobile_repo_path')),
+            'uploadSymbols': pf.get('upload_symbols', False),
+            'platform': platform,
+            'baseWorkDir': 'build', #Defaults to being under a slave builddir, which has tree info
+            'baseUploadDir': '%s-%s' % (name, platform),
+            'buildToolsRepoPath': pf.get('build_tools_repo_path', config.get('build_tools_repo_path')),
+            'clobberURL': pf.get('base_clobber_url', config.get('base_clobber_url')),
+            'clobberTime': pf.get('clobber_time', config.get('default_clobber_time')),
+            'buildSpace': pf.get('build_space', config.get('default_build_space')),
+            'buildsBeforeReboot': pf.get('builds_before_reboot'),
+            'nightly': False,
+            'clobber': config.get('enable_try', False),
+            'packageGlobList': pf.get('package_globlist'),
+            'mozRevision': pf.get('mozilla_revision'),
+            'mobileRevision': pf.get('mobile_revision'),
+            # It would be great to have:
+            # 'packageTests': pf.get('package_tests', False),
+            # 'uploadPlatform': platform,
+            # These are disabled until l10n comes up
+            #'triggerBuilds': True,
+            #'triggeredSchedulers': triggeredSchedulers,
+        }
+
+        builddir_base = '%s-%s-%s' % (name, mobile_repo_name, platform)
+
+        if 'maemo' in platform:
+            factory_class = MaemoBuildFactory
+            sb_home=pf.get('scratchbox_home', config.get('scratchbox_home'))
+            factory_kwargs.update({
+                'baseBuildDir': builddir_base,
+                'baseWorkDir': '%s/build/%s' % (sb_home, builddir_base),
+                'scratchboxPath': pf.get('scratchbox_path', config.get('scratchbox_path')),
+                'scratchboxPath': pf.get('scratchbox_path', config.get('scratchbox_path')),
+                'multiLocale': pf.get('multi_locale', config.get('multi_locale')),
+                'l10nRepoPath': pf.get('l10n_repo_path', config.get('l10n_repo_path')),
+                'compareLocalesTag': pf.get('compares_locale_tag', config.get('compare_locales_tag')),
+                'l10nTag': pf.get('l10n_tag', config.get('l10n_tag')),
+                'debs': pf.get('debs', config.get('debs', True)),
+                'mergeLocales': pf.get('merge_locales', config.get('merge_locales')),
+                'locales': pf.get('locales', config.get('locales')),
+                'objdirRelPath': pf.get('objdirRelPath'),
+                'objdirAbsPath': pf.get('objdirAbsPath'),
+                'sb_target': pf.get('scratchbox_target'),
+            })
+        elif 'android' in platform:
+            factory_class = AndroidBuildFactory
+        else:
+            factory_class = MobileDesktopBuildFactory
+
+        if pf.get('enable_mobile_nightly', config.get('enable_mobile_nightly', True)):
+            builddir= '%s-nightly' % builddir_base
+            builder_name = '%s nightly' % base_name
+            nightly_kwargs = deepcopy(factory_kwargs)
+            nightly_kwargs['nightly'] = True
+
+            factory = factory_class(**nightly_kwargs)
+
+            builder ={
+                'name': builder_name,
+                'slavenames': pf.get('slaves'),
+                'builddir': builddir,
+                'factory': factory,
+                'category': '%s-%s' % (name, mobile_repo_name),
+                'nextSlave': _nextFastSlave,
+                'properties': {'branch': '%s-%s' % (name, mobile_repo_name),
+                               'platform': platform,}
+            }
+            nightlyBuilders.append(builder_name)
+            mobile_objects['builders'].append(builder)
+
+        if pf.get('enable_mobile_dep', config.get('enable_mobile_dep', True)):
+            builddir = '%s-build' % builddir_base
+            builder_name = '%s build' % base_name
+
+            dep_kwargs = deepcopy(factory_kwargs)
+            factory = factory_class(**dep_kwargs)
+
+            builder ={
+                'name': builder_name,
+                'slavenames': pf.get('slaves'),
+                'builddir': builddir,
+                'factory': factory,
+                'category': '%s-%s' % (name, mobile_repo_name),
+                'nextSlave': _nextFastSlave,
+                'properties': {'branch': '%s-%s' % (name, mobile_repo_name),
+                               'platform': platform,}
+            }
+            builders.append(builder_name)
+            mobile_objects['builders'].append(builder)
+
+    #For now at least, mobile results go to a different tinderbox
+    mobile_objects['status'].append(TinderboxMailNotifier(
+        fromaddr='mozilla2.buildbot@build.mozilla.org',
+        tree=config.get('mobile_tinderbox_tree'),
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost='mail.build.mozilla.org',
+        builders=builders + nightlyBuilders,
+        logCompression='bzip2',
+    ))
+
+    #Try server mail notifier
+    if config.get('enable_mail_notifier'):
+        package_url = config['package_url']
+        package_dir = config['package_dir']
+
+        mobile_objects['status'].append(MailNotifier(
+            fromaddr='tryserver@build.mozilla.org',
+            mode='all',
+            sendToInterestedUsers=True,
+            lookup=MercurialEmailLookup(),
+            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
+                '/'.join([packageUrl, packageDir]), config['tinderbox_tree']),
+            subject='Try Server: %(result)s on %(builder)s',
+            relayhost='mail.build.mozilla.org',
+            builders=builders,
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'),
+                "References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
+    ))
+
+    if config.get('mobile_build_failure_emails'):
+        mobile_objects['status'].append(MailNotifier(
+            fromaddr='mobile-build-failures@mozilla.org',
+            sendToInterestedUsers=False,
+            extraRecipients=config['mobile_build_failure_emails'],
+            mode='failing',
+            builders=builders+nightlyBuilders,
+            relayhost='smtp.mozilla.org',
+        ))
+
+
+    #This change source is for the mobile_repo.  There is an assumption
+    #that there will be a change source created for the main repository
+    mobile_objects['change_source'].append(HgPoller(
+        hgURL=config.get('hgurl'),
+        branch=config.get('mobile_repo_path'),
+        pushlogUrlOverride='%s/%s/pushlog' %(config.get('hgurl'),
+                                             config.get('mobile_repo_path')),
+        tipsOnly=config.get('enable_try', False),
+        pollInterval=1*60,
+    ))
+
+    #this scheduler is to trigger mobile builds on a mozilla change
+    mobile_objects['schedulers'].append(Scheduler(
+        name='%s-%s-build-mozilla' % (name, mobile_repo_name),
+        branch=config.get('repo_path'),
+        treeStableTimer=3*60,
+        builderNames=builders,
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
+    ))
+    #this scheduler is to trigger mobile builds on a mobile change
+    mobile_objects['schedulers'].append(Scheduler(
+        name='%s-%s-build-mobile' % (mobile_repo_name, name),
+        branch=config.get('mobile_repo_path'),
+        treeStableTimer=3*60,
+        builderNames=builders,
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
+    ))
+
+    #Mobile nightlies on this branch
+    mobile_objects['schedulers'].append(Nightly(
+        name='%s-%s-nightly' % (name, mobile_repo_name),
+        branch=config.get('mobile_repo_path'),
+        hour=config.get('start_hour'),
+        minute=config.get('start_minute'),
+        builderNames=nightlyBuilders
+    ))
+
+    if not config.get('enable_merging', True):
+        nomergeBuilders.extend(builders + nightlyBuilders)
+
+    return mobile_objects
+

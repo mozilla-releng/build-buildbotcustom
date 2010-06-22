@@ -5385,9 +5385,13 @@ class MobileBuildFactory(MozillaBuildFactory):
             descriptionDone=['pulled', targetDirectory],
             haltOnFailure=True
         )
+        if revision:
+            rev_list = ['--rev', revision]
+        else:
+            rev_list = []
         self.addStep(ShellCommand,
             name='hg_update',
-            command=['hg', 'update', '-C', '-r', revision],
+            command=['hg', 'update', '-C'] + rev_list,
             workdir="%s/%s" % (workdir, targetDirectory),
             description=['updating', targetDirectory],
             descriptionDone=['updated', targetDirectory],
@@ -5535,7 +5539,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
                 description=['removing', 'log', 'file'],
                 workdir=self.baseWorkDir
             )
-        self.addStep(ShellCommand,
+        if self.clobber:
+            self.addStep(ShellCommand,
                 name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
                 description=['clobber', 'build'],
@@ -7234,7 +7239,8 @@ class AndroidBuildFactory(MobileBuildFactory):
                 description=['removing', 'log', 'file'],
                 workdir=self.baseWorkDir
             )
-        self.addStep(ShellCommand,
+        if self.clobber:
+            self.addStep(ShellCommand,
                 name='clobber_%s_dir' % self.branchName,
                 command=['rm', '-rf', self.branchName],
                 description=['clobber', 'build'],
