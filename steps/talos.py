@@ -12,7 +12,7 @@ class MozillaUpdateConfig(ShellCommand):
         if addOptions is None:
             self.addOptions = []
         else:
-            self.addOptions = addOptions
+            self.addOptions = addOptions[:]
 
         self.branch = branch
         self.branchName = branchName
@@ -32,20 +32,18 @@ class MozillaUpdateConfig(ShellCommand):
         ShellCommand.setBuild(self, build)
         title = build.slavename
         buildid = time.strftime("%Y%m%d%H%M", time.localtime(build.source.changes[-1].when))
-        #if we are an addonTester then the addon build property should be set
+        #if we are an addonTester then the addonName/addonUrl build property should be set
         #  if it's not set this will throw a key error and the run will go red - which should be the expected result
-        if self.addonTester: 
-            addon = self.build.getProperty('addon')
-            ext, prefix = addon
-            self.addOptions += ['--testPrefix', prefix, '--extension', self.extName]
+        if self.addonTester:
+            addon_prefix = self.build.getProperty('addonName')
+            self.addOptions += ['--testPrefix', addon_prefix, '--extension', self.extName]
 
-        extraopts = copy.copy(self.addOptions)
         if self.useSymbols:
-            extraopts += ['--symbolsPath', '../symbols']
+            self.addOptions += ['--symbolsPath', '../symbols']
 
         self.setCommand(["python", "PerfConfigurator.py", "-v", "-e",
             self.exePath, "-t", title, "-b", self.branch, "-d",
-            buildid, '--branchName', self.branchName] + extraopts)
+            buildid, '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
         superResult = ShellCommand.evaluateCommand(self, cmd)

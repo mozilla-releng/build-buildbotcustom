@@ -6538,9 +6538,10 @@ class TalosFactory(BuildFactory):
 
     def addDownloadExtensionStep(self):
         def get_addon_url(build):
-            addon = build.getProperty('addon')
-            ext, prefix = addon
-            return ext
+            import urlparse
+            base_url = 'https://addons.mozilla.org/'
+            addon_url = build.getProperty('addonUrl')
+            return urlparse.urljoin(base_url, addon_url)
 
         self.addStep(DownloadFile(
          url_fn=get_addon_url,
