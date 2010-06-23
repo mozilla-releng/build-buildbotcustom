@@ -7189,7 +7189,7 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
                                 '%s_info.txt' % self.platform)],
-         workdir='%s/dist' % (self.objdirAbsPath)
+         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
         )
         self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
                                                     self.platform)
