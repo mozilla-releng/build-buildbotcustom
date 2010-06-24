@@ -265,6 +265,7 @@ class SetMozillaBuildProperties(LoggingBuildStep):
 
 class SendChangeStep(ShellCommand):
     warnOnFailure = True
+    flunkOnFailure = False
     name = "sendchange"
     description = ["sendchange"]
 
