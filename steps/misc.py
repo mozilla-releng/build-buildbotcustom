@@ -307,7 +307,9 @@ class SendChangeStep(ShellCommand):
                     self.user, self.files))
             bb_cmd = ['buildbot', 'sendchange', '--master', self.master,
                       '--username', self.user, '--branch', self.branch,
-                      '--revision', self.revision, '--comments', self.comments]
+                      '--revision', self.revision]
+            if self.comments:
+                bb_cmd.extend(['--comments', self.comments])
             if self.files:
                 bb_cmd.extend(self.files)
             cmd = ['python',
