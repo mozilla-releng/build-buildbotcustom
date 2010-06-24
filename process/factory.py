@@ -6993,7 +6993,7 @@ class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
         self.addStep(ShellCommand,
          name='copy_files',
          command=['sh', '-c',
-                  WithProperties('cp fennec-*.%(locale)s.linux-gnueabi-arm.tar.bz2 ' +
+                  WithProperties('cp fennec-*.%(locale)s.linux-gnueabi-arm.tar.* ' +
                                  'install/fennec-*.%(locale)s.langpack.xpi ' +
                                  '%(locale)s/')],
          workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir),
