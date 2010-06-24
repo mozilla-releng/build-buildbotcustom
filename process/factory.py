@@ -6172,7 +6172,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  symbols_path='symbols',
                  maxTime=120*60, # Two Hours
                 ))
-            elif suite in ('reftest', 'crashtest', 'jsreftest'):
+            elif suite in ('reftest', 'reftest-d2d', 'crashtest', 'jsreftest'):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
                  env=self.env,

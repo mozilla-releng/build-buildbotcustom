@@ -40,6 +40,7 @@ from buildbotcustom.l10n import NightlyL10n
 from buildbotcustom.status.mail import MercurialEmailLookup
 from buildbot.status.mail import MailNotifier
 from buildbotcustom.status.generators import buildTryCompleteMessage
+from buildbotcustom.env import MozillaEnvironments
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -215,6 +216,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
                 'factory': factory,
                 'category': branch_name,
                 'nextSlave': _nextSlowSlave,
+                'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
     else:
@@ -237,6 +239,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
             'factory': factory,
             'category': branch_name,
+            'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
         }
         builders.append(builder)
     return builders
@@ -1771,7 +1774,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     unittest_suites = "%s_unittest_suites" % test_type
 
                     # create builder names for TinderboxMailNotifier
-                    for suites_name, suites in branch_config['platforms'][platform][unittest_suites]:
+                    for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                         test_builders.extend(generateTestBuilderNames(
                             '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
                     # Collect test builders for the TinderboxMailNotifier
@@ -1779,7 +1782,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                     triggeredUnittestBuilders.append(('%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, True))
 
-                    for suites_name, suites in branch_config['platforms'][platform][unittest_suites]:
+                    for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                         # create the builders
                         branchObjects['builders'].extend(generateTestBuilder(
                                 branch_config, branch, platform, "%s %s %s test" % (platform_name, branch, test_type),
