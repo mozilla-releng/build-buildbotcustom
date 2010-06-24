@@ -263,14 +263,17 @@ class SetMozillaBuildProperties(LoggingBuildStep):
             return FAILURE
         return SUCCESS
 
-class SendChangeStep(BuildStep):
+class SendChangeStep(ShellCommand):
     warnOnFailure = True
     def __init__(self, master, branch, files, revision=None, user=None,
-            comments="", timeout=1800, retries=5, **kwargs):
-        BuildStep.__init__(self, **kwargs)
+                 comments="", timeout=1800, retries=5, **kwargs):
+
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(master=master, branch=branch, files=files,
-                revision=revision, user=user, comments=comments, timeout=timeout,
-                retries=retries)
+                                 revision=revision, user=user,
+                                 comments=comments, timeout=timeout,
+                                 retries=retries)
         self.master = master
         self.branch = branch
         self.files = files
@@ -281,12 +284,8 @@ class SendChangeStep(BuildStep):
         self.retries = retries
 
         self.name = 'sendchange'
-        self.warnings = None
 
-        self.sender = Sender(master)
         self.sleepTime = 5
-
-        self._interrupt = None
 
     def start(self):
         master = self.master
@@ -304,63 +303,24 @@ class SendChangeStep(BuildStep):
     revision: %s
     comments: %s
     user: %s
-    files: %s""" % (self.master, self.branch, self.revision, self.comments, self.user, self.files))
-            return self.sendChange()
+    files: %s""" % (self.master, self.branch, self.revision, self.comments,
+                    self.user, self.files))
+            bb_cmd = ['buildbot', 'sendchange', '--master', self.master,
+                      '--username', self.user, '--branch', self.branch,
+                      '--revision', self.revision, '--comments', self.comments]
+            if self.files:
+                bb_cmd.extend(self.files)
+            cmd = ['python',
+                   WithProperties("%(toolsdir)s/buildfarm/utils/retry.py"),
+                   '-s', str(self.sleepTime), '-t', str(self.timeout),
+                   '-r', str(self.retries)]
+            cmd.extend(bb_cmd)
+            self.setCommand(cmd)
+            self.super_class.start(self)
         except KeyError:
             self.addCompleteLog("errors", str(Failure()))
             return self.finished(FAILURE)
 
-    def sendChange(self):
-        d = self.sender.send(self.branch, self.revision, self.comments, self.files, self.user)
-        if self.timeout:
-            d = errbackAfter(d, self.timeout)
-        d = InterruptableDeferred(d)
-        self._interrupt = d.interrupt
-        d.addCallback(self.sendChangeSuccess)
-        d.addErrback(self.sendChangeFailed)
-        return d
-
-    def sendChangeFailed(self, res):
-        # Go to sleep and then try again!
-        try:
-            if self.retries > 0:
-                if not self.warnings:
-                    self.warnings = self.addLog('warnings')
-                self.warnings.addStderr('\nWarning: error when trying to sendchange to %s, trying again in %i seconds (%i tries left)\n' % \
-                        (self.master, self.sleepTime, self.retries))
-                log.msg("Error when trying to sendchange to %s: %s.  %i tries left.  Trying again in %i seconds" % (self.master, str(res), self.retries, self.sleepTime))
-                self.retries -= 1
-                self.sleepTime *= 2
-                d = Deferred()
-                d.addCallback(lambda res: self.sendChange())
-                d.addErrback(lambda res: log.msg("delayed call interrupted"))
-                delayed = reactor.callLater(self.sleepTime, d.callback, None)
-                def interrupt(reason):
-                    delayed.cancel()
-                    self.retries = 0
-                    return self.sendChangeFailed(reason)
-                self._interrupt = interrupt
-                return d
-
-            self.step_status.setText(['sendchange to', self.master, 'failed'])
-            if self.warnOnFailure:
-                self.step_status.setText2(['sendchange'])
-            self.addCompleteLog("errors", str(res))
-            return self.finished(FAILURE)
-        except:
-            log.msg("Error processing sendchange failure")
-            log.err()
-            return self.finished(FAILURE)
-
-    def sendChangeSuccess(self, results):
-        self.step_status.setText(['sendchange to', self.master, 'ok'])
-        return self.finished(SUCCESS)
-
-    def interrupt(self, reason):
-        self.retries = 0
-        if self._interrupt:
-            self._interrupt("Cancelled sendchange")
-            self._interrupt = None
 
 class DownloadFile(ShellCommand):
     haltOnFailure = True
