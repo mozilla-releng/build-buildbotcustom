@@ -7264,7 +7264,6 @@ class AndroidBuildFactory(MobileBuildFactory):
             envJava = {}
         else:
             envJava = self.env.copy()
-        envJava['PATH']      = '/tools/jdk6/bin:%s' % envJava.get('PATH', os.environ['PATH'])
         envJava['JARSIGNER'] = '../../../../../tools/release/signing/mozpass.py'
 
         self.addStep(ShellCommand,
