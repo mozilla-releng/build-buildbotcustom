@@ -7342,3 +7342,49 @@ class AndroidBuildFactory(MobileBuildFactory):
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
 
+class AndroidReleaseBuildFactory(AndroidBuildFactory):
+    def __init__(self, **kwargs):
+        AndroidBuildFactory.__init__(self, **kwargs)
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            name="get_buildid",
+            command=['python', '../config/printconfigsetting.py',
+                     'dist/bin/application.ini',
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                 '%s_info.txt' % self.platform)],
+         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
+        )
+        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
+                                                    self.platform)
+        self.addStep(MozillaStageUpload,
+            name="upload_to_stage",
+            description=['upload','to','stage'],
+            objdir=self.branchName,
+            username=self.stageUsername,
+            milestone='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
+            remoteHost=self.stageServer,
+            remoteBasePath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=False,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=False,
+            releaseToCandidates=True,
+            tinderboxBuildsDir='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
+            remoteCandidatesPath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
+        )
