@@ -365,9 +365,10 @@ class MozillaBuildFactory(BuildFactory):
         return {'filepath': None}
 
     def addFilePropertiesSteps(self, filename, directory, fileType, 
-                               maxDepth=1, haltOnFailure=False):
+                               doStepIf=True, maxDepth=1, haltOnFailure=False):
         self.addStep(FindFile(
             name='find_filepath',
+            doStepIf=doStepIf,
             filename=filename,
             directory=directory,
             filetype='file',
@@ -377,6 +378,7 @@ class MozillaBuildFactory(BuildFactory):
             haltOnFailure=haltOnFailure
         ))
         self.addStep(SetProperty,
+            doStepIf=doStepIf,
             command=['basename', WithProperties('%(filepath)s')],
             property=fileType+'Filename',
             workdir='.',
@@ -384,6 +386,7 @@ class MozillaBuildFactory(BuildFactory):
             haltOnFailure=haltOnFailure
         )
         self.addStep(SetProperty,
+            doStepIf=doStepIf,
             command=['bash', '-c', 
                      WithProperties("ls -l %(filepath)s")],
             workdir='.',
@@ -392,6 +395,7 @@ class MozillaBuildFactory(BuildFactory):
             haltOnFailure=haltOnFailure
         )
         self.addStep(SetProperty,
+            doStepIf=doStepIf,
             command=['bash', '-c', 
                      WithProperties('openssl ' + 'dgst -' + self.hashType +
                                     ' %(filepath)s')],
@@ -401,6 +405,7 @@ class MozillaBuildFactory(BuildFactory):
             haltOnFailure=haltOnFailure
         )   
         self.addStep(SetProperty,
+            doStepIf=doStepIf,
             name='unset_filepath',
             command='echo "filepath:"',
             workdir=directory,
@@ -1654,6 +1659,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
         marPattern += '.complete.mar'
         return marPattern
 
+    def previousMarExists(self, step):
+        return step.build.getProperties().has_key("previousMarFilename") and len(step.getProperty("previousMarFilename")) > 0;
+
     def addCreatePartialUpdateSteps(self, extraArgs=None):
         '''This function expects that the following build properties are
            already set: buildid, completeMarFilename
@@ -1707,13 +1715,16 @@ class NightlyBuildFactory(MercurialBuildFactory):
                                                              marPattern))
                      ],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
-            haltOnFailure=True,
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True
         ))
         previousMarURL = WithProperties('http://%s' % self.stageServer + \
                           '%s' % self.latestDir + \
                           '/%(previousMarFilename)s')
         self.addStep(ShellCommand(
             name='get_previous_mar',
+            doStepIf = self.previousMarExists,
             command=['wget', '-O', 'previous.mar', '--no-check-certificate',
                      previousMarURL],
             workdir='%s/dist/update' % self.absMozillaObjDir,
@@ -1722,6 +1733,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # Unpack the previous complete mar.                                    
         self.addStep(ShellCommand(
             name='unpack_previous_mar',
+            doStepIf = self.previousMarExists,
             command=['bash', '-c',
                      WithProperties('%(basedir)s/' +
                                     self.absMozillaSrcDir +
@@ -1734,6 +1746,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # Extract the build ID from the unpacked previous complete mar.
         self.addStep(FindFile(
             name='find_inipath',
+            doStepIf = self.previousMarExists,
             filename='application.ini',
             directory='previous',
             filetype='file',
@@ -1744,6 +1757,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         ))
         self.addStep(SetProperty(
             name='set_previous_buildid',
+            doStepIf = self.previousMarExists,
             command=['python',
                      '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
                      WithProperties(self.absMozillaObjDir + '/%(previous_inipath)s'),
@@ -1764,6 +1778,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             partialMarCommand.extend(extraArgs)
         self.addStep(ShellCommand(
             name='make_partial_mar',
+            doStepIf = self.previousMarExists,
             command=partialMarCommand,
             env=updateEnv,
             workdir=self.absMozillaObjDir,
@@ -1772,6 +1787,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         ))
         self.addStep(ShellCommand(
             name='rm_previous_mar',
+            doStepIf = self.previousMarExists,
             command=['rm', '-rf', 'previous.mar'],
             env=self.env,
             workdir='%s/dist/update' % self.absMozillaObjDir,
@@ -1780,6 +1796,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # Update the build properties to pickup information about the partial.
         self.addFilePropertiesSteps(
             filename='*.partial.*.mar',
+            doStepIf = self.previousMarExists,
             directory='%s/dist/update' % self.absMozillaObjDir,
             fileType='partialMar',
             haltOnFailure=True,
@@ -1804,6 +1821,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         if self.createPartial:
             self.addStep(CreatePartialUpdateSnippet(
                 name='create_partial_snippet',
+                doStepIf = self.previousMarExists,
                 objdir=self.absMozillaObjDir,
                 milestone=milestone,
                 baseurl='%s/nightly' % self.downloadBaseURL,
@@ -1811,6 +1829,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             ))
             self.addStep(ShellCommand(
                 name='cat_partial_snippet',
+                doStepIf = self.previousMarExists,
                 command=['cat', 'partial.update.snippet'],
                 workdir='%s/dist/update' % self.absMozillaObjDir,
             ))
@@ -1842,6 +1861,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         ausPreviousBuildUploadDir = self.getPreviousBuildUploadDir()
         self.addStep(ShellCommand(
             name='create_aus_previous_updir',
+            doStepIf = self.previousMarExists,
             command=['bash', '-c',
                      WithProperties('ssh -l %s ' %  self.ausUser +
                                     '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
@@ -1851,6 +1871,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             ))
         self.addStep(ShellCommand(
             name='upload_complete_snippet',
+            doStepIf = self.previousMarExists,
             command=['scp', '-o', 'User=%s' % self.ausUser,
                      '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
                      'dist/update/complete.update.snippet',
@@ -1866,6 +1887,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         if self.createPartial:
             self.addStep(ShellCommand(
                 name='upload_partial_snippet',
+                doStepIf = self.previousMarExists,
                 command=['scp', '-o', 'User=%s' % self.ausUser,
                          '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
                          'dist/update/partial.update.snippet',
@@ -1878,6 +1900,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             ausCurrentBuildUploadDir = self.getCurrentBuildUploadDir()
             self.addStep(ShellCommand(
                 name='create_aus_current_updir',
+                doStepIf = self.previousMarExists,
                 command=['bash', '-c',
                          WithProperties('ssh -l %s ' %  self.ausUser +
                                         '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
@@ -1890,6 +1913,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             # AUS webheads.
             self.addStep(ShellCommand(
                 name='create_empty_snippets',
+                doStepIf = self.previousMarExists,
                 command=['bash', '-c',
                          WithProperties('ssh -l %s ' %  self.ausUser +
                                         '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +

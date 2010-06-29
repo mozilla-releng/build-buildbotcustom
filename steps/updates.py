@@ -4,15 +4,15 @@ from os import path
 import buildbot
 from buildbot.interfaces import BuildSlaveTooOldError
 from buildbot.process.buildstep import BuildStep
-from buildbot.status.builder import SUCCESS, FAILURE
+from buildbot.status.builder import SUCCESS, FAILURE, SKIPPED
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.transfer import _FileReader, StatusRemoteCommand
 
 class CreateUpdateSnippet(BuildStep):
     def __init__(self, objdir, milestone, baseurl, appendDatedDir=True,
-                 snippetType='complete', hashType='sha512',
+                 snippetType='complete', hashType='sha512', doStepIf=True,
                  name='create_update_snippet'):
-        BuildStep.__init__(self, name=name)
+        BuildStep.__init__(self, name=name, doStepIf=doStepIf)
 
         self.addFactoryArguments(
           objdir=objdir,
@@ -34,6 +34,9 @@ class CreateUpdateSnippet(BuildStep):
         self.maxsize = 16384
         self.mode = None
         self.blocksize = 4096
+
+        self.cmd = None
+        self.stdio_log = None
 
     def _getDatedDirPath(self):
         buildid = self.getProperty('buildid')
@@ -117,18 +120,20 @@ class CreateUpdateSnippet(BuildStep):
 
     def finished(self, result):
         self.step_status.setText(['create', self.snippetType, 'snippet'])
-        if self.cmd.stderr != '':
+        if self.cmd and self.cmd.stderr != '':
             self.addCompleteLog('stderr', self.cmd.stderr)
 
-        self.stdio_log.addStdout("Snippet generation complete\n\n")
+        if self.stdio_log:
+            self.stdio_log.addStdout("Snippet generation complete\n\n")
 
-        if self.cmd.rc is None or self.cmd.rc == 0:
-            # Other BuildSteps will probably want this data.
-            self.setProperty(self.snippetType + 'snippetFilename',
-              path.join(self.updateDir, self.snippetFilename))
+        if self.cmd:
+            if self.cmd.rc is None or self.cmd.rc == 0:
+                # Other BuildSteps will probably want this data.
+                self.setProperty(self.snippetType + 'snippetFilename',
+                  path.join(self.updateDir, self.snippetFilename))
 
-            return BuildStep.finished(self, SUCCESS)
-        return BuildStep.finished(self, FAILURE)
+                return BuildStep.finished(self, SUCCESS)
+        return BuildStep.finished(self, result)
 
 
 class CreateCompleteUpdateSnippet(CreateUpdateSnippet):
