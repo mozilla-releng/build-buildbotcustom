@@ -165,13 +165,13 @@ class MozillaBuildFactory(BuildFactory):
             'source',
             'updates',
             'final_verification',
-            'l10n_verification',
             'xulrunner_source',
             ]
     ignore_dirs.extend(['%s_update_verify' % p for p in getSupportedPlatforms()])
     ignore_dirs.extend(['%s_build' % p for p in getSupportedPlatforms()])
     ignore_dirs.extend(['%s_repack' % p for p in getSupportedPlatforms()])
     ignore_dirs.extend(['xulrunner_%s_build' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['%s_l10n_verification' % p for p in getSupportedPlatforms()])
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
@@ -5177,13 +5177,14 @@ class CodeCoverageFactory(UnittestBuildFactory):
 class L10nVerifyFactory(ReleaseFactory):
     def __init__(self, cvsroot, stagingServer, productName, version,
                  buildNumber, oldVersion, oldBuildNumber,
-                 l10nPlatforms, verifyDir='verify', linuxExtension='bz2',
-                 buildSpace=14, **kwargs):
+                 platform, verifyDir='verify', linuxExtension='bz2',
+                 buildSpace=4, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
                                 **kwargs)
 
         verifyDirVersion = 'tools/release/l10n'
+        platformFtpDir = getPlatformFtpDir(platform)
 
         # Remove existing verify dir
         self.addStep(ShellCommand,
@@ -5220,8 +5221,9 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
-                   (stagingServer, productName, version, str(buildNumber)),
+                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
+                   (stagingServer, productName, version, str(buildNumber),
+                    platformFtpDir),
                   '%s-%s-build%s/' % (productName,
                                       version,
                                       str(buildNumber))
@@ -5247,11 +5249,12 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
+                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer,
                     productName,
                     oldVersion,
-                    str(oldBuildNumber)),
+                    str(oldBuildNumber),
+                    platformFtpDir),
                   '%s-%s-build%s/' % (productName,
                                       oldVersion,
                                       str(oldBuildNumber))
@@ -5282,9 +5285,8 @@ class L10nVerifyFactory(ReleaseFactory):
                          description=['verify', 'l10n', product],
                          descriptionDone=['verified', 'l10n', product],
                          command=["bash", "-c",
-                                  "./verify_l10n.sh " + product + " " +
-                                  " ".join(map(getPlatformFtpDir,
-                                               l10nPlatforms))],
+                                  "./verify_l10n.sh %s %s" % (product,
+                                                              platformFtpDir)],
                          workdir=verifyDirVersion,
                          haltOnFailure=True,
                         )
