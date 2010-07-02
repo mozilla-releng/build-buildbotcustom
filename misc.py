@@ -429,8 +429,8 @@ def generateBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-        if config['enable_shark'] and platform.startswith('macosx'):
-            nightlyBuilders.append('%s shark' % base_name)
+            if config['enable_shark'] and platform == 'macosx':
+                nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
             unittestBuilders.append('%s unit test' % base_name)
@@ -892,6 +892,45 @@ def generateBranchObjects(config, name):
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
+            if config['enable_shark'] and platform == 'macosx':
+                mozilla2_shark_factory = NightlyBuildFactory(
+                    env= pf['env'],
+                    objdir=config['objdir'],
+                    platform=platform,
+                    hgHost=config['hghost'],
+                    repoPath=config['repo_path'],
+                    buildToolsRepoPath=config['build_tools_repo_path'],
+                    configRepoPath=config['config_repo_path'],
+                    configSubDir=config['config_subdir'],
+                    profiledBuild=False,
+                    productName=config['product_name'],
+                    mozconfig='macosx/%s/shark' % name,
+                    stageServer=config['stage_server'],
+                    stageUsername=config['stage_username'],
+                    stageGroup=config['stage_group'],
+                    stageSshKey=config['stage_ssh_key'],
+                    stageBasePath=config['stage_base_path'],
+                    codesighs=False,
+                    uploadPackages=uploadPackages,
+                    uploadSymbols=False,
+                    nightly=True,
+                    createSnippet=False,
+                    buildSpace=buildSpace,
+                    clobberURL=config['base_clobber_url'],
+                    clobberTime=clobberTime,
+                    buildsBeforeReboot=pf['builds_before_reboot']
+                )
+                mozilla2_shark_builder = {
+                    'name': '%s shark' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s-shark' % (name, platform),
+                    'factory': mozilla2_shark_factory,
+                    'category': name,
+                    'nextSlave': _nextSlowSlave,
+                   'properties': {'branch': name, 'platform': platform},
+                }
+                branchObjects['builders'].append(mozilla2_shark_builder)
+
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
@@ -1038,45 +1077,6 @@ def generateBranchObjects(config, name):
                     'properties': {'branch': name, 'platform': platform},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
-
-        if config['enable_shark'] and platform.startswith('macosx'):
-             mozilla2_shark_factory = NightlyBuildFactory(
-                 env= pf['env'],
-                 objdir=config['objdir'],
-                 platform=platform,
-                 hgHost=config['hghost'],
-                 repoPath=config['repo_path'],
-                 buildToolsRepoPath=config['build_tools_repo_path'],
-                 configRepoPath=config['config_repo_path'],
-                 configSubDir=config['config_subdir'],
-                 profiledBuild=False,
-                 productName=config['product_name'],
-                 mozconfig='macosx/%s/shark' % name,
-                 stageServer=config['stage_server'],
-                 stageUsername=config['stage_username'],
-                 stageGroup=config['stage_group'],
-                 stageSshKey=config['stage_ssh_key'],
-                 stageBasePath=config['stage_base_path'],
-                 codesighs=False,
-                 uploadPackages=uploadPackages,
-                 uploadSymbols=False,
-                 nightly=True,
-                 createSnippet=False,
-                 buildSpace=buildSpace,
-                 clobberURL=config['base_clobber_url'],
-                 clobberTime=clobberTime,
-                 buildsBeforeReboot=pf['builds_before_reboot']
-             )
-             mozilla2_shark_builder = {
-                 'name': '%s shark' % pf['base_name'],
-                 'slavenames': pf['slaves'],
-                 'builddir': '%s-%s-shark' % (name, platform),
-                 'factory': mozilla2_shark_factory,
-                 'category': name,
-                 'nextSlave': _nextSlowSlave,
-                'properties': {'branch': name, 'platform': platform},
-             }
-             branchObjects['builders'].append(mozilla2_shark_builder)
 
         if config['enable_xulrunner'] and platform not in ('wince',):
              xr_env = pf['env'].copy()
