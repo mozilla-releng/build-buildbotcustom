@@ -1988,6 +1988,8 @@ def generateMobileBranchObjects(config, name):
             'buildsBeforeReboot': pf.get('builds_before_reboot'),
             'nightly': False,
             'clobber': config.get('enable_try', False),
+            'enable_try': config.get('enable_try', False),
+            'try_subdir': config.get('package_dir', None),
             'packageGlobList': pf.get('package_globlist'),
             'mozRevision': pf.get('mozilla_revision'),
             'mobileRevision': pf.get('mobile_revision'),
@@ -2106,42 +2108,46 @@ def generateMobileBranchObjects(config, name):
         ))
 
 
-    #This change source is for the mobile_repo.  There is an assumption
-    #that there will be a change source created for the main repository
-    mobile_objects['change_source'].append(HgPoller(
-        hgURL=config.get('hgurl'),
-        branch=config.get('mobile_repo_path'),
-        pushlogUrlOverride='%s/%s/pushlog' %(config.get('hgurl'),
-                                             config.get('mobile_repo_path')),
-        tipsOnly=config.get('enable_try', False),
-        pollInterval=1*60,
-    ))
+    if not config.get('enable_try', True):
+        #This change source is for the mobile_repo.  There is an assumption
+        #that there will be a change source created for the main repository
+        mobile_objects['change_source'].append(HgPoller(
+            hgURL=config.get('hgurl'),
+            branch=config.get('mobile_repo_path'),
+            pushlogUrlOverride='%s/%s/pushlog' %(config.get('hgurl'),
+                                                 config.get('mobile_repo_path')),
+            tipsOnly=config.get('enable_mobile_try', False),
+            pollInterval=1*60,
+        ))
 
     #this scheduler is to trigger mobile builds on a mozilla change
     mobile_objects['schedulers'].append(Scheduler(
         name='%s-%s-build-mozilla' % (name, mobile_repo_name),
         branch=config.get('repo_path'),
-        treeStableTimer=3*60,
-        builderNames=builders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
-    ))
-    #this scheduler is to trigger mobile builds on a mobile change
-    mobile_objects['schedulers'].append(Scheduler(
-        name='%s-%s-build-mobile' % (mobile_repo_name, name),
-        branch=config.get('mobile_repo_path'),
-        treeStableTimer=3*60,
+        treeStableTimer=None if config.get('enable_try') else 3*60,
         builderNames=builders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
     ))
 
-    #Mobile nightlies on this branch
-    mobile_objects['schedulers'].append(Nightly(
-        name='%s-%s-nightly' % (name, mobile_repo_name),
-        branch=config.get('mobile_repo_path'),
-        hour=config.get('start_hour'),
-        minute=config.get('start_minute'),
-        builderNames=nightlyBuilders
-    ))
+    if not config.get('enable_try', True):
+        #this scheduler is to trigger mobile builds on a mobile change
+        mobile_objects['schedulers'].append(Scheduler(
+            name='%s-%s-build-mobile' % (mobile_repo_name, name),
+            branch=config.get('mobile_repo_path'),
+            treeStableTimer=3*60,
+            builderNames=builders,
+            fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
+        ))
+
+    if config.get('enable_mobile_nightlies'):
+        #Mobile nightlies on this branch
+        mobile_objects['schedulers'].append(Nightly(
+            name='%s-%s-nightly' % (name, mobile_repo_name),
+            branch=config.get('mobile_repo_path'),
+            hour=config.get('start_hour'),
+            minute=config.get('start_minute'),
+            builderNames=nightlyBuilders
+        ))
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + nightlyBuilders)

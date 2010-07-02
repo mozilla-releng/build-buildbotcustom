@@ -5339,7 +5339,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  uploadSymbols=False, productName='mobile',
                  clobber=False, env=None,
                  mobileRevision='default',
-                 mozRevision='default', **kwargs):
+                 mozRevision='default', enable_try=False,
+                 try_subdir=None, **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm)
@@ -5349,6 +5350,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.configRepository = self.getRepository(configRepoPath)
         self.mobileRepository = self.getRepository(mobileRepoPath)
         self.mobileBranchName = self.getRepoName(self.mobileRepository)
+        self.mobileRepoPath = mobileRepoPath
         self.baseWorkDir = baseWorkDir
         self.configSubDir = configSubDir
         self.env = env
@@ -5366,6 +5368,11 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.mozRevision = mozRevision
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
+        self.enable_try = enable_try
+        if enable_try:
+            self.clobber = clobber = True
+            assert try_subdir is not None
+            self.try_subdir = try_subdir
 
         if nightly:
             self.clobber = clobber = True
@@ -5462,12 +5469,71 @@ class MobileBuildFactory(MozillaBuildFactory):
         pass
 
     def addBaseRepoSteps(self):
-        self.addHgPullSteps(repository=self.repository,
+        if self.enable_try:
+            self.addStep(Mercurial(
+                name='hg_update',
+                mode='clobber',
+                baseURL='http://%s/' % self.hgHost,
+                defaultBranch=self.repoPath,
+                timeout=60*60,
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            ))
+            self.addStep(SetProperty(
+                name='set_moz_rev',
+                command=['hg', 'parent', '--template={node}'],
+                extract_fn = short_hash,
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            ))
+            moz_csl = self.mozChangesetLink.replace('hg_revision',
+                                                    'got_revision')
+            mobile_csl = self.mobileChangesetLink.replace('hg_revision',
+                                                          'mobile_rev')
+            self.addStep(SetProperty(
+                name='mobile_repo',
+                command=['bash', '-c',
+                  'if [[ -f mobile-repo ]] ; then ' +
+                  'cat mobile-repo ; else ' +
+                  'echo %s ; fi' % self.mobileRepoPath],
+                property='mobile_repo',
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+            ))
+            self.addStep(SetProperty(
+                name='mobile_rev',
+                command=['bash', '-c',
+                  'if [[ -f mobile-rev ]] ; then ' +
+                  'cat mobile-rev ; else ' +
+                  'echo default ; fi'],
+                property='mobile_rev',
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+            ))
+            mobile_clone_cmd = 'hg clone -U http://%s/' % self.hgHost
+            mobile_clone_cmd += '%(mobile_repo)s mobile'
+            self.addStep(ShellCommand(
+                name='mobile_clone',
+                command=['bash', '-c', WithProperties(mobile_clone_cmd)],
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+                haltOnFailure=True,
+            ))
+            mobile_update_cmd = 'hg update --rev %(mobile_rev)s'
+            self.addStep(ShellCommand(
+                name='mobile_update',
+                command=['bash', '-c', WithProperties(mobile_update_cmd)],
+                workdir='%s/%s/mobile' % (self.baseWorkDir, self.branchName),
+                haltOnFailure=True,
+            ))
+            self.addStep(ShellCommand(
+                name='mobile_ident',
+                command=['hg', 'ident', '-R', 'mobile', '-i'],
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+            ))
+ 
+        else:
+            self.addHgPullSteps(repository=self.repository,
                             workdir=self.baseWorkDir,
                             changesetLink=self.mozChangesetLink,
                             revision=self.mozRevision,
                             cloneTimeout=60*30)
-        self.addHgPullSteps(repository=self.mobileRepository,
+            self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
                             changesetLink=self.mobileChangesetLink,
@@ -5495,38 +5561,64 @@ class MobileBuildFactory(MozillaBuildFactory):
 
 
     def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            name="get_buildid",
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % (self.objdir),
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(MozillaStageUpload,
-            name="upload_to_stage",
-            description=['upload','to','stage'],
-            objdir="%s/%s" % (self.branchName, self.objdir),
-            username=self.stageUsername,
-            milestone=self.baseUploadDir,
-            remoteHost=self.stageServer,
-            remoteBasePath=self.stageBasePath,
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=self.nightly,
-            releaseToDated=self.nightly,
-            releaseToTinderboxBuilds=True,
-            tinderboxBuildsDir=self.baseUploadDir,
-            remoteCandidatesPath=self.stageBasePath,
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                        self.objdir)
-        )
+        if self.enable_try:
+            self.addStep(SetBuildProperty(
+                name='set_who',
+                property_name='who',
+                value=lambda x: str(x.source.changes[0].who),
+            ))
+            remote_location = '%s/%s/tryserver-%s' % (self.stageBasePath,
+                            self.try_subdir, self.platform)
+            ssh_string = 'ssh -i ~/.ssh/%s %s@%s mkdir -p %s' % \
+                    (self.stageSshKey, self.stageUsername,
+                     self.stageServer, remote_location)
+            scp_string = 'scp -i ~/.ssh/%s %s %s@%s:%s' % \
+                    (self.stageSshKey, self.packageGlob,
+                     self.stageUsername, self.stageServer, remote_location)
+            self.addStep(ShellCommand(
+                name='mkdir_remote',
+                command=['bash', '-c', WithProperties(ssh_string)],
+                workdir=self.baseWorkDir,
+            ))
+            self.addStep(ShellCommand(
+                name='upload',
+                command=['bash', '-c', WithProperties(scp_string)],
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                      self.objdir),
+            ))
+        else:
+            self.addStep(SetProperty,
+                name="get_buildid",
+                command=['python', 'config/printconfigsetting.py',
+                         '%s/dist/bin/application.ini' % (self.objdir),
+                         'App', 'BuildID'],
+                property='buildid',
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+                description=['getting', 'buildid'],
+                descriptionDone=['got', 'buildid']
+            )
+            self.addStep(MozillaStageUpload,
+                name="upload_to_stage",
+                description=['upload','to','stage'],
+                objdir="%s/%s" % (self.branchName, self.objdir),
+                username=self.stageUsername,
+                milestone=self.baseUploadDir,
+                remoteHost=self.stageServer,
+                remoteBasePath=self.stageBasePath,
+                platform=platform,
+                group=self.stageGroup,
+                packageGlob=self.packageGlob,
+                sshKey=self.stageSshKey,
+                uploadCompleteMar=False,
+                releaseToLatest=self.nightly,
+                releaseToDated=self.nightly,
+                releaseToTinderboxBuilds=True,
+                tinderboxBuildsDir=self.baseUploadDir,
+                remoteCandidatesPath=self.stageBasePath,
+                dependToDated=True,
+                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                            self.objdir)
+            )
 
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
@@ -7313,37 +7405,41 @@ class AndroidBuildFactory(MobileBuildFactory):
         #    env=self.env,
         #    haltOnFailure=True,
         # )
-
     def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            name="get_buildid",
-            command=['python', '../config/printconfigsetting.py',
-                     'dist/bin/application.ini',
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(MozillaStageUpload,
-            name="upload_to_stage",
-            description=['upload','to','stage'],
-            objdir=self.branchName,
-            username=self.stageUsername,
-            milestone=self.baseUploadDir,
-            remoteHost=self.stageServer,
-            remoteBasePath=self.stageBasePath,
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=self.nightly,
-            releaseToDated=self.nightly,
-            releaseToTinderboxBuilds=True,
-            tinderboxBuildsDir=self.baseUploadDir,
-            remoteCandidatesPath=self.stageBasePath,
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
+        if self.enable_try:
+            MobileBuildFactory.addUploadSteps(self, platform)
+        else:
+            self.addStep(SetProperty,
+                name="get_buildid",
+                command=['python', '../config/printconfigsetting.py',
+                         'dist/bin/application.ini',
+                         'App', 'BuildID'],
+                property='buildid',
+                workdir='%s/%s/%s' % (self.baseWorkDir,
+                    self.branchName, self.objdir),
+                description=['getting', 'buildid'],
+                descriptionDone=['got', 'buildid']
+            )
+            self.addStep(MozillaStageUpload,
+                name="upload_to_stage",
+                description=['upload','to','stage'],
+                objdir=self.branchName,
+                username=self.stageUsername,
+                milestone=self.baseUploadDir,
+                remoteHost=self.stageServer,
+                remoteBasePath=self.stageBasePath,
+                platform=platform,
+                group=self.stageGroup,
+                packageGlob=self.packageGlob,
+                sshKey=self.stageSshKey,
+                uploadCompleteMar=False,
+                releaseToLatest=self.nightly,
+                releaseToDated=self.nightly,
+                releaseToTinderboxBuilds=True,
+                tinderboxBuildsDir=self.baseUploadDir,
+                remoteCandidatesPath=self.stageBasePath,
+                dependToDated=True,
+                workdir='%s/%s/%s' % (self.baseWorkDir,
+                    self.branchName, self.objdir)
+            )
 
