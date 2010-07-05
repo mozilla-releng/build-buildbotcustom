@@ -1660,7 +1660,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         return marPattern
 
     def previousMarExists(self, step):
-        return step.build.getProperties().has_key("previousMarFilename") and len(step.getProperty("previousMarFilename")) > 0;
+        return step.build.getProperties().has_key("previousMarFilename") and len(step.build.getProperty("previousMarFilename")) > 0;
 
     def addCreatePartialUpdateSteps(self, extraArgs=None):
         '''This function expects that the following build properties are
