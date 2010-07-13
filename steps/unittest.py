@@ -450,11 +450,11 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
         bin_extension = ""
         if platform.startswith('win'):
             bin_extension = ".exe"
-        script = """if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi
-cp bin/xpcshell%(bin_extension)s %(exedir)s
-cp -R bin/components/* %(exedir)s/components/
-cp -R bin/plugins/* %(exedir)s/plugins/
-python -u xpcshell/runxpcshelltests.py""".replace("\n", " && ")
+        script = " && ".join(["if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi",
+                  "cp bin/xpcshell" + bin_extension + " %(exedir)s",
+                  "cp -R bin/components/* %(exedir)s/components/",
+                  "cp -R bin/plugins/* %(exedir)s/plugins/",
+                  "python -u xpcshell/runxpcshelltests.py"])
 
         if symbols_path:
             script += " --symbols-path=%s" % symbols_path
