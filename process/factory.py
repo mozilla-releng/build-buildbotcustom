@@ -6318,6 +6318,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
+                 platform=platform,
                  symbols_path='symbols',
                  maxTime=120*60, # Two Hours
                 ))

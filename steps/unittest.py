@@ -441,21 +441,24 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
     warnOnWarnings = True
     name = "xpcshell"
 
-    def __init__(self, symbols_path=None, **kwargs):
+    def __init__(self, platform, symbols_path=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
         self.addFactoryArguments(symbols_path=symbols_path)
 
+        bin_extension = ""
+        if platform.startswith('win'):
+            bin_extension = ".exe"
         script = """if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi
-cp bin/xpcshell %(exedir)s
+cp bin/xpcshell%(bin_extension)s %(exedir)s
 cp -R bin/components/* %(exedir)s/components/
 cp -R bin/plugins/* %(exedir)s/plugins/
 python -u xpcshell/runxpcshelltests.py""".replace("\n", " && ")
 
         if symbols_path:
             script += " --symbols-path=%s" % symbols_path
-        script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell"
+        script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell%(bin_extension)s"
 
         self.command = ['bash', '-c', WithProperties(script)]
 
