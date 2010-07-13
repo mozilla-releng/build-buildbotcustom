@@ -2139,7 +2139,7 @@ def generateMobileBranchObjects(config, name):
             fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
         ))
 
-    if config.get('enable_mobile_nightlies'):
+    if config.get('enable_mobile_nightly'):
         #Mobile nightlies on this branch
         mobile_objects['schedulers'].append(Nightly(
             name='%s-%s-nightly' % (name, mobile_repo_name),
