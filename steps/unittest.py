@@ -445,7 +445,7 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
-        self.addFactoryArguments(symbols_path=symbols_path)
+        self.addFactoryArguments(platform=platform, symbols_path=symbols_path)
 
         bin_extension = ""
         if platform.startswith('win'):
