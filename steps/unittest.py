@@ -458,7 +458,7 @@ python -u xpcshell/runxpcshelltests.py""".replace("\n", " && ")
 
         if symbols_path:
             script += " --symbols-path=%s" % symbols_path
-        script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell%(bin_extension)s"
+        script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell" + bin_extension
 
         self.command = ['bash', '-c', WithProperties(script)]
 
