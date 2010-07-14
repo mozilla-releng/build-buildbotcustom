@@ -227,7 +227,7 @@ class MobileTalosFactory(BuildFactory):
             haltOnFailure=True,
         ))
 
-    def addTarballTalosSteps(self):
+    def addTarballPageloaderSteps(self):
         self.addStep(ShellCommand(
             command=['wget', self.pageloader_tarball,
                      '-O', 'pageloader.tar.bz2'],
@@ -245,7 +245,7 @@ class MobileTalosFactory(BuildFactory):
             haltOnFailure=True,
         ))
 
-    def addTarballPageloaderSteps(self):
+    def addTarballTalosSteps(self):
         self.addStep(ShellCommand(
             command=['wget', self.talos_tarball, '-O', 'talos.tar.bz2'],
             workdir=self.base_dir,
@@ -350,13 +350,15 @@ class MobileTalosFactory(BuildFactory):
 #
 class MobileUnittestFactory(MobileTalosFactory):
     def __init__(self, test_type, known_fail_count=0, clients=None,
-                 maemkit_repo_path='qa/maemkit', **kwargs):
+                 maemkit_repo_path='qa/maemkit', maemkit_tarball=None,
+                 **kwargs):
         ''' clients is a tuple of (clientnumber, totalclients), e.g. (1,4).
         being hopeful about default 0 for known fail count'''
         self.test_type = test_type
         self.known_fail_count = known_fail_count
         self.clients = clients
         self.maemkit_repo_path = maemkit_repo_path
+        self.maemkit_tarball = maemkit_tarball
         MobileTalosFactory.__init__(self, **kwargs)
 
     def addSetupSteps(self):
@@ -365,8 +367,11 @@ class MobileUnittestFactory(MobileTalosFactory):
             name='mkdir_maemkit_logs',
             description=['make', 'maemkit', 'log', 'dir'],
         ))
-        self.addSteps(simpleHG(self.hg_host,
-                      self.maemkit_repo_path, self.base_dir, 'maemkit'))
+        if self.maemkit_tarball is not None:
+            self.addTarballMaemkitSteps()
+        else:
+            self.addSteps(simpleHG(self.hg_host,
+                          self.maemkit_repo_path, self.base_dir, 'maemkit'))
 
     def addObtainBuildSteps(self):
         MobileTalosFactory.addObtainBuildSteps(self)
@@ -390,6 +395,23 @@ class MobileUnittestFactory(MobileTalosFactory):
             workdir="%s/fennec" % self.base_dir,
             name='unpack_test',
             description=['unpack', 'tests'],
+            haltOnFailure=True,
+        ))
+
+    def addTarballMaemkitSteps(self):
+        self.addStep(ShellCommand(
+            command=['wget', self.maemkit_tarball,
+                     '-O', 'maemkit.tar.bz2'],
+            workdir=self.base_dir,
+            description=['get', 'maemkit'],
+            name='get_maemkit',
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            command=['tar', 'jxvf', 'maemkit.tar.bz2'],
+            workdir='%s' % self.base_dir,
+            description=['unpack', 'maemkit'],
+            name='unpack_maemkit',
             haltOnFailure=True,
         ))
 
