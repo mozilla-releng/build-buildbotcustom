@@ -5517,8 +5517,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                   'if [[ -f mobile-rev ]] ; then ' +
                   'cat mobile-rev ; else ' +
                   'echo default ; fi'],
-                property='mobile_rev',
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+                property='requested_mobile_rev',
             ))
             mobile_clone_cmd = 'hg clone -U http://%s/' % self.hgHost
             mobile_clone_cmd += '%(mobile_repo)s mobile'
@@ -5528,17 +5528,26 @@ class MobileBuildFactory(MozillaBuildFactory):
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
                 haltOnFailure=True,
             ))
-            mobile_update_cmd = 'hg update --rev %(mobile_rev)s'
+            mobile_update_cmd = 'hg update --rev %(requested_mobile_rev)s'
             self.addStep(ShellCommand(
                 name='mobile_update',
                 command=['bash', '-c', WithProperties(mobile_update_cmd)],
                 workdir='%s/%s/mobile' % (self.baseWorkDir, self.branchName),
                 haltOnFailure=True,
             ))
-            self.addStep(ShellCommand(
+            self.addStep(SetProperty(
                 name='mobile_ident',
                 command=['hg', 'ident', '-R', 'mobile', '-i'],
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName)
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+                property='mobile_rev',
+            ))
+            self.addStep(OutputStep(
+                name='show_moz_rev',
+                data=WithProperties('TinderboxPrint: ' + moz_csl),
+            ))
+            self.addStep(OutputStep(
+                name='show_mobile_rev',
+                data=WithProperties('TinderboxPrint: ' + mobile_csl),
             ))
  
         else:
