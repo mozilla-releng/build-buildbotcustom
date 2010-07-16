@@ -151,6 +151,7 @@ def getPlatformMinidumpPath(platform):
         'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+        'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
         }
@@ -164,13 +165,13 @@ class MozillaBuildFactory(BuildFactory):
             'source',
             'updates',
             'final_verification',
-            'l10n_verification',
             'xulrunner_source',
             ]
     ignore_dirs.extend(['%s_update_verify' % p for p in getSupportedPlatforms()])
     ignore_dirs.extend(['%s_build' % p for p in getSupportedPlatforms()])
     ignore_dirs.extend(['%s_repack' % p for p in getSupportedPlatforms()])
     ignore_dirs.extend(['xulrunner_%s_build' % p for p in getSupportedPlatforms()])
+    ignore_dirs.extend(['%s_l10n_verification' % p for p in getSupportedPlatforms()])
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
@@ -5224,13 +5225,14 @@ class CodeCoverageFactory(UnittestBuildFactory):
 class L10nVerifyFactory(ReleaseFactory):
     def __init__(self, cvsroot, stagingServer, productName, version,
                  buildNumber, oldVersion, oldBuildNumber,
-                 l10nPlatforms, verifyDir='verify', linuxExtension='bz2',
-                 buildSpace=14, **kwargs):
+                 platform, verifyDir='verify', linuxExtension='bz2',
+                 buildSpace=4, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
                                 **kwargs)
 
         verifyDirVersion = 'tools/release/l10n'
+        platformFtpDir = getPlatformFtpDir(platform)
 
         # Remove existing verify dir
         self.addStep(ShellCommand,
@@ -5267,8 +5269,9 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
-                   (stagingServer, productName, version, str(buildNumber)),
+                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
+                   (stagingServer, productName, version, str(buildNumber),
+                    platformFtpDir),
                   '%s-%s-build%s/' % (productName,
                                       version,
                                       str(buildNumber))
@@ -5294,11 +5297,12 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/*' %
+                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer,
                     productName,
                     oldVersion,
-                    str(oldBuildNumber)),
+                    str(oldBuildNumber),
+                    platformFtpDir),
                   '%s-%s-build%s/' % (productName,
                                       oldVersion,
                                       str(oldBuildNumber))
@@ -5329,9 +5333,8 @@ class L10nVerifyFactory(ReleaseFactory):
                          description=['verify', 'l10n', product],
                          descriptionDone=['verified', 'l10n', product],
                          command=["bash", "-c",
-                                  "./verify_l10n.sh " + product + " " +
-                                  " ".join(map(getPlatformFtpDir,
-                                               l10nPlatforms))],
+                                  "./verify_l10n.sh %s %s" % (product,
+                                                              platformFtpDir)],
                          workdir=verifyDirVersion,
                          haltOnFailure=True,
                         )
@@ -5723,7 +5726,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                  l10nRepoPath = 'l10n-central',
                  compareLocalesRepoPath = 'build/compare-locales',
                  compareLocalesTag = 'RELEASE_AUTOMATION',
-                 packageGlobList=['dist/*.tar.bz2',
+                 packageGlobList=['dist/*.tar.*',
                                   'mobile/*.deb',
                                   'dist/deb_name.txt',
                                   'dist/*.zip'],
@@ -5779,7 +5782,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             # before the multi-locale. This packageGlob will be used to move packages
             # into the "en-US" directory before uploading it and later on the 
             # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "dist/*.tar.bz2 mobile/*.deb dist/deb_name.txt"
+            self.packageGlob = "dist/*.tar.* mobile/*.deb dist/deb_name.txt"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -5975,7 +5978,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True, packageTests=True)
-        self.packageGlob="dist/fennec*.tar.bz2 mobile/fennec*.deb " + \
+        self.packageGlob="dist/fennec*.tar.* mobile/fennec*.deb " + \
                          "dist/deb_name.txt dist/fennec*.zip"
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
@@ -6261,7 +6264,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
              property_name="exepath",
              name="Find executable",
             ))
-        elif self.platform == "win32":
+        elif self.platform.startswith('win'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="%s/%s.exe" % (self.productName, self.productName),
@@ -6279,16 +6282,11 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          value=get_exedir,
         ))
 
-        # Set up the stack walker
-        if self.platform == 'win32':
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths for the stack walker.
+        if self.platform.startswith('win'):
             self.addStep(SetProperty,
              command=['bash', '-c', 'pwd -W'],
-             property='toolsdir',
-             workdir='tools'
-            )
-        else:
-            self.addStep(SetProperty,
-             command=['bash', '-c', 'pwd'],
              property='toolsdir',
              workdir='tools'
             )
@@ -6331,7 +6329,7 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  symbols_path='symbols',
                  maxTime=120*60, # Two Hours
                 ))
-            elif suite in ('reftest', 'crashtest', 'jsreftest'):
+            elif suite in ('reftest', 'reftest-d2d', 'crashtest', 'jsreftest'):
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
                  env=self.env,
@@ -6379,11 +6377,12 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
         MozillaBuildFactory.addInitialSteps(self)
 
 class TalosFactory(BuildFactory):
+    extName = 'addon.xpi'
     """Create working talos build factory"""
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
-            talosAddOns=[],
+            talosAddOns=[], addonTester=False,
             cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
 
         BuildFactory.__init__(self)
@@ -6392,12 +6391,11 @@ class TalosFactory(BuildFactory):
             workdirBase = "."
 
         self.workdirBase = workdirBase
-        self.envName = envName
         self.OS = OS
         self.supportUrlBase = supportUrlBase
         self.buildBranch = buildBranch
         self.branchName = branchName
-        self.configOptions = configOptions
+        self.configOptions = configOptions[:]
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
@@ -6407,21 +6405,25 @@ class TalosFactory(BuildFactory):
         self.pageset = pageset
         self.talosAddOns = talosAddOns[:]
         self.exepath = None
+        self.env = MozillaEnvironments[envName]
+        self.addonTester = addonTester
 
         self.addCleanupSteps()
         self.addDmgInstaller()
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
         self.addGetBuildInfoStep()
-        if fetchSymbols and (self.OS not in ('snowleopard',)):
+        if fetchSymbols and (self.OS not in ('snowleopard','w764')):
             self.addDownloadSymbolsStep()
+        if self.addonTester:
+            self.addDownloadExtensionStep()
         self.addSetupSteps()
         self.addUpdateConfigStep()
         self.addRunTestStep()
         self.addRebootStep()
 
     def addCleanupSteps(self):
-        if self.OS in ('xp', 'vista', 'win7'):
+        if self.OS in ('xp', 'vista', 'win7', 'w764'):
             #required step due to long filename length in tp4
             self.addStep(ShellCommand(
              name='mv tp4',
@@ -6430,7 +6432,7 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(ShellCommand(
              name='chmod_files',
@@ -6439,7 +6441,7 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="chmod files (see msys bug)",
              command=["chmod", "-v", "-R", "a+rwx", "."],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             #on windows move the whole working dir out of the way, saves us trouble later
             self.addStep(ShellCommand(
@@ -6447,21 +6449,21 @@ class TalosFactory(BuildFactory):
              workdir=os.path.dirname(self.workdirBase),
              description="move working dir",
              command=["if", "exist", os.path.basename(self.workdirBase), "mv", os.path.basename(self.workdirBase), "t-%random%"],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(ShellCommand(
              name='remove any old working dirs',
              workdir=os.path.dirname(self.workdirBase),
              description="remove old working dirs",
              command='if exist t-* nohup rm -vrf t-*',
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(ShellCommand(
              name='create new working dir',
              workdir=os.path.dirname(self.workdirBase),
              description="create new working dir",
              command='mkdir ' + os.path.basename(self.workdirBase),
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         else:
             self.addStep(ShellCommand(
@@ -6469,14 +6471,14 @@ class TalosFactory(BuildFactory):
              workdir=self.workdirBase,
              description="Cleanup",
              command='nohup rm -vrf *',
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
          description="talos dir creation",
          command='mkdir talos',
-         env=MozillaEnvironments[self.envName])
+         env=self.env)
         )
 
     def addDmgInstaller(self):
@@ -6505,7 +6507,7 @@ class TalosFactory(BuildFactory):
          workdir=self.workdirBase,
          name="Unpack build",
         ))
-        if self.OS in ('xp', 'vista', 'win7'):
+        if self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(ShellCommand(
              name='chmod_files',
              workdir=os.path.join(self.workdirBase, "firefox/"),
@@ -6513,7 +6515,7 @@ class TalosFactory(BuildFactory):
              warnOnFailure=False,
              description="chmod files (see msys bug)",
              command=["chmod", "-v", "-R", "a+x", "."],
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         if self.OS in ('tiger', 'leopard', 'snowleopard'):
             self.addStep(FindFile(
@@ -6525,7 +6527,7 @@ class TalosFactory(BuildFactory):
              name="Find executable",
              filetype="file",
             ))
-        elif self.OS in ('xp', 'vista', 'win7'):
+        elif self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../firefox/firefox"
@@ -6608,7 +6610,7 @@ class TalosFactory(BuildFactory):
              description="checking out talos",
              haltOnFailure=True,
              flunkOnFailure=True,
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
             self.addStep(DownloadFile(
              url="%s/tools/buildfarm/utils/generate-tpcomponent.py" % self.supportUrlBase,
@@ -6621,13 +6623,14 @@ class TalosFactory(BuildFactory):
              description="setting up pageloader",
              haltOnFailure=True,
              flunkOnFailure=True,
-             env=MozillaEnvironments[self.envName])
+             env=self.env)
             )
         else:
             self.addStep(FileDownload(
              mastersrc=self.customTalos,
              slavedest=self.customTalos,
              workdir=self.workdirBase,
+             blocksize=640*1024,
             ))
             self.addStep(UnpackFile(
              filename=self.customTalos,
@@ -6690,6 +6693,21 @@ class TalosFactory(BuildFactory):
          name="Unpack symbols",
         ))
 
+    def addDownloadExtensionStep(self):
+        def get_addon_url(build):
+            import urlparse
+            base_url = 'https://addons.mozilla.org/'
+            addon_url = build.getProperty('addonUrl')
+            return urlparse.urljoin(base_url, addon_url)
+
+        self.addStep(DownloadFile(
+         url_fn=get_addon_url,
+         workdir=os.path.join(self.workdirBase, "talos"),
+         name="Download extension",
+         ignore_certs=True, 
+         wget_args=['-O', TalosFactory.extName],
+        ))
+
     def addUpdateConfigStep(self):
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(self.workdirBase, "talos/"),
@@ -6698,7 +6716,9 @@ class TalosFactory(BuildFactory):
          haltOnFailure=True,
          executablePath=self.exepath,
          addOptions=self.configOptions,
-         env=MozillaEnvironments[self.envName],
+         env=self.env,
+         extName=TalosFactory.extName,
+         addonTester=self.addonTester,
          useSymbols=self.fetchSymbols)
         )
 
@@ -6709,7 +6729,7 @@ class TalosFactory(BuildFactory):
          timeout=21600,
          haltOnFailure=False,
          command=self.talosCmd,
-         env=MozillaEnvironments[self.envName])
+         env=self.env)
         )
 
     def addRebootStep(self):
@@ -6729,7 +6749,7 @@ class TalosFactory(BuildFactory):
          description="reboot after 1 test run",
          command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
          force_disconnect=do_disconnect,
-         env=MozillaEnvironments[self.envName],
+         env=self.env,
         ))
 
 class TryTalosFactory(TalosFactory):
@@ -7130,7 +7150,7 @@ class MaemoReleaseRepackFactory(MaemoNightlyRepackFactory):
         self.addStep(ShellCommand,
          name='copy_files',
          command=['sh', '-c',
-                  WithProperties('cp fennec-*.%(locale)s.linux-gnueabi-arm.tar.bz2 ' +
+                  WithProperties('cp fennec-*.%(locale)s.linux-gnueabi-arm.tar.* ' +
                                  'install/fennec-*.%(locale)s.langpack.xpi ' +
                                  '%(locale)s/')],
          workdir='%s/%s/dist' % (self.baseWorkDir, self.origSrcDir),
@@ -7322,6 +7342,15 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                '%s_info.txt' % self.platform)],
+         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
+        )
+        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
+                                                    self.platform)
         self.addStep(MozillaStageUpload,
             objdir="%s/%s" % (self.branchName, self.objdir),
             username=self.stageUsername,
@@ -7389,12 +7418,19 @@ class AndroidBuildFactory(MobileBuildFactory):
             )
 
     def addBuildSteps(self):
+        # forcing of PATH to contain jdk6 is only required while bug #567945 is active
+        if self.env is None:
+            envJava = {}
+        else:
+            envJava = self.env.copy()
+        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH', '/opt/local/bin:/tools/python/bin:/tools/buildbot/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/cltbld/bin')
+
         self.addStep(ShellCommand,
                 name='compile',
                 command=['make', '-f', 'client.mk', 'build'],
                 description=['compile'],
                 workdir=self.baseWorkDir + "/" +  self.branchName,
-                env=self.env,
+                env=envJava,
                 haltOnFailure=True
             )
 
@@ -7467,3 +7503,49 @@ class AndroidBuildFactory(MobileBuildFactory):
                     self.branchName, self.objdir)
             )
 
+class AndroidReleaseBuildFactory(AndroidBuildFactory):
+    def __init__(self, **kwargs):
+        AndroidBuildFactory.__init__(self, **kwargs)
+
+    def addUploadSteps(self, platform):
+        self.addStep(SetProperty,
+            name="get_buildid",
+            command=['python', '../config/printconfigsetting.py',
+                     'dist/bin/application.ini',
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        self.addStep(ShellCommand,
+         name='echo_buildID',
+         command=['bash', '-c',
+                  WithProperties('echo buildID=%(buildid)s > ' + \
+                                 '%s_info.txt' % self.platform)],
+         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
+        )
+        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
+                                                    self.platform)
+        self.addStep(MozillaStageUpload,
+            name="upload_to_stage",
+            description=['upload','to','stage'],
+            objdir=self.branchName,
+            username=self.stageUsername,
+            milestone='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
+            remoteHost=self.stageServer,
+            remoteBasePath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
+            platform=platform,
+            group=self.stageGroup,
+            packageGlob=self.packageGlob,
+            sshKey=self.stageSshKey,
+            uploadCompleteMar=False,
+            releaseToLatest=False,
+            releaseToDated=False,
+            releaseToTinderboxBuilds=False,
+            releaseToCandidates=True,
+            tinderboxBuildsDir='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
+            remoteCandidatesPath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
+            dependToDated=True,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
+        )

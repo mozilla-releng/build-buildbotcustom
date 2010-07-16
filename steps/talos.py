@@ -7,36 +7,43 @@ class MozillaUpdateConfig(ShellCommand):
     name = "Update config"
 
     def __init__(self, branch, branchName, executablePath, addOptions=None,
-            useSymbols=False, **kwargs):
+            useSymbols=False, addonTester=False, extName=None, **kwargs):
 
         if addOptions is None:
             self.addOptions = []
         else:
-            self.addOptions = addOptions
+            self.addOptions = addOptions[:]
 
         self.branch = branch
         self.branchName = branchName
         self.exePath = executablePath
         self.useSymbols = useSymbols
+        self.extName = extName
+        self.addonTester = addonTester
+
 
         ShellCommand.__init__(self, **kwargs)
 
         self.addFactoryArguments(branch=branch, addOptions=addOptions,
                 branchName=branchName, executablePath=executablePath,
-                useSymbols=useSymbols)
+                useSymbols=useSymbols, extName=extName, addonTester=addonTester)
 
     def setBuild(self, build):
         ShellCommand.setBuild(self, build)
         title = build.slavename
         buildid = time.strftime("%Y%m%d%H%M", time.localtime(build.source.changes[-1].when))
+        #if we are an addonTester then the addonName/addonUrl build property should be set
+        #  if it's not set this will throw a key error and the run will go red - which should be the expected result
+        if self.addonTester:
+            addon_prefix = self.build.getProperty('addonName')
+            self.addOptions += ['--testPrefix', addon_prefix, '--extension', self.extName]
 
-        extraopts = copy.copy(self.addOptions)
         if self.useSymbols:
-            extraopts += ['--symbolsPath', '../symbols']
+            self.addOptions += ['--symbolsPath', '../symbols']
 
         self.setCommand(["python", "PerfConfigurator.py", "-v", "-e",
             self.exePath, "-t", title, "-b", self.branch, "-d",
-            buildid, '--branchName', self.branchName] + extraopts)
+            buildid, '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
         superResult = ShellCommand.evaluateCommand(self, cmd)

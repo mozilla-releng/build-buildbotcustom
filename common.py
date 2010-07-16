@@ -1,5 +1,5 @@
 def getSupportedPlatforms():
-    return ('linux', 'linux64', 'win32', 'wince', 'macosx', 'macosx64')
+    return ('linux', 'linux64', 'win32', 'win64', 'wince', 'macosx', 'macosx64')
 
 def getPlatformFtpDir(platform):
     platform_ftp_map = {
@@ -8,6 +8,7 @@ def getPlatformFtpDir(platform):
         'macosx': 'mac',
         'macosx64': 'mac64',
         'win32': 'win32',
+        'win64': 'win64',
         'wince': 'wince-arm',
     }
     return platform_ftp_map.get(platform)
