@@ -31,7 +31,6 @@ class MozillaUpdateConfig(ShellCommand):
     def setBuild(self, build):
         ShellCommand.setBuild(self, build)
         title = build.slavename
-        buildid = time.strftime("%Y%m%d%H%M", time.localtime(build.source.changes[-1].when))
         #if we are an addonTester then the addonName/addonUrl build property should be set
         #  if it's not set this will throw a key error and the run will go red - which should be the expected result
         if self.addonTester:
@@ -42,8 +41,8 @@ class MozillaUpdateConfig(ShellCommand):
             self.addOptions += ['--symbolsPath', '../symbols']
 
         self.setCommand(["python", "PerfConfigurator.py", "-v", "-e",
-            self.exePath, "-t", title, "-b", self.branch, "-d",
-            buildid, '--branchName', self.branchName] + self.addOptions)
+            self.exePath, "-t", title, "-b", self.branch,
+            '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
         superResult = ShellCommand.evaluateCommand(self, cmd)
