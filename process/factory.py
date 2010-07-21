@@ -2858,12 +2858,12 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
              haltOnFailure=True
             )
         self.addStep(ShellCommand,
-         name='make_locale_installers',
+         name='repack_installers',
+         description=['repack', 'installers'],
          command=['sh','-c',
                   WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env = self.env,
          haltOnFailure=True,
-         description=['make','installers'],
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
         )
         self.addStep(FindFile(
@@ -2993,10 +2993,9 @@ class ReleaseFactory(MozillaBuildFactory):
         return version
 
 
-
 class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
     def __init__(self, platform, buildRevision, version, buildNumber,
-                 env={}, brandName=None, **kwargs):
+                 env={}, brandName=None, mergeLocales=False, **kwargs):
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
@@ -3018,7 +3017,8 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
                              '-v %s ' % self.version + \
                              '-n %s ' % self.buildNumber + \
                              '--release-to-candidates-dir'
-        BaseRepackFactory.__init__(self, env=env, platform=platform, **kwargs)
+        BaseRepackFactory.__init__(self, env=env, platform=platform,
+                                   mergeLocales=mergeLocales, **kwargs)
 
     def updateSources(self):
         self.addStep(ShellCommand,
@@ -3102,23 +3102,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              haltOnFailure=True
             )
 
-    def compareLocales(self):
-        self.addStep(ShellCommand,
-         name='comparing_locales',
-         command=['python',
-                  '../../../compare-locales/scripts/compare-locales',
-                  "l10n.ini",
-                  "../../../%s" % self.l10nRepoPath,
-                  WithProperties('%(locale)s')],
-         description='comparing locale',
-         env={'PYTHONPATH': ['../../../compare-locales/lib']},
-         flunkOnWarnings=True,
-         haltOnFailure=True,
-         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.origSrcDir,
-                                       self.appName),
-        )
-
     def doRepack(self):
         # For releases we have to make memory/jemalloc
         if self.platform.startswith('win32'):
@@ -3149,8 +3132,10 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             )
 
         self.addStep(ShellCommand,
-         name='make_installers_locale',
-         command=['make', WithProperties('installers-%(locale)s')],
+         name='repack_installers',
+         description=['repack', 'installers'],
+         command=['sh','-c',
+                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env=self.env,
          haltOnFailure=True,
          workdir='build/'+self.objdir+'/'+self.appName+'/locales'
@@ -6953,7 +6938,8 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
 
     def doRepack(self):
         self.addStep(ShellCommand,
-         name='repack_locales',
+         name='repack_installers',
+         description=['repack', 'installers'],
          command=['sh','-c',
                   WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          haltOnFailure=True,
