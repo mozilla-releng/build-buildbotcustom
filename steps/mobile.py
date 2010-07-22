@@ -106,5 +106,7 @@ class MobileParseTestLog(ShellCommand):
             if self.name != 'mochitest-browser-chrome':
                 if not re.search('TEST-PASS', cmdText):
                     return WARNINGS
+        elif not re.search('INFO Passed: [^0]', cmdText):
+            return WARNINGS
 
         return SUCCESS
