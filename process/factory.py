@@ -328,6 +328,9 @@ class MozillaBuildFactory(BuildFactory):
 
     def getRepository(self, repoPath, hgHost=None, push=False):
         assert repoPath
+        for prefix in ('http://', 'ssh://'):
+            if repoPath.startswith(prefix):
+                return repoPath
         if repoPath.startswith('/'):
             repoPath = repoPath.lstrip('/')
         if not hgHost:
@@ -603,13 +606,22 @@ class MercurialBuildFactory(MozillaBuildFactory):
             )
 
     def addSourceSteps(self):
-        self.addStep(Mercurial,
-         name='hg_update',
-         mode='update',
-         baseURL='http://%s/' % self.hgHost,
-         defaultBranch=self.repoPath,
-         timeout=60*60, # 1 hour
-        )
+        if self.hgHost.startswith('ssh'):
+            self.addStep(Mercurial(
+             name='hg_ssh_clone',
+             mode='update',
+             baseURL= '%s/' % self.hgHost,
+             defaultBranch=self.repoPath,
+             timeout=60*60, # 1 hour
+            ))
+        else:
+            self.addStep(Mercurial,
+             name='hg_update',
+             mode='update',
+             baseURL='http://%s/' % self.hgHost,
+             defaultBranch=self.repoPath,
+             timeout=60*60, # 1 hour
+            )
         if self.buildRevision:
             self.addStep(ShellCommand,
              name='hg_update',
@@ -1955,10 +1967,16 @@ class NightlyBuildFactory(MercurialBuildFactory):
         else:
             tinderboxBuildsDir = self.tinderboxBuildsDir
         postUploadCmd =  ['post_upload.py']
-        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
-                          '-i %(buildid)s',
-                          '-p %s' % self.productName,
-                          '--release-to-tinderbox-dated-builds']
+        if self.hgHost.startswith('ssh'):
+            postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
+                              '-i %(buildid)s',
+                              '-p %s' % self.productName,
+                              '--release-to-shadow-central-builds']
+        else:
+            postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
+                              '-i %(buildid)s',
+                              '-p %s' % self.productName,
+                              '--release-to-tinderbox-dated-builds']
         if self.nightly:
             # If this is a nightly build also place them in the latest and
             # dated directories in nightly/

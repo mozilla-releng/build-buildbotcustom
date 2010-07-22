@@ -660,7 +660,7 @@ def generateBranchObjects(config, name):
         pf = config['platforms'][platform]
 
         leakTest = False
-        codesighs = True
+        codesighs = config.get('enable_codesighs',True)
         uploadPackages = True
         uploadSymbols = False
         packageTests = False
@@ -1377,7 +1377,7 @@ def generateCCBranchObjects(config, name):
         pf = config['platforms'][platform]
 
         leakTest = False
-        codesighs = True
+        codesighs = config.get('enable_codesighs',True)
         uploadPackages = True
         uploadSymbols = False
         packageTests = False
