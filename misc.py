@@ -1714,6 +1714,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     for platform, platform_config in PLATFORMS.items():
         for slave_platform in platform_config['slave_platforms']:
+            platform_name = platform_config[slave_platform]['name']
             for suite, talosConfig in SUITES.items():
                 tests, merge, extra, platforms = branch_config['%s_tests' % suite]
                 if tests == 0 or slave_platform not in platforms:
@@ -1731,7 +1732,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     fetchSymbols=branch_config['fetch_symbols'],
                     **extra # Extra test specific factory parameters
                 )
-                platform_name = platform_config[slave_platform]['name']
                 if suite == "chrome":
                     name_suffix = ""
                     builddir_suffix = ""
@@ -1760,7 +1760,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 branchObjects['builders'].append(builder)
                 branch_builders.append(builder['name'])
 
-            if platform in ACTIVE_UNITTEST_PLATFORMS.keys():
+            if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
                 testTypes = []
 
                 if branch_config['platforms'][platform].get('enable_opt_unittests'):
