@@ -53,7 +53,7 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", 
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip))",
                         "\n".join([stdout, stderr]), re.M):
         if m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
