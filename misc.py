@@ -1702,7 +1702,7 @@ def generateCCBranchObjects(config, name):
     return branchObjects
 
 
-def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, 
+def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branchObjects = {'schedulers': [], 'builders': [], 'status': []}
     branch_builders = []
@@ -1768,6 +1768,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 if branch_config['platforms'][platform].get('enable_debug_unittests'):
                     testTypes.append('debug')
 
+                merge_tests = branch_config.get('enable_merging', True)
+
                 for test_type in testTypes:
                     test_builders = []
                     triggeredUnittestBuilders = []
@@ -1780,7 +1782,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     # Collect test builders for the TinderboxMailNotifier
                     all_test_builders.extend(test_builders)
 
-                    triggeredUnittestBuilders.append(('%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, True))
+                    triggeredUnittestBuilders.append(('%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, merge_tests))
 
                     for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                         # create the builders
