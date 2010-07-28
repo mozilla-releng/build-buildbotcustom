@@ -1817,6 +1817,24 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            errorparser="unittest",
                            logCompression="bzip2"))
 
+    ### Try mail notifier
+    if branch_config.get('enable_mail_notifier'):
+        packageUrl = branch_config['package_url']
+        packageDir = branch_config['package_dir']
+        branchObjects['status'].append(MailNotifier(
+            fromaddr="tryserver@build.mozilla.org",
+            mode="all",
+            sendToInterestedUsers=True,
+            lookup=MercurialEmailLookup(),
+            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
+                '/'.join([packageUrl, packageDir]), branch_config['tinderbox_tree']),
+            subject="Try Server: %(result)s on %(builder)s",
+            relayhost="mail.build.mozilla.org",
+            builders=all_test_builders + branch_builders,
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(revision:-unknown)s>'),
+                "References": WithProperties('<tryserver-%(revision:-unknown)s>')}
+        ))
+
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
                 branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
