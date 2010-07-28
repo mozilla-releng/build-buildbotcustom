@@ -577,6 +577,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addSourceSteps()
         self.addConfigSteps()
         self.addDoBuildSteps()
+        self.addBuildAnalysisSteps()
 
     def addPreBuildSteps(self):
         if self.nightly:
@@ -690,6 +691,28 @@ class MercurialBuildFactory(MozillaBuildFactory):
                       # and because 10.6 builds on minis with 1 GB RAM take a REALLY
                       # long time.
         )
+
+    def addBuildAnalysisSteps(self):
+        if self.platform in ('linux', 'linux64'):
+            # Analyze the number of ctors
+            def get_ctors(rc, stdout, stderr):
+                try:
+                    output = stdout.split("\t")
+                    return dict(num_ctors=int(output[0]))
+                except:
+                    return {}
+
+            self.addStep(SetProperty(
+                name='get_ctors',
+                command=['python', WithProperties('%(toolsdir)s/buildfarm/utils/count_ctors.py'),
+                    '%s/dist/bin/libxul.so' % self.objdir],
+                extract_fn=get_ctors,
+                ))
+
+            self.addStep(OutputStep(
+                name='tinderboxprint_ctors',
+                data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
+                ))
 
     def addLeakTestSteps(self):
         # we want the same thing run a few times here, with different
