@@ -84,10 +84,10 @@ successfully created and could be available for download at %(url)s\n\n" % local
         for log in attrs['logs']:
             if 'summary' not in log[0]:
                 continue
-            for line in summary:
-                if '"test"' in line:
-                    test = re.findall('>t[a-zA-Z]+: \d+\.[0-9a-zA-Z]+', line)[0]
-                    text += '%s\n' % test
+            for line in log[2]:
+                test = re.search("(\w+): ([0-9.:]+)", line)
+                if test:
+                    text += "%s\n" % (test.group(0))
         text += '\n'
 
     text += """Visit http://tinderbox.mozilla.org/showbuilds.cgi?tree=%(tinderboxTree)s to view the full logs.""" % locals()
