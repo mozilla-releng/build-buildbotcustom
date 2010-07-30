@@ -2621,6 +2621,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.createPartial = createPartial
         self.geriatricMasters = []
 
+        env = env.copy()
+
         env.update({'EN_US_BINARY_URL':enUSBinaryURL})
 
         # Unfortunately, we can't call BaseRepackFactory.__init__() before this
