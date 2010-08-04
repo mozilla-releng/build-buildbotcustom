@@ -461,7 +461,7 @@ def generateBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=builders + nightlyBuilders,
-        logCompression="bzip2"
+        logCompression="gzip"
     ))
     # XULRunner builds
     branchObjects['status'].append(TinderboxMailNotifier(
@@ -470,7 +470,7 @@ def generateBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=xulrunnerNightlyBuilders,
-        logCompression="bzip2"
+        logCompression="gzip"
     ))
     # Separate notifier for unittests, since they need to be run through
     # the unittest errorparser
@@ -480,7 +480,7 @@ def generateBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=unittestBuilders + debugBuilders,
-        logCompression="bzip2",
+        logCompression="gzip",
         errorparser="unittest"
     ))
     # Weekly builds (currently only code coverage) go to a different tree
@@ -490,7 +490,7 @@ def generateBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=weeklyBuilders,
-        logCompression="bzip2",
+        logCompression="gzip",
         errorparser="unittest"
     ))
     # Try Server notifier
@@ -534,7 +534,7 @@ def generateBranchObjects(config, name):
             tree=config['l10n_tinderbox_tree'],
             extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
             relayhost="mail.build.mozilla.org",
-            logCompression="bzip2",
+            logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
         ))
@@ -546,7 +546,7 @@ def generateBranchObjects(config, name):
             tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
             extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
             relayhost="mail.build.mozilla.org",
-            logCompression="bzip2",
+            logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
         ))
@@ -617,7 +617,7 @@ def generateBranchObjects(config, name):
             extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
             relayhost="mail.build.mozilla.org",
             builders=test_builders,
-            logCompression="bzip2",
+            logCompression="gzip",
             errorparser="unittest"
         ))
 
@@ -1224,7 +1224,7 @@ def generateCCBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=builders + nightlyBuilders,
-        logCompression="bzip2"
+        logCompression="gzip"
     ))
     # Separate notifier for unittests, since they need to be run through
     # the unittest errorparser
@@ -1234,7 +1234,7 @@ def generateCCBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=unittestBuilders + debugBuilders,
-        logCompression="bzip2",
+        logCompression="gzip",
         errorparser="unittest"
     ))
     # Weekly builds (currently only code coverage) go to a different tree
@@ -1244,7 +1244,7 @@ def generateCCBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
         builders=weeklyBuilders,
-        logCompression="bzip2",
+        logCompression="gzip",
         errorparser="unittest"
     ))
 
@@ -1264,7 +1264,7 @@ def generateCCBranchObjects(config, name):
             tree=config['l10n_tinderbox_tree'],
             extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
             relayhost="mail.build.mozilla.org",
-            logCompression="bzip2",
+            logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
         ))
@@ -1276,7 +1276,7 @@ def generateCCBranchObjects(config, name):
             tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
             extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
             relayhost="mail.build.mozilla.org",
-            logCompression="bzip2",
+            logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
         ))
@@ -1331,7 +1331,7 @@ def generateCCBranchObjects(config, name):
             extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
             relayhost="mail.build.mozilla.org",
             builders=test_builders,
-            logCompression="bzip2",
+            logCompression="gzip",
             errorparser="unittest"
         ))
 
@@ -1894,7 +1894,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            relayhost="smtp.mozilla.org",
                            builders=branch_builders,
                            useChangeTime=False,
-                           logCompression="bzip2"))
+                           logCompression="gzip"))
     ###  Unittests need specific errorparser
     branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
@@ -1904,7 +1904,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            builders=all_test_builders,
                            useChangeTime=False,
                            errorparser="unittest",
-                           logCompression="bzip2"))
+                           logCompression="gzip"))
 
     ### Try mail notifier
     if branch_config.get('enable_mail_notifier'):
@@ -2098,7 +2098,7 @@ def generateMobileBranchObjects(config, name):
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost='mail.build.mozilla.org',
         builders=builders + nightlyBuilders,
-        logCompression='bzip2',
+        logCompression='gzip',
     ))
 
     #Try server mail notifier
