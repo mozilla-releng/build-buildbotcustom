@@ -6643,17 +6643,8 @@ class TalosFactory(BuildFactory):
              env=self.env)
             )
             self.addStep(DownloadFile(
-             url="%s/tools/buildfarm/utils/generate-tpcomponent.py" % self.supportUrlBase,
+             url="%s/xpis/pageloader.xpi" % self.supportUrlBase,
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
-            )
-            self.addStep(ShellCommand(
-             name='setup_pageloader',
-             command=["python", "generate-tpcomponent.py"],
-             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
-             description="setting up pageloader",
-             haltOnFailure=True,
-             flunkOnFailure=True,
-             env=self.env)
             )
         else:
             self.addStep(FileDownload(
