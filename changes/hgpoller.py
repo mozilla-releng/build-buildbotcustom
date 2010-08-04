@@ -430,7 +430,8 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         reactor.callLater(0, self.loop.start, self.pollInterval)
 
     def stopService(self):
-        self.loop.stop()
+        if self.running:
+            self.loop.stop()
         return base.ChangeSource.stopService(self)
     
     def describe(self):
@@ -505,7 +506,8 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
         reactor.callLater(0, self.loop.start, self.pollInterval)
 
     def stopService(self):
-        self.loop.stop()
+        if self.running:
+            self.loop.stop()
         return base.ChangeSource.stopService(self)
 
     def addChange(self, change):
