@@ -68,7 +68,7 @@ which is XML of the form
 
 import time
 from calendar import timegm
-from xml.dom import minidom, Node
+import xml.etree.cElementTree as ElementTree
 import operator
 
 from twisted.python import log, failure
@@ -217,33 +217,25 @@ def parse_date_string(dateString):
     return timegm(parse_date(dateString).utctimetuple())
 
 def _parse_changes(query):
-    dom = minidom.parseString(query)
+    etree = ElementTree.fromstring(query)
+    xmlns = re.sub("({.*}).*", "\\1", etree.tag)
 
-    items = dom.getElementsByTagName("entry")
     changes = []
-    for i in items:
+    for entry in etree.findall(xmlns+'entry'):
         d = {}
-        for k in ["title", "updated"]:
-            d[k] = i.getElementsByTagName(k)[0].firstChild.wholeText
-        d["updated"] = parse_date_string(d["updated"])
-        _cs = d["title"].split(" ")[1]
-        assert _cs == str(_cs)
-        d["changeset"] = str(_cs)
-        nameNode = i.getElementsByTagName("author")[0].childNodes[1]
-        d["author"] = nameNode.firstChild.wholeText
-        d["link"] = i.getElementsByTagName("link")[0].getAttribute("href")
-        # Get all <li class="file"> elements
-        files = filter(lambda e: 'file' in e.getAttribute('class').split(),
-                       i.getElementsByTagName('li'))
-        # For each <li class="file"> element, concat the data of all
-        # text node children.
-        # This way, we don't get confused if the DOM has split the file
-        # paths.
-        # We end up with a list of paths by using map()
-        d["files"] = map(lambda e: reduce(operator.add,
-                                          map(lambda t:t.data, e.childNodes),
-                                          ''),
-                         files)
+        for n in entry:
+            tag = n.tag.replace(xmlns, "")
+            if tag == "title":
+                d['title'] = n.text
+                d['changeset'] = n.text.split(" ")[1]
+            elif tag == "updated":
+                d['updated'] = parse_date_string(n.text)
+            elif tag == "author":
+                d['author'] = n[0].text
+            elif tag == "link":
+                d['link'] = n.get('href')
+            elif tag == "content":
+                d['files'] = [c.text for c in n.getiterator("{http://www.w3.org/1999/xhtml}li")]
         changes.append(d)
     changes.reverse() # want them in chronological order
     return changes

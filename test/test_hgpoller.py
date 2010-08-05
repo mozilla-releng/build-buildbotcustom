@@ -188,7 +188,7 @@ class PushlogParsing(unittest.TestCase):
         self.failUnlessEqual(len(changes[1]['files']), 7)
 
     def testMalformedPushlog(self):
-        self.failUnlessRaises(ExpatError, _parse_changes, malformedPushlog)
+        self.failUnlessRaises(SyntaxError, _parse_changes, malformedPushlog)
 
     def testEmptyPushlog(self):
-        self.failUnlessRaises(ExpatError, _parse_changes, "")
+        self.failUnlessRaises(SyntaxError, _parse_changes, "")
