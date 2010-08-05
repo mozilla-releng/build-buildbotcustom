@@ -60,7 +60,12 @@ def ParseLocalesFile(data):
         splitLine = line.split()
         locale = splitLine[0]
         buildPlatforms = splitLine[1:]
-        locales[locale] = buildPlatforms
+        if locale in locales:
+            for plat in buildPlatforms:
+                if plat not in locales[locale]:
+                    locales[locale].append(plat)
+        else:
+            locales[locale] = buildPlatforms
     return locales
 
 class L10nMixin(object):
