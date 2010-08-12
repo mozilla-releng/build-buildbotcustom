@@ -2998,10 +2998,10 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          workdir='build/'+self.origSrcDir
         )
 
-        candidatesDir = 'http://%s' % self.stageServer + \
-                        '/pub/mozilla.org/%s/nightly' % self.project + \
-                        '/%s-candidates/build%s' % (self.version,
-                                                    self.buildNumber)
+        candidatesDir = 'http://%s%s' % (self.stageServer,
+                                         self.getCandidatesDir(self.project,
+                                                               self.version,
+                                                               self.buildNumber))
         longVersion = self.makeLongVersion(self.version)
 
         # This block sets platform specific data that our wget command needs.
@@ -5208,9 +5208,10 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
-                   (stagingServer, productName, version, str(buildNumber),
-                    platformFtpDir),
+                  '%s:%s/%s' % (stagingServer,
+                                self.getCandidatesDir(productName, version,
+                                                      buildNumber),
+                                platformFtpDir),
                   '%s-%s-build%s/' % (productName,
                                       version,
                                       str(buildNumber))
@@ -5236,12 +5237,10 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
-                   (stagingServer,
-                    productName,
-                    oldVersion,
-                    str(oldBuildNumber),
-                    platformFtpDir),
+                  '%s:%s/%s' % (stagingServer,
+                                self.getCandidatesDir(productName, oldVersion,
+                                                      oldBuildNumber),
+                                platformFtpDir),
                   '%s-%s-build%s/' % (productName,
                                       oldVersion,
                                       str(oldBuildNumber))
