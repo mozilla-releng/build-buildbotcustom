@@ -1176,7 +1176,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['make', 'uploadsymbols'],
          env=self.env,
          workdir='build/%s' % self.objdir,
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=2400, # 40 minutes
         )
 
     def addPostBuildCleanupSteps(self):
