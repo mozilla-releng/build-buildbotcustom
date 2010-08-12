@@ -332,7 +332,11 @@ class MozillaBuildFactory(BuildFactory):
             repoPath = repoPath.lstrip('/')
         if not hgHost:
             hgHost = self.hgHost
-        proto = 'ssh' if push else 'http'
+        if push:
+            proto = 'ssh'
+        else:
+            proto = 'http'
+
         return '%s://%s/%s' % (proto, hgHost, repoPath)
 
     def getPackageFilename(self, platform):
