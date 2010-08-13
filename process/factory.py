@@ -1476,7 +1476,7 @@ class TryBuildFactory(MercurialBuildFactory):
              timeout=40*60 # 40 minutes
         )
 
-        talosBranch = "%s-%s" % (self.branchName, self.platform)
+        talosBranch = "%s-%s-talos" % (self.branchName, self.platform)
         for master, warn in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -1937,7 +1937,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 timeout=40*60 # 40 minutes
             ))
 
-        talosBranch = "%s-%s" % (self.branchName, self.platform)
+        talosBranch = "%s-%s-talos" % (self.branchName, self.platform)
         for master, warn in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -2072,7 +2072,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
-        talosBranch = "%s-release-%s" % (self.branchName, self.platform)
+        talosBranch = "%s-release-%s-talos" % (self.branchName, self.platform)
         for master, warn in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
