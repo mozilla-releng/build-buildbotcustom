@@ -212,6 +212,11 @@ class MozillaBuildFactory(BuildFactory):
          name='tinderboxsummarymessage_buildername',
          data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
         ))
+        if self.branchName in ('tryserver',):
+            self.addStep(OutputStep(
+             name='tinderboxprint_revision',
+             data=WithProperties('TinderboxPrint: s: %(revision)s'),
+            ))
         self.addInitialSteps()
 
     def addInitialSteps(self):
@@ -1239,7 +1244,7 @@ class TryBuildFactory(MercurialBuildFactory):
                                                       self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
-         name='tinderboxprint_changeset',
+         name='tinderboxprint_changeset_link',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
 
