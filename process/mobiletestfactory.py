@@ -218,14 +218,6 @@ class MobileTalosFactory(BuildFactory):
     def addHGPageloaderSteps(self):
         self.addSteps(simpleHG(self.hg_host, self.tools_repo_path,
                                self.base_dir, 'tools'))
-        self.addStep(ShellCommand(
-            command=['python',
-                     "%s/tools/buildfarm/utils/generate-tpcomponent.py" % self.base_dir],
-            workdir="%s/talos/page_load_test" % self.base_dir,
-            description=['create', 'pageloader'],
-            name='generate_pageloader',
-            haltOnFailure=True,
-        ))
 
     def addTarballPageloaderSteps(self):
         self.addStep(ShellCommand(
