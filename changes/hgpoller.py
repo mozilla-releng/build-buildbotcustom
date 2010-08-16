@@ -338,6 +338,8 @@ class BaseHgPoller(BasePoller):
         self.startLoad = 0
         self.loadTime = None
 
+        self.emptyRepo = False
+
     def getData(self):
         url = self._make_url()
         if self.verbose:
@@ -361,9 +363,40 @@ class BaseHgPoller(BasePoller):
 
         return url
 
+    def dataFailed(self, res):
+        if hasattr(res.value, 'status') and res.value.status == '500' and \
+                'unknown revision' in res.value.response:
+            # Indicates that the revision can't be found.  The repo has most
+            # likely been reset.  Forget about our lastChangeset, and set
+            # emptyRepo to True so we can trigger builds for new changes there
+            if self.verbose:
+                log.msg("%s has been reset" % self.baseURL)
+            self.lastChangeset = None
+            self.emptyRepo = True
+        return BasePoller.dataFailed(self, res)
+
     def processData(self, query):
         change_list = _parse_changes(query)
-        if self.lastChangeset is not None:
+        if len(change_list) == 0:
+            if self.lastChangeset is None:
+                # We don't have a lastChangeset, and there are no changes.  Assume
+                # the repository is empty.
+                self.emptyRepo = True
+                if self.verbose:
+                    log.msg("%s is empty" % self.baseURL)
+            # Nothing else to do
+            return
+
+        # If we have a lastChangeset we're comparing against, we've been
+        # running for a while and so any changes returned here are new.
+
+        # If the repository was previously empty (indicated by emptyRepo=True),
+        # we also want to pay attention to all these pushes.
+
+        # If we don't have a lastChangeset and the repository isn't empty, then
+        # don't trigger any new builds, and start monitoring for changes since
+        # the latest changeset in the repository
+        if self.lastChangeset is not None or self.emptyRepo:
             for change in change_list:
                 adjustedChangeTime = change["updated"]
                 c = changes.Change(who = change["author"],
@@ -374,13 +407,15 @@ class BaseHgPoller(BasePoller):
                                    branch = self.branch)
                 self.changeHook(c)
                 self.parent.addChange(c)
-        if len(change_list) > 0:
-            self.lastChange = max(self.lastChange, *[c["updated"]
-                                                     for c in change_list])
-            self.lastChangeset = change_list[-1]["changeset"]
-            if self.verbose:
-                log.msg("last changeset %s on %s" %
-                        (self.lastChangeset, self.baseURL))
+
+        # The repository isn't empty any more!
+        self.emptyRepo = False
+        self.lastChange = max(self.lastChange, *[c["updated"]
+                                                 for c in change_list])
+        self.lastChangeset = change_list[-1]["changeset"]
+        if self.verbose:
+            log.msg("last changeset %s on %s" %
+                    (self.lastChangeset, self.baseURL))
 
     def changeHook(self, change):
         pass
