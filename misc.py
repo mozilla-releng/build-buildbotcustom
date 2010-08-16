@@ -1816,7 +1816,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     branchName=branchName,
                     configOptions=talosConfig,
                     talosCmd=talosCmd,
-                    fetchSymbols=branch_config['fetch_symbols'],
+                    fetchSymbols=branch_config['fetch_symbols'] and
+                      branch_config['platforms'][platform].get('download_symbols',True),
                     **extra # Extra test specific factory parameters
                 )
                 builder = {

@@ -6452,7 +6452,7 @@ class TalosFactory(BuildFactory):
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
         self.addGetBuildInfoStep()
-        if fetchSymbols and (self.OS not in ('snowleopard','w764')):
+        if fetchSymbols:
             self.addDownloadSymbolsStep()
         if self.addonTester:
             self.addDownloadExtensionStep()
