@@ -52,6 +52,77 @@ import buildbotcustom.steps.unittest as unittest_steps
 import buildbotcustom.steps.talos as talos_steps
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
 
+def postUploadCmdPrefix(upload_dir=None,
+        branch=None,
+        product=None,
+        revision=None,
+        who=None,
+        builddir=None,
+        buildid=None,
+        buildNumber=None,
+        to_tinderbox_dated=False,
+        to_tinderbox_builds=False,
+        to_dated=False,
+        to_latest=False,
+        to_try=False,
+        to_shadow=False,
+        to_candidates=False,
+        as_list=True,
+        ):
+    """Returns a post_upload.py command line for the given arguments.
+
+    If as_list is True (the default), the command line will be returned as a
+    list of arguments.  Some arguments may be WithProperties instances.
+
+    If as_list is False, the command will be returned as a WithProperties
+    instance representing the entire command line as a single string.
+
+    It is expected that the returned value is augmented with the list of files
+    to upload, and where to upload it.
+    """
+
+    cmd = ["post_upload.py"]
+
+    if upload_dir:
+        cmd.extend(["--tinderbox-builds-dir", upload_dir])
+    if branch:
+        cmd.extend(["-b", branch])
+    if product:
+        cmd.extend(["-p", product])
+    if buildid:
+        cmd.extend(['-i', buildid])
+    if buildNumber:
+        cmd.extend(['-n', buildNumber])
+    if revision:
+        cmd.extend(['--revision', revision])
+    if who:
+        cmd.extend(['--who', who])
+    if builddir:
+        cmd.extend(['--builddir', builddir])
+    if to_tinderbox_dated:
+        cmd.append('--release-to-tinderbox-dated-builds')
+    if to_tinderbox_builds:
+        cmd.append('--release-to-tinderbox-builds')
+    if to_try:
+        cmd.append('--release-to-tryserver-builds')
+    if to_latest:
+        cmd.append("--release-to-latest")
+    if to_dated:
+        cmd.append("--release-to-dated")
+    if to_shadow:
+        cmd.append("--release-to-shadow-central-builds")
+    if to_candidates:
+        cmd.append("--release-to-candidates-dir")
+
+    if as_list:
+        return cmd
+    else:
+        # Remove WithProperties instances and replace them with their fmtstring
+        for i,a in enumerate(cmd):
+            if isinstance(a, WithProperties):
+                cmd[i] = a.fmtstring
+        return WithProperties(' '.join(cmd))
+
 def parse_make_upload(rc, stdout, stderr):
     ''' This function takes the output and return code from running
     the upload make target and returns a dictionary of important
@@ -1528,16 +1599,17 @@ class TryBuildFactory(MercurialBuildFactory):
         # Set up the post upload to the custom tryserver tinderboxBuildsDir
         tinderboxBuildsDir = self.packageDir
 
-        postUploadCmd =  ['post_upload.py']
-        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
-                          '-i %(buildid)s',
-                          '-p %s' % self.productName,
-                          '--revision %(got_revision)s',
-                          '--who %(who)s',
-                          '--builddir %(builddir)s',
-                          '--release-to-tryserver-builds']
-
-        uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
+                upload_dir=tinderboxBuildsDir,
+                product=self.productName,
+                revision=WithProperties('%(got_revision)s'),
+                who=WithProperties('%(who)s'),
+                builddir=WithProperties('%(builddir)s'),
+                buildid=WithProperties('%(buildid)s'),
+                to_try=True,
+                to_dated=False,
+                as_list=False,
+                )
 
         self.addStep(SetProperty,
              command=['make', 'upload'],
@@ -2001,27 +2073,27 @@ class NightlyBuildFactory(MercurialBuildFactory):
             tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
         else:
             tinderboxBuildsDir = self.tinderboxBuildsDir
-        postUploadCmd =  ['post_upload.py']
+
+        uploadArgs = dict(
+                upload_dir=tinderboxBuildsDir,
+                product=self.productName,
+                buildid=WithProperties("%(buildid)s"),
+                as_list=False,
+            )
         if self.hgHost.startswith('ssh'):
-            postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
-                              '-i %(buildid)s',
-                              '-p %s' % self.productName,
-                              '--release-to-shadow-central-builds']
+            uploadArgs['to_shadow'] = True
+            uploadArgs['to_tinderbox_dated'] = False
         else:
-            postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
-                              '-i %(buildid)s',
-                              '-p %s' % self.productName,
-                              '--release-to-tinderbox-dated-builds']
+            uploadArgs['to_shadow'] = False
+            uploadArgs['to_tinderbox_dated'] = True
+
         if self.nightly:
-            # If this is a nightly build also place them in the latest and
-            # dated directories in nightly/
-            postUploadCmd += ['-b %s' % self.branchName,
-                              '--release-to-latest',
-                              '--release-to-dated']
+            uploadArgs['to_dated'] = True
+            uploadArgs['to_latest'] = True
+            uploadArgs['branch'] = self.branchName
 
-        uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
 
-        
         if self.productName == 'xulrunner':
             self.addStep(SetProperty,
              command=['make', '-f', 'client.mk', 'upload'],
@@ -2132,10 +2204,10 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
-    def addFilePropertiesSteps(self, filename=None, directory=None, 
+    def addFilePropertiesSteps(self, filename=None, directory=None,
                                fileType=None, maxDepth=1, haltOnFailure=False):
         # We don't need to do this for release builds.
-        pass    
+        pass
 
     def doUpload(self):
         # Make sure the complete MAR has been generated
@@ -2162,11 +2234,13 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
-        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
-                                       '-p %s ' % self.productName + \
-                                       '-v %s ' % self.version + \
-                                       '-n %s ' % self.buildNumber + \
-                                       '--release-to-candidates-dir'
+        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
+                productName=self.productName,
+                version=self.version,
+                buildNumber=self.buildNumber,
+                to_candidates=True,
+                as_list=False)
+
         self.addStep(SetProperty,
          name='make_upload',
          command=['make', 'upload'],
@@ -2717,7 +2791,7 @@ class CCBaseRepackFactory(BaseRepackFactory):
 
 class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     extraConfigureArgs = []
-    
+
     def __init__(self, enUSBinaryURL, nightly=False, env={},
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
@@ -2748,27 +2822,29 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
           uploadDir = '%s-l10n' % kwargs['branchName']
         else:
           uploadDir = '%s-l10n' % self.getRepoName(kwargs['repoPath'])
-        postUploadCmd = ['post_upload.py', 
-                         '-p %s ' % kwargs['project'],
-                         '-b %s ' % uploadDir]
+
+        uploadArgs = dict(
+                product=kwargs['project'],
+                branch=uploadDir,
+                as_list=False,
+                )
         if l10nDatedDirs:
             # nightly repacks and on-change upload to different places
             if self.nightly:
-                postUploadCmd += ['--buildid %(buildid)s',
-                                  '--release-to-latest',
-                                  '--release-to-dated']
+                uploadArgs['buildid'] = WithProperties("%(buildid)s")
+                uploadArgs['to_latest'] = True
+                uploadArgs['to_dated'] = True
             else:
                 # For the repack-on-change scenario we just want to upload
                 # to tinderbox builds
-                postUploadCmd += \
-                      ['--tinderbox-builds-dir %s' % uploadDir,
-                      '--release-to-tinderbox-builds']
-            self.postUploadCmd = WithProperties(' '.join(postUploadCmd))
+                uploadArgs['upload_dir'] = uploadDir
+                uploadArgs['to_tinderbox_builds'] = True
         else:
             # for backwards compatibility when the nightly and repack on-change
             # runs were the same 
-            postUploadCmd += ['--release-to-latest']
-            self.postUploadCmd = ' '.join(postUploadCmd)
+            uploadArgs['to_latest'] = True
+
+        self.postUploadCmd = postUploadCmdPrefix(**uploadArgs)
 
         # 2) preparation for updates
         if l10nNightlyUpdate and self.nightly:
@@ -4603,15 +4679,13 @@ class UnittestBuildFactory(MozillaBuildFactory):
                 uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
             # Always upload builds to the dated tinderbox builds directories
-            postUploadCmd =  ['post_upload.py']
-            postUploadCmd += ['--tinderbox-builds-dir %s-%s-unittest' %
-                                    (self.branchName, self.platform),
-                              '-i %(buildid)s',
-                              '-p %s' % self.productName,
-                              '--release-to-tinderbox-dated-builds']
-
-            uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
-            
+            uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
+                    as_list=False,
+                    upload_dir="%s-%s-unittest" % (self.branchName, self.platform),
+                    buildid=WithProperties("%(buildid)s"),
+                    product=self.productName,
+                    to_tinderbox_dated=True,
+                    )
             self.addStep(SetProperty,
              name='make_upload',
              command=['make', 'upload'],
@@ -4716,17 +4790,16 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
             if self.stageSshKey:
                 uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
-            postUploadCmd =  ['post_upload.py']
-            postUploadCmd += ['--tinderbox-builds-dir %s-%s-unittest' %
-                                    (self.branchName, self.platform),
-                              '-i %(buildid)s',
-                              '-p %s' % self.productName,
-                              '--revision %(got_revision)s',
-                              '--who %(who)s',
-                              '--builddir %(builddir)s',
-                              '--release-to-tryserver-builds']
-
-            uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+            uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
+                    as_list=False,
+                    upload_dir="%s-%s-unittest" % (self.branchName, self.platform),
+                    buildid=WithProperties("%(buildid)s"),
+                    product=self.productName,
+                    revision=WithProperties('%(got_revision)s'),
+                    who=WithProperties('%(who)s'),
+                    builddir=WithProperties('%(builddir)s'),
+                    to_try=True,
+                    )
 
             self.addStep(SetProperty,
              command=['make', 'upload'],

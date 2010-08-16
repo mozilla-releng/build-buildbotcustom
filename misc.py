@@ -6,6 +6,7 @@ except:
 import collections
 import random
 import re
+import sys, os.path
 from copy import deepcopy
 
 from twisted.python import log
@@ -21,6 +22,7 @@ import buildbotcustom.l10n
 import buildbotcustom.scheduler
 import buildbotcustom.status.mail
 import buildbotcustom.status.generators
+import buildbotcustom.status.log_handlers
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -28,6 +30,7 @@ reload(buildbotcustom.l10n)
 reload(buildbotcustom.scheduler)
 reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
+reload(buildbotcustom.status.log_handlers)
 
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
@@ -46,6 +49,7 @@ from buildbot.status.mail import MailNotifier
 from buildbotcustom.status.generators import buildTryCompleteMessage
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser
+from buildbotcustom.status.log_handlers import SubprocessLogHandler
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -455,6 +459,28 @@ def generateBranchObjects(config, name):
         if config['enable_xulrunner'] and platform not in ('wince',):
             xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
 
+    logUploadCmd = [sys.executable,
+         '%s/bin/log_uploader.py' % buildbotcustom.__path__[0],
+         config['stage_server'],
+         '-u', config['stage_username'],
+         '-i', os.path.expanduser("~/.ssh/%s" % config['stage_ssh_key']),
+         '-b', name,
+         '-p', WithProperties("%(platform)s"),
+        ]
+    if config.get('enable_try'):
+        logUploadCmd.append('--try')
+
+    branchObjects['status'].append(SubprocessLogHandler(
+        logUploadCmd,
+        builders=builders + unittestBuilders + debugBuilders,
+    ))
+
+    if nightlyBuilders:
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--nightly'],
+            builders=nightlyBuilders,
+        ))
+
     # Currently, each branch goes to a different tree
     # If this changes in the future this may have to be
     # moved out of the loop
@@ -644,6 +670,11 @@ def generateBranchObjects(config, name):
             builders=test_builders,
             logCompression="gzip",
             errorparser="unittest"
+        ))
+
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd,
+            builders=test_builders,
         ))
 
     # Now, setup the nightly en-US schedulers and maybe,
@@ -1854,7 +1885,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     'builddir': "%s_%s_test-%s" % (branch, slave_platform, suite),
                     'factory': factory,
                     'category': branch,
-                    'properties': {'branch': branch, 'platform': slave_platform},
+                    'properties': {'branch': branch, 'platform': slave_platform, 'build_platform': platform},
                 }
                 if not merge:
                     nomergeBuilders.append(builder['name'])
@@ -1949,6 +1980,22 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            useChangeTime=False,
                            errorparser="unittest",
                            logCompression="gzip"))
+
+    logUploadCmd = [sys.executable,
+         '%s/bin/log_uploader.py' % buildbotcustom.__path__[0],
+         branch_config['stage_server'],
+         '-u', branch_config['stage_username'],
+         '-i', os.path.expanduser("~/.ssh/%s" % branch_config['stage_ssh_key']),
+         '-b', branch,
+         '-p', WithProperties("%(build_platform)s"),
+        ]
+    if branch == 'tryserver':
+        logUploadCmd.append('--try')
+
+    branchObjects['status'].append(SubprocessLogHandler(
+        logUploadCmd,
+        builders=branch_builders + all_test_builders,
+    ))
 
     ### Try mail notifier
     if branch_config.get('enable_mail_notifier'):
@@ -2231,4 +2278,3 @@ def generateMobileBranchObjects(config, name):
         nomergeBuilders.extend(builders + nightlyBuilders)
 
     return mobile_objects
-
