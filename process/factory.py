@@ -4888,6 +4888,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         if self.exec_mozmill_suites:
             mozmillEnv = self.env.copy()
             mozmillEnv['NO_EM_RESTART'] = "0"
+            mozmillEnv['MOZMILL_NO_VNC'] = "1"
             self.addStep(unittest_steps.MozillaCheck,
              test_name="mozmill",
              warnOnWarnings=True,
