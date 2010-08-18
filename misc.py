@@ -689,6 +689,7 @@ def generateBranchObjects(config, name):
             codesighs = False
 
         buildSpace = pf.get('build_space', config['default_build_space'])
+        l10nSpace = config['default_l10n_space']
         clobberTime = pf.get('clobber_time', config['default_clobber_time'])
         mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
         crashtestLeakThreshold = pf.get('crashtest_leak_threshold', None)
@@ -880,7 +881,7 @@ def generateBranchObjects(config, name):
                         buildToolsRepoPath=config['build_tools_repo_path'],
                         compareLocalesRepoPath=config['compare_locales_repo_path'],
                         compareLocalesTag=config['compare_locales_tag'],
-                        buildSpace=2,
+                        buildSpace=l10nSpace,
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
                     )
@@ -953,7 +954,7 @@ def generateBranchObjects(config, name):
                 buildToolsRepoPath=config['build_tools_repo_path'],
                 compareLocalesRepoPath=config['compare_locales_repo_path'],
                 compareLocalesTag=config['compare_locales_tag'],
-                buildSpace=2,
+                buildSpace=l10nSpace,
                 clobberURL=config['base_clobber_url'],
                 clobberTime=clobberTime,
             )
