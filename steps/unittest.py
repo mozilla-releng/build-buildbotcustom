@@ -576,7 +576,7 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
 
         if suite == 'crashtest':
             self.command.append('reftest/tests/testing/crashtest/crashtests.list')
-        elif suite == 'reftest':
+        elif suite in ('reftest', 'direct3D', 'opengl'):
             self.command.append('reftest/tests/layout/reftests/reftest.list')
         elif suite == 'reftest-d2d':
             self.command.append('--setpref=gfx.font_rendering.directwrite.enabled=true')

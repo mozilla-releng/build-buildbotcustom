@@ -6368,7 +6368,10 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  symbols_path='symbols',
                  maxTime=120*60, # Two Hours
                 ))
-            elif suite in ('reftest', 'reftest-d2d', 'crashtest', 'jsreftest'):
+            elif suite in ('reftest', 'reftest-d2d', 'crashtest', 'jsreftest', \
+                           'direct3D', 'opengl'):
+                if suite in ('direct3D', 'opengl'):
+                    self.env.update({'MOZ_ACCELERATED':'11'})
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
                  env=self.env,
