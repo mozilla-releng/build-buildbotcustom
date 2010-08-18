@@ -2751,7 +2751,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      )
         self.addStep(ShellCommand,
                      name='update_enUS_revision',
-                     command=['hg', 'update', '-r',
+                     command=['hg', 'update', '-C', '-r',
                               WithProperties('%(fx_revision)s')],
                      haltOnFailure=True,
                      workdir='build/' + self.origSrcDir)
@@ -2897,12 +2897,12 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
          extract_fn=identToProperties()
         )
         self.addStep(ShellCommand,
-         command=['hg', 'update', '-r', WithProperties('%(comm_revision)s')],
+         command=['hg', 'update', '-C', '-r', WithProperties('%(comm_revision)s')],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )
         self.addStep(ShellCommand,
-         command=['hg', 'update', '-r', WithProperties('%(moz_revision)s')],
+         command=['hg', 'update', '-C', '-r', WithProperties('%(moz_revision)s')],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
         )
@@ -3357,7 +3357,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
                 # have those commits
                 self.addStep(ShellCommand,
                  name='hg_update',
-                 command=['hg', 'up', '-r',
+                 command=['hg', 'up', '-C', '-r',
                           WithProperties('%s', '%s-revision' % repoName)],
                  workdir=repoName,
                  description=['update', repoName],
@@ -3508,7 +3508,7 @@ class SingleSourceFactory(ReleaseFactory):
         # 'hg up -r FIREFOX_3_1b1_RELEASE' with the bundle
         self.addStep(ShellCommand,
          name='hg_update_incl_tags',
-         command=['hg', 'up'],
+         command=['hg', 'up', '-C'],
          workdir=self.branchName,
          description=['update to', 'include tag revs'],
          haltOnFailure=True
@@ -3627,7 +3627,7 @@ class MultiSourceFactory(ReleaseFactory):
             # 'hg up -r FIREFOX_3_1b1_RELEASE' with the bundle
             self.addStep(ShellCommand,
              name='hg_update_incl_tags',
-             command=['hg', 'up'],
+             command=['hg', 'up', '-C'],
              workdir=location,
              description=['update to', 'include tag revs'],
              haltOnFailure=True
@@ -7088,7 +7088,7 @@ class PartnerRepackFactory(ReleaseFactory):
         )
         self.addStep(ShellCommand,
             name='update_partners_repo',
-            command=['hg', 'update', '-r', self.partnersRepoRevision],
+            command=['hg', 'update', '-C', '-r', self.partnersRepoRevision],
             description=['update', 'partners', 'repo'],
             workdir=self.partnersRepackDir,
             haltOnFailure=True            
