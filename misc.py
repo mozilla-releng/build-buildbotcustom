@@ -1883,7 +1883,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
                         if not merge:
                             nomergeBuilders.extend(test_builders)
-                        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=0))
+                        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=None))
 
     branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
