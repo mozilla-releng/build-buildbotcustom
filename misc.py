@@ -392,6 +392,8 @@ def generateBranchObjects(config, name):
     # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
     l10nBuilders = {}
     l10nNightlyBuilders = {}
+    pollInterval = config.get('pollInterval', 60)
+    l10nPollInterval = config.get('l10nPollInterval', 15*60)
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
     for platform in config['platforms'].keys():
@@ -559,13 +561,13 @@ def generateBranchObjects(config, name):
         pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
                                               config['repo_path']),
         tipsOnly=config.get('enable_try', False),
-        pollInterval=1*60
+        pollInterval=pollInterval,
     ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
-                            pollInterval = 15*60)
+                            pollInterval=l10nPollInterval)
         hg_all_locales_poller.parallelRequests = 1
         branchObjects['change_source'].append(hg_all_locales_poller)
 
@@ -1159,6 +1161,8 @@ def generateCCBranchObjects(config, name):
     # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
     l10nBuilders = {}
     l10nNightlyBuilders = {}
+    pollInterval = config.get('pollInterval', 60)
+    l10nPollInterval = config.get('l10nPollInterval', 15*60)
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
     for platform in config['platforms'].keys():
@@ -1288,20 +1292,20 @@ def generateCCBranchObjects(config, name):
         branch=config['repo_path'],
         pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
                                               config['repo_path']),
-        pollInterval=1*60
+        pollInterval=pollInterval,
     ))
     branchObjects['change_source'].append(HgPoller(
         hgURL=config['hgurl'],
         branch=config['repo_path'],
         pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
                                               config['mozilla_repo_path']),
-        pollInterval=1*60
+        pollInterval=pollInterval,
     ))
 
     if config['enable_l10n']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
-                            pollInterval = 15*60)
+                            pollInterval=l10nPollInterval)
         hg_all_locales_poller.parallelRequests = 1
         branchObjects['change_source'].append(hg_all_locales_poller)
 
@@ -1971,6 +1975,7 @@ def generateMobileBranchObjects(config, name):
     builders = []
     nightlyBuilders = []
     mobile_repo_name = config.get('mobile_repo_path').split('/')[-1]
+    pollInterval = config.get('pollInterval', 60)
 
     #We could also make mobile_repo_path a list and iterate over that lise
     #here to allow for more than one mobile repository to be built against
@@ -2139,7 +2144,7 @@ def generateMobileBranchObjects(config, name):
             pushlogUrlOverride='%s/%s/pushlog' %(config.get('hgurl'),
                                                  config.get('mobile_repo_path')),
             tipsOnly=config.get('enable_mobile_try', False),
-            pollInterval=1*60,
+            pollInterval=pollInterval,
         ))
 
     #this scheduler is to trigger mobile builds on a mozilla change
