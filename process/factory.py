@@ -3780,7 +3780,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=14, triggerSchedulers=None, releaseNotesUrl=None,
-                 binaryName=None, oldBinaryName=None, **kwargs):
+                 binaryName=None, oldBinaryName=None, testOlderPartials=False,
+                 **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -3835,6 +3836,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.triggerSchedulers = triggerSchedulers
         self.binaryName = binaryName
         self.oldBinaryName = oldBinaryName
+        self.testOlderPartials = testOlderPartials
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4150,6 +4152,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bcmd.extend(['--binary-name', self.binaryName])
         if self.oldBinaryName:
             bcmd.extend(['--old-binary-name', self.oldBinaryName])
+        if self.testOlderPartials:
+            bcmd.extend(['--test-older-partials'])
         return bcmd
 
     def getSnippetDir(self):
