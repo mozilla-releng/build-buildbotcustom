@@ -83,7 +83,7 @@ class MobileTalosFactory(BuildFactory):
                  hg_host='http://hg.mozilla.org', tools_repo_path='build/tools',
                  talos_tarball=None, pageloader_tarball=None,
                  cleanup_glob='tools talos fennec* *.tar.bz2 *.zip',
-                 tp4_source='/tools/tp4', browser_wait=7, **kwargs):
+                 tp4_source='/tools/tp4', browser_wait=7, env={}, **kwargs):
         BuildFactory.__init__(self, **kwargs)
         self.test = test
         self.timeout = timeout
@@ -102,6 +102,7 @@ class MobileTalosFactory(BuildFactory):
         self.cleanup_glob = cleanup_glob
         self.tp4_source = tp4_source
         self.browser_wait = browser_wait
+        self.env = env.copy()
 
         self.addStartupSteps()
         self.addCleanupSteps()
@@ -276,6 +277,7 @@ class MobileTalosFactory(BuildFactory):
             description=['perfconfig', self.test],
             haltOnFailure=True,
             name='perfconfig_%s' % self.test,
+            env=self.env,
         ))
         self.addStep(ShellCommand(
             command=["cat", "local.config"],
@@ -293,6 +295,7 @@ class MobileTalosFactory(BuildFactory):
             warnOnWarnings=True,
             haltOnFailure=False,
             name='run_test_%s' % self.test,
+            env=self.env,
         ))
 
     def addFinalSteps(self):
@@ -424,6 +427,7 @@ class MobileUnittestFactory(MobileTalosFactory):
             name="run_%s" % self.test,
             haltOnFailure=True,
             timeout=self.timeout,
+            env=self.env,
         ))
         self.addStep(MobileParseTestLog,
             name=self.test_type,
@@ -434,4 +438,5 @@ class MobileUnittestFactory(MobileTalosFactory):
             timeout=120,
             flunkOnFailure=False,
             haltOnFailure=False,
+            env=self.env,
        )
