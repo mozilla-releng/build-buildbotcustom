@@ -106,9 +106,7 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
 # and the dep builders only obey HgPoller/Force Build triggered ones.
 
 def isHgPollerTriggered(change, hgUrl):
-    if change.comments.find(hgUrl) > -1:
-        return True
-    return False
+    return hgUrl in change.revlink
 
 def isImportantL10nFile(change, l10nModules):
     for f in change.files:
@@ -585,8 +583,6 @@ def generateBranchObjects(config, name):
     branchObjects['change_source'].append(HgPoller(
         hgURL=config['hgurl'],
         branch=config['repo_path'],
-        pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
-                                              config['repo_path']),
         tipsOnly=config.get('enable_try', False),
         pollInterval=pollInterval,
     ))
@@ -1344,14 +1340,12 @@ def generateCCBranchObjects(config, name):
     branchObjects['change_source'].append(HgPoller(
         hgURL=config['hgurl'],
         branch=config['repo_path'],
-        pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
-                                              config['repo_path']),
         pollInterval=pollInterval,
     ))
     branchObjects['change_source'].append(HgPoller(
         hgURL=config['hgurl'],
         branch=config['repo_path'],
-        pushlogUrlOverride='%s/%s/pushlog' % (config['hgurl'],
+        pushlogUrlOverride='%s/%s/json-pushes?full=1' % (config['hgurl'],
                                               config['mozilla_repo_path']),
         pollInterval=pollInterval,
     ))
@@ -2230,8 +2224,6 @@ def generateMobileBranchObjects(config, name):
         mobile_objects['change_source'].append(HgPoller(
             hgURL=config.get('hgurl'),
             branch=config.get('mobile_repo_path'),
-            pushlogUrlOverride='%s/%s/pushlog' %(config.get('hgurl'),
-                                                 config.get('mobile_repo_path')),
             tipsOnly=config.get('enable_mobile_try', False),
             pollInterval=pollInterval,
         ))

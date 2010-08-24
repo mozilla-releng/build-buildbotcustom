@@ -40,35 +40,53 @@
 # ***** END LICENSE BLOCK *****
 
 """hgpoller provides Pollers to work on single hg repositories as well
-as on a group of hg repositories. It's polling the RSS feed of pushlog,
-which is XML of the form
+as on a group of hg repositories. It's polling the json feed of pushlog,
+which of the form
 
-<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
- <id>http://hg.mozilla.org/l10n-central/repo/pushlog</id>
- <link rel="self" href="http://hg.mozilla.org/l10n-central/repo/pushlog" />
- <updated>2009-02-09T23:10:59Z</updated>
- <title>repo Pushlog</title>
- <entry>
-  <title>Changeset 3dd5e26f1334ad08a333a7acbe7649af7450feda</title>
-  <id>http://www.selenic.com/mercurial/#changeset-3dd5e26f1334ad08a333a7acbe7649af7450feda</id>
-  <link href="http://hg.mozilla.org/l10n-central/repo/rev/3dd5e26f1334ad08a333a7acbe7649af7450feda" />
-  <updated>2009-02-09T23:10:59Z</updated>
-  <author>
-   <name>ldap@domain.tld</name>
-  </author>
-  <content type="xhtml">
-    <div xmlns="http://www.w3.org/1999/xhtml">
-      <ul class="filelist"><li class="file">some/file/path</li></ul>
-    </div>
-  </content>
- </entry>
-</feed>
+{
+ "15092": {
+  "date": 1281863455,
+  "changesets": [
+   {
+    "node": "ace72819f4a94b9175519a8fa5a1db654edae098",
+    "files": [
+     "gfx/thebes/gfxBlur.cpp"
+    ],
+    "tags": [],
+    "author": "Julian Seward <jseward@acm.org>",
+    "branch": "default",
+    "desc": "Bug 582668 - gfxAlphaBoxBlur::Paint appears to pass garbage down through Cairo. r=roc"
+   },
+   {
+    "node": "43b490ef9dab30db2c4e2706110ad5d524a21597",
+    "files": [
+     "content/html/document/src/nsHTMLDocument.cpp",
+     "dom/interfaces/html/nsIDOMNSHTMLDocument.idl",
+     "js/src/xpconnect/src/dom_quickstubs.qsconf"
+    ],
+    "tags": [],
+    "author": "Ms2ger <ms2ger@gmail.com>",
+    "branch": "default",
+    "desc": "Bug 585877 - remove document.height / document.width. r=sicking, sr=jst"
+   },
+   {
+    "node": "75caf7ab03760f6bc39775cd8c4e097f33161c58",
+    "files": [
+     "modules/plugin/base/src/nsNPAPIPlugin.cpp"
+    ],
+    "tags": [],
+    "author": "Martin Str\u00e1nsk\u00fd <stransky@redhat.com>",
+    "branch": "default",
+    "desc": "Bug 574354 - Disable OOP for plugins wrapped by nspluginwrapper. r=josh"
+   }
+  ],
+  "user": "dgottwald@mozilla.com"
+ }
+}
 """
 
 import time
 from calendar import timegm
-import xml.etree.cElementTree as ElementTree
 import operator
 
 from twisted.python import log, failure
@@ -77,167 +95,25 @@ from twisted.internet.task import LoopingCall
 from twisted.web.client import getPage
 
 from buildbot.changes import base, changes
+from buildbot.util import json
 
-# From pyiso8601 module,
-#  http://code.google.com/p/pyiso8601/source/browse/trunk/iso8601/iso8601.py
-#   Revision 22
-
-# Required license header:
-
-# Copyright (c) 2007 Michael Twomey
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included
-# in all copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-# OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-"""ISO 8601 date time string parsing
-
-Basic usage:
->>> import iso8601
->>> iso8601.parse_date("2007-01-25T12:00:00Z")
-datetime.datetime(2007, 1, 25, 12, 0, tzinfo=<iso8601.iso8601.Utc ...>)
->>>
-
-"""
-
-from datetime import datetime, timedelta, tzinfo
-import re
-
-__all__ = ["parse_timezone", "parse_date", "parse_date_string",
-           "ParseError", "Utc", "FixedOffset", 
-           "Pluggable", "BasePoller", "BaseHgPoller", "HgPoller",
-           "HgLocalePoller", "HgAllLocalesPoller"]
-
-# Adapted from http://delete.me.uk/2005/03/iso8601.html
-ISO8601_REGEX = re.compile(r"(?P<year>[0-9]{4})(-(?P<month>[0-9]{1,2})(-(?P<day>[0-9]{1,2})"
-    r"((?P<separator>.)(?P<hour>[0-9]{2}):(?P<minute>[0-9]{2})(:(?P<second>[0-9]{2})(\.(?P<fraction>[0-9]+))?)?"
-    r"(?P<timezone>Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?"
-)
-TIMEZONE_REGEX = re.compile("(?P<prefix>[+-])(?P<hours>[0-9]{2}).(?P<minutes>[0-9]{2})")
-
-class ParseError(Exception):
-    """Raised when there is a problem parsing a date string"""
-
-# Yoinked from python docs
-ZERO = timedelta(0)
-class Utc(tzinfo):
-    """UTC
-    
-    """
-    def utcoffset(self, dt):
-        return ZERO
-
-    def tzname(self, dt):
-        return "UTC"
-
-    def dst(self, dt):
-        return ZERO
-UTC = Utc()
-
-class FixedOffset(tzinfo):
-    """Fixed offset in hours and minutes from UTC
-    
-    """
-    def __init__(self, offset_hours, offset_minutes, name):
-        self.__offset = timedelta(hours=offset_hours, minutes=offset_minutes)
-        self.__name = name
-
-    def utcoffset(self, dt):
-        return self.__offset
-
-    def tzname(self, dt):
-        return self.__name
-
-    def dst(self, dt):
-        return ZERO
-    
-    def __repr__(self):
-        return "<FixedOffset %r>" % self.__name
-
-def parse_timezone(tzstring, default_timezone=UTC):
-    """Parses ISO 8601 time zone specs into tzinfo offsets
-    
-    """
-    if tzstring == "Z":
-        return default_timezone
-    # This isn't strictly correct, but it's common to encounter dates without
-    # timezones so I'll assume the default (which defaults to UTC).
-    # Addresses issue 4.
-    if tzstring is None:
-        return default_timezone
-    m = TIMEZONE_REGEX.match(tzstring)
-    prefix, hours, minutes = m.groups()
-    hours, minutes = int(hours), int(minutes)
-    if prefix == "-":
-        hours = -hours
-        minutes = -minutes
-    return FixedOffset(hours, minutes, tzstring)
-
-def parse_date(datestring, default_timezone=UTC):
-    """Parses ISO 8601 dates into datetime objects
-    
-    The timezone is parsed from the date string. However it is quite common to
-    have dates without a timezone (not strictly correct). In this case the
-    default timezone specified in default_timezone is used. This is UTC by
-    default.
-    """
-    if not isinstance(datestring, basestring):
-        raise ParseError("Expecting a string %r" % datestring)
-    m = ISO8601_REGEX.match(datestring)
-    if not m:
-        raise ParseError("Unable to parse date string %r" % datestring)
-    groups = m.groupdict()
-    tz = parse_timezone(groups["timezone"], default_timezone=default_timezone)
-    if groups["fraction"] is None:
-        groups["fraction"] = 0
-    else:
-        groups["fraction"] = int(float("0.%s" % groups["fraction"]) * 1e6)
-    return datetime(int(groups["year"]), int(groups["month"]), int(groups["day"]),
-        int(groups["hour"]), int(groups["minute"]), int(groups["second"]),
-        int(groups["fraction"]), tz)
-
-# End of iso8601.py
-
-def parse_date_string(dateString):
-    return timegm(parse_date(dateString).utctimetuple())
-
-def _parse_changes(query):
-    etree = ElementTree.fromstring(query)
-    xmlns = re.sub("({.*}).*", "\\1", etree.tag)
-
+def _parse_changes(data):
+    pushes = json.loads(data)
     changes = []
-    for entry in etree.findall(xmlns+'entry'):
-        d = {}
-        for n in entry:
-            tag = n.tag.replace(xmlns, "")
-            if tag == "title":
-                d['title'] = n.text
-                d['changeset'] = n.text.split(" ")[1]
-            elif tag == "updated":
-                d['updated'] = parse_date_string(n.text)
-            elif tag == "author":
-                d['author'] = n[0].text
-            elif tag == "link":
-                d['link'] = n.get('href')
-            elif tag == "content":
-                d['files'] = [c.text for c in n.getiterator("{http://www.w3.org/1999/xhtml}li")]
-        changes.append(d)
-    changes.reverse() # want them in chronological order
+    for push_id, push_data in pushes.iteritems():
+        push_time = push_data['date']
+        for cset in push_data['changesets']:
+            change = {}
+            change['updated'] = push_time
+            change['changeset'] = cset['node']
+            change['files'] = cset['files']
+            change['author'] = cset['author']
+            change['branch'] = cset['branch']
+            change['comments'] = cset['desc']
+            changes.append(change)
+
+    # Sort by push date
+    changes.sort(key=lambda c:c['updated'])
     return changes
 
 class Pluggable(object):
@@ -320,7 +196,7 @@ class BaseHgPoller(BasePoller):
     timeout = 30
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
-                 tipsOnly=False, tree = None):
+                 tipsOnly=False, tree=None, repo_branch=None):
         BasePoller.__init__(self)
         self.hgURL = hgURL
         self.branch = branch
@@ -337,6 +213,7 @@ class BaseHgPoller(BasePoller):
         self.lastChangeset = None
         self.startLoad = 0
         self.loadTime = None
+        self.repo_branch = repo_branch
 
         self.emptyRepo = False
 
@@ -351,7 +228,7 @@ class BaseHgPoller(BasePoller):
         if self.pushlogUrlOverride:
             url = self.pushlogUrlOverride
         else:
-            url = "/".join((self.baseURL, 'pushlog'))
+            url = "/".join((self.baseURL, 'json-pushes?full=1'))
 
         args = []
         if self.lastChangeset is not None:
@@ -359,9 +236,13 @@ class BaseHgPoller(BasePoller):
         if self.tipsOnly:
             args.append('tipsonly=1')
         if args:
-            url += '?' + '&'.join(args)
+            if '?' not in url:
+                url += '?'
+            else:
+                url += '&'
+            url += '&'.join(args)
 
-        return url
+        return str(url)
 
     def dataFailed(self, res):
         if hasattr(res.value, 'status') and res.value.status == '500' and \
@@ -398,12 +279,16 @@ class BaseHgPoller(BasePoller):
         # the latest changeset in the repository
         if self.lastChangeset is not None or self.emptyRepo:
             for change in change_list:
-                adjustedChangeTime = change["updated"]
+                # Ignore changes off the specified in-repo branch.
+                if self.repo_branch is not None and self.repo_branch != change['branch']:
+                    continue
+                link = "%s/rev/%s" % (self.baseURL, change["changeset"])
                 c = changes.Change(who = change["author"],
                                    files = change["files"],
                                    revision = change["changeset"],
-                                   comments = change["link"],
-                                   when = adjustedChangeTime,
+                                   comments = change["comments"],
+                                   revlink = link,
+                                   when = change["updated"],
                                    branch = self.branch)
                 self.changeHook(c)
                 self.parent.addChange(c)
@@ -429,7 +314,7 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
     parent = None
     loop = None
     volatile = ['loop']
-    
+
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
                  tipsOnly=False, pollInterval=30):
         """
@@ -446,9 +331,9 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
                                 With this enabled every push will only show up
                                 as *one* changeset
         """
-        
+
         BaseHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
-                              tipsOnly)
+                              tipsOnly, repo_branch="default")
         self.pollInterval = pollInterval
 
     def startService(self):
@@ -460,7 +345,7 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         if self.running:
             self.loop.stop()
         return base.ChangeSource.stopService(self)
-    
+
     def describe(self):
         return "Getting changes from: %s" % self._make_url()
 
