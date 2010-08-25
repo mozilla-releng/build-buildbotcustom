@@ -9,7 +9,7 @@ from buildbot.process.factory import BuildFactory
 from buildbot.steps import trigger
 from buildbot.steps.shell import ShellCommand, WithProperties, SetProperty
 from buildbot.steps.source import Mercurial
-from buildbot.steps.transfer import FileDownload
+from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, JSONStringDownload
 from buildbot import locks
 
 import buildbotcustom.steps.misc
@@ -7658,6 +7658,20 @@ class AndroidBuildFactory(MobileBuildFactory):
                 workdir='%s/%s/%s' % (self.baseWorkDir,
                     self.branchName, self.objdir)
             )
+
+class ScriptFactory(BuildFactory):
+    def __init__(self, scriptRepo, scriptName, extra_data=None, extra_args=None):
+        BuildFactory.__init__(self)
+
+        self.addStep(JSONPropertiesDownload(name="download_props", slavedest="buildprops.json"))
+        if extra_data:
+            self.addStep(JSONStringDownload(extra_data, name="download_extra", slavedest="data.json"))
+        self.addStep(ShellCommand(name="clobber_scripts", command=['rm', '-rf', 'scripts']))
+        self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
+        cmd = ['scripts/%s' % scriptName]
+        if extra_args:
+            cmd.extend(extra_args)
+        self.addStep(ShellCommand(name="run_script", command=cmd))
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
     def __init__(self, **kwargs):
