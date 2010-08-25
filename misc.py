@@ -6,10 +6,11 @@ except:
 import collections
 import random
 import re
-import sys, os.path
+import sys, os
 from copy import deepcopy
 
 from twisted.python import log
+from twisted.internet.task import LoopingCall
 
 from buildbot.scheduler import Nightly, Scheduler
 from buildbot.status.tinderbox import TinderboxMailNotifier
@@ -131,6 +132,8 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
     return test_builders
 
 fastRegexes = []
+nReservedFastSlaves = 0
+nReservedSlowSlaves = 0
 
 def _partitionSlaves(slaves):
     """Partitions the list of slaves into 'fast' and 'slow' slaves, according to
@@ -147,6 +150,45 @@ def _partitionSlaves(slaves):
         else:
             slow.append(s)
     return fast, slow
+
+def _partitionUnreservedSlaves(slaves):
+    fast, slow = _partitionSlaves(slaves)
+    return fast[nReservedFastSlaves:], slow[nReservedSlowSlaves:]
+
+def _readReservedFile(filename, fast=True):
+    if not os.path.exists(filename):
+        n = 0
+    else:
+        try:
+            n = int(open(filename).read())
+        except IOError:
+            log.msg("Unable to open '%s' for reading" % filename)
+            log.err()
+            return
+        except ValueError:
+            log.msg("Unable to read '%s' as an integer" % filename)
+            log.err()
+            return
+
+    global nReservedSlowSlaves, nReservedFastSlaves
+    if fast:
+        if n != nReservedFastSlaves:
+            log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n, nReservedFastSlaves))
+            nReservedFastSlaves = n
+    else:
+        if n != nReservedSlowSlaves:
+            log.msg("Setting nReservedSlowSlaves to %i (was %i)" % (n, nReservedSlowSlaves))
+            nReservedSlowSlaves = n
+
+_reservedFileWatcherLoop = None
+def watchReservedFile(filename, fast=True, interval=60):
+    global _reservedFileWatcherLoop
+    # Cancel the old task
+    if _reservedFileWatcherLoop and _reservedFileWatcherLoop.running:
+        _reservedFileWatcherLoop.stop()
+
+    _reservedFileWatcherLoop = LoopingCall(_readReservedFile, filename, fast)
+    _reservedFileWatcherLoop.start(interval)
 
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so
@@ -170,7 +212,7 @@ def _recentSort(builder):
 
 def _nextSlowSlave(builder, available_slaves):
     try:
-        fast, slow = _partitionSlaves(available_slaves)
+        fast, slow = _partitionUnreservedSlaves(available_slaves)
         # Choose the slow slave that was most recently on this builder
         # If there aren't any slow slaves, choose the slow slave that was most
         # recently on this builder
@@ -179,8 +221,7 @@ def _nextSlowSlave(builder, available_slaves):
         elif fast:
             return sorted(fast, _recentSort(builder))[-1]
         else:
-            log.msg("No fast or slow slaves found for builder '%s', choosing randomly instead" % builder.name)
-            return random.choice(available_slaves)
+            return []
     except:
         log.msg("Error choosing next slow slave for builder '%s', choosing randomly instead" % builder.name)
         log.err()
@@ -188,13 +229,30 @@ def _nextSlowSlave(builder, available_slaves):
 
 def _nextFastSlave(builder, available_slaves):
     try:
-        fast, slow = _partitionSlaves(available_slaves)
+        fast, slow = _partitionUnreservedSlaves(available_slaves)
         # Choose the fast slave that was most recently on this builder
         # If there aren't any fast slaves, choose the slow slave that was most
         # recently on this builder
         if fast:
             return sorted(fast, _recentSort(builder))[-1]
         elif slow:
+            return sorted(slow, _recentSort(builder))[-1]
+        else:
+            return []
+    except:
+        log.msg("Error choosing next fast slave for builder '%s', choosing randomly instead" % builder.name)
+        log.err()
+        return random.choice(available_slaves)
+
+def _nextFastReservedSlave(builder, available_slaves, onlyFast=True):
+    try:
+        fast, slow = _partitionSlaves(available_slaves)
+        # Choose the fast slave that was most recently on this builder
+        # If there aren't any fast slaves, choose the slow slave that was most
+        # recently on this builder if onlyFast isn't set
+        if fast:
+            return sorted(fast, _recentSort(builder))[-1]
+        elif not onlyFast and slow:
             return sorted(slow, _recentSort(builder))[-1]
         else:
             log.msg("No fast or slow slaves found for builder '%s', choosing randomly instead" % builder.name)
@@ -215,7 +273,7 @@ def _nextL10nSlave(n=8):
             connected_slaves = [s for s in builder.slaves if s.slave.slave_status.isConnected()]
             # Sort the list so we're stable across reconfigs
             connected_slaves.sort(key=lambda s: s.slave.slavename)
-            fast, slow = _partitionSlaves(connected_slaves)
+            fast, slow = _partitionUnreservedSlaves(connected_slaves)
             slow = slow[:n]
             # Choose enough fast slaves so that we're considering a total of n slaves
             fast = fast[:n-(len(slow))]
@@ -236,6 +294,16 @@ def _nextL10nSlave(n=8):
             log.msg("Error choosing l10n slave for builder '%s', choosing randomly instead" % builder.name)
             log.err()
             return random.choice(available_slaves)
+    return _nextslave
+
+def _nextSlowIdleSlave(nReserved):
+    """Return a nextSlave function that will only return a slave to run a build
+    if there are at least nReserved slaves available."""
+    def _nextslave(builder, available_slaves):
+        fast, slow = _partitionUnreservedSlaves(available_slaves)
+        if len(slow) <= nReserved:
+            return None
+        return sorted(slow, _recentSort(builder))[-1]
     return _nextslave
 
 nomergeBuilders = []
