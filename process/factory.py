@@ -2175,7 +2175,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
-        talosBranch = "%s-release-%s-talos" % (self.branchName, self.platform)
+        talosBranch = "release-%s-%s-talos" % (self.branchName, self.platform)
         for master, warn, retries in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
