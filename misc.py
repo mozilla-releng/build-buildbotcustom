@@ -40,12 +40,12 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
-  TryUnittestBuildFactory
+  TryUnittestBuildFactory, ScriptFactory
 from buildbotcustom.process.factory import MaemoBuildFactory, \
    MaemoNightlyRepackFactory, MobileDesktopBuildFactory, \
    MobileDesktopNightlyRepackFactory, \
    AndroidBuildFactory
-from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler
+from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, PersistentScheduler
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup
 from buildbot.status.mail import MailNotifier
@@ -2346,3 +2346,53 @@ def generateMobileBranchObjects(config, name):
         nomergeBuilders.extend(builders + nightlyBuilders)
 
     return mobile_objects
+
+def generateFuzzingObjects(config, SLAVES):
+    builders = []
+    f = ScriptFactory(
+            config['scripts_repo'],
+            'scripts/fuzzing/fuzzer.sh',
+            )
+    for platform in config['platforms']:
+        env = MozillaEnvironments.get("%s-unittest" % platform, {})
+        env['HG_REPO'] = config['fuzzing_repo']
+        env['FUZZ_REMOTE_HOST'] = config['fuzzing_remote_host']
+        env['FUZZ_BASE_DIR'] = config['fuzzing_base_dir']
+        builder = {'name': 'fuzzer-%s' % platform,
+                   'builddir': 'fuzzer-%s' % platform,
+                   'slavenames': SLAVES[platform],
+                   'nextSlave': _nextSlowIdleSlave(config['fuzzing_idle_slaves']),
+                   'factory': f,
+                   'category': 'idle',
+                   'env': env,
+                  }
+        builders.append(builder)
+        nomergeBuilders.append(builder)
+    fuzzing_scheduler = PersistentScheduler(
+            name="fuzzer",
+            builderNames=[b['name'] for b in builders],
+            numPending=2,
+            pollInterval=300, # Check every 5 minutes
+        )
+    return {
+            'builders': builders,
+            'schedulers': [fuzzing_scheduler],
+            }
+
+def generateMiscObjects(config, SLAVES):
+    builders = []
+    schedulers = []
+    change_sources = []
+    status = []
+    buildObjects = {
+            'builders': builders,
+            'schedulers': schedulers,
+            'status': status,
+            'change_source': change_sources,
+            }
+    # Fuzzing
+    if config.get('fuzzing'):
+        fuzzingObjects = generateFuzzingObjects(config['fuzzing'], SLAVES)
+        for k, v in fuzzingObjects.items():
+            buildObjects[k].extend(v)
+    return buildObjects

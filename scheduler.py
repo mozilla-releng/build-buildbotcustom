@@ -7,7 +7,10 @@ from twisted.internet import defer
 from twisted.python import log
 
 from buildbot.scheduler import Scheduler
+from buildbot.schedulers.base import BaseScheduler
 from buildbot.sourcestamp import SourceStamp
+
+from buildbot.util import eventual, now
 
 import time
 
@@ -34,6 +37,52 @@ class MultiScheduler(Scheduler):
         # and finally retire the changes from scheduler_changes
         changeids = [c.number for c in all_changes]
         db.scheduler_retire_changes(self.schedulerid, changeids, t)
+
+class PersistentScheduler(BaseScheduler):
+    """Make sure at least numPending builds are pending on each of builderNames"""
+    def __init__(self, numPending, pollInterval=60, ssFunc=None, properties={},
+            **kwargs):
+        self.numPending = numPending
+        self.pollInterval = pollInterval
+        self.lastCheck = 0
+        if ssFunc is None:
+            self.ssFunc = self._default_ssFunc
+        else:
+            self.ssFunc = ssFunc
+
+        BaseScheduler.__init__(self, properties=properties, **kwargs)
+
+    def _default_ssFunc(self, builderName):
+        return SourceStamp()
+
+    def run(self):
+        if self.lastCheck + self.pollInterval > now():
+            # Try again later
+            return (self.lastCheck + self.pollInterval + 1)
+
+        db = self.parent.db
+        to_create = []
+        for builderName in self.builderNames:
+            n = len(db.get_pending_brids_for_builder(builderName))
+            num_to_create = self.numPending - n
+            if num_to_create <= 0:
+                continue
+            to_create.append( (builderName, num_to_create) )
+
+        d = db.runInteraction(lambda t: self.create_builds(to_create, t))
+        return d
+
+    def create_builds(self, to_create, t):
+        db = self.parent.db
+        for builderName, count in to_create:
+            ss = self.ssFunc(builderName)
+            ssid = db.get_sourcestampid(ss, t)
+            for i in range(0, count):
+                self.create_buildset(ssid, "scheduler", t, builderNames=[builderName])
+
+        # Try again in a bit
+        self.lastCheck = now()
+        return now() + self.pollInterval
 
 class BuilderChooserScheduler(MultiScheduler):
     compare_attrs = MultiScheduler.compare_attrs + ('chooserFunc',)
