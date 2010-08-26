@@ -10,6 +10,7 @@ from buildbot.steps import trigger
 from buildbot.steps.shell import ShellCommand, WithProperties, SetProperty
 from buildbot.steps.source import Mercurial
 from buildbot.steps.transfer import FileDownload
+from buildbot import locks
 
 import buildbotcustom.steps.misc
 import buildbotcustom.steps.release
@@ -47,6 +48,10 @@ import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
+
+# limit the number of clones of the try repository so that we don't kill
+# dm-vcview04 if the master is restarted, or there is a large number of pushes
+hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=14*3)
 
 def postUploadCmdPrefix(upload_dir=None,
         branch=None,
@@ -1299,6 +1304,7 @@ class TryBuildFactory(MercurialBuildFactory):
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          timeout=60*60, # 1 hour
+         locks=[hg_try_lock.access('counting')],
         )
         if self.buildRevision:
             self.addStep(ShellCommand,
