@@ -216,16 +216,19 @@ class PushlogParsing(unittest.TestCase):
         self.failUnlessEqual(changes[0]['updated'], 1282358416)
         self.failUnlessEqual(len(changes[0]['files']), 4)
         self.failUnlessEqual(changes[0]['branch'], 'GECKO20b5pre_20100820_RELBRANCH')
+        self.failUnlessEqual(changes[0]['author'], 'dougt@mozilla.com')
 
         self.failUnlessEqual(changes[1]['changeset'], 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
         self.failUnlessEqual(changes[1]['updated'], 1282362551)
         self.failUnlessEqual(len(changes[1]['files']), 7)
         self.failUnlessEqual(changes[1]['branch'], 'default')
+        self.failUnlessEqual(changes[1]['author'], 'bobbyholley@stanford.edu')
 
         self.failUnlessEqual(changes[2]['changeset'], '33be08836cb164f9e546231fc59e9e4cf98ed991')
         self.failUnlessEqual(changes[2]['updated'], 1282362551)
         self.failUnlessEqual(len(changes[2]['files']), 1)
         self.failUnlessEqual(changes[2]['branch'], 'default')
+        self.failUnlessEqual(changes[2]['author'], 'bobbyholley@stanford.edu')
 
     def testMalformedPushlog(self):
         self.failUnlessRaises(json.decoder.JSONDecodeError, _parse_changes, malformedPushlog)

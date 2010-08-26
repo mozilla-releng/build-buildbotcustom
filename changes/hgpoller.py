@@ -102,12 +102,13 @@ def _parse_changes(data):
     changes = []
     for push_id, push_data in pushes.iteritems():
         push_time = push_data['date']
+        push_user = push_data['user']
         for cset in push_data['changesets']:
             change = {}
             change['updated'] = push_time
+            change['author'] = push_user
             change['changeset'] = cset['node']
             change['files'] = cset['files']
-            change['author'] = cset['author']
             change['branch'] = cset['branch']
             change['comments'] = cset['desc']
             changes.append(change)
