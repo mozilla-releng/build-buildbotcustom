@@ -13,6 +13,7 @@ from buildbot.steps.transfer import FileDownload
 
 import buildbotcustom.steps.misc
 import buildbotcustom.steps.release
+import buildbotcustom.steps.source
 import buildbotcustom.steps.test
 import buildbotcustom.steps.transfer
 import buildbotcustom.steps.updates
@@ -22,6 +23,7 @@ import buildbotcustom.env
 import buildbotcustom.common
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.release)
+reload(buildbotcustom.steps.source)
 reload(buildbotcustom.steps.test)
 reload(buildbotcustom.steps.transfer)
 reload(buildbotcustom.steps.updates)
@@ -33,8 +35,10 @@ reload(buildbotcustom.common)
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
-  EvaluatingShellCommand, RepackPartners
+  RepackPartners
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
+from buildbotcustom.steps.source import EvaluatingMercurial, \
+  MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
 from buildbotcustom.steps.transfer import MozillaStageUpload
@@ -242,7 +246,7 @@ class MozillaBuildFactory(BuildFactory):
          workdir='.',
          flunkOnFailure=False,
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='clone_buildtools',
          command=['hg', 'clone', self.buildToolsRepo, 'tools'],
          description=['clone', 'build tools'],
@@ -613,7 +617,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
     def addSourceSteps(self):
         if self.hgHost.startswith('ssh'):
-            self.addStep(Mercurial(
+            self.addStep(EvaluatingMercurial(
              name='hg_ssh_clone',
              mode='update',
              baseURL= '%s/' % self.hgHost,
@@ -621,7 +625,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=60*60, # 1 hour
             ))
         else:
-            self.addStep(Mercurial,
+            self.addStep(EvaluatingMercurial,
              name='hg_update',
              mode='update',
              baseURL='http://%s/' % self.hgHost,
@@ -662,7 +666,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          descriptionDone=['remove', 'configs'],
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='hg_clone_configs',
          command=['hg', 'clone', configRepo, 'configs'],
          description=['checking', 'out', 'configs'],
@@ -1222,7 +1226,7 @@ class TryBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(Mercurial,
+        self.addStep(EvaluatingMercurial,
          name='hg_update',
          mode='clobber',
          baseURL='http://%s/' % self.hgHost,
@@ -1583,7 +1587,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(Mercurial, 
+        self.addStep(EvaluatingMercurial, 
          name='hg_update',
          mode='update',
          baseURL='http://%s/' % self.hgHost,
@@ -2408,7 +2412,7 @@ class BaseRepackFactory(MozillaBuildFactory):
              workdir='build/'+self.origSrcDir,
              haltOnFailure=True
             ))
-            self.addStep(ShellCommand(
+            self.addStep(MercurialCloneCommand(
              name='checkout_configs',
              command=['hg', 'clone', self.configRepo, 'configs'],
              description=['checkout', 'configs'],
@@ -2512,7 +2516,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
     def getSources(self):
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='get_enUS_src',
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
@@ -2529,7 +2533,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=True,
          timeout=30*60 # 30 minutes
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='get_locale_src',
          command=['sh', '-c',
           WithProperties('if [ -d %(locale)s ]; then ' +
@@ -2570,7 +2574,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir=self.baseWorkDir,
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='clone_compare_locales',
          command=['hg', 'clone', compareLocalesRepo, 'compare-locales'],
          description=['checkout', 'compare-locales'],
@@ -3442,7 +3446,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
             # 'hg clone -r' breaks in the respin case because the cloned
             # repository will not have ANY changesets from the release branch
             # and 'hg up -C' will fail
-            self.addStep(ShellCommand,
+            self.addStep(MercurialCloneCommand,
              name='hg_clone',
              command=['hg', 'clone', repo, repoName],
              workdir='.',
@@ -3593,7 +3597,7 @@ class SingleSourceFactory(ReleaseFactory):
          workdir='.',
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='hg_clone',
          command=['hg', 'clone', self.repository, self.branchName],
          workdir='.',
@@ -3712,7 +3716,7 @@ class MultiSourceFactory(ReleaseFactory):
             location = repo['location']
             bundleFiles.append('source/%s' % repo['bundleName'])
 
-            self.addStep(ShellCommand,
+            self.addStep(MercurialCloneCommand,
              name='hg_clone',
              command=['hg', 'clone', repository, location],
              workdir='.',
@@ -3812,7 +3816,7 @@ class CCSourceFactory(ReleaseFactory):
          workdir='.',
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          command=['hg', 'clone', self.repository, self.branchName],
          workdir='.',
          description=['clone %s' % self.branchName],
@@ -4495,7 +4499,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStep(Mercurial,
+        self.addStep(EvaluatingMercurial,
          name='hg_update',
          mode='update',
          baseURL='http://%s/' % self.hgHost,
@@ -4511,7 +4515,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
          workdir='.'
         )
 
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='buildbot_configs',
          command=['hg', 'clone', self.config_repo_url, 'mozconfigs'],
          workdir='.'
@@ -4840,7 +4844,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStep(Mercurial, mode='update',
+        self.addStep(EvaluatingMercurial, mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          alwaysUseLatest=True,
@@ -4867,7 +4871,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir='.'
         )
 
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='buildbot_configs',
          command=['hg', 'clone', self.config_repo_url, 'mozconfigs'],
          workdir='.'
@@ -5455,7 +5459,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         if (targetDirectory == None):
             targetDirectory = self.getRepoName(repository)
 
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
             name='checkout',
             command=['bash', '-c',
                      'if [ ! -d %s ]; then hg clone %s %s; fi' %
@@ -5527,7 +5531,7 @@ class MobileBuildFactory(MozillaBuildFactory):
 
     def addBaseRepoSteps(self):
         if self.enable_try:
-            self.addStep(Mercurial(
+            self.addStep(EvaluatingMercurial(
                 name='hg_update',
                 mode='clobber',
                 baseURL='http://%s/' % self.hgHost,
@@ -5565,7 +5569,7 @@ class MobileBuildFactory(MozillaBuildFactory):
             ))
             mobile_clone_cmd = 'hg clone -U http://%s/' % self.hgHost
             mobile_clone_cmd += '%(mobile_repo)s mobile'
-            self.addStep(ShellCommand(
+            self.addStep(MercurialCloneCommand(
                 name='mobile_clone',
                 command=['bash', '-c', WithProperties(mobile_clone_cmd)],
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
@@ -6032,7 +6036,7 @@ class MaemoBuildFactory(MobileBuildFactory):
          workdir=self.baseWorkDir,
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='clone_compare_locales',
          command=['hg', 'clone', self.compareLocalesRepo, 'compare-locales'],
          description=['checkout', 'compare-locales'],
@@ -6048,7 +6052,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
 
     def checkOutLocale(self, locale):
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='get_locale_src_%s' % locale,
          command=['sh', '-c',
           WithProperties('if [ -d '+locale+' ]; then ' +
@@ -6614,7 +6618,7 @@ class TalosFactory(BuildFactory):
          name='get build info',
         )
 
-        def check_sdk(step, cmd):
+        def check_sdk(cmd, step):
             txt = cmd.logs['stdio'].getText()
             m = re.search("MacOSX10\.5\.sdk", txt, re.M)
             if m :
@@ -6622,11 +6626,11 @@ class TalosFactory(BuildFactory):
                 return FAILURE
             return SUCCESS
         if self.OS == "tiger":
-            self.addStep(EvaluatingShellCommand(
+            self.addStep(ShellCommand(
                 command=['bash', '-c',
                          WithProperties('unzip -c %(exedir)s/chrome/toolkit.jar content/global/buildconfig.html | grep sdk')],
                 workdir=os.path.join(self.workdirBase, "talos"),
-                eval_fn=check_sdk,
+                log_eval_fn=check_sdk,
                 haltOnFailure=True,
                 flunkOnFailure=False,
                 name='check sdk okay'))
@@ -6906,7 +6910,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
 
     def getSources(self):
         BaseRepackFactory.getSources(self)
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
          name='enUS_mobile_source',
          command=['sh', '-c', 'if [ -d mobile ]; then ' +
                   'hg -R mobile pull -r '+self.l10nTag+' ; else ' +
@@ -7091,7 +7095,7 @@ class MaemoNightlyRepackFactory(MobileNightlyRepackFactory):
             descriptionDone=['remove', 'configs'],
             haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
             name='pull_configs',
             command=['hg', 'clone', 'http://%s/%s' % (self.hgHost,
                                               self.configRepoPath),
@@ -7279,7 +7283,7 @@ class PartnerRepackFactory(ReleaseFactory):
             description=['remove', 'partners', 'repo'],
             workdir=self.baseWorkDir,
         )
-        self.addStep(ShellCommand,
+        self.addStep(MercurialCloneCommand,
             name='clone_partners_repo',
             command=['hg', 'clone',
                      'http://%s/%s' % (self.hgHost,
