@@ -39,12 +39,13 @@ from buildbotcustom.process.factory import MaemoBuildFactory, \
    MaemoNightlyRepackFactory, MobileDesktopBuildFactory, \
    MobileDesktopNightlyRepackFactory, \
    AndroidBuildFactory
-from buildbotcustom.scheduler import MultiScheduler
+from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup
 from buildbot.status.mail import MailNotifier
 from buildbotcustom.status.generators import buildTryCompleteMessage
 from buildbotcustom.env import MozillaEnvironments
+from buildbotcustom.misc_scheduler import tryChooser
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -573,14 +574,23 @@ def generateBranchObjects(config, name):
 
     # schedulers
     # this one gets triggered by the HG Poller
+    # for Try we have a custom scheduler that can accept a function to read commit comments
+    # in order to know what to schedule
     extra_args = {}
+    if config.get('enable_try'):
+        scheduler_class = BuilderChooserScheduler
+        extra_args['chooserFunc'] = tryChooser
+        extra_args['numberOfBuildsToTrigger'] = 1
+    else:
+        scheduler_class = Scheduler
+
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
         extra_args['treeStableTimer'] = None
     else:
         extra_args['treeStableTimer'] = 3*60
 
-    branchObjects['schedulers'].append(Scheduler(
+    branchObjects['schedulers'].append(scheduler_class(
         name=name,
         branch=config['repo_path'],
         builderNames=builders + unittestBuilders + debugBuilders,
@@ -611,7 +621,20 @@ def generateBranchObjects(config, name):
         scheduler_name = scheduler_branch
         if not merge:
             nomergeBuilders.extend(test_builders)
-        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=None))
+        extra_args = {}
+        if config.get('enable_try'):
+            scheduler_class = BuilderChooserScheduler
+            extra_args['chooserFunc'] = tryChooser
+            extra_args['numberOfBuildsToTrigger'] = 1
+        else:
+            scheduler_class = Scheduler
+        branchObjects['schedulers'].append(scheduler_class(
+            name=scheduler_name, 
+            branch=scheduler_branch, 
+            builderNames=test_builders, 
+            treeStableTimer=None, 
+            **extra_args
+        ))
 
         branchObjects['status'].append(TinderboxMailNotifier(
             fromaddr="mozilla2.buildbot@build.mozilla.org",
@@ -1835,12 +1858,19 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 }
                 if not merge:
                     nomergeBuilders.append(builder['name'])
-                s = MultiScheduler(
+                extra_args = {}
+                if branch == "tryserver":
+                    scheduler_class = BuilderChooserScheduler
+                    extra_args['chooserFunc'] = tryChooser
+                else:
+                    scheduler_class = MultiScheduler
+                s = scheduler_class(
                         name='tests-%s-%s-%s-talos' % (branch, slave_platform, suite),
                         branch='%s-%s-talos' % (branch, platform),
                         treeStableTimer=None,
                         builderNames=[builder['name']],
                         numberOfBuildsToTrigger=tests,
+                        **extra_args
                         )
                 branchObjects['schedulers'].append(s)
                 branchObjects['builders'].append(builder)
@@ -1887,8 +1917,20 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
                         if not merge:
                             nomergeBuilders.extend(test_builders)
-                        branchObjects['schedulers'].append(Scheduler(name=scheduler_name, branch=scheduler_branch, builderNames=test_builders, treeStableTimer=None))
-
+                        extra_args = {}
+                        if branch == "tryserver":
+                            scheduler_class = BuilderChooserScheduler
+                            extra_args['chooserFunc'] = tryChooser
+                            extra_args['numberOfBuildsToTrigger'] = 1
+                        else:
+                            scheduler_class = Scheduler
+                        branchObjects['schedulers'].append(scheduler_class(
+                            name=scheduler_name, 
+                            branch=scheduler_branch, 
+                            builderNames=test_builders, 
+                            treeStableTimer=None, 
+                            **extra_args
+                        ))
     branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
                            tree=branch_config['tinderbox_tree'],
@@ -2148,12 +2190,21 @@ def generateMobileBranchObjects(config, name):
         ))
 
     #this scheduler is to trigger mobile builds on a mozilla change
-    mobile_objects['schedulers'].append(Scheduler(
+    extra_args = {}
+    if config.get('enable_try'):
+        scheduler_class = BuilderChooserScheduler
+        extra_args['chooserFunc'] = tryChooser
+        extra_args['numberOfBuildsToTrigger'] = 1
+    else:
+        scheduler_class = Scheduler
+
+    mobile_objects['schedulers'].append(scheduler_class(
         name='%s-%s-build-mozilla' % (name, mobile_repo_name),
         branch=config.get('repo_path'),
         treeStableTimer=None if config.get('enable_try') else 3*60,
         builderNames=builders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
+        **extra_args
     ))
 
     if not config.get('enable_try', True):
