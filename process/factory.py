@@ -2412,13 +2412,13 @@ class BaseRepackFactory(MozillaBuildFactory):
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
                          'hg -R '+self.origSrcDir+' pull ;'+
-                         'hg -R '+self.origSrcDir+' up ;'+
+                         'hg -R '+self.origSrcDir+' up -C ;'+
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.repoPath+' ' +
                          self.origSrcDir+' ; ' +
                          'fi ' +
-                         '&& hg -R '+self.origSrcDir+' update -r %(en_revision)s')],
+                         '&& hg -R '+self.origSrcDir+' update -C -r %(en_revision)s')],
          descriptionDone="en-US source",
          workdir=self.baseWorkDir,
          haltOnFailure=True,
@@ -2434,7 +2434,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+ 
                            '/%(locale)s/ ; ' +
                          'fi ' +
-                         '&& hg -R %(locale)s update -r %(l10n_revision)s')],
+                         '&& hg -R %(locale)s update -C -r %(l10n_revision)s')],
          descriptionDone="locale source",
          timeout=5*60, # 5 minutes
          haltOnFailure=True,
@@ -5860,7 +5860,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+
                            '/'+locale+'/ ; ' +
-                         'hg -R '+locale+' up -r '+self.l10nTag+' ; '
+                         'hg -R '+locale+' up -C -r '+self.l10nTag+' ; '
                          'fi ')],
          descriptionDone="locale source",
          timeout=5*60, # 5 minutes
@@ -6712,7 +6712,7 @@ class MobileNightlyRepackFactory(BaseRepackFactory):
                   'hg -R mobile pull -r '+self.l10nTag+' ; else ' +
                   'hg clone http://' + self.hgHost + '/' + self.mobileRepoPath +
                   ' mobile ; ' +
-                  'fi && hg -R mobile update -r '+self.l10nTag],
+                  'fi && hg -R mobile update -C -r '+self.l10nTag],
          descriptionDone=['en-US', 'mobile', 'source'],
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=30*60 # 30 minutes
