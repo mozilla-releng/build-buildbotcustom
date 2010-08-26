@@ -299,7 +299,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
             'factory': factory,
             'category': branch_name,
-            'properties': {'branch': branch_name, 'platform': platform},
+            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform},
             'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
         }
         builders.append(builder)
