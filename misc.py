@@ -106,7 +106,8 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
 # and the dep builders only obey HgPoller/Force Build triggered ones.
 
 def isHgPollerTriggered(change, hgUrl):
-    return hgUrl in change.revlink
+    if hgUrl in change.revlink or change.comments.find(hgUrl) > -1:
+        return True
 
 def isImportantL10nFile(change, l10nModules):
     for f in change.files:
