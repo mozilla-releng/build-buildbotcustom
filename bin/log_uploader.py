@@ -62,6 +62,15 @@ def getBuild(builder_path, build_number):
     build.builder = FakeBuilder()
     return build
 
+def getAuthor(build):
+    props = build.getProperties()
+    if 'who' in props:
+        return props['who']
+
+    changes = build.getSourceStamp().changes
+    if changes:
+        return changes[0].who
+
 def getBuildId(build):
     return build.getProperty('buildid')
 
@@ -162,7 +171,7 @@ if __name__ == "__main__":
                 uploadArgs.update(dict(
                     to_try=True,
                     to_tinderbox_dated=False,
-                    who=build.getProperty('who'),
+                    who=getAuthor(build),
                     revision=build.getProperty('revision')[:12],
                     builddir=build.getProperty('builddir'),
                     ))
