@@ -47,9 +47,9 @@ from buildbotcustom.process.factory import MaemoBuildFactory, \
    AndroidBuildFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, PersistentScheduler
 from buildbotcustom.l10n import TriggerableL10n
-from buildbotcustom.status.mail import MercurialEmailLookup
+from buildbotcustom.status.mail import MercurialEmailLookup, ChangeNotifier
 from buildbot.status.mail import MailNotifier
-from buildbotcustom.status.generators import buildTryCompleteMessage
+from buildbotcustom.status.generators import buildTryCompleteMessage, buildTryChangeMessage
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
@@ -603,19 +603,40 @@ def generateBranchObjects(config, name):
         for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
             notify_builders.extend(test_builders)
 
+        if config.get('notify_real_author'):
+            extraRecipients = []
+            sendToInterestedUsers = True
+        else:
+            extraRecipients = config['email_override']
+            sendToInterestedUsers = False
+
         branchObjects['status'].append(MailNotifier(
             fromaddr="tryserver@build.mozilla.org",
             mode="all",
-            sendToInterestedUsers=True,
+            sendToInterestedUsers=sendToInterestedUsers,
+            extraRecipients=extraRecipients,
             lookup=MercurialEmailLookup(),
-            customMesg=lambda attrs: buildTryCompleteMessage(attrs, 
-            	'/'.join([packageUrl, packageDir]), config['tinderbox_tree']),
+            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
+                '/'.join([packageUrl, packageDir]), config['tinderbox_tree']),
             subject="Try Server: %(result)s on %(builder)s",
             relayhost="mail.build.mozilla.org",
             builders=notify_builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'), 
-            	"References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
-        ))
+            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'),
+                "References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
+            ))
+
+        # This notifies users as soon as we receive their push, and will let them
+        # know where to find builds/logs
+        branchObjects['status'].append(ChangeNotifier(
+            fromaddr="tryserver@build.mozilla.org",
+            lookup=MercurialEmailLookup(),
+            relayhost="mail.build.mozilla.org",
+            sendToInterestedUsers=sendToInterestedUsers,
+            extraRecipients=extraRecipients,
+            branches=[config['repo_path']],
+            messageFormatter=lambda c: buildTryChangeMessage(c,
+                '/'.join([packageUrl, packageDir])),
+            ))
 
     if config['enable_l10n']:
         l10n_builders = []
@@ -2071,10 +2092,18 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     if branch_config.get('enable_mail_notifier'):
         packageUrl = branch_config['package_url']
         packageDir = branch_config['package_dir']
+        if branch_config.get('notify_real_author'):
+            extraRecipients = []
+            sendToInterestedUsers = True
+        else:
+            extraRecipients = branch_config['email_override']
+            sendToInterestedUsers = False
+
         branchObjects['status'].append(MailNotifier(
             fromaddr="tryserver@build.mozilla.org",
             mode="all",
-            sendToInterestedUsers=True,
+            sendToInterestedUsers=sendToInterestedUsers,
+            extraRecipients=extraRecipients,
             lookup=MercurialEmailLookup(),
             customMesg=lambda attrs: buildTryCompleteMessage(attrs,
                 '/'.join([packageUrl, packageDir]), branch_config['tinderbox_tree']),
@@ -2084,7 +2113,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(revision:-unknown)s>'),
                 "References": WithProperties('<tryserver-%(revision:-unknown)s>')}
         ))
-
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
                 branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
@@ -2269,10 +2297,18 @@ def generateMobileBranchObjects(config, name):
         package_url = config['package_url']
         package_dir = config['package_dir']
 
+        if config.get('notify_real_author'):
+            extraRecipients = []
+            sendToInterestedUsers = True
+        else:
+            extraRecipients = config['email_override']
+            sendToInterestedUsers = False
+
         mobile_objects['status'].append(MailNotifier(
             fromaddr='tryserver@build.mozilla.org',
             mode='all',
-            sendToInterestedUsers=True,
+            sendToInterestedUsers=sendToInterestedUsers,
+            extraRecipients=extraRecipients,
             lookup=MercurialEmailLookup(),
             customMesg=lambda attrs: buildTryCompleteMessage(attrs,
                 '/'.join([package_url, package_dir]), config['tinderbox_tree']),

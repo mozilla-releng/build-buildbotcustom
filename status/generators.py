@@ -1,5 +1,35 @@
 import re
 import os.path
+import subprocess
+
+def getFortune():
+    try:
+        return subprocess.Popen(['fortune'], stdout=subprocess.PIPE).communicate()[0]
+    except:
+        return None
+
+def buildTryChangeMessage(change, packageDir):
+    got_revision = revision = change.revision[:12]
+    who = change.who
+    packageDir = packageDir % locals()
+    fortune = getFortune() or "Thanks for using Try"
+    msgdict = {"type": "plain"}
+    msgdict['subject'] = "Try submission %(revision)s" % locals()
+    msgdict['headers'] = {"In-Reply-To": "<tryserver-%(revision)s>" % locals(),
+                          "References": "<tryserver-%(revision)s>" % locals(),
+                          }
+    msgdict["body"] = """\
+Thanks for your try submission (http://hg.mozilla.org/try/pushloghtml?changeset=%(revision)s).  It's the best!
+
+Builds and logs will be available at %(packageDir)s.
+
+This directory won't be created until the first builds are uploaded, so please be patient.
+
+--
+%(fortune)s
+""" % locals()
+
+    return msgdict
 
 def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
     platform = ''
