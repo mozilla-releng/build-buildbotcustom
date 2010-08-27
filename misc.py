@@ -399,7 +399,7 @@ def generateBranchObjects(config, name):
     l10nBuilders = {}
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
-    l10nPollInterval = config.get('l10nPollInterval', 15*60)
+    l10nPollInterval = config.get('l10nPollInterval', 5*60)
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
     for platform in config['platforms'].keys():
@@ -634,7 +634,7 @@ def generateBranchObjects(config, name):
         branchObjects['schedulers'].append(Scheduler(
             name="%s l10n" % name,
             branch=config['l10n_repo_path'],
-            treeStableTimer=3*60,
+            treeStableTimer=None,
             builderNames=l10n_builders,
             fileIsImportant=lambda c: isImportantL10nFile(c, config['l10n_modules']),
             properties={
