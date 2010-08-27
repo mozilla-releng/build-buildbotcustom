@@ -22,7 +22,7 @@ def processMessage(message):
 def getDesktopBuilders(platforms, builderNames, buildTypes):
     desktopBuilders = []
 
-    if platforms != ['none']:
+    if platforms != 'none':
         for buildType in buildTypes:
             if buildType == 'opt':
                 buildType = 'build'
@@ -40,7 +40,7 @@ def getDesktopBuilders(platforms, builderNames, buildTypes):
 def getMobileBuilders(platforms, builderNames):
     mobileBuilders = []
 
-    if platforms != ['none']:
+    if platforms != 'none':
         for platform in platforms:
             if platform in ('win32', 'macosx', 'linux'):
                 platform = 'mobile_' + platform
@@ -53,13 +53,7 @@ def getMobileBuilders(platforms, builderNames):
 def getTestBuilders(platforms, testType, tests, builderNames, buildTypes):
     testBuilders = []
     # for all possible suites, add in the builderNames for that platform
-    if tests != ['none']:
-        if tests == ['all']:
-          if testType == "test":
-            tests = UNITTEST_SUITES
-          if testType == "talos":
-            tests = TALOS_SUITES
-
+    if tests != 'none':
         if testType == "test":
             for buildType in buildTypes:
                 for platform in platforms:
@@ -71,7 +65,6 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes):
                             custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES[platform], buildType, testType, test)
                         if custom_builder in (builderNames):
                             testBuilders.extend([custom_builder])
-
         if testType == "talos":
             for platform in platforms:
                 for test in tests:
@@ -117,7 +110,7 @@ def TryParser(message, builderNames):
     (options, unknown_args) = parser.parse_known_args(processMessage(message))
 
     # Build options include a possible override of 'all' to get a buildset that matches m-c
-    if options.build == 'do':
+    if options.build == 'do' or options.build == 'od':
         options.build = ['opt', 'debug']
     elif options.build == 'd':
         options.build = ['debug']
@@ -130,21 +123,26 @@ def TryParser(message, builderNames):
         options.test = 'all'
         options.talos = 'all'
     else:
-        options.build = ['debug']
+        # for any input other than do/od, d, o, all set to default
+        options.build = ['opt','debug']
 
     if options.desktop == 'all':
         options.desktop = DESKTOP_PLATFORMS
-    else:
+    elif options.desktop != 'none':
         options.desktop = options.desktop.split(',')
 
     if options.mobile == 'all':
         options.mobile = MOBILE_PLATFORMS
-    else:
+    elif options.mobile != 'none':
         options.mobile = options.mobile.split(',')
 
-    if options.test:
+    if options.test == 'all':
+        options.test = UNITTEST_SUITES
+    elif options.test != 'none':
         options.test = options.test.split(',')
-    if options.talos:
+    if options.talos == 'all':
+        options.talos = TALOS_SUITES
+    elif options.talos != 'none':
         options.talos = options.talos.split(',')
 
     # Get the custom builder names
