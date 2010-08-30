@@ -2247,7 +2247,7 @@ def generateMobileBranchObjects(config, name):
         **extra_args
     ))
 
-    if not config.get('enable_try', True):
+    if not config.get('enable_try', False):
         #this scheduler is to trigger mobile builds on a mobile change
         mobile_objects['schedulers'].append(Scheduler(
             name='%s-%s-build-mobile' % (mobile_repo_name, name),
