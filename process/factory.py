@@ -5588,6 +5588,7 @@ class MaemoBuildFactory(MobileBuildFactory):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
         self.packageGlob = ' '.join(packageGlobList)
+        self.origPackageGlob = self.packageGlob
         self.scratchboxPath = scratchboxPath
         self.multiLocale = multiLocale
         self.l10nRepoPath = l10nRepoPath
@@ -5627,11 +5628,6 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.getMozconfig()
         self.addPreBuildSteps()
         if self.multiLocale:
-            # In the multi-locale scenario we build and upload the single-locale
-            # before the multi-locale. This packageGlob will be used to move packages
-            # into the "en-US" directory before uploading it and later on the 
-            # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "dist/*.tar.* mobile/*.deb dist/deb_name.txt"
             self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
             self.compareLocalesTag = compareLocalesTag
             self.addStep(ShellCommand,
@@ -5642,7 +5638,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             )
             self.addBuildSteps(extraEnv="L10NBASEDIR='../../%s'" % self.l10nRepoPath)
             # This will package the en-US single-locale build (no tests)
-            self.addPackageSteps()
+            self.addPackageSteps(packageTests=True)
             self.uploadEnUS()
             self.useProgress = False
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
@@ -5777,22 +5773,21 @@ class MaemoBuildFactory(MobileBuildFactory):
         # localeDir (e.g. maemo/en-US) and scp -r maemo instead of
         # scp -r maemo/en-US, which loses that directory structure.
         if not uploadDir:
-            uploadDir=localeDir
+            uploadDir = "dist/%s" % localeDir
         self.addStep(ShellCommand,
             name='prepare_upload',
-            command=['mkdir', '-p', localeDir],
+            command=['mkdir', '-p', uploadDir],
             haltOnFailure=True,
-            workdir='%s/dist' % (self.objdirAbsPath)
+            workdir=self.objdirAbsPath
         )
         self.addStep(ShellCommand,
             name='cp_binaries',
-            command=['sh', '-c', 'cp %s dist/%s' % (self.packageGlob,
-                                                       localeDir)],
+            command=['sh', '-c', 'cp %s %s' % (self.packageGlob, uploadDir)],
             workdir=self.objdirAbsPath,
         )
         # Now that we have moved all the packages that we want under localeDir
         # let's indicate that we want to upload the whole directory
-        self.packageGlob = '-r dist/%s' % uploadDir
+        self.packageGlob = '-r %s' % uploadDir
 
     def uploadEnUS(self):
         self.prepUpload(localeDir='en-US')
@@ -5827,8 +5822,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addChromeLocale(locale)
         # Let's package the multi-locale build and upload it
         self.addPackageSteps(multiLocale=True, packageTests=True)
-        self.packageGlob="dist/fennec*.tar.* mobile/fennec*.deb " + \
-                         "dist/deb_name.txt dist/fennec*.zip"
+        self.packageGlob = self.origPackageGlob
         self.uploadMulti()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
