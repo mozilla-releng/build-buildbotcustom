@@ -26,5 +26,5 @@ PRETTY_NAMES = {
                 }
 DESKTOP_PLATFORMS = ['linux','linux64','macosx','macosx64','win32']
 MOBILE_PLATFORMS = ['android-r7', 'maemo4', 'maemo5-gtk', 'maemo5-qt']
-UNITTEST_SUITES = ['mochitests-1/5', 'mochitests-2/5', 'mochitests-3/5, mochitests-4/5', 'mochitests-5/5', 'mochitest-other', 'reftest', 'crashtest', 'xpcshell', 'jsreftest']
+UNITTEST_SUITES = ['mochitests-1/5', 'mochitests-2/5', 'mochitests-3/5', 'mochitests-4/5', 'mochitests-5/5', 'mochitest-other', 'reftest', 'crashtest', 'xpcshell', 'jsreftest']
 TALOS_SUITES = ['nochrome', 'dromaeo', 'a11y', 'svg', 'chrome', 'tp4', 'dirty', 'scroll', 'cold', 'v8']
