@@ -528,19 +528,8 @@ def generateBranchObjects(config, name):
         if config['enable_xulrunner'] and platform not in ('wince',):
             xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
 
-    logUploadCmd = [sys.executable,
-         '%s/bin/log_uploader.py' % buildbotcustom.__path__[0],
-         config['stage_server'],
-         '-u', config['stage_username'],
-         '-i', os.path.expanduser("~/.ssh/%s" % config['stage_ssh_key']),
-         '-b', name,
-         '-p', WithProperties("%(platform)s"),
-        ]
-    if config.get('enable_try'):
-        logUploadCmd.append('--try')
-
-    if name == 'shadow-central':
-        logUploadCmd.append('--shadow')
+    logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
+            is_shadow=bool(name=='shadow-central'))
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
@@ -594,14 +583,11 @@ def generateBranchObjects(config, name):
         logCompression="gzip",
         errorparser="unittest"
     ))
+
     # Try Server notifier
     if config.get('enable_mail_notifier'):
         packageUrl = config['package_url']
         packageDir = config['package_dir']
-
-        notify_builders = builders + unittestBuilders + debugBuilders
-        for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
-            notify_builders.extend(test_builders)
 
         if config.get('notify_real_author'):
             extraRecipients = []
@@ -609,21 +595,6 @@ def generateBranchObjects(config, name):
         else:
             extraRecipients = config['email_override']
             sendToInterestedUsers = False
-
-        branchObjects['status'].append(MailNotifier(
-            fromaddr="tryserver@build.mozilla.org",
-            mode="all",
-            sendToInterestedUsers=sendToInterestedUsers,
-            extraRecipients=extraRecipients,
-            lookup=MercurialEmailLookup(),
-            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
-                '/'.join([packageUrl, packageDir]), config['tinderbox_tree']),
-            subject="Try Server: %(result)s on %(builder)s",
-            relayhost="mail.build.mozilla.org",
-            builders=notify_builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'),
-                "References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
-            ))
 
         # This notifies users as soon as we receive their push, and will let them
         # know where to find builds/logs
@@ -2070,49 +2041,16 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            errorparser="unittest",
                            logCompression="gzip"))
 
-    logUploadCmd = [sys.executable,
-         '%s/bin/log_uploader.py' % buildbotcustom.__path__[0],
-         branch_config['stage_server'],
-         '-u', branch_config['stage_username'],
-         '-i', os.path.expanduser("~/.ssh/%s" % branch_config['stage_ssh_key']),
-         '-b', branch,
-         '-p', WithProperties("%(build_platform)s"),
-        ]
-    if branch == 'tryserver':
-        logUploadCmd.append('--try')
-    elif branch == 'shadow-central':
-        logUploadCmd.append('--shadow')
+    logUploadCmd = makeLogUploadCommand(branch, branch_config,
+            is_try=bool(branch=='tryserver'),
+            is_shadow=bool(branch=='shadow-central'),
+            platform_prop='build_platform')
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
         builders=branch_builders + all_test_builders,
     ))
 
-    ### Try mail notifier
-    if branch_config.get('enable_mail_notifier'):
-        packageUrl = branch_config['package_url']
-        packageDir = branch_config['package_dir']
-        if branch_config.get('notify_real_author'):
-            extraRecipients = []
-            sendToInterestedUsers = True
-        else:
-            extraRecipients = branch_config['email_override']
-            sendToInterestedUsers = False
-
-        branchObjects['status'].append(MailNotifier(
-            fromaddr="tryserver@build.mozilla.org",
-            mode="all",
-            sendToInterestedUsers=sendToInterestedUsers,
-            extraRecipients=extraRecipients,
-            lookup=MercurialEmailLookup(),
-            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
-                '/'.join([packageUrl, packageDir]), branch_config['tinderbox_tree']),
-            subject="Try Server: %(result)s on %(builder)s",
-            relayhost="mail.build.mozilla.org",
-            builders=all_test_builders + branch_builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(revision:-unknown)s>'),
-                "References": WithProperties('<tryserver-%(revision:-unknown)s>')}
-        ))
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
                 branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
@@ -2302,31 +2240,13 @@ def generateMobileBranchObjects(config, name):
         logCompression='gzip',
     ))
 
-    #Try server mail notifier
-    if config.get('enable_mail_notifier'):
-        package_url = config['package_url']
-        package_dir = config['package_dir']
+    logUploadCmd = makeLogUploadCommand(name, config,
+            is_try=config.get('enable_try'),
+            is_shadow=bool(name=='shadow-central'))
 
-        if config.get('notify_real_author'):
-            extraRecipients = []
-            sendToInterestedUsers = True
-        else:
-            extraRecipients = config['email_override']
-            sendToInterestedUsers = False
-
-        mobile_objects['status'].append(MailNotifier(
-            fromaddr='tryserver@build.mozilla.org',
-            mode='all',
-            sendToInterestedUsers=sendToInterestedUsers,
-            extraRecipients=extraRecipients,
-            lookup=MercurialEmailLookup(),
-            customMesg=lambda attrs: buildTryCompleteMessage(attrs,
-                '/'.join([package_url, package_dir]), config['tinderbox_tree']),
-            subject='Try Server: %(result)s on %(builder)s',
-            relayhost='mail.build.mozilla.org',
-            builders=builders,
-            extraHeaders={"In-Reply-To":WithProperties('<tryserver-%(got_revision:-unknown)s>'),
-                "References": WithProperties('<tryserver-%(got_revision:-unknown)s>')}
+    mobile_objects['status'].append(SubprocessLogHandler(
+        logUploadCmd,
+        builders=builders,
     ))
 
     if config.get('mobile_build_failure_emails'):
@@ -2442,3 +2362,40 @@ def generateMiscObjects(config, SLAVES):
         for k, v in fuzzingObjects.items():
             buildObjects[k].extend(v)
     return buildObjects
+
+def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
+        platform_prop="platform"):
+    extra_args = []
+    if config.get('enable_mail_notifier'):
+        if config.get('notify_real_author'):
+            extraRecipients = []
+            sendToAuthor = True
+        else:
+            extraRecipients = config['email_override']
+            sendToAuthor = False
+
+        upload_cmd = 'try_mailer.py'
+        extra_args.extend(['-f', 'tryserver@build.mozilla.org'])
+        for r in extraRecipients:
+            extra_args.extend(['-t', r])
+        if sendToAuthor:
+            extra_args.append("--to-author")
+    else:
+        upload_cmd = 'log_uploader.py'
+
+    logUploadCmd = [sys.executable,
+         '%s/bin/%s' % (buildbotcustom.__path__[0], upload_cmd),
+         config['stage_server'],
+         '-u', config['stage_username'],
+         '-i', os.path.expanduser("~/.ssh/%s" % config['stage_ssh_key']),
+         '-b', branch_name,
+         '-p', WithProperties("%%(%s)s" % platform_prop),
+        ] + extra_args
+
+    if is_try:
+        logUploadCmd.append('--try')
+
+    if is_shadow:
+        logUploadCmd.append('--shadow')
+
+    return logUploadCmd

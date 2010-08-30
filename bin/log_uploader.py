@@ -72,7 +72,10 @@ def getAuthor(build):
         return changes[0].who
 
 def getBuildId(build):
-    return build.getProperty('buildid')
+    try:
+        return build.getProperty('buildid')
+    except:
+        return None
 
 def formatLog(tmpdir, build):
     """
@@ -153,7 +156,6 @@ if __name__ == "__main__":
         # Format the log into a compressed text file
         build = getBuild(builder_path, build_number)
         logfile = formatLog(local_tmpdir, build)
-        buildid = build.getProperty('buildid')
 
         # Now....upload it!
         remote_tmpdir = ssh(user=options.user, identity=options.identity, host=host,
@@ -166,7 +168,6 @@ if __name__ == "__main__":
             uploadArgs = dict(
                 branch=options.branch,
                 product=options.product,
-                buildid=buildid,
             )
 
             # Make sure debug platforms are properly identified
@@ -185,6 +186,13 @@ if __name__ == "__main__":
                     builddir="%s-%s" % (options.branch, platform),
                     ))
             else:
+                buildid = getBuildId(build)
+                if buildid is None:
+                    # No build id, so we don't know where to upload this :(
+                    print "No build id for %s/%s, giving up" % (builder_path, build_number)
+                    # Exit cleanly so we don't spam twistd.log with exceptions
+                    sys.exit(0)
+
                 if options.shadowbuild:
                     uploadArgs['to_shadow'] = True
                     uploadArgs['to_tinderbox_dated'] = False
@@ -197,6 +205,7 @@ if __name__ == "__main__":
                     who=None,
                     revision=None,
                     builddir=None,
+                    buildid=buildid,
                     ))
             post_upload_cmd = postUploadCmdPrefix(**uploadArgs)
             post_upload_cmd += [remote_tmpdir]
