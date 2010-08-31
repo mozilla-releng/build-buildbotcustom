@@ -3,8 +3,13 @@
 #   Lukas Blakk <lsblakk@mozilla.com>
 
 import argparse, re
+
 from twisted.python import log
-from valid_builders import PRETTY_NAMES, DESKTOP_PLATFORMS, MOBILE_PLATFORMS, \
+
+import buildbotcustom.valid_builders
+reload(buildbotcustom.valid_builders)
+
+from buildbotcustom.valid_builders import PRETTY_NAMES, DESKTOP_PLATFORMS, MOBILE_PLATFORMS, \
                            TALOS_SUITES, UNITTEST_SUITES
 
 '''Given a list of arguments from commit message or info file

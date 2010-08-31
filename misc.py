@@ -23,6 +23,7 @@ import buildbotcustom.scheduler
 import buildbotcustom.status.mail
 import buildbotcustom.status.generators
 import buildbotcustom.status.log_handlers
+import buildbotcustom.misc_scheduler
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -31,6 +32,7 @@ reload(buildbotcustom.scheduler)
 reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
 reload(buildbotcustom.status.log_handlers)
+reload(buildbotcustom.misc_scheduler)
 
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \

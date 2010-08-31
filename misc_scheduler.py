@@ -2,13 +2,16 @@
 # Contributor(s):
 #   Chris AtLee <catlee@mozilla.com>
 #   Lukas Blakk <lsblakk@mozilla.com>
-
-from buildbotcustom.try_parser import TryParser
-
 from twisted.python import log
 from twisted.internet import defer
 from twisted.web.client import getPage
+
 import re
+
+import buildbotcustom.try_parser
+reload(buildbotcustom.try_parser)
+
+from buildbotcustom.try_parser import TryParser
 
 def tryChooser(s, all_changes):
     log.msg("Looking at changes: %s" % all_changes)
