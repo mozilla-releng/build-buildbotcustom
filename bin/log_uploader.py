@@ -118,6 +118,7 @@ if __name__ == "__main__":
     parser.set_defaults(
             nightly=False,
             trybuild=False,
+            shadowbuild=False,
             user=os.environ.get("USER"),
             product="firefox",
             )
@@ -130,6 +131,8 @@ if __name__ == "__main__":
             help="upload to nightly dir")
     parser.add_option("--try", dest="trybuild", action="store_true",
             help="upload to try build directory")
+    parser.add_option("--shadow", dest="shadowbuild", action="store_true",
+            help="upload to shadow build directory")
 
     options, args = parser.parse_args()
 
@@ -182,10 +185,15 @@ if __name__ == "__main__":
                     builddir="%s-%s" % (options.branch, platform),
                     ))
             else:
+                if options.shadowbuild:
+                    uploadArgs['to_shadow'] = True
+                    uploadArgs['to_tinderbox_dated'] = False
+                else:
+                    uploadArgs['to_shadow'] = False
+                    uploadArgs['to_tinderbox_dated'] = True
                 uploadArgs.update(dict(
                     upload_dir="%s-%s" % (options.branch, platform),
                     to_try=False,
-                    to_tinderbox_dated=True,
                     who=None,
                     revision=None,
                     builddir=None,

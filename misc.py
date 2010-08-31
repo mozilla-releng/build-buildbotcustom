@@ -471,6 +471,9 @@ def generateBranchObjects(config, name):
     if config.get('enable_try'):
         logUploadCmd.append('--try')
 
+    if name == 'shadow-central':
+        logUploadCmd.append('--shadow')
+
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
         builders=builders + unittestBuilders + debugBuilders,
@@ -1988,6 +1991,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         ]
     if branch == 'tryserver':
         logUploadCmd.append('--try')
+    elif branch == 'shadow-central':
+        logUploadCmd.append('--shadow')
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
