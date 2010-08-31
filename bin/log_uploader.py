@@ -161,11 +161,17 @@ if __name__ == "__main__":
 
             remote_files = [os.path.join(remote_tmpdir, os.path.basename(f)) for f in [logfile]]
             uploadArgs = dict(
-                upload_dir="%s-%s" % (options.branch, options.platform),
                 branch=options.branch,
                 product=options.product,
                 buildid=buildid,
             )
+
+            # Make sure debug platforms are properly identified
+            # Test builders don't have the '-debug' distinction in the platform
+            # string, so check in the builder name to make sure.
+            platform = options.platform
+            if '-debug' in builder_path and '-debug' not in platform:
+                platform += "-debug"
 
             if options.trybuild:
                 uploadArgs.update(dict(
@@ -173,10 +179,11 @@ if __name__ == "__main__":
                     to_tinderbox_dated=False,
                     who=getAuthor(build),
                     revision=build.getProperty('revision')[:12],
-                    builddir=build.getProperty('builddir'),
+                    builddir="%s-%s" % (options.branch, platform),
                     ))
             else:
                 uploadArgs.update(dict(
+                    upload_dir="%s-%s" % (options.branch, platform),
                     to_try=False,
                     to_tinderbox_dated=True,
                     who=None,
