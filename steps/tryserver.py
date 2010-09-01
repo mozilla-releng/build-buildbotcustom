@@ -32,13 +32,13 @@ from twisted.python import log
 from twisted.internet import reactor
 
 from buildbot.steps.shell import ShellCommand
-from buildbot.steps.source import Mercurial
 from buildbot.steps.transfer import FileDownload
 from buildbot.process.buildstep import BuildStep
 from buildbot.sourcestamp import SourceStamp
 from buildbot.buildset import BuildSet
 from buildbot.status.builder import SUCCESS, SKIPPED, WARNINGS
 
+from buildbotcustom.steps.source import EvaluatingMercurial
 
 def parseSendchangeArguments(args):
     """This function parses the arguments that the Buildbot patch uploader
@@ -291,17 +291,17 @@ class MozillaUploadTryBuild(ShellCommand):
         self.super_class.start(self)
 
 
-class MozillaTryServerHgClone(Mercurial):
+class MozillaTryServerHgClone(EvaluatingMercurial):
     haltOnFailure = True
     flunkOnFailure = True
     
     def __init__(self, baseURL="http://hg.mozilla.org/", mode='clobber',
                  defaultBranch='mozilla-central', timeout=3600, **kwargs):
         # repourl overridden in startVC
-        Mercurial.__init__(self, baseURL=baseURL, mode=mode,
-                           defaultBranch=defaultBranch, timeout=timeout,
-                           **kwargs)
-        self.super_class = Mercurial
+        EvaluatingMercurial.__init__(self, baseURL=baseURL, mode=mode,
+                                     defaultBranch=defaultBranch,
+                                     timeout=timeout, **kwargs)
+        self.super_class = EvaluatingMercurial
 
     def startVC(self, branch, revision, patch):
         if branch == 'PATCH_TRY' or branch == 'HG_TRY':
