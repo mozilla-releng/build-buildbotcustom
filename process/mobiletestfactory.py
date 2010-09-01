@@ -93,7 +93,10 @@ class MobileTalosFactory(BuildFactory):
         self.reboot = reboot
         self.base_dir = base_dir
         self.reboot_cmd = reboot_cmd
-        self.nochrome = '' if nochrome is None else '--noChrome'
+        if not nochrome:
+            self.nochrome = ''
+        else:
+            self.nochrome = '--noChrome'
         self.cvsroot = cvsroot #We are using a static ip because of dns failures
         self.hg_host = hg_host
         self.tools_repo_path = tools_repo_path
