@@ -6261,131 +6261,115 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
             workdir=self.objdirAbsPath
         )
 
-class UnittestPackagedBuildFactory(MozillaBuildFactory):
-    def __init__(self, platform, test_suites, env={}, productName='firefox',
-            mochitest_leak_threshold=None, crashtest_leak_threshold=None,
-            totalChunks=None, thisChunk=None, chunkByDir=None, downloadSymbols=True,
-            **kwargs):
-        self.platform = platform.split('-')[0]
 
-        self.env = MozillaEnvironments['%s-unittest' % self.platform].copy()
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-        self.env.update(env)
+def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
+    '''Given a build object, figure out which files have the include_substr
+    in them, then exclude files that have one of the exclude_substrs. This
+    function uses substring pattern matching instead of regular expressions
+    as it meets the need without incurring as much overhead.'''
+    potential_files=[]
+    for file in build.source.changes[-1].files:
+        if include_substr in file and file not in potential_files:
+            potential_files.append(file)
+    assert len(potential_files) > 0, 'sendchange missing this archive type'
+    for substring in exclude_substrs:
+        for f in potential_files[:]:
+            if substring in f:
+                potential_files.remove(f)
+    assert len(potential_files) == 1, 'Ambiguous testing sendchange!'
+    return potential_files[0]
+
+
+class MozillaTestFactory(MozillaBuildFactory):
+    def __init__(self, platform, productName='firefox',
+                 downloadSymbols=True, downloadTests=False, **kwargs):
+        self.platform = platform.split('-')[0]
         self.productName = productName
+        self.downloadSymbols = downloadSymbols
+        self.downloadTests = downloadTests
 
         assert self.platform in getSupportedPlatforms()
 
         MozillaBuildFactory.__init__(self, **kwargs)
 
-        self.test_suites = test_suites
-        self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
-                                'crashtest': crashtest_leak_threshold}
+        self.addCleanupSteps()
+        self.addPrepareBuildSteps()
+        if self.downloadSymbols:
+            self.addPrepareSymbolsSteps()
+        if self.downloadTests:
+            self.addPrepareTestsSteps()
+        self.addIdentifySteps()
+        self.addSetupSteps()
+        self.addRunTestSteps()
+        self.addTearDownSteps()
 
-        def get_url(build, include_substr='', exclude_substrs=[]):
-            '''Given a build object, figure out which files have the include_substr
-            in them, then exclude files that have one of the exclude_substrs. This
-            function uses substring pattern matching instead of regular expressions
-            as it meets the need without incurring as much overhead.'''
-            potential_files=[]
-            for file in build.source.changes[-1].files:
-                if include_substr in file and file not in potential_files:
-                    potential_files.append(file)
-            assert len(potential_files) > 0, 'sendchange missing this archive type'
-            for substring in exclude_substrs:
-                for f in potential_files:
-                    if substring in f:
-                        potential_files.remove(f)
-            assert len(potential_files) == 1, 'Ambiguous unittest sendchange!'
-            return potential_files[0]
+    def addInitialSteps(self):
+        def get_revision(build):
+            try:
+                revision = build.source.changes[-1].revision
+                return revision
+            except:
+                return "not-set"
+        self.addStep(SetBuildProperty(
+         property_name="revision",
+         value=get_revision,
+        ))
 
+        def get_who(build):
+            try:
+                revision = build.source.changes[-1].who
+                return revision
+            except:
+                return "not-set"
+
+        self.addStep(SetBuildProperty(
+         property_name="who",
+         value=get_who,
+        ))
+
+        MozillaBuildFactory.addInitialSteps(self)
+
+    def addCleanupSteps(self):
+        '''Clean up the relevant places before starting a build'''
+        #On windows, we should try using cmd's attrib and native rmdir
+        self.addStep(ShellCommand(
+            name='rm_builddir',
+            command=['rm', '-rf', 'build'],
+            workdir='.',
+            flunkOnFailure=False, # XXX until bug 558430 is fixed
+        ))
+
+    def addPrepareBuildSteps(self):
+        '''This function understands how to prepare a build for having tests run
+        against it.  It downloads, unpacks then sets important properties for use
+        during testing'''
         def get_build_url(build):
             '''Make sure that there is at least one build in the file list'''
             assert len(build.source.changes[-1].files) > 0, 'Unittest sendchange has no files'
-            return get_url(build, exclude_substrs=['.crashreporter-symbols.',
+            return parse_sendchange_files(build, exclude_substrs=['.crashreporter-symbols.',
                                                    '.tests.'])
-
-        def get_tests_url(build):
-            '''If there is only one file, we assume that the tests package is at
-            the same location with the file extension of the browser replaced with
-            .tests.tar.bz2, otherwise we try to find the explicit file'''
-            if len(build.source.changes[-1].files) < 2:
-                build_url = build.getProperty('build_url')
-                for suffix in ('.tar.bz2', '.zip', '.dmg', '.exe'):
-                    if build_url.endswith(suffix):
-                        return build_url[:-len(suffix)] + '.tests.tar.bz2'
-            else:
-                return get_url(build, include_substr='.tests.')
-
-        def get_symbols_url(build):
-            '''If there are two files, we assume that the second file is the tests tarball
-            and use the same location as the build, with the build's file extension replaced
-            with .crashreporter-symbols.zip.  If there are three or more files then we figure
-            out which is the real file'''
-            if len(build.source.changes[-1].files) < 3:
-                build_url = build.getProperty('build_url')
-                for suffix in ('.tar.bz2', '.zip', '.dmg', '.exe'):
-                    if build_url.endswith(suffix):
-                        return build_url[:-len(suffix)] + '.crashreporter-symbols.zip'
-            else:
-                return get_url(build, include_substr='.crashreporter-symbols.')
-
         self.addStep(DownloadFile(
-         url_fn=get_build_url,
-         filename_property='build_filename',
-         url_property='build_url',
-         haltOnFailure=True,
-         name='download build',
+            url_fn=get_build_url,
+            filename_property='build_filename',
+            url_property='build_url',
+            haltOnFailure=True,
+            name='download_build',
         ))
-
-        self.addStep(DownloadFile(
-         url_fn=get_tests_url,
-         filename_property='tests_filename',
-         url_property='tests_url',
-         haltOnFailure=True,
-         name='download tests',
-        ))
-
-        if downloadSymbols:
-            self.addStep(DownloadFile(
-             url_fn=get_symbols_url,
-             filename_property='symbols_filename',
-             url_property='symbols_url',
-             name='download symbols',
-             workdir='build/symbols',
-            ))
-
-        # Unpack the build
         self.addStep(UnpackFile(
-         filename=WithProperties('%(build_filename)s'),
-         scripts_dir='../tools/buildfarm/utils',
-         haltOnFailure=True,
-         name='unpack build',
+            filename=WithProperties('%(build_filename)s'),
+            scripts_dir='../tools/buildfarm/utils',
+            haltOnFailure=True,
+            name='unpack_build',
         ))
-
-        # Unpack the tests
-        self.addStep(UnpackFile(
-         filename=WithProperties('%(tests_filename)s'),
-         haltOnFailure=True,
-         name='unpack tests',
-        ))
-
-        if downloadSymbols:
-            # Unpack the symbols
-            self.addStep(UnpackFile(
-             filename=WithProperties('%(symbols_filename)s'),
-             name='unpack symbols',
-             workdir='build/symbols',
-            ))
-
         # Find the application binary!
         if self.platform.startswith('macosx'):
             self.addStep(FindFile(
-             filename="%s-bin" % self.productName,
-             directory=".",
-             filetype="file",
-             max_depth=4,
-             property_name="exepath",
-             name="Find executable",
+                filename="%s-bin" % self.productName,
+                directory=".",
+                filetype="file",
+                max_depth=4,
+                property_name="exepath",
+                name="find_executable",
             ))
         elif self.platform.startswith('win'):
             self.addStep(SetBuildProperty(
@@ -6414,6 +6398,63 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
              workdir='tools'
             )
 
+
+    def addPrepareSymbolsSteps(self):
+        '''This function knows how to setup the symbols for a build to be useful'''
+        def get_symbols_url(build):
+            '''If there are two files, we assume that the second file is the tests tarball
+            and use the same location as the build, with the build's file extension replaced
+            with .crashreporter-symbols.zip.  If there are three or more files then we figure
+            out which is the real file'''
+            if len(build.source.changes[-1].files) < 3:
+                build_url = build.getProperty('build_url')
+                for suffix in ('.tar.bz2', '.zip', '.dmg', '.exe'):
+                    if build_url.endswith(suffix):
+                        return build_url[:-len(suffix)] + '.crashreporter-symbols.zip'
+            else:
+                return parse_sendchange_files(build, include_substr='.crashreporter-symbols.')
+        self.addStep(DownloadFile(
+            url_fn=get_symbols_url,
+            filename_property='symbols_filename',
+            url_property='symbols_url',
+            name='download_symbols',
+            workdir='build/symbols'
+        ))
+        self.addStep(UnpackFile(
+            filename=WithProperties('%(symbols_filename)s'),
+            name='unpack_symbols',
+            workdir='build/symbols'
+        ))
+
+    def addPrepareTestsSteps(self):
+        def get_tests_url(build):
+            '''If there is only one file, we assume that the tests package is at
+            the same location with the file extension of the browser replaced with
+            .tests.tar.bz2, otherwise we try to find the explicit file'''
+            if len(build.source.changes[-1].files) < 2:
+                build_url = build.getProperty('build_url')
+                for suffix in ('.tar.bz2', '.zip', '.dmg', '.exe'):
+                    if build_url.endswith(suffix):
+                        return build_url[:-len(suffix)] + '.tests.tar.bz2'
+            else:
+                return parse_sendchange_files(build, include_substr='.tests.')
+        self.addStep(DownloadFile(
+            url_fn=get_tests_url,
+            filename_property='tests_filename',
+            url_property='tests_url',
+            haltOnFailure=True,
+            name='download tests',
+        ))
+        # Unpack the tests
+        self.addStep(UnpackFile(
+            filename=WithProperties('%(tests_filename)s'),
+            haltOnFailure=True,
+            name='unpack tests',
+        ))
+
+    def addIdentifySteps(self):
+        '''This function knows how to figure out which build this actually is
+        and display it in a useful way'''
         # Figure out build ID and TinderboxPrint revisions
         def get_build_info(rc, stdout, stderr):
             retval = {}
@@ -6430,6 +6471,40 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
          name='get build info',
         )
 
+
+    def addSetupSteps(self):
+        '''This stub is for implementing classes to do harness specific setup'''
+        pass
+
+    def addRunTestSteps(self):
+        '''This stub is for implementing classes to do the actual test runs'''
+        pass
+
+    def addTearDownSteps(self):
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
+
+
+class UnittestPackagedBuildFactory(MozillaTestFactory):
+    def __init__(self, platform, test_suites, env=None, productName='firefox',
+                 mochitest_leak_threshold=None,
+                 crashtest_leak_threshold=None, totalChunks=None,
+                 thisChunk=None, chunkByDir=None, **kwargs):
+        platform = platform.split('-')[0]
+        self.test_suites = test_suites
+        self.totalChunks = totalChunks
+        self.thisChunk = thisChunk
+        self.chunkByDir = chunkByDir
+        self.env = MozillaEnvironments['%s-unittest' % platform].copy()
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        self.env.update(env)
+        self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
+                                'crashtest': crashtest_leak_threshold,}
+        MozillaTestFactory.__init__(self, platform, productName,
+                                    downloadTests=True, **kwargs)
+
+
+    def addRunTestSteps(self):
         # Run them!
         for suite in self.test_suites:
             leak_threshold = self.leak_thresholds.get(suite, None)
@@ -6440,15 +6515,15 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  env=self.env,
                  symbols_path='symbols',
                  leakThreshold=leak_threshold,
-                 chunkByDir=chunkByDir,
-                 totalChunks=totalChunks,
-                 thisChunk=thisChunk,
+                 chunkByDir=self.chunkByDir,
+                 totalChunks=self.totalChunks,
+                 thisChunk=self.thisChunk,
                  maxTime=90*60, # One and a half hours, to allow for slow minis
                 ))
             elif suite == 'xpcshell':
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
-                 platform=platform,
+                 platform=self.platform,
                  symbols_path='symbols',
                  maxTime=120*60, # Two Hours
                 ))
@@ -6464,43 +6539,6 @@ class UnittestPackagedBuildFactory(MozillaBuildFactory):
                  maxTime=2*60*60, # Two Hours
                 ))
 
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
-
-    def addInitialSteps(self):
-        # XX remove flunkOnFailure after bug 558430 is fixed
-        self.addStep(ShellCommand,
-         name='rm_builddir',
-         command=['rm', '-rf', 'build'],
-         workdir='.',
-         flunkOnFailure=False,
-        )
-
-        def get_revision(build):
-            try:
-                revision = build.source.changes[-1].revision
-                return revision
-            except:
-                return "not-set"
-
-        self.addStep(SetBuildProperty(
-         property_name="revision",
-         value=get_revision,
-        ))
-
-        def get_who(build):
-            try:
-                revision = build.source.changes[-1].who
-                return revision
-            except:
-                return "not-set"
-
-        self.addStep(SetBuildProperty(
-         property_name="who",
-         value=get_who,
-        ))
-
-        MozillaBuildFactory.addInitialSteps(self)
 
 class TalosFactory(BuildFactory):
     extName = 'addon.xpi'
