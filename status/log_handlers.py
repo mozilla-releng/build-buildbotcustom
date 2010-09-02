@@ -23,6 +23,7 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
 
         self.watched = []
 
+        self.size = size
         self.pool = threadpool.ThreadPool(maxthreads=size)
 
     def setServiceParent(self, parent):
