@@ -302,7 +302,7 @@ class SendChangeStep(ShellCommand):
             cmd = ['python',
                    WithProperties("%(toolsdir)s/buildfarm/utils/retry.py"),
                    '-s', str(self.sleepTime), '-t', str(self.timeout),
-                   '-r', str(self.retries)]
+                   '-r', str(self.retries), '--stdout-regexp="change sent successfully"']
             cmd.extend(bb_cmd)
             self.setCommand(cmd)
             self.super_class.start(self)
