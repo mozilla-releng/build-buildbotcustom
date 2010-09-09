@@ -4663,6 +4663,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             unittestMasters=None, unittestBranch=None, stageUsername=None,
             stageServer=None, stageSshKey=None, exec_xpcshell_suites=True,
             exec_reftest_suites=True, exec_mochi_suites=True,
+            client_py_extra_args=None,
             exec_mozmill_suites=False, run_a11y=True, env={}, **kwargs):
         self.env = {}
 
@@ -4678,6 +4679,12 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.config_dir = config_dir
         self.objdir = objdir
         self.run_a11y = run_a11y
+
+        if client_py_extra_args is None:
+            self.client_py_extra_args = []
+        else:
+            self.client_py_extra_args = client_py_extra_args
+
         self.unittestMasters = unittestMasters or []
         self.unittestBranch = unittestBranch
         if self.unittestMasters:
@@ -4762,7 +4769,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.addStepNoEnv(ShellCommand,
          name='checkout_client.py',
          command=['python', 'client.py', 'checkout',
-                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)],
+                  '--mozilla-repo=%s' % self.getRepository(self.mozRepoPath)] + self.client_py_extra_args,
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
          haltOnFailure=True,
