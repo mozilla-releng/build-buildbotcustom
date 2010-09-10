@@ -34,7 +34,8 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
   EvaluatingShellCommand, RepackPartners
-from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
+from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
+  SnippetComparison
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
 from buildbotcustom.steps.transfer import MozillaStageUpload
@@ -3771,6 +3772,7 @@ class CCSourceFactory(ReleaseFactory):
 
 
 class ReleaseUpdatesFactory(ReleaseFactory):
+    snippetStagingDir = '/opt/aus2/snippets/staging'
     def __init__(self, cvsroot, patcherToolsTag, patcherConfig, verifyConfigs,
                  appName, productName,
                  version, appVersion, baseTag, buildNumber,
@@ -3854,10 +3856,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         else:
           self.mozRepository = self.repository
 
-
         self.brandName = brandName or productName.capitalize()
         self.releaseNotesUrl = releaseNotesUrl
 
+        self.setChannelData()
         self.setup()
         self.bumpPatcherConfig()
         self.bumpVerifyConfigs()
@@ -3868,7 +3870,39 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             self.createBuildNSnippets()
         self.uploadMars()
         self.uploadSnippets()
+        self.verifySnippets()
+        self.wait()
         self.trigger()
+
+    def setChannelData(self):
+        # This method figures out all the information needed to push snippets
+        # to AUS, push test snippets live, and do basic verifications on them.
+        # Test snippets always end up in the same local and remote directories
+        # All of the beta and (if applicable) release channel information
+        # is dependent on the useBetaChannel flag. When false, there is no
+        # release channel, and the beta channel is comprable to 'releasetest'
+        # rather than 'betatest'
+        baseSnippetDir = self.getSnippetDir()
+        self.dirMap = {
+            'aus2.test': '%s-test' % baseSnippetDir,
+            'aus2': baseSnippetDir
+        }
+
+        self.channels = {
+            'betatest': { 'dir': 'aus2.test' },
+            'releasetest': { 'dir': 'aus2.test' },
+            'beta': {}
+        }
+        if self.useBetaChannel:
+            self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
+            self.channels['beta']['dir'] = 'aus2.beta'
+            self.channels['release'] = {
+                'dir': 'aus2',
+                'compareTo': 'releasetest',
+            }
+        else:
+            self.channels['beta']['dir'] = 'aus2'
+            self.channels['beta']['compareTo'] = 'releasetest'
 
     def setup(self):
         # General setup
@@ -4099,27 +4133,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         ))
 
     def uploadSnippets(self):
-        # If useBetaChannel is False the unnamed snippet type will be
-        # 'beta' channel snippets (and 'release' if we're into stable releases).
-        # If useBetaChannel is True the unnamed type will be 'release'
-        # channel snippets
-        snippetTypes = ['', 'test']
-        if self.useBetaChannel:
-            snippetTypes.append('beta')
-
-        for type in snippetTypes:
-            # Patcher generates an 'aus2' directory and 'aus2.snippetType'
-            # directories for each snippetType. Typically, there is 'aus2',
-            # 'aus2.test', and (when we're out of beta) 'aus2.beta'.
-            localDir = 'aus2'
-            # On the AUS server we store each type of snippet in a directory
-            # named thusly, with the snippet type appended to it
-            remoteDir = self.getSnippetDir()
-            if type != '':
-                localDir = localDir + '.%s' % type
-                remoteDir = remoteDir + '-%s' % type
-            snippetDir = '/opt/aus2/snippets/staging/%s' % remoteDir
-
+        for localDir,remoteDir in self.dirMap.iteritems():
+            snippetDir = self.snippetStagingDir + '/' + remoteDir
             self.addStep(ShellCommand,
              name='upload_snippets',
              command=['rsync', '-av',
@@ -4127,12 +4142,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                       localDir + '/',
                       '%s@%s:%s' % (self.ausUser, self.ausHost, snippetDir)],
              workdir=self.updateDir,
-             description=['upload', '%s snippets' % type],
+             description=['upload', '%s snippets' % localDir],
              haltOnFailure=True
             )
-
             # We only push test channel snippets from automation.
-            if type == 'test':
+            if localDir.endswith('test'):
                 self.addStep(ShellCommand(
                  name='backupsnip',
                  command=['bash', '-c',
@@ -4153,13 +4167,24 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  description=['pushsnip'],
                  haltOnFailure=True
                 ))
-                # Wait for timeout on AUS's NFS caching to expire before
-                # attempting to test newly-pushed snippets
-                self.addStep(ShellCommand(
-                 name='wait_live_snippets',
-                 command=['sleep','360'],
-                 description=['wait for live snippets']
-                ))
+
+    def verifySnippets(self):
+        channelComparisons = [(c, self.channels[c]['compareTo']) for c in self.channels if 'compareTo' in self.channels[c]]
+        for chan1,chan2 in channelComparisons:
+            self.addStep(SnippetComparison(
+                chan1=chan1,
+                chan2=chan2,
+                dir1=self.channels[chan1]['dir'],
+                dir2=self.channels[chan2]['dir'],
+                workdir=self.updateDir
+            ))
+
+    def wait(self):
+        self.addStep(ShellCommand(
+         name='wait_for_nfs_cache',
+         command=['sleep', '360'],
+         description=['wait for nfs cache', 'to expire']
+        ))
 
     def trigger(self):
         if self.triggerSchedulers:
