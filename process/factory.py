@@ -3864,6 +3864,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.buildTools()
         self.downloadBuilds()
         self.createPatches()
+        if buildNumber >= 2:
+            self.createBuildNSnippets()
         self.uploadMars()
         self.uploadSnippets()
         self.trigger()
@@ -4033,6 +4035,39 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   WithProperties('--config=%s' % self.patcherConfigFile)],
          description=['patcher:', 'create patches'],
          haltOnFailure=True
+        ))
+
+    def createBuildNSnippets(self):
+        command = ['python',
+                   WithProperties('%(toolsdir)s/release/generate-candidate-build-updates.py'),
+                   '--brand', self.brandName,
+                   '--product', self.productName,
+                   '--version', self.version,
+                   '--old-version', self.oldVersion,
+                   '--build-number', self.buildNumber,
+                   '--old-build-number', self.oldBuildNumber,
+                   '--channel', 'betatest', '--channel', 'releasetest',
+                   '--channel', 'beta',
+                   '--stage-server', self.stagingServer,
+                   '--old-base-snippet-dir', '.',
+                   '--workdir', '.',
+                   '--hg-server', self.getRepository('/'),
+                   '--source-repo', self.repoPath,
+                   '--verbose']
+        for p in (self.verifyConfigs.keys()):
+            command.extend(['--platform', p])
+        if self.useBetaChannel:
+            command.extend(['--channel', 'release'])
+        if self.testOlderPartials:
+            command.extend(['--generate-partials'])
+        self.addStep(ShellCommand(
+         name='create_buildN_snippets',
+         command=command,
+         description=['generate snippets', 'for prior',
+                      '%s builds' % self.version],
+         env={'PYTHONPATH': WithProperties('%(toolsdir)s/lib/python')},
+         haltOnFailure=True,
+         workdir=self.updateDir
         ))
 
     def uploadMars(self):
