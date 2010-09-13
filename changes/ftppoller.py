@@ -20,7 +20,8 @@ class FtpPoller(base.ChangeSource):
     """This source will poll an ftp directory searching for a specific file and when found
     trigger a change to the change master."""
     
-    compare_attrs = ["ftpURLs", "pollInterval", "branch"]
+    compare_attrs = ["ftpURLs", "pollInterval", "branch", "timeout",
+                     "searchString"]
     
     parent = None # filled in when we're added
     loop = None
