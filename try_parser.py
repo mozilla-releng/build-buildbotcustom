@@ -15,6 +15,18 @@ from buildbotcustom.valid_builders import PRETTY_NAMES, DESKTOP_PLATFORMS, MOBIL
 '''Given a list of arguments from commit message or info file
    returns only those builder names that should be built.'''
 
+def getMochitests(suites):
+  test_suites = []
+  for s in suites:
+    if s == 'mochitests': # for 'all' unittests
+      test_suites.extend(UNITTEST_SUITES['mochitests'].values())
+    elif s.startswith('mochitest-'): # checking user submitted list of suites
+      mochitest = UNITTEST_SUITES['mochitests'][s]
+      test_suites.append(mochitest)
+    else:
+      test_suites.append(s)
+  return test_suites
+
 def processMessage(message):
     match = re.search('try:',str(message))
     if match:
@@ -94,28 +106,40 @@ def TryParser(message, builderNames):
                                      and tryParse populates the list with the builderNames\
                                      that need schedulers.')
 
-    parser.add_argument('--build',
+    parser.add_argument('--do-everything', '-a',
+                        action='store_true',
+                        dest='do_everything',
+                        help='m-c override to do all builds, tests, talos just like a trunk push')
+    parser.add_argument('--build', '-b',
                         default='do',
                         dest='build',
-                        help='accepts the build types requested ')
-    parser.add_argument('--p',
+                        help='accepts the build types requested')
+    parser.add_argument('--platform', '-p',
                         default='all',
                         dest='desktop',
                         help='provide a list of desktop platforms, or specify none (default is all)')
-    parser.add_argument('--m',
+    parser.add_argument('--mobile', '-m',
                         default='all',
                         dest='mobile',
                         help='provide a list of mobile platform, or specify none (default is all)')
-    parser.add_argument('--u',
+    parser.add_argument('--unittests', '-u',
                         default='all',
                         dest='test',
                         help='provide a list of unit tests, or specify all (default is None)')
-    parser.add_argument('--t',
+    parser.add_argument('--talos', '-t',
                         default='none',
                         dest='talos',
                         help='provide a list of talos tests, or specify all (default is None)')
 
     (options, unknown_args) = parser.parse_known_args(processMessage(message))
+
+
+    if options.do_everything:
+        options.build = ['opt', 'debug']
+        options.desktop = 'all'
+        options.mobile = 'all'
+        options.test = 'all'
+        options.talos = 'all'
 
     # Build options include a possible override of 'all' to get a buildset that matches m-c
     if options.build == 'do' or options.build == 'od':
@@ -124,12 +148,6 @@ def TryParser(message, builderNames):
         options.build = ['debug']
     elif options.build == 'o':
         options.build = ['opt']
-    elif options.build == 'all':
-        options.build = ['opt', 'debug']
-        options.desktop = 'all'
-        options.mobile = 'all'
-        options.test = 'all'
-        options.talos = 'all'
     else:
         # for any input other than do/od, d, o, all set to default
         options.build = ['opt','debug']
@@ -145,9 +163,9 @@ def TryParser(message, builderNames):
         options.mobile = options.mobile.split(',')
 
     if options.test == 'all':
-        options.test = UNITTEST_SUITES
+        options.test = getMochitests(UNITTEST_SUITES)
     elif options.test != 'none':
-        options.test = options.test.split(',')
+        options.test = getMochitests(options.test.split(','))
     if options.talos == 'all':
         options.talos = TALOS_SUITES
     elif options.talos != 'none':
