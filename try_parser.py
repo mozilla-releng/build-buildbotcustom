@@ -63,8 +63,11 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes):
             for buildType in buildTypes:
                 for platform in platforms:
                     for test in tests:
-                        # we only do unittests on WINNT 6.1
+                        # we only do opt unittests on Rev3 WINNT 6.1, the debug tests still run on pm02
                         if platform == 'win32':
+                          if buildType == 'debug':
+                            custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES['desktop_win32'], buildType, testType, test)
+                          else:
                             custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES[platform][1], buildType, testType, test)
                         else:
                             custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES[platform], buildType, testType, test)
