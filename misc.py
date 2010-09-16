@@ -2177,6 +2177,10 @@ def generateMobileBranchObjects(config, name):
         pf=config['mobile_platforms'][platform]
         base_name = pf.get('base_name') % render
 
+        createSnippet = False
+        if config.get('create_mobile_snippet', None) and pf.get('update_platform', None):
+            createSnippet = True
+
         factory_kwargs={
             'hgHost': pf.get('hghost', config.get('hghost')),
             'repoPath': pf.get('repo_path', config.get('repo_path')),
@@ -2206,9 +2210,14 @@ def generateMobileBranchObjects(config, name):
             'packageGlobList': pf.get('package_globlist'),
             'mozRevision': pf.get('mozilla_revision'),
             'mobileRevision': pf.get('mobile_revision'),
+            'ausUser': config.get('aus2_user', None),
+            'ausSshKey': config.get('aus2_ssh_key', None),
+            'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', None),
+            'ausHost': config['aus2_host'],
+            'downloadBaseURL': config['mobile_download_base_url'],
+            'updatePlatform': pf.get('update_platform', None),
             # It would be great to have:
             # 'packageTests': pf.get('package_tests', False),
-            # 'uploadPlatform': platform,
             # These are disabled until l10n comes up
             #'triggerBuilds': True,
             #'triggeredSchedulers': triggeredSchedulers,
@@ -2246,6 +2255,7 @@ def generateMobileBranchObjects(config, name):
             nightly_kwargs = deepcopy(factory_kwargs)
             nightly_kwargs['nightly'] = True
             nightly_kwargs['uploadSymbols'] = pf.get('upload_symbols', False)
+            nightly_kwargs['createSnippet'] = createSnippet
 
             factory = factory_class(**nightly_kwargs)
 
