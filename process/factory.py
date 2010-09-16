@@ -5478,6 +5478,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
                  uploadSymbols=False, productName='mobile',
                  clobber=False, env=None,
+                 tinderboxBuildsDir=None,
                  mobileRevision='default',
                  mozRevision='default', enable_try=False,
                  createSnippet=False, ausUser=None,
@@ -5508,6 +5509,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.stageServer = stageServer
         self.stageBasePath = stageBasePath
         self.stageGroup = stageGroup
+        self.tinderboxBuildsDir = tinderboxBuildsDir
         self.mobileRevision = mobileRevision
         self.mozRevision = mozRevision
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
@@ -5791,20 +5793,68 @@ class MobileBuildFactory(MozillaBuildFactory):
                                             self.objdir)
             )
 
+    def addMakeUploadSteps(self):
+        self.addStep(SetProperty,
+            name="get_buildid",
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/dist/bin/application.ini' % (self.objdir),
+                     'App', 'BuildID'],
+            property='buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid']
+        )
+        # From NightlyBuildFactory doUpload, but with altered workdir
+        # and with platform in the nightly dir.
+        # We should be able to get rid of this duplicate code with
+        # bug 557260.
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1'})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        # Always upload builds to the dated tinderbox builds directories
+        if self.tinderboxBuildsDir is None:
+            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
+        else:
+            tinderboxBuildsDir = self.tinderboxBuildsDir
+        postUploadCmd =  ['post_upload.py']
+        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
+                          '-i %(buildid)s',
+                          '-p %s' % self.productName,
+                          '--release-to-tinderbox-dated-builds']
+        if self.nightly:
+            # If this is a nightly build also place them in the latest and
+            # dated directories in nightly/
+            postUploadCmd += ['-b %s-%s' % (self.branchName, self.platform),
+                              '--release-to-latest',
+                              '--release-to-dated']
+        uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+
+        self.addStep(SetProperty(
+            name='make_upload',
+            command=['make', 'upload'],
+            env=uploadEnv,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                        self.objdir),
+            extract_fn = parse_make_upload,
+            haltOnFailure=True,
+            description=['make', 'upload'],
+            timeout=40*60 # 40 minutes
+        ))
+
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
     def __init__(self, packageGlobList=['-r', 'mobile/dist/*.tar.bz2',
                                         'xulrunner/dist/*.tar.bz2'],
-                 uploadPlatform=None, **kwargs):
+                 **kwargs):
         """This class creates a desktop fennec build.  -r in package glob
         is to ensure that all files are uploaded as this is the first
         option given to scp.  hack alert!"""
         MobileBuildFactory.__init__(self, **kwargs)
         self.packageGlob = ' '.join(packageGlobList)
-        if uploadPlatform is not None:
-            self.uploadPlatform = uploadPlatform
-        else:
-            self.uploadPlatform = self.platform.replace('-i686', '')
 
         self.addPreCleanSteps()
         self.addBaseRepoSteps()
@@ -5813,7 +5863,7 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addSymbolSteps()
-        self.addUploadSteps(platform=self.uploadPlatform)
+        self.addMakeUploadSteps()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
