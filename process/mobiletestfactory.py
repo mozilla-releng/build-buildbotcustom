@@ -177,11 +177,11 @@ class MobileTalosFactory(BuildFactory):
         ))
         self.addStep(ShellCommand(
             command=['echo', 'TinderboxPrint:',
-                     WithProperties('<a href=%(mozilla_repository)s/rev/%(mozilla_changeset)s' +
-                                    'title="Built from Mozilla revision %(mozilla_changeset)s">' +
+                     WithProperties('<a href=%(mozilla_repository)s/rev/%(mozilla_changeset)s ' +
+                                    'title="Built from Mozilla revision %(mozilla_changeset)s"> ' +
                                     'moz:%(mozilla_changeset)s</a> <br />' +
-                                    '<a href=%(mobile_repository)s/rev/%(mobile_changeset)s' +
-                                    'title="Built from Mobile revision %(mobile_changeset)s">' +
+                                    '<a href=%(mobile_repository)s/rev/%(mobile_changeset)s ' +
+                                    'title="Built from Mobile revision %(mobile_changeset)s"> ' +
                                     'mobile:%(mobile_changeset)s</a>')],
             description=['list', 'revisions'],
             name='rev_info',
