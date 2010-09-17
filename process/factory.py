@@ -6553,6 +6553,7 @@ class MozillaTestFactory(MozillaBuildFactory):
         pass
 
     def addTearDownSteps(self):
+        self.addCleanupSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
