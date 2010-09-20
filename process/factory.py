@@ -1827,7 +1827,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             command=['bash', '-c',
                      WithProperties('%(basedir)s/' +
                                     self.absMozillaSrcDir +
-                                    '/tools/update-packaging/unwrap_full_update.sh ' +
+                                    '/tools/update-packaging/unwrap_full_update.pl ' +
                                     '../dist/update/%(completeMarFilename)s')],
             env=updateEnv,
             haltOnFailure=True,
@@ -1874,7 +1874,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             command=['bash', '-c',
                      WithProperties('%(basedir)s/' +
                                     self.absMozillaSrcDir +
-                                    '/tools/update-packaging/unwrap_full_update.sh ' +
+                                    '/tools/update-packaging/unwrap_full_update.pl ' +
                                     '../dist/update/previous.mar')],
             env=updateEnv,
             workdir='%s/previous' % self.absMozillaObjDir,
