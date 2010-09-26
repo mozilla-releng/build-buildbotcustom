@@ -508,7 +508,7 @@ def generateBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-            if config['enable_shark'] and platform == 'macosx':
+            if config['enable_shark'] and platform.startswith('macosx'):
                 nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
@@ -1014,7 +1014,7 @@ def generateBranchObjects(config, name):
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
-            if config['enable_shark'] and platform == 'macosx':
+            if config['enable_shark'] and platform.startswith('macosx'):
                 mozilla2_shark_factory = NightlyBuildFactory(
                     env= pf['env'],
                     objdir=config['objdir'],
@@ -1026,7 +1026,7 @@ def generateBranchObjects(config, name):
                     configSubDir=config['config_subdir'],
                     profiledBuild=False,
                     productName=config['product_name'],
-                    mozconfig='macosx/%s/shark' % name,
+                    mozconfig='%s/%s/shark' % (platform, name),
                     stageServer=config['stage_server'],
                     stageUsername=config['stage_username'],
                     stageGroup=config['stage_group'],
@@ -1927,7 +1927,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     continue
 
                 factory = factory_class(
-                    OS=slave_platform,
+                    OS=slave_platform.split('-')[0],
                     supportUrlBase=branch_config['support_url_base'],
                     envName=platform_config['env_name'],
                     workdirBase="../talos-data",
@@ -1936,7 +1936,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     configOptions=talosConfig,
                     talosCmd=talosCmd,
                     fetchSymbols=branch_config['fetch_symbols'] and
-                      branch_config['platforms'][platform].get('download_symbols',True),
+                      platform_config[slave_platform].get('download_symbols',True),
                     **extra # Extra test specific factory parameters
                 )
                 builder = {
