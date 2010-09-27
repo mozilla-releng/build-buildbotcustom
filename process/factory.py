@@ -6576,6 +6576,12 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         MozillaTestFactory.__init__(self, platform, productName,
                                     downloadTests=True, **kwargs)
 
+    def addSetupSteps(self):
+        if 'linux' in self.platform:
+            self.addStep(ShellCommand(
+                name='disable_screensaver',
+                command=['xset', 's', 'reset'],
+            ))
 
     def addRunTestSteps(self):
         # Run them!
