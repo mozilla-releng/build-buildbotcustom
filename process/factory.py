@@ -7900,18 +7900,35 @@ class AndroidBuildFactory(MobileBuildFactory):
             self._uploadSnippet()
 
 class ScriptFactory(BuildFactory):
-    def __init__(self, scriptRepo, scriptName, extra_data=None, extra_args=None):
+    def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
+            extra_data=None, extra_args=None):
         BuildFactory.__init__(self)
 
+        env = {'PROPERTIES_FILE': 'buildprops.json'}
         self.addStep(JSONPropertiesDownload(name="download_props", slavedest="buildprops.json"))
         if extra_data:
             self.addStep(JSONStringDownload(extra_data, name="download_extra", slavedest="data.json"))
+            env['EXTRA_DATA'] = 'data.json'
         self.addStep(ShellCommand(name="clobber_scripts", command=['rm', '-rf', 'scripts']))
         self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
-        cmd = ['scripts/%s' % scriptName]
+
+        if scriptName[0] == '/':
+            script_path = scriptName
+        else:
+            script_path = 'scripts/%s' % scriptName
+
+        if interpreter:
+            if isinstance(interpreter, (tuple,list)):
+                cmd = list(interpreter) + [script_path]
+            else:
+                cmd = [interpreter, script_path]
+        else:
+            cmd = [script_path]
+
         if extra_args:
             cmd.extend(extra_args)
-        self.addStep(ShellCommand(name="run_script", command=cmd))
+
+        self.addStep(ShellCommand(name="run_script", command=cmd, env=env))
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
     def __init__(self, **kwargs):

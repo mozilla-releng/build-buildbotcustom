@@ -312,6 +312,15 @@ def mergeRequests(builder, req1, req2):
         return False
     return req1.canBeMergedWith(req2)
 
+def mergeBuildObjects(d1, d2):
+    retval = d1.copy()
+    keys = ['builders', 'status', 'schedulers', 'change_source']
+
+    for key in keys:
+        retval.setdefault(key, []).extend(d2.get(key, []))
+
+    return retval
+
 def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_prefix,
         suites_name, suites, mochitestLeakThreshold, crashtestLeakThreshold, slaves=None):
     builders = []
@@ -2320,14 +2329,14 @@ def generateFuzzingObjects(config, SLAVES):
             'scripts/fuzzing/fuzzer.sh',
             )
     for platform in config['platforms']:
-        env = MozillaEnvironments.get("%s-unittest" % platform, {})
+        env = MozillaEnvironments.get("%s-unittest" % platform, {}).copy()
         env['HG_REPO'] = config['fuzzing_repo']
         env['FUZZ_REMOTE_HOST'] = config['fuzzing_remote_host']
         env['FUZZ_BASE_DIR'] = config['fuzzing_base_dir']
         builder = {'name': 'fuzzer-%s' % platform,
                    'builddir': 'fuzzer-%s' % platform,
                    'slavenames': SLAVES[platform],
-                   'nextSlave': _nextSlowIdleSlave(config['fuzzing_idle_slaves']),
+                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                    'factory': f,
                    'category': 'idle',
                    'env': env,
@@ -2345,7 +2354,68 @@ def generateFuzzingObjects(config, SLAVES):
             'schedulers': [fuzzing_scheduler],
             }
 
-def generateMiscObjects(config, SLAVES):
+def generateNanojitObjects(config, SLAVES):
+    builders = []
+    for platform in config['platforms']:
+        if 'win' in platform:
+            slaves = SLAVES[platform]
+            interpreter = 'bash'
+        elif 'arm' in platform:
+            slaves = SLAVES['linux']
+            interpreter = ['/scratchbox/moz_scratchbox', '-d', '/builds/slave/nanojit-arm/build']
+        else:
+            slaves = SLAVES[platform]
+            interpreter = None
+
+        f = ScriptFactory(
+                config['scripts_repo'],
+                'scripts/nanojit/nanojit.sh',
+                interpreter=interpreter,
+                )
+
+        builder = {'name': 'nanojit-%s' % platform,
+                   'builddir': 'nanojit-%s' % platform,
+                   'slavenames': slaves,
+                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                   'factory': f,
+                   'category': 'idle',
+                  }
+        builders.append(builder)
+        nomergeBuilders.append(builder)
+
+    # Set up polling
+    poller = HgPoller(
+            hgURL=config['hgurl'],
+            branch=config['repo_path'],
+            pollInterval=5*60,
+            )
+
+    # Set up scheduler
+    scheduler = Scheduler(
+            name="nanojit",
+            branch=config['repo_path'],
+            treeStableTimer=None,
+            builderNames=[b['name'] for b in builders],
+            )
+
+    # Tinderbox notifier
+    tbox_mailer = TinderboxMailNotifier(
+        fromaddr="mozilla2.buildbot@build.mozilla.org",
+        tree=config['tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=[b['name'] for b in builders],
+        logCompression="gzip",
+    )
+
+    return {
+            'builders': builders,
+            'change_source': [poller],
+            'schedulers': [scheduler],
+            'status': [tbox_mailer],
+            }
+
+def generateProjectObjects(project, config, SLAVES):
     builders = []
     schedulers = []
     change_sources = []
@@ -2356,11 +2426,17 @@ def generateMiscObjects(config, SLAVES):
             'status': status,
             'change_source': change_sources,
             }
+
     # Fuzzing
-    if config.get('fuzzing'):
-        fuzzingObjects = generateFuzzingObjects(config['fuzzing'], SLAVES)
-        for k, v in fuzzingObjects.items():
-            buildObjects[k].extend(v)
+    if project == 'fuzzing':
+        fuzzingObjects = generateFuzzingObjects(config, SLAVES)
+        buildObjects = mergeBuildObjects(buildObjects, fuzzingObjects)
+
+    # Nanojit
+    elif project == 'nanojit':
+        nanojitObjects = generateNanojitObjects(config, SLAVES)
+        buildObjects = mergeBuildObjects(buildObjects, nanojitObjects)
+
     return buildObjects
 
 def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
