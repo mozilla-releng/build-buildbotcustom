@@ -7901,7 +7901,8 @@ class AndroidBuildFactory(MobileBuildFactory):
 
 class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
-            extra_data=None, extra_args=None):
+            extra_data=None, extra_args=None,
+            script_timeout=1200, script_maxtime=None):
         BuildFactory.__init__(self)
 
         env = {'PROPERTIES_FILE': 'buildprops.json'}
@@ -7928,7 +7929,8 @@ class ScriptFactory(BuildFactory):
         if extra_args:
             cmd.extend(extra_args)
 
-        self.addStep(ShellCommand(name="run_script", command=cmd, env=env))
+        self.addStep(ShellCommand(name="run_script", command=cmd, env=env,
+            timeout=script_timeout, maxTime=script_maxtime))
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
     def __init__(self, **kwargs):

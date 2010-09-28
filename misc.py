@@ -2327,6 +2327,8 @@ def generateFuzzingObjects(config, SLAVES):
     f = ScriptFactory(
             config['scripts_repo'],
             'scripts/fuzzing/fuzzer.sh',
+            script_timeout=1500,
+            script_maxtime=1800,
             )
     for platform in config['platforms']:
         env = MozillaEnvironments.get("%s-unittest" % platform, {}).copy()
