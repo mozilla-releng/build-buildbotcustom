@@ -6626,7 +6626,7 @@ class TalosFactory(BuildFactory):
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             talosAddOns=[], addonTester=False,
-            cvsRoot=":pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot"):
+            cvsRoot=":pserver:anonymous@dm-cvs02.mozilla.org:/cvsroot"):
 
         BuildFactory.__init__(self)
 
