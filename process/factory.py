@@ -6581,6 +6581,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
             self.addStep(ShellCommand(
                 name='disable_screensaver',
                 command=['xset', 's', 'reset'],
+                env=self.env,
             ))
 
     def addRunTestSteps(self):
