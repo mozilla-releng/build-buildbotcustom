@@ -27,7 +27,7 @@ def tryChooser(s, all_changes):
         for p in push:
             pd = push[p]
             changes = pd['changesets']
-            for change in changes:
+            for change in reversed(changes):
                 match = re.search("try:", change['desc'])
                 if match:
                     return change['desc'].encode("utf8", "replace")
