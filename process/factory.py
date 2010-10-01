@@ -6660,8 +6660,7 @@ class TalosFactory(BuildFactory):
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
-            talosAddOns=[], addonTester=False,
-            cvsRoot=":pserver:anonymous@dm-cvs02.mozilla.org:/cvsroot"):
+            talosAddOns=[], addonTester=False):
 
         BuildFactory.__init__(self)
 
@@ -6677,7 +6676,6 @@ class TalosFactory(BuildFactory):
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
-        self.cvsRoot = cvsRoot
         self.fetchSymbols = fetchSymbols
         self.plugins = plugins
         self.pageset = pageset
@@ -6880,16 +6878,14 @@ class TalosFactory(BuildFactory):
             )
 
         if self.customTalos is None:
-            self.addStep(ShellCommand(
-             name='checkout_talos',
-             command=["cvs", "-d", self.cvsRoot, "co", "-d", "talos",
-                      "mozilla/testing/performance/talos"],
+            self.addStep(DownloadFile(
+              url="%s/zips/talos.zip" % self.supportUrlBase,
+              workdir=self.workdirBase,
+            ))
+            self.addStep(UnpackFile(
+             filename='talos.zip',
              workdir=self.workdirBase,
-             description="checking out talos",
-             haltOnFailure=True,
-             flunkOnFailure=True,
-             env=self.env)
-            )
+            ))
             self.addStep(DownloadFile(
              url="%s/xpis/pageloader.xpi" % self.supportUrlBase,
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
