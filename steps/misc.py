@@ -400,6 +400,46 @@ class UnpackFile(ShellCommand):
 
         return SUCCESS
 
+class UnpackTest(ShellCommand):
+    def __init__(self, filename, testtype, scripts_dir=".", **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
+        self.filename = filename
+        self.scripts_dir = scripts_dir
+        self.testtype = testtype
+        self.addFactoryArguments(filename=filename, testtype=testtype, scripts_dir=scripts_dir)
+
+    def start(self):
+        filename = self.build.getProperties().render(self.filename)
+        self.filename = filename
+        if filename.endswith(".zip"):
+            # modify the commands to extract only the files we need - the test directory and bin/ and certs/
+            if self.testtype == "mochitest":
+                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'mochitest*'])
+            elif self.testtype == "xpcshell":
+                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'xpcshell*'])
+            elif self.testtype == "jsreftest":
+                # jsreftest needs both jsreftest/ and reftest/ in addition to bin/ and certs/
+                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'jsreftest*', 'reftest*'])
+            elif self.testtype == "reftest":
+                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'reftest*'])
+            else:
+                # If it all fails, we extract the whole shebang
+                self.setCommand(['unzip', '-o', filename])
+        else:
+            # TODO: The test package is .zip across all three platforms, so we're special casing for that
+            raise ValueError("Don't know how to handle %s" % filename)
+        self.super_class.start(self)
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        if superResult != SUCCESS:
+            return superResult
+        if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
+            return FAILURE
+
+        return SUCCESS
+
 class FindFile(ShellCommand):
     def __init__(self, filename, directory, max_depth, property_name, filetype=None, **kwargs):
         ShellCommand.__init__(self, **kwargs)

@@ -36,7 +36,7 @@ reload(buildbotcustom.common)
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
-  RepackPartners
+  RepackPartners, UnpackTest
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
 from buildbotcustom.steps.source import EvaluatingMercurial, \
   MercurialCloneCommand
@@ -6517,12 +6517,6 @@ class MozillaTestFactory(MozillaBuildFactory):
             haltOnFailure=True,
             name='download tests',
         ))
-        # Unpack the tests
-        self.addStep(UnpackFile(
-            filename=WithProperties('%(tests_filename)s'),
-            haltOnFailure=True,
-            name='unpack tests',
-        ))
 
     def addIdentifySteps(self):
         '''This function knows how to figure out which build this actually is
@@ -6589,6 +6583,14 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         for suite in self.test_suites:
             leak_threshold = self.leak_thresholds.get(suite, None)
             if suite.startswith('mochitest'):
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='mochitest',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
+
                 variant = suite.split('-', 1)[1]
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
@@ -6601,16 +6603,48 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  maxTime=90*60, # One and a half hours, to allow for slow minis
                 ))
             elif suite == 'xpcshell':
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='xpcshell',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
+
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
                  platform=self.platform,
                  symbols_path='symbols',
                  maxTime=120*60, # Two Hours
                 ))
-            elif suite in ('reftest', 'reftest-d2d', 'crashtest', 'jsreftest', \
+            elif suite in ('jsreftest', ):
+                # Specialized runner for jsreftest because they take so long to unpack and clean up
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='jsreftest',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
+ 
+                self.addStep(unittest_steps.MozillaPackagedReftests(
+                 suite=suite,
+                 env=self.env,
+                 leakThreshold=leak_threshold,
+                 symbols_path='symbols',
+                 maxTime=2*60*60, # Two Hours
+                ))
+            elif suite in ('reftest', 'reftest-d2d', 'crashtest', \
                            'direct3D', 'opengl'):
                 if suite in ('direct3D', 'opengl'):
                     self.env.update({'MOZ_ACCELERATED':'11'})
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='reftest',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
                  env=self.env,
