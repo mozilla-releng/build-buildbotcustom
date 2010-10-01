@@ -7899,10 +7899,24 @@ class AndroidBuildFactory(MobileBuildFactory):
         if self.createSnippet:
             self._uploadSnippet()
 
+def rc_eval_func(exit_statuses):
+    def eval_func(cmd, step):
+        if cmd.rc in exit_statuses:
+            return exit_statuses[cmd.rc]
+        # Use None to specify a default value if you don't want the
+        # normal 0 -> SUCCESS, != 0 -> FAILURE
+        elif None in exit_statuses:
+            return exit_statuses[None]
+        elif cmd.rc == 0:
+            return SUCCESS
+        else:
+            return FAILURE
+    return eval_func
+
 class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
             extra_data=None, extra_args=None,
-            script_timeout=1200, script_maxtime=None):
+            script_timeout=1200, script_maxtime=None, log_eval_func=None):
         BuildFactory.__init__(self)
 
         env = {'PROPERTIES_FILE': 'buildprops.json'}
@@ -7930,7 +7944,9 @@ class ScriptFactory(BuildFactory):
             cmd.extend(extra_args)
 
         self.addStep(ShellCommand(name="run_script", command=cmd, env=env,
-            timeout=script_timeout, maxTime=script_maxtime))
+            timeout=script_timeout, maxTime=script_maxtime,
+            log_eval_func=log_eval_func,
+            warnOnWarnings=True))
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
     def __init__(self, **kwargs):

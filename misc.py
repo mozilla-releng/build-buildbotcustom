@@ -15,6 +15,7 @@ from twisted.internet.task import LoopingCall
 from buildbot.scheduler import Nightly, Scheduler
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
 
 import buildbotcustom.changes.hgpoller
 import buildbotcustom.process.factory
@@ -40,7 +41,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
-  TryUnittestBuildFactory, ScriptFactory
+  TryUnittestBuildFactory, ScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import MaemoBuildFactory, \
    MaemoNightlyRepackFactory, MobileDesktopBuildFactory, \
    MobileDesktopNightlyRepackFactory, \
@@ -2373,6 +2374,7 @@ def generateNanojitObjects(config, SLAVES):
                 config['scripts_repo'],
                 'scripts/nanojit/nanojit.sh',
                 interpreter=interpreter,
+                log_eval_func=rc_eval_func({1: WARNINGS}),
                 )
 
         builder = {'name': 'nanojit-%s' % platform,
