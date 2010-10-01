@@ -25,8 +25,7 @@
 #   Alice Nodelman <anodelman@mozilla.com>
 # ***** END LICENSE BLOCK *****
 
-from buildbot.steps.shell import ShellCommand
-from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS
+from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, worst_status
 from buildbot.process.buildstep import BuildStep
 
 from twisted.internet.defer import DeferredList, Deferred
@@ -43,6 +42,8 @@ import signal
 from os import path
 import string
 
+from buildbotcustom.steps.base import ShellCommand
+
 class AliveTest(ShellCommand):
     name = "alive test"
     description = ["alive test"]
@@ -51,7 +52,8 @@ class AliveTest(ShellCommand):
     warnOnFailure = True
 
     def __init__(self, extraArgs=None, logfile=None, **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
 
         self.addFactoryArguments(extraArgs=extraArgs,
                                  logfile=logfile)
@@ -121,7 +123,8 @@ class CompareBloatLogs(ShellCommand):
     def __init__(self, bloatLog, testname="", testnameprefix="",
                        bloatDiffPath="tools/rb/bloatdiff.pl",
                        mozillaDir="", tbPrint=True, **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(bloatLog=bloatLog, testname=testname,
                                  testnameprefix=testnameprefix,
                                  bloatDiffPath=bloatDiffPath,
@@ -143,14 +146,14 @@ class CompareBloatLogs(ShellCommand):
                         self.bloatLog]
 
     def evaluateCommand(self, cmd):
-        superResult = ShellCommand.evaluateCommand(self, cmd)
+        superResult = self.super_class.evaluateCommand(self, cmd)
         try:
             leaks = self.getProperty('leaks')
         except:
             log.msg("Could not find build property: leaks")
-            return FAILURE
+            return worst_status(superResult, FAILURE)
         if leaks and int(leaks) > 0:
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
         return superResult
             
     def createSummary(self, log):
@@ -205,7 +208,8 @@ class CompareLeakLogs(ShellCommand):
                  tbPrint=True, **kwargs):
         assert platform.startswith('win32') or platform.startswith('macosx') \
           or platform.startswith('linux')
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(platform=platform, mallocLog=mallocLog,
                                  leakFailureThreshold=leakFailureThreshold,
                                  testname=testname,
@@ -234,17 +238,17 @@ class CompareLeakLogs(ShellCommand):
                             self.mallocLog]
 
     def evaluateCommand(self, cmd):
-        superResult = ShellCommand.evaluateCommand(self, cmd)
+        superResult = self.super_class.evaluateCommand(self, cmd)
         try:
             leakStats = self.getProperty('leakStats')
         except:
             log.msg("Could not find build property: leakStats")
-            return FAILURE
+            return worst_status(superResult, FAILURE)
         if leakStats and \
            leakStats['new'] and \
            leakStats['new']['leaks'] and \
            int(leakStats['new']['leaks']) > int(self.leakFailureThreshold):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
         return superResult
             
     def createSummary(self, log):
@@ -324,7 +328,8 @@ class CompareLeakLogs(ShellCommand):
 
 class Codesighs(ShellCommand):
     def __init__(self, objdir, platform, type='auto', tbPrint=True, **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(objdir=objdir, platform=platform, type=type, tbPrint=tbPrint)
 
         assert platform in ('win32', 'macosx', 'macosx64', 'linux', 'linux64')
@@ -481,7 +486,7 @@ class GraphServerPost(BuildStep):
         if self.error:
             self.step_status.setText(["Automation", "Error:", "failed", "graph", "server", "post"])
             self.step_status.setText2(["Automation", "Error:", "failed", "graph", "server", "post"])
-            self.finished(FAILURE)
+            self.finished(EXCEPTION)
         else:
             self.step_status.setText(["graph", "server", "post", "ok"])
             self.finished(SUCCESS)

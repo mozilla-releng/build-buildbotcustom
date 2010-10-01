@@ -1,10 +1,9 @@
 import re
 
-from buildbot.steps.shell import ShellCommand
-  
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, \
   EXCEPTION
 
+from buildbotcustom.steps.base import ShellCommand
 import buildbotcustom.steps.unittest
 reload(buildbotcustom.steps.unittest)
 from buildbotcustom.steps.unittest import emphasizeFailureText, summaryText
@@ -25,7 +24,7 @@ class MobileParseTestLog(ShellCommand):
             command = ['python', 'maemkit-chunked.py',
                           '--testtype=%s' % name],
 
-        ShellCommand.__init__(self, timeout=timeout, command=command, **kwargs)
+        self.super_class.__init__(self, timeout=timeout, command=command, **kwargs)
 
         self.addFactoryArguments(command=command, timeout=timeout,
                                  knownFailCount=knownFailCount)

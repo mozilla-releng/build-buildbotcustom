@@ -5,13 +5,14 @@ import urllib
 
 from twisted.python import log
 
+from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.process.factory import BuildFactory
-from buildbot.steps import trigger
-from buildbot.steps.shell import ShellCommand, WithProperties, SetProperty
-from buildbot.steps.source import Mercurial
+from buildbot.steps.shell import WithProperties
 from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, JSONStringDownload
 from buildbot import locks
 
+import buildbotcustom.status.errors
+import buildbotcustom.steps.base
 import buildbotcustom.steps.misc
 import buildbotcustom.steps.release
 import buildbotcustom.steps.source
@@ -22,6 +23,8 @@ import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
 import buildbotcustom.env
 import buildbotcustom.common
+reload(buildbotcustom.status.errors)
+reload(buildbotcustom.steps.base)
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.release)
 reload(buildbotcustom.steps.source)
@@ -33,13 +36,15 @@ reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 reload(buildbotcustom.common)
 
+from buildbotcustom.status.errors import purge_error
+from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
+  Trigger
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
   RepackPartners, UnpackTest
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
-from buildbotcustom.steps.source import EvaluatingMercurial, \
-  MercurialCloneCommand
+from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
 from buildbotcustom.steps.transfer import MozillaStageUpload
@@ -368,6 +373,7 @@ class MozillaBuildFactory(BuildFactory):
              haltOnFailure=True,
              workdir='.',
              timeout=3600, # One hour, because Windows is slow
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error)
             )
 
     def addTriggeredBuildsSteps(self,
@@ -382,7 +388,7 @@ class MozillaBuildFactory(BuildFactory):
             triggeredSchedulers = self.triggeredSchedulers
 
         for triggeredScheduler in triggeredSchedulers:
-            self.addStep(trigger.Trigger(
+            self.addStep(Trigger(
                 schedulerNames=[triggeredScheduler],
                 waitForFinish=False))
 
@@ -693,7 +699,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
     def addSourceSteps(self):
         if self.hgHost.startswith('ssh'):
-            self.addStep(EvaluatingMercurial(
+            self.addStep(Mercurial(
              name='hg_ssh_clone',
              mode='update',
              baseURL= '%s/' % self.hgHost,
@@ -701,7 +707,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=60*60, # 1 hour
             ))
         else:
-            self.addStep(EvaluatingMercurial,
+            self.addStep(Mercurial,
              name='hg_update',
              mode='update',
              baseURL='http://%s/' % self.hgHost,
@@ -1302,7 +1308,7 @@ class TryBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(EvaluatingMercurial,
+        self.addStep(Mercurial,
          name='hg_update',
          mode='clobber',
          baseURL='http://%s/' % self.hgHost,
@@ -1665,7 +1671,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(EvaluatingMercurial, 
+        self.addStep(Mercurial, 
          name='hg_update',
          mode='update',
          baseURL='http://%s/' % self.hgHost,
@@ -4311,7 +4317,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
     def trigger(self):
         if self.triggerSchedulers:
-            self.addStep(trigger.Trigger(
+            self.addStep(Trigger(
              schedulerNames=self.triggerSchedulers,
              waitForFinish=False
             ))
@@ -4581,7 +4587,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStep(EvaluatingMercurial,
+        self.addStep(Mercurial,
          name='hg_update',
          mode='update',
          baseURL='http://%s/' % self.hgHost,
@@ -4923,7 +4929,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStep(EvaluatingMercurial, mode='update',
+        self.addStep(Mercurial, mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          alwaysUseLatest=True,
@@ -5632,7 +5638,7 @@ class MobileBuildFactory(MozillaBuildFactory):
 
     def addBaseRepoSteps(self):
         if self.enable_try:
-            self.addStep(EvaluatingMercurial(
+            self.addStep(Mercurial(
                 name='hg_update',
                 mode='clobber',
                 baseURL='http://%s/' % self.hgHost,

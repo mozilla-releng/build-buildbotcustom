@@ -2,8 +2,8 @@ from os import path
 from time import strftime, strptime
 
 import buildbot
-from buildbot.steps.shell import ShellCommand
 from buildbotcustom.common import getSupportedPlatforms
+from buildbotcustom.steps.base import ShellCommand
 
 class MozillaStageUpload(ShellCommand):
     def __init__(self, objdir, username, milestone, platform, remoteHost,

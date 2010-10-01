@@ -1,6 +1,8 @@
 import re, os, time, copy
-from buildbot.steps.shell import ShellCommand, WithProperties
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
+from buildbot.steps.shell import WithProperties
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, worst_status
+
+from buildbotcustom.steps.base import ShellCommand
 
 class MozillaUpdateConfig(ShellCommand):
     """Configure YAML file for run_tests.py"""
@@ -21,15 +23,15 @@ class MozillaUpdateConfig(ShellCommand):
         self.extName = extName
         self.addonTester = addonTester
 
-
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
 
         self.addFactoryArguments(branch=branch, addOptions=addOptions,
                 branchName=branchName, executablePath=executablePath,
                 useSymbols=useSymbols, extName=extName, addonTester=addonTester)
 
     def setBuild(self, build):
-        ShellCommand.setBuild(self, build)
+        self.super_class.setBuild(self, build)
         title = build.slavename
         #if we are an addonTester then the addonName/addonUrl build property should be set
         #  if it's not set this will throw a key error and the run will go red - which should be the expected result
@@ -45,9 +47,9 @@ class MozillaUpdateConfig(ShellCommand):
             '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
-        superResult = ShellCommand.evaluateCommand(self, cmd)
+        superResult = self.super_class.evaluateCommand(self, cmd)
         if SUCCESS != superResult:
-            return FAILURE
+            return superResult
         stdioText = cmd.logs['stdio'].getText()
         if None != re.search('ERROR', stdioText):
             return FAILURE
@@ -63,6 +65,9 @@ class MozillaUpdateConfig(ShellCommand):
 class MozillaRunPerfTests(ShellCommand):
     """Run the performance tests"""
     name = "Run performance tests"
+    def __init__(self, **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
 
     def createSummary(self, log):
         summary = []
@@ -74,10 +79,10 @@ class MozillaRunPerfTests(ShellCommand):
         self.addCompleteLog('summary', "\n".join(summary))
 
     def evaluateCommand(self, cmd):
-        superResult = ShellCommand.evaluateCommand(self, cmd)
+        superResult = self.super_class.evaluateCommand(self, cmd)
         stdioText = cmd.logs['stdio'].getText()
         if SUCCESS != superResult:
-            return FAILURE
+            return superResult
         if None != re.search('ERROR', stdioText):
             return FAILURE
         if None != re.search('USAGE:', stdioText):

@@ -31,14 +31,13 @@ from urlparse import urljoin, urlparse
 from twisted.python import log
 from twisted.internet import reactor
 
-from buildbot.steps.shell import ShellCommand
 from buildbot.steps.transfer import FileDownload
 from buildbot.process.buildstep import BuildStep
 from buildbot.sourcestamp import SourceStamp
 from buildbot.buildset import BuildSet
-from buildbot.status.builder import SUCCESS, SKIPPED, WARNINGS
+from buildbot.status.builder import SUCCESS, SKIPPED, WARNINGS, worst_status
 
-from buildbotcustom.steps.source import EvaluatingMercurial
+from buildbotcustom.steps.base import Mercurial, ShellCommand
 
 def parseSendchangeArguments(args):
     """This function parses the arguments that the Buildbot patch uploader
@@ -291,17 +290,17 @@ class MozillaUploadTryBuild(ShellCommand):
         self.super_class.start(self)
 
 
-class MozillaTryServerHgClone(EvaluatingMercurial):
+class MozillaTryServerHgClone(Mercurial):
     haltOnFailure = True
     flunkOnFailure = True
     
     def __init__(self, baseURL="http://hg.mozilla.org/", mode='clobber',
                  defaultBranch='mozilla-central', timeout=3600, **kwargs):
         # repourl overridden in startVC
-        EvaluatingMercurial.__init__(self, baseURL=baseURL, mode=mode,
+        Mercurial.__init__(self, baseURL=baseURL, mode=mode,
                                      defaultBranch=defaultBranch,
                                      timeout=timeout, **kwargs)
-        self.super_class = EvaluatingMercurial
+        self.super_class = Mercurial
 
     def startVC(self, branch, revision, patch):
         if branch == 'PATCH_TRY' or branch == 'HG_TRY':
@@ -405,5 +404,5 @@ class MozillaCreateUploadDirectory(ShellCommand):
     def evaluateCommand(self, cmd):
         result = self.super_class.evaluateCommand(self, cmd)
         if None != re.search('File exists', cmd.logs['stdio'].getText()):
-            result = SUCCESS
+            result = worst_status(result, SUCCESS)
         return result

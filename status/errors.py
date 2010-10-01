@@ -2,6 +2,8 @@ import re
 
 from buildbot.status.builder import EXCEPTION, RETRY
 
-hg_errors = ((re.compile("abort: HTTP Error \d{3}"), RETRY),
+global_errors = ((re.compile("No space left on device"), RETRY),)
+hg_errors = ((re.compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re.compile("abort: .*: no match found!"), RETRY)
             )
+purge_error = ((re.compile("Error: unable to free"), RETRY),)

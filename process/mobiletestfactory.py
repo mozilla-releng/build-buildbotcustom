@@ -1,8 +1,7 @@
 import re
 
 from buildbot.process.factory import BuildFactory
-from buildbot.steps.shell import Compile, ShellCommand, WithProperties, \
-  SetProperty
+from buildbot.steps.shell import WithProperties
 from buildbot.changes import base, changes
 
 import buildbotcustom.steps.misc
@@ -11,6 +10,7 @@ import buildbotcustom.steps.mobile
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.mobile)
+from buildbotcustom.steps.base import ShellCommand, SetProperty
 from buildbotcustom.steps.misc import FindFile, DownloadFile, UnpackFile, \
   DisconnectStep
 from buildbotcustom.steps.talos import MozillaRunPerfTests

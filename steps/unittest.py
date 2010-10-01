@@ -27,8 +27,10 @@
 
 import re
 
-from buildbot.steps.shell import ShellCommand, WithProperties
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, HEADER
+from buildbot.steps.shell import WithProperties
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, HEADER, worst_status
+
+from buildbotcustom.steps.base import ShellCommand
 
 cvsCoLog = "cvsco.log"
 tboxClobberCvsCoLog = "tbox-CLOBBER-cvsco.log"
@@ -186,12 +188,12 @@ class ShellCommandReportTimeout(ShellCommand):
                                     "TinderboxPrint: " + self.name + "<br/>" +
                                     emphasizeFailureText("timeout") + "\n")
                 # We don't need to print a second error if we timed out
-                return WARNINGS
+                return worst_status(superResult, WARNINGS)
 
         if cmd.rc != 0:
             self.addCompleteLog('error',
               'Unknown Error: command finished with exit code: %d' % cmd.rc)
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
         return superResult
 
@@ -345,20 +347,20 @@ class MozillaCheck(ShellCommandReportTimeout):
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
         if superResult != SUCCESS:
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
         # Xpcshell tests (only):
         # Assume that having the "Failed: 0" line
         # means the tests run completed (successfully).
         if 'xpcshell' in self.name and \
            not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)
 
     
 class MozillaReftest(ShellCommandReportTimeout):
@@ -384,16 +386,16 @@ class MozillaReftest(ShellCommandReportTimeout):
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
         if superResult != SUCCESS:
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
         # Assume that having the "Unexpected: 0" line
         # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)
 
 
 class MozillaMochitest(ShellCommandReportTimeout):
@@ -419,7 +421,7 @@ class MozillaMochitest(ShellCommandReportTimeout):
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
         if superResult != SUCCESS:
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
         failIdent = r"^\d+ INFO Failed: 0"
         # Support browser-chrome result summary format which differs
@@ -431,9 +433,9 @@ class MozillaMochitest(ShellCommandReportTimeout):
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)
 
 
 class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
@@ -475,9 +477,9 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)
 
 
 class MozillaPackagedMochitests(ShellCommandReportTimeout):
@@ -543,9 +545,9 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)
 
 
 class MozillaPackagedReftests(ShellCommandReportTimeout):
@@ -599,6 +601,6 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
         if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
            re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
+            return worst_status(superResult, WARNINGS)
 
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)

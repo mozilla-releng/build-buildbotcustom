@@ -34,11 +34,12 @@ import os
 import buildbot
 import re
 
-from buildbot.process.buildstep import LoggedRemoteCommand, LoggingBuildStep, \
-  BuildStep
-from buildbot.steps.shell import ShellCommand, WithProperties
-from buildbot.status.builder import FAILURE, SUCCESS
+from buildbot.process.buildstep import LoggedRemoteCommand, BuildStep
+from buildbot.steps.shell import WithProperties
+from buildbot.status.builder import FAILURE, SUCCESS, worst_status
 from buildbot.clients.sendchange import Sender
+
+from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand
 
 def errbackAfter(wrapped_d, timeout):
     # Thanks to Dustin!
@@ -98,7 +99,8 @@ class CreateDir(ShellCommand):
     warnOnFailure = True
 
     def __init__(self, platform, dir=None, **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(platform=platform, dir=dir)
         self.platform = platform
         if dir:
@@ -119,7 +121,8 @@ class TinderboxShellCommand(ShellCommand):
        passed, all exit codes will be ignored.
     """
     def __init__(self, ignoreCodes=None, **kwargs):
-       ShellCommand.__init__(self, **kwargs)
+       self.super_class = ShellCommand
+       self.super_class.__init__(self, **kwargs)
        self.addFactoryArguments(ignoreCodes=ignoreCodes)
        self.ignoreCodes = ignoreCodes
     
@@ -170,7 +173,8 @@ class GetBuildID(ShellCommand):
 
     def __init__(self, objdir="", inifile="application.ini", section="App",
             **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(objdir=objdir,
                                  inifile=inifile,
                                  section=section)
@@ -329,7 +333,8 @@ class DownloadFile(ShellCommand):
             self.wget_args = wget_args
         else:
             self.wget_args = ['--progress=dot:mega']
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(url_fn=url_fn, url=url,
                 url_property=url_property, filename_property=filename_property,
                 ignore_certs=ignore_certs, wget_args=wget_args)
@@ -354,12 +359,12 @@ class DownloadFile(ShellCommand):
             self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", url])
         else:
             self.setCommand(["wget"] + self.wget_args + ["-N", url])
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
     def evaluateCommand(self, cmd):
-        superResult = ShellCommand.evaluateCommand(self, cmd)
+        superResult = self.super_class.evaluateCommand(self, cmd)
         if SUCCESS != superResult:
-            return FAILURE
+            return superResult
         if None != re.search('ERROR', cmd.logs['stdio'].getText()):
             return FAILURE
         return SUCCESS
@@ -370,7 +375,8 @@ class UnpackFile(ShellCommand):
     def __init__(self, filename, scripts_dir=".", **kwargs):
         self.filename = filename
         self.scripts_dir = scripts_dir
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(filename=filename, scripts_dir=scripts_dir)
 
     def start(self):
@@ -389,11 +395,11 @@ class UnpackFile(ShellCommand):
             )
         else:
             raise ValueError("Don't know how to handle %s" % filename)
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
     def evaluateCommand(self, cmd):
-        superResult = ShellCommand.evaluateCommand(self, cmd)
-        if superResult != SUCCESS:
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        if SUCCESS != superResult:
             return superResult
         if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
             return FAILURE
@@ -442,7 +448,8 @@ class UnpackTest(ShellCommand):
 
 class FindFile(ShellCommand):
     def __init__(self, filename, directory, max_depth, property_name, filetype=None, **kwargs):
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
 
         self.addFactoryArguments(filename=filename, directory=directory,
                 max_depth=max_depth, property_name=property_name,
@@ -460,14 +467,17 @@ class FindFile(ShellCommand):
         self.setCommand(['bash', '-c', 'find %(directory)s -maxdepth %(max_depth)s %(filetype)s -name %(filename)s' % locals()])
 
     def evaluateCommand(self, cmd):
+        worst = self.super_class.evaluateCommand(self, cmd)
         try:
             output = cmd.logs['stdio'].getText().strip()
             if output:
                 self.setProperty(self.property_name, output)
-                return SUCCESS
+                worst = worst_status(worst, SUCCESS)
+            else:
+                worst = worst_status(worst, FAILURE)
         except:
             pass
-        return FAILURE
+        return worst
 
 class MozillaClobberer(ShellCommand):
     flunkOnFailure = False
@@ -594,7 +604,8 @@ class DisconnectStep(ShellCommand):
     name = "disconnect"
     def __init__(self, force_disconnect=None, **kwargs):
         self.force_disconnect = force_disconnect
-        ShellCommand.__init__(self, **kwargs)
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(force_disconnect=force_disconnect)
 
         self._disconnected = False
@@ -634,7 +645,7 @@ class DisconnectStep(ShellCommand):
         if self._disconnected:
             self.step_status.setText(self.describe(True) + ["slave", "lost"])
             self.step_status.setText2(['slave', 'lost'])
-        return ShellCommand.finished(self, res)
+        return self.super_class.finished(self, res)
 
 class RepackPartners(ShellCommand):
     '''This step allows a regular ShellCommand to be optionally extended
@@ -642,6 +653,9 @@ class RepackPartners(ShellCommand):
        to be run based on, e.g., properties supplied by the user in the 
        force builds web interface.
     '''
+    def __init__(self, **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
     def start(self):
         try:
             properties = self.build.getProperties()
@@ -651,7 +665,7 @@ class RepackPartners(ShellCommand):
         except:
             # No partner was specified, so repacking all partners.
             pass
-        ShellCommand.start(self)
+        self.super_class.start(self)
 
             
         
