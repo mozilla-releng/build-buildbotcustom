@@ -5379,7 +5379,13 @@ class MobileBuildFactory(MozillaBuildFactory):
                  clobber=False, env=None,
                  tinderboxBuildsDir=None,
                  mobileRevision='default',
-                 mozRevision='default', **kwargs):
+                 mozRevision='default',
+                 createSnippet=False, ausUser=None,
+                 ausSshKey=None, ausBaseUploadDir=None,
+                 updatePlatform=None, ausHost=None,
+                 downloadBaseURL=None, ausPreviousUploadDir=None,
+                 ausFullUploadDir=None,
+                 **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm)
@@ -5417,6 +5423,29 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.baseUploadDir = self.mobileBranchName
         else:
             self.baseUploadDir = baseUploadDir
+
+        self.createSnippet = createSnippet
+        if createSnippet:
+            assert ausBaseUploadDir or (ausFullUploadDir and ausPreviousUploadDir)
+            assert updatePlatform and downloadBaseURL
+            assert ausUser and ausSshKey and ausHost
+            self.ausBaseUploadDir = ausBaseUploadDir
+            self.updatePlatform = updatePlatform
+            self.downloadBaseURL = downloadBaseURL
+            self.ausUser = ausUser
+            self.ausSshKey = ausSshKey
+            self.ausHost = ausHost
+            if ausPreviousUploadDir:
+                self.ausPreviousUploadDir = ausPreviousUploadDir
+            else:
+                self.ausPreviousUploadDir = "%s/%s/%%(previous_buildid)s/en-US" % \
+                  (self.ausBaseUploadDir, self.updatePlatform)
+            if ausFullUploadDir:
+                self.ausFullUploadDir = ausFullUploadDir
+            else:
+                self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
+                                        (self.ausBaseUploadDir,
+                                        self.updatePlatform)
 
         self.mozChangesetLink = '<a href=%s/rev' % (self.repository)
         self.mozChangesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
@@ -5530,6 +5559,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                 haltOnFailure=True
             )
 
+    def addUpdateSteps(self):
+        pass
 
     def addUploadSteps(self, platform):
         self.addStep(SetProperty,
@@ -7346,6 +7377,8 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
+        if self.createSnippet:
+            self.addUpdateSteps()
         self.addSymbolSteps()
         self.addUploadSteps(platform=self.uploadPlatform)
         if self.triggerBuilds:
@@ -7418,44 +7451,234 @@ class AndroidBuildFactory(MobileBuildFactory):
         #    haltOnFailure=True,
         # )
 
-    def addUploadSteps(self, platform):
+    def getPreviousApk(self):
+        self.addStep(ShellCommand(
+            name='get_previous_apk',
+            description=['get', 'previous', 'apk'],
+            command=['bash', '-c', 'wget -O previous.apk %s/nightly/%s/fennec.apk' % \
+              (self.downloadBaseURL, self.latestDir)],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True
+        ))
+
+    def getPreviousBuildID(self):
+        self.getPreviousApk()
+        self.addStep(SetProperty(
+            name='test_previous_apk',
+            property='previousApk',
+            command=['ls', 'previous.apk'],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+            name='unzip_previous_apk',
+            command=['unzip', '-o', 'previous.apk', 'application.ini'],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'previous', 'buildid'],
+            descriptionDone=['got', 'previous', 'buildid'],
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True,
+        ))
+        self.addStep(SetProperty,
+            name='get_previous_buildid',
+            command=['python', 'config/printconfigsetting.py',
+                     'application.ini', 'App', 'BuildID'],
+            property='previous_buildid',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'previous', 'buildid'],
+            descriptionDone=['got', 'previous', 'buildid'],
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True,
+        )
+
+
+    def _createSnippet(self):
+        """Split out to override in release factory."""
+        self.addStep(CreateCompleteUpdateSnippet(
+            name='create_complete_update_snippet',
+            objdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                 self.objdir),
+            milestone=self.baseUploadDir,
+            baseurl='%s/nightly' % self.downloadBaseURL,
+            hashType=self.hashType)
+        )
+
+    def addUpdateSteps(self):
+        # Normally we'd make a mar first, but we'll create a snippet of
+        # the apk for now.
+        self.addFilePropertiesSteps(filename='fennec.apk',
+                                    directory='%s/%s/%s/embedding/android' % \
+                                      (self.baseWorkDir, self.branchName,
+                                       self.objdir),
+                                    fileType='completeMar',
+                                    haltOnFailure=True)
         self.addStep(SetProperty,
             name="get_buildid",
-            command=['python', '../config/printconfigsetting.py',
-                     'dist/bin/application.ini',
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/dist/bin/application.ini' % self.objdir,
                      'App', 'BuildID'],
             property='buildid',
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
-        self.addStep(MozillaStageUpload,
-            name="upload_to_stage",
-            description=['upload','to','stage'],
-            objdir=self.branchName,
-            username=self.stageUsername,
-            milestone=self.baseUploadDir,
-            remoteHost=self.stageServer,
-            remoteBasePath=self.stageBasePath,
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=self.nightly,
-            releaseToDated=self.nightly,
-            releaseToTinderboxBuilds=True,
-            tinderboxBuildsDir=self.baseUploadDir,
-            remoteCandidatesPath=self.stageBasePath,
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
+        self.addStep(SetProperty(
+            name="get_app_version",
+            command=['python', 'config/printconfigsetting.py',
+                     '%s/dist/bin/application.ini' % self.objdir,
+                     'App', 'Version'],
+            property='appVersion',
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            description=['getting', 'app', 'version'],
+            descriptionDone=['got', 'app', 'version']
+        ))
+        self._createSnippet()
+        self.addStep(ShellCommand,
+            name='cat_complete_snippet',
+            description=['cat','complete','snippet'],
+            command=['cat','complete.update.snippet'],
+            workdir='%s/%s/%s/dist/update' % (self.baseWorkDir,
+                                              self.branchName, self.objdir),
         )
 
-class AndroidReleaseBuildFactory(AndroidBuildFactory):
-    def __init__(self, **kwargs):
-        AndroidBuildFactory.__init__(self, **kwargs)
+    def unsetFilepath(self, rv, stdout, stderr):
+        return {'filepath': None}
+
+    def addFilePropertiesSteps(self, filename, directory, fileType,
+                               maxDepth=1, haltOnFailure=False):
+        '''From Coop's patch for the now-defunct WinmoBuildFactory.'''
+        self.addStep(FindFile(
+            name='find_filepath',
+            filename=filename,
+            directory=directory,
+            filetype='file',
+            max_depth=maxDepth,
+            property_name='filepath',
+            workdir='.',
+            haltOnFailure=haltOnFailure
+        ))
+        self.addStep(SetProperty,
+            command=['basename', WithProperties('%(filepath)s')],
+            property=fileType+'Filename',
+            workdir='.',
+            name='set_'+fileType.lower()+'_filename',
+            haltOnFailure=haltOnFailure
+        )
+        self.addStep(SetProperty,
+            command=['bash', '-c',
+                     WithProperties("ls -l %(filepath)s")],
+            workdir='.',
+            name='set_'+fileType.lower()+'_size',
+            extract_fn = self.parseFileSize(propertyName=fileType+'Size'),
+            haltOnFailure=haltOnFailure
+        )
+        self.addStep(SetProperty,
+            command=['bash', '-c',
+                     WithProperties('openssl ' + 'dgst -' + self.hashType +
+                                    ' %(filepath)s')],
+            workdir='.',
+            name='set_'+fileType.lower()+'_hash',
+            extract_fn=self.parseFileHash(propertyName=fileType+'Hash'),
+            haltOnFailure=haltOnFailure
+        )
+        self.addStep(SetProperty,
+            name='unset_filepath',
+            command='echo "filepath:"',
+            workdir=directory,
+            extract_fn = self.unsetFilepath,
+        )
+
+    def _uploadSnippet(self):
+        self.addStep(ShellCommand,
+            name='create_aus_previous_updir',
+            command=['ssh', '-l', self.ausUser, self.ausHost,
+                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
+                     WithProperties('mkdir -p %s' % self.ausPreviousUploadDir)],
+            description=['create', 'aus', 'upload', 'dir'],
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True,
+        )
+        self.addStep(ShellCommand,
+            name='upload_complete_snippet',
+            command=['scp', '-o', 'User=%s' % self.ausUser,
+                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
+                     'dist/update/complete.update.snippet',
+                     WithProperties("%s:'%s/complete.txt'" % \
+                       (self.ausHost, self.ausPreviousUploadDir))],
+            workdir='%s/%s/%s' % (self.baseWorkDir,
+                                  self.branchName, self.objdir),
+            description=['upload', 'complete', 'snippet'],
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True,
+        )
+        self.addStep(ShellCommand,
+            name='create_aus_current_updir',
+            command=['ssh', '-l', self.ausUser, self.ausHost,
+                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
+                     WithProperties('mkdir -p %s' % self.ausFullUploadDir)],
+            description=['create', 'aus', 'upload', 'dir'],
+            haltOnFailure=True
+        )
+        self.addStep(ShellCommand(
+            name='create_empty_snippets',
+            command=['ssh', '-l', self.ausUser, self.ausHost,
+                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
+                     WithProperties('touch %s/complete.txt %s/partial.txt %s' % \
+                       (self.ausFullUploadDir, self.ausFullUploadDir,
+                        self.ausFullUploadDir))],
+            description=['create', 'empty', 'snippets'],
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True,
+        ))
 
     def addUploadSteps(self, platform):
+        if self.createSnippet:
+            self.getPreviousBuildID()
+        MobileBuildFactory.addUploadSteps(self, platform)
+        if self.createSnippet:
+            self._uploadSnippet()
+
+class AndroidReleaseBuildFactory(AndroidBuildFactory):
+    def __init__(self, previousCandidateDir, currentCandidateDir, **kwargs):
+        self.previousCandidateDir = previousCandidateDir
+        self.currentCandidateDir = currentCandidateDir
+        AndroidBuildFactory.__init__(self, **kwargs)
+
+    def getPreviousApk(self):
+        self.addStep(ShellCommand(
+            name='get_previous_apk',
+            description=['get', 'previous', 'apk'],
+            command=['bash', '-c', 'wget -O previous.apk %s/%s/fennec.apk' % \
+                     (self.downloadBaseURL, self.previousCandidateDir)],
+            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+            flunkOnFailure=False,
+            haltOnFailure=False,
+            warnOnFailure=True
+        ))
+
+    def _createSnippet(self):
+        self.addStep(CreateCompleteUpdateSnippet(
+            name='create_complete_update_snippet',
+            objdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                                 self.objdir),
+            milestone=self.baseUploadDir,
+            appendDatedDir=False,
+            baseurl='%s/%s' % (self.downloadBaseURL, self.currentCandidateDir),
+            hashType=self.hashType)
+        )
+
+    def addUploadSteps(self, platform):
+        if self.createSnippet:
+            self.getPreviousBuildID()
         self.addStep(SetProperty,
             name="get_buildid",
             command=['python', '../config/printconfigsetting.py',
@@ -7497,3 +7720,5 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
             dependToDated=True,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
         )
+        if self.createSnippet:
+            self._uploadSnippet()
