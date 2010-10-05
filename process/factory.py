@@ -4295,6 +4295,9 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
             description=['symlink mar dir']
         ))
 
+    def createBuildNSnippets(self):
+        pass
+
     def uploadMars(self):
         pass
 
