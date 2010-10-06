@@ -7315,50 +7315,64 @@ class PartnerRepackFactory(ReleaseFactory):
         )
 
 class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
-    def __init__(self, **kwargs):
+    def __init__(self, buildNumber=None, version=None, **kwargs):
+        self.buildNumber = buildNumber
+        self.version = version
         MobileDesktopBuildFactory.__init__(self, **kwargs)
 
-    def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
+    def addMakeUploadSteps(self):
+        self.addStep(SetProperty(
+            name="get_buildid",
             command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % self.objdir,
+                     '%s/dist/bin/application.ini' % (self.objdir),
                      'App', 'BuildID'],
             property='buildid',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
-        )
-        self.addStep(ShellCommand,
+        ))
+        # From NightlyBuildFactory doUpload, but with altered workdir
+        # and with platform in the nightly dir.
+        # We should be able to get rid of this duplicate code with
+        # bug 557260.
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1',
+                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        # Always upload builds to the dated tinderbox builds directories
+        if self.tinderboxBuildsDir is None:
+            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
+        else:
+            tinderboxBuildsDir = self.tinderboxBuildsDir
+        postUploadCmd =  ['post_upload.py']
+        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
+                          '-p %s' % self.productName,
+                          '-v %s' % self.version,
+                          '-n %s' % self.buildNumber,
+                          '--release-to-candidates-dir']
+        uploadEnv['POST_UPLOAD_CMD'] = ' '.join(postUploadCmd)
+        self.addStep(ShellCommand(
          name='echo_buildID',
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
-                                '%s_info.txt' % self.platform)],
+                                 '%s_info.txt' % self.platform)],
          workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
-        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
-                                                    self.platform)
-        self.addStep(MozillaStageUpload,
-            objdir="%s/%s" % (self.branchName, self.objdir),
-            username=self.stageUsername,
-            milestone=self.baseUploadDir,
-            remoteHost=self.stageServer,
-            remoteBasePath=self.stageBasePath,
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=False,
-            releaseToDated=False,
-            releaseToTinderboxBuilds=False,
-            releaseToCandidates=True,
-            tinderboxBuildsDir=self.baseUploadDir,
-            remoteCandidatesPath=self.stageBasePath,
-            dependToDated=True,
+        ))
+        self.addStep(SetProperty(
+            name='make_upload',
+            command=['make', 'upload'],
+            env=uploadEnv,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                  self.objdir)
-        )
-
+                                  self.objdir),
+            extract_fn = parse_make_upload,
+            haltOnFailure=True,
+            description=['make', 'upload'],
+            timeout=40*60 # 40 minutes
+        ))
 
 class AndroidBuildFactory(MobileBuildFactory):
     def __init__(self, uploadPlatform='linux',
