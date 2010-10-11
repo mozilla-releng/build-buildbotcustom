@@ -346,6 +346,13 @@ class MozillaCheck(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
             return worst_status(superResult, WARNINGS)
 
@@ -385,6 +392,13 @@ class MozillaReftest(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
             return worst_status(superResult, WARNINGS)
 
@@ -420,6 +434,13 @@ class MozillaMochitest(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
             return worst_status(superResult, WARNINGS)
 
@@ -469,6 +490,13 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
             return superResult
 
@@ -533,6 +561,13 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
             return superResult
 
@@ -593,6 +628,13 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
             return superResult
 
