@@ -407,6 +407,8 @@ class UnpackFile(ShellCommand):
         return SUCCESS
 
 class UnpackTest(ShellCommand):
+    description = ["unpack", "tests"]
+
     def __init__(self, filename, testtype, scripts_dir=".", **kwargs):
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
