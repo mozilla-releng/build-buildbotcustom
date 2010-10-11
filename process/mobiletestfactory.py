@@ -82,8 +82,10 @@ class MobileTalosFactory(BuildFactory):
                  cvsroot=":pserver:anonymous@63.245.209.14:/cvsroot",
                  hg_host='http://hg.mozilla.org', tools_repo_path='build/tools',
                  talos_tarball=None, pageloader_tarball=None,
+                 tp4_tarball=None,
                  cleanup_glob='tools talos fennec* *.tar.bz2 *.zip',
-                 tp4_source='/tools/tp4', browser_wait=7, env={}, **kwargs):
+                 tp4_parent_dir='/home/user', browser_wait=7, env={},
+                 **kwargs):
         BuildFactory.__init__(self, **kwargs)
         self.test = test
         self.timeout = timeout
@@ -93,14 +95,15 @@ class MobileTalosFactory(BuildFactory):
         self.reboot = reboot
         self.base_dir = base_dir
         self.reboot_cmd = reboot_cmd
-        self.nochrome = '' if nochrome is None else '--noChrome'
+        self.nochrome = nochrome
         self.cvsroot = cvsroot #We are using a static ip because of dns failures
         self.hg_host = hg_host
         self.tools_repo_path = tools_repo_path
         self.talos_tarball = talos_tarball
         self.pageloader_tarball = pageloader_tarball
+        self.tp4_tarball = tp4_tarball
         self.cleanup_glob = cleanup_glob
-        self.tp4_source = tp4_source
+        self.tp4_parent_dir = tp4_parent_dir
         self.browser_wait = browser_wait
         self.env = env.copy()
 
@@ -138,7 +141,7 @@ class MobileTalosFactory(BuildFactory):
     def addCleanupSteps(self):
         self.addStep(ShellCommand(
             command=['sh', '-c',
-                     "rm talos/tp4 ; rm -rf %s" % self.cleanup_glob],
+                     "rm talos/page_load_tests/tp4 ; rm -rf %s" % self.cleanup_glob],
             # If you don't delete the tp4 symlink before cleanup
             # bad things happen!
             workdir=self.base_dir,
@@ -205,11 +208,9 @@ class MobileTalosFactory(BuildFactory):
             name='fix_perms',
         ))
         if 'tp4' in self.test:
+            self.addTarballTp4Steps()
             self.addStep(ShellCommand(
-                #maybe do rsync -a self.tp4_source.rstrip('/')
-                #                  self.base_dir/talos/page_load_test+'/'
-                #so we know we are always working with a pristine tp4 set
-                command=['ln', '-s', self.tp4_source, '.'],
+                command=['ln', '-s', '%s/tp4' % self.tp4_parent_dir, '.'],
                 workdir='%s/talos/page_load_test' % self.base_dir,
                 description=['create', 'tp4', 'symlink'],
                 name='tp4_symlink',
@@ -235,6 +236,30 @@ class MobileTalosFactory(BuildFactory):
             workdir='%s/fennec' % self.base_dir,
             description=['unpack', 'pageloader'],
             name='unpack_pageloader',
+            haltOnFailure=True,
+        ))
+
+    def addTarballTp4Steps(self):
+        self.addStep(ShellCommand(
+            command='if [ ! -d tp4 ] ; then '+
+                     'wget %s -O tp4.tar.bz2; fi' % self.tp4_tarball,
+            workdir=self.tp4_parent_dir,
+            description=['get', 'tp4'],
+            name='get_tp4',
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            command='if [ ! -d tp4 ] ; then tar jxvf tp4.tar.bz2; fi',
+            workdir=self.tp4_parent_dir,
+            description=['unpack', 'tp4'],
+            name='unpack_tp4',
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            command=['chmod', '-R', 'go+rwx', 'tp4'],
+            workdir=self.tp4_parent_dir,
+            description=['chmod', 'tp4'],
+            name='chmod_tp4',
             haltOnFailure=True,
         ))
 
@@ -266,9 +291,10 @@ class MobileTalosFactory(BuildFactory):
                       '--sampleConfig', self.talos_config_file,
                       '--browserWait', str(self.browser_wait),
                       '--resultsServer', self.results_server,
-                      self.nochrome,
                       '--resultsLink', '/server/collect.cgi',
                       '--output', 'local.config']
+        if self.nochrome:
+            perfconf_cmd += ['--noChrome']
         runtest_cmd=["python", "run_tests.py", "--noisy",
                      "--debug", "local.config"]
         self.addStep(ShellCommand(
