@@ -656,12 +656,16 @@ def generateBranchObjects(config, name):
 
     # change sources - if try is enabled, tipsOnly will be true which  makes 
     # every push only show up as one changeset
-    branchObjects['change_source'].append(HgPoller(
-        hgURL=config['hgurl'],
-        branch=config['repo_path'],
-        tipsOnly=config.get('enable_try', False),
-        pollInterval=pollInterval,
-    ))
+    # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
+    if config['hgurl'].startswith('https:'):
+        pass
+    else:
+        branchObjects['change_source'].append(HgPoller(
+            hgURL=config['hgurl'],
+            branch=config['repo_path'],
+            tipsOnly=config.get('enable_try', False),
+            pollInterval=pollInterval,
+        ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
