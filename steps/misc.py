@@ -146,6 +146,10 @@ class GetHgRevision(ShellCommand):
     """
     name = "get hg revision"
     command = ["hg", "identify", "-i"]
+    def __init__(self, propertyPrefix="hg", **kwargs):
+        self.propertyPrefix = propertyPrefix
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
 
     def commandComplete(self, cmd):
         rev = ""
@@ -155,8 +159,8 @@ class GetHgRevision(ShellCommand):
             mod = rev.find('+')
             if mod != -1:
                 rev = rev[:mod]
-                self.setProperty('hg_modified', True)
-            self.setProperty('hg_revision', rev)
+                self.setProperty('%s_modified' % propertyPrefix, True)
+            self.setProperty('%s_revision' % propertyPrefix, rev)
         except:
             log.msg("Could not find hg revision")
             log.msg("Output: %s" % rev)

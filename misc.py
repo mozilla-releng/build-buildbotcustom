@@ -2168,6 +2168,7 @@ def generateMobileBranchObjects(config, name):
             'ausHost': config['aus2_host'],
             'downloadBaseURL': config['mobile_download_base_url'],
             'updatePlatform': pf.get('update_platform', None),
+            'talosMasters': pf.get('talos_masters', []),
             # It would be great to have:
             # 'packageTests': pf.get('package_tests', False),
             # These are disabled until l10n comes up

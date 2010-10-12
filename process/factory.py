@@ -138,12 +138,14 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip))",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk))",
                         "\n".join([stdout, stderr]), re.M):
         if m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
             retval['testsUrl'] = m
+        elif m.endswith("apk") and 'unsigned' in m:
+            retval['unsignedApkUrl'] = m
         else:
             retval['packageUrl'] = m
     return retval
@@ -5491,6 +5493,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  ausSshKey=None, ausBaseUploadDir=None,
                  updatePlatform=None, ausHost=None,
                  downloadBaseURL=None,
+                 talosMasters=None,
                  try_subdir=None, **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -5520,6 +5523,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.mozRevision = mozRevision
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
+        self.talosMasters = talosMasters or []
         self.enable_try = enable_try
         if enable_try:
             self.clobber = clobber = True
@@ -5561,6 +5565,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                        targetDirectory=None, workdir=None,
                        cloneTimeout=60*20,
                        revision='default',
+                       propertyPrefix="hg",
                        changesetLink=None):
         assert (repository and workdir)
         if (targetDirectory == None):
@@ -5598,8 +5603,11 @@ class MobileBuildFactory(MozillaBuildFactory):
         )
         if changesetLink:
             self.addStep(GetHgRevision(
+                propertyPrefix=propertyPrefix,
                 workdir='%s/%s' % (workdir, targetDirectory)
             ))
+            changesetLink = changesetLink.replace('hg_revision',
+                                                  '%s_revision' % propertyPrefix)
             self.addStep(OutputStep(
                 name='tinderboxprint_changeset',
                 data=['TinderboxPrint:', WithProperties(changesetLink)]
@@ -5709,13 +5717,21 @@ class MobileBuildFactory(MozillaBuildFactory):
                             workdir=self.baseWorkDir,
                             changesetLink=self.mozChangesetLink,
                             revision=self.mozRevision,
+                            propertyPrefix="mozilla",
                             cloneTimeout=60*30)
             self.addHgPullSteps(repository=self.mobileRepository,
                             workdir='%s/%s' % (self.baseWorkDir,
                                                self.branchName),
                             changesetLink=self.mobileChangesetLink,
                             revision=self.mobileRevision,
+                            propertyPrefix="mobile",
                             targetDirectory='mobile')
+            self.addStep(SetProperty(
+                name='set_got_revision',
+                command=WithProperties("echo %(mozilla_revision)s:%(mobile_revision)s"),
+                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+                property='got_revision'
+            ))
 
     def addSymbolSteps(self):
         if self.uploadSymbols:
@@ -5820,37 +5836,67 @@ class MobileBuildFactory(MozillaBuildFactory):
                           'UPLOAD_TO_TEMP': '1'})
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
-
-        # Always upload builds to the dated tinderbox builds directories
         if self.tinderboxBuildsDir is None:
             tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
         else:
             tinderboxBuildsDir = self.tinderboxBuildsDir
-        postUploadCmd =  ['post_upload.py']
-        postUploadCmd += ['--tinderbox-builds-dir %s' % tinderboxBuildsDir,
-                          '-i %(buildid)s',
-                          '-p %s' % self.productName,
-                          '--release-to-tinderbox-dated-builds']
+        uploadArgs = dict(
+                upload_dir=tinderboxBuildsDir,
+                product=self.productName,
+                buildid=WithProperties("%(buildid)s"),
+                as_list=False,
+            )
+        if self.hgHost.startswith('ssh'):
+            uploadArgs['to_shadow'] = True
+            uploadArgs['to_tinderbox_dated'] = False
+        else:
+            uploadArgs['to_shadow'] = False
+            if self.enable_try:
+                uploadArgs['to_try'] = True
+                uploadArgs['to_tinderbox_dated'] = False
+                uploadArgs['revision'] = WithProperties('%(got_revision)s')
+                uploadArgs['who'] = WithProperties('%(who)s')
+                uploadArgs['builddir'] = WithProperties('%(builddir)s')
+            else:
+                uploadArgs['to_tinderbox_dated'] = True
+
         if self.nightly:
-            # If this is a nightly build also place them in the latest and
-            # dated directories in nightly/
-            postUploadCmd += ['-b %s-%s' % (self.branchName, self.platform),
-                              '--release-to-latest',
-                              '--release-to-dated']
-        uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
+            uploadArgs['to_dated'] = True
+            uploadArgs['to_latest'] = True
+            uploadArgs['branch'] = '%s-%s' % (self.branchName, self.platform)
+
+        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
 
         self.addStep(SetProperty(
             name='make_upload',
             command=['make', 'upload'],
             env=uploadEnv,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                        self.objdir),
+                                  self.objdir),
             extract_fn = parse_make_upload,
             haltOnFailure=True,
             description=['make', 'upload'],
             timeout=40*60 # 40 minutes
         ))
-
+        sendchangePlatform = None
+        if self.talosMasters:
+            if self.platform == 'android-r7':
+                sendchangePlatform = 'android'
+            if 'linux' in self.platform:
+                sendchangePlatform = 'linux'
+        if sendchangePlatform:
+            talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
+            for master, warn, retries in self.talosMasters:
+                self.addStep(SendChangeStep(
+                 name='sendchange_%s' % master,
+                 warnOnFailure=warn,
+                 master=master,
+                 retries=retries,
+                 branch=talosBranch,
+                 revision=WithProperties("%(got_revision)s"),
+                 files=[WithProperties('%(packageUrl)s')],
+                 user="sendchange")
+                )
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
     def __init__(self, packageGlobList=['-r', 'mobile/dist/*.tar.bz2',
@@ -7669,7 +7715,7 @@ class AndroidBuildFactory(MobileBuildFactory):
         if self.createSnippet:
             self.addUpdateSteps()
         self.addSymbolSteps()
-        self.addUploadSteps(platform=self.uploadPlatform)
+        self.addMakeUploadSteps()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
@@ -7709,36 +7755,21 @@ class AndroidBuildFactory(MobileBuildFactory):
             )
 
     def addPackageSteps(self):
-        # forcing of PATH to contain jdk6 is only required while bug #562461 is active
-        if self.env is None:
-            envJava = {}
-        else:
-            envJava = self.env.copy()
-        envJava['JARSIGNER'] = '../../../../../tools/release/signing/mozpass.py'
-
         self.addStep(ShellCommand,
             name='make_android_pkg',
-            command=['make', '-C', 'embedding/android'],
+            command=['make', 'package'],
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
             description=['make', 'android', 'package'],
-            env=envJava,
+            env=self.env,
             haltOnFailure=True,
         )
-        # self.addStep(ShellCommand,
-        #    name='make_android_pkg',
-        #    command=['make', 'package'],
-        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-        #    description=['make', 'android', 'package'],
-        #    env=self.env,
-        #    haltOnFailure=True,
-        # )
-        # self.addStep(ShellCommand,
-        #    name='make_pkg_tests',
-        #    command=['make', 'package-tests'],
-        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-        #    env=self.env,
-        #    haltOnFailure=True,
-        # )
+        self.addStep(ShellCommand,
+           name='make_pkg_tests',
+           command=['make', 'package-tests'],
+           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+           env=self.env,
+           haltOnFailure=True,
+        )
 
     def previousApkExists(self, step):
         return step.build.getProperties().has_key("previousApk") and len(step.build.getProperty("previousApk")) > 0;
