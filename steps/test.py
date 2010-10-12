@@ -25,7 +25,8 @@
 #   Alice Nodelman <anodelman@mozilla.com>
 # ***** END LICENSE BLOCK *****
 
-from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, worst_status
+from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, EXCEPTION, \
+  worst_status
 from buildbot.process.buildstep import BuildStep
 
 from twisted.internet.defer import DeferredList, Deferred
