@@ -5602,8 +5602,9 @@ class MobileBuildFactory(MozillaBuildFactory):
             haltOnFailure=True
         )
         if changesetLink:
-            self.addStep(GetHgRevision(
-                propertyPrefix=propertyPrefix,
+            self.addStep(SetProperty(
+                command=['hg', 'identify', '-i'],
+                property='%s_revision' % propertyPrefix,
                 workdir='%s/%s' % (workdir, targetDirectory)
             ))
             changesetLink = changesetLink.replace('hg_revision',
