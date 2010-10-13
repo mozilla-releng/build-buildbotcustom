@@ -7692,7 +7692,6 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
                                   self.objdir)
         )
 
-
 class AndroidBuildFactory(MobileBuildFactory):
     def __init__(self, uploadPlatform='linux',
                        packageGlobList=['dist/*.apk',], **kwargs):
@@ -7785,8 +7784,9 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addStep(ShellCommand(
             name='get_previous_apk',
             description=['get', 'previous', 'apk'],
-            command=['bash', '-c', 'wget -O previous.apk %s/nightly/%s/fennec.apk' % \
-              (self.downloadBaseURL, self.latestDir)],
+            command=['bash', '-c',
+                     WithProperties('wget -O previous.apk %s/nightly/%s/%%(completeMarFilename)s' % \
+                     (self.downloadBaseURL, self.latestDir))],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             flunkOnFailure=False,
             haltOnFailure=False,
@@ -7838,8 +7838,8 @@ class AndroidBuildFactory(MobileBuildFactory):
     def addUpdateSteps(self):
         # Normally we'd make a mar first, but we'll create a snippet of
         # the apk for now.
-        self.addFilePropertiesSteps(filename='fennec.apk',
-                                    directory='%s/%s/%s/embedding/android' % \
+        self.addFilePropertiesSteps(filename='fennec*.apk',
+                                    directory='%s/%s/%s/dist' % \
                                       (self.baseWorkDir, self.branchName,
                                        self.objdir),
                                     fileType='completeMar',
@@ -7963,10 +7963,10 @@ class AndroidBuildFactory(MobileBuildFactory):
             haltOnFailure=True,
         ))
 
-    def addUploadSteps(self, platform):
+    def addMakeUploadSteps(self):
         if self.createSnippet:
             self.getPreviousBuildID()
-        MobileBuildFactory.addUploadSteps(self, platform)
+        MobileBuildFactory.addMakeUploadSteps(self)
         # ausFullUploadDir contains an interpolation of the buildid property.
         # We expect the property to be set by the parent call to
         # addUploadSteps()
