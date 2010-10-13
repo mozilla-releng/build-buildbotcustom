@@ -7756,19 +7756,25 @@ class AndroidBuildFactory(MobileBuildFactory):
             )
 
     def addPackageSteps(self):
+        if self.env is None:
+            envJava = {}
+        else:
+            envJava = self.env.copy()
+            envJava['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
+
         self.addStep(ShellCommand,
             name='make_android_pkg',
             command=['make', 'package'],
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
             description=['make', 'android', 'package'],
-            env=self.env,
+            env=envJava,
             haltOnFailure=True,
         )
         self.addStep(ShellCommand,
            name='make_pkg_tests',
            command=['make', 'package-tests'],
            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-           env=self.env,
+           env=envJava,
            haltOnFailure=True,
         )
 
