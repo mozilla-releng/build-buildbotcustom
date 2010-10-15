@@ -5827,6 +5827,12 @@ class MobileBuildFactory(MozillaBuildFactory):
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
+        if self.enable_try:
+            self.addStep(SetBuildProperty(
+                name='set_who',
+                property_name='who',
+                value=lambda x: str(x.source.changes[0].who),
+            ))
         # From NightlyBuildFactory doUpload, but with altered workdir
         # and with platform in the nightly dir.
         # We should be able to get rid of this duplicate code with
