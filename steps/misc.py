@@ -438,6 +438,11 @@ class UnpackTest(ShellCommand):
             else:
                 # If it all fails, we extract the whole shebang
                 self.setCommand(['unzip', '-o', filename])
+        #If we come across a test not packaged as a zip file, try unpacking the whole thing using tar+gzip/bzip2
+        elif filename.endswith("tar.bz2"):
+            self.setCommand(['tar', '-jxvf', filename])
+        elif filename.endswith("tar.gz"):
+            self.setCommand(['tar', '-zxvf', filename])
         else:
             # TODO: The test package is .zip across all three platforms, so we're special casing for that
             raise ValueError("Don't know how to handle %s" % filename)
