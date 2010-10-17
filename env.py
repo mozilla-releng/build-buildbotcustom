@@ -181,3 +181,9 @@ MozillaEnvironments['mac-perf'] = {
     # for extracting dmg's
     "PAGER": '/bin/cat',
 }
+
+MozillaEnvironments['android-unittest'] = {
+}
+
+MozillaEnvironments['android-perf'] = {
+}

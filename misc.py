@@ -1925,14 +1925,26 @@ def generateCCBranchObjects(config, name):
 def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branchObjects = {'schedulers': [], 'builders': [], 'status': [], 'change_source': []}
-    branch_builders = []
-    all_test_builders = []
+    branch_builders = {}
+    all_test_builders = {}
+    all_builders = []
 
-    branchName = branch_config['branch_name']
     buildBranch = branch_config['build_branch']
     talosCmd = branch_config['talos_command']
 
     for platform, platform_config in PLATFORMS.items():
+        if platform_config.get('is_mobile', False):
+            branchName = branch_config['mobile_branch_name']
+            tinderboxTree = branch_config['mobile_tinderbox_tree']
+        else:
+            branchName = branch_config['branch_name']
+            tinderboxTree = branch_config['tinderbox_tree']
+
+        if tinderboxTree not in branch_builders:
+            branch_builders[tinderboxTree] = []
+        if tinderboxTree not in all_test_builders:
+            all_test_builders[tinderboxTree] = []
+
         for slave_platform in platform_config['slave_platforms']:
             platform_name = platform_config[slave_platform]['name']
             for suite, talosConfig in SUITES.items():
@@ -1979,7 +1991,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         )
                 branchObjects['schedulers'].append(s)
                 branchObjects['builders'].append(builder)
-                branch_builders.append(builder['name'])
+                branch_builders[tinderboxTree].append(builder['name'])
+                all_builders.append(builder['name'])
 
             if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
                 testTypes = []
@@ -2005,7 +2018,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         test_builders.extend(generateTestBuilderNames(
                             '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
                     # Collect test builders for the TinderboxMailNotifier
-                    all_test_builders.extend(test_builders)
+                    all_test_builders[tinderboxTree].extend(test_builders)
+                    all_builders.extend(test_builders)
 
                     triggeredUnittestBuilders.append(('tests-%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, merge_tests))
 
@@ -2030,24 +2044,26 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         else:
                             scheduler_class = Scheduler
                         branchObjects['schedulers'].append(scheduler_class(
-                            name=scheduler_name, 
-                            branch=scheduler_branch, 
-                            builderNames=test_builders, 
-                            treeStableTimer=None, 
+                            name=scheduler_name,
+                            branch=scheduler_branch,
+                            builderNames=test_builders,
+                            treeStableTimer=None,
                             **extra_args
                         ))
-    branchObjects['status'].append(TinderboxMailNotifier(
+    for tinderboxTree in branch_builders.keys():
+        branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
-                           tree=branch_config['tinderbox_tree'],
+                           tree=tinderboxTree,
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
                            relayhost="smtp.mozilla.org",
-                           builders=branch_builders,
+                           builders=branch_builders[tinderboxTree],
                            useChangeTime=False,
                            logCompression="gzip"))
     ###  Unittests need specific errorparser
-    branchObjects['status'].append(TinderboxMailNotifier(
+    for tinderboxTree in branch_builders.keys():
+        branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
-                           tree=branch_config['tinderbox_tree'],
+                           tree=tinderboxTree,
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
                            relayhost="smtp.mozilla.org",
                            builders=all_test_builders,
@@ -2062,7 +2078,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
-        builders=branch_builders + all_test_builders,
+        builders=all_builders,
     ))
 
     if branch_config.get('release_tests'):

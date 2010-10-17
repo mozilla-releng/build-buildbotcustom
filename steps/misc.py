@@ -386,7 +386,7 @@ class UnpackFile(ShellCommand):
     def start(self):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
-        if filename.endswith(".zip"):
+        if filename.endswith(".zip") or filename.endswith(".apk"):
             self.setCommand(['unzip', '-o', filename])
         elif filename.endswith(".tar.gz"):
             self.setCommand(['tar', '-zxvf', filename])

@@ -241,6 +241,7 @@ def getPlatformMinidumpPath(platform):
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
+        'android': None,
         }
     return platform_minidump_path[platform]
 
@@ -6596,7 +6597,6 @@ class MozillaTestFactory(MozillaBuildFactory):
          name='get build info',
         )
 
-
     def addSetupSteps(self):
         '''This stub is for implementing classes to do harness specific setup'''
         pass
@@ -6712,13 +6712,13 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  maxTime=2*60*60, # Two Hours
                 ))
 
-
 class TalosFactory(BuildFactory):
     extName = 'addon.xpi'
     """Create working talos build factory"""
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
+            remoteTests=False, productName="firefox", remoteExtras=None,
             talosAddOns=[], addonTester=False):
 
         BuildFactory.__init__(self)
@@ -6731,6 +6731,7 @@ class TalosFactory(BuildFactory):
         self.supportUrlBase = supportUrlBase
         self.buildBranch = buildBranch
         self.branchName = branchName
+        self.remoteTests = remoteTests
         self.configOptions = configOptions[:]
         self.talosCmd = talosCmd
         self.customManifest = customManifest
@@ -6742,6 +6743,8 @@ class TalosFactory(BuildFactory):
         self.exepath = None
         self.env = MozillaEnvironments[envName]
         self.addonTester = addonTester
+        self.productName = productName
+        self.remoteExtras = remoteExtras
 
         self.addCleanupSteps()
         self.addDmgInstaller()
@@ -6753,6 +6756,8 @@ class TalosFactory(BuildFactory):
         if self.addonTester:
             self.addDownloadExtensionStep()
         self.addSetupSteps()
+        if self.remoteTests:
+            self.addPrepareDeviceStep()
         self.addUpdateConfigStep()
         self.addRunTestStep()
         self.addRebootStep()
@@ -6837,15 +6842,22 @@ class TalosFactory(BuildFactory):
         ))
 
     def addUnpackBuildSteps(self):
-        self.addStep(UnpackFile(
-         filename=WithProperties("%(filename)s"),
-         workdir=self.workdirBase,
-         name="Unpack build",
-        ))
+        if self.OS in ('tegra_android',):
+            self.addStep(UnpackFile(
+             filename=WithProperties("../%(filename)s"),
+             workdir="%s/%s" % (self.workdirBase, self.productName),
+             name="Unpack build",
+            ))
+        else:
+            self.addStep(UnpackFile(
+             filename=WithProperties("%(filename)s"),
+             workdir=self.workdirBase,
+             name="Unpack build",
+            ))
         if self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(ShellCommand(
              name='chmod_files',
-             workdir=os.path.join(self.workdirBase, "firefox/"),
+             workdir=os.path.join(self.workdirBase, "%s/" % self.productName),
              flunkOnFailure=False,
              warnOnFailure=False,
              description="chmod files (see msys bug)",
@@ -6855,7 +6867,7 @@ class TalosFactory(BuildFactory):
         if self.OS in ('tiger', 'leopard', 'snowleopard'):
             self.addStep(FindFile(
              workdir=os.path.join(self.workdirBase, "talos"),
-             filename="firefox-bin",
+             filename="%s-bin" % self.productName,
              directory="..",
              max_depth=4,
              property_name="exepath",
@@ -6865,12 +6877,21 @@ class TalosFactory(BuildFactory):
         elif self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
-             value="../firefox/firefox"
+             value="../%s/%s" % (self.productName, self.productName)
             ))
-        else:
+        elif self.OS in ('tegra_android',):
             self.addStep(SetBuildProperty(
              property_name="exepath",
-             value="../firefox/firefox-bin"
+             value="../%s/%s" % (self.productName, self.productName)
+            ))
+        else:
+            if self.productName == 'fennec':
+                exeName = self.productName
+            else:
+                exeName = "%s-bin" % self.productName
+            self.addStep(SetBuildProperty(
+             property_name="exepath",
+             value="../%s/%s" % (self.productName, exeName)
             ))
         self.exepath = WithProperties('%(exepath)s')
 
@@ -6924,10 +6945,11 @@ class TalosFactory(BuildFactory):
                 name='check sdk okay'))
 
     def addSetupSteps(self):
-        self.addStep(DownloadFile(
-         url="%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase,
-         workdir=self.workdirBase,
-        ))
+        if not self.remoteTests:
+            self.addStep(DownloadFile(
+             url="%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase,
+             workdir=self.workdirBase,
+            ))
 
         if self.customManifest:
             self.addStep(FileDownload(
@@ -6936,7 +6958,7 @@ class TalosFactory(BuildFactory):
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
             )
 
-        if self.customTalos is None:
+        if self.customTalos is None and not self.remoteTests:
             self.addStep(DownloadFile(
               url="%s/zips/talos.zip" % self.supportUrlBase,
               workdir=self.workdirBase,
@@ -6948,6 +6970,36 @@ class TalosFactory(BuildFactory):
             self.addStep(DownloadFile(
              url="%s/xpis/pageloader.xpi" % self.supportUrlBase,
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
+            )
+        elif self.remoteTests:
+            self.addStep(ShellCommand(
+             name='copy_talos',
+             command=["cp", "-r", "../../talos-data/talos", "."],
+             workdir=self.workdirBase,
+             description="copying talos",
+             haltOnFailure=True,
+             flunkOnFailure=True,
+             env=self.env)
+            )
+            self.addStep(ShellCommand(
+             name='copy_fennecmark',
+             command=["cp", "-r", "../../talos-data/bench@taras.glek",
+                      "talos/mobile_profile/extensions/"],
+             workdir=self.workdirBase,
+             description="copying fennecmark",
+             haltOnFailure=True,
+             flunkOnFailure=True,
+             env=self.env)
+            )
+            self.addStep(ShellCommand(
+             name='copy_pageloader',
+             command=["cp", "-r", "../../talos-data/pageloader@mozilla.org",
+                      "talos/mobile_profile/extensions/"],
+             workdir=self.workdirBase,
+             description="copying pageloader",
+             haltOnFailure=True,
+             flunkOnFailure=True,
+             env=self.env)
             )
         else:
             self.addStep(FileDownload(
@@ -7028,22 +7080,49 @@ class TalosFactory(BuildFactory):
          url_fn=get_addon_url,
          workdir=os.path.join(self.workdirBase, "talos"),
          name="Download extension",
-         ignore_certs=True, 
+         ignore_certs=True,
          wget_args=['-O', TalosFactory.extName],
         ))
+
+    def addPrepareDeviceStep(self):
+        self.addStep(SetProperty,
+             command=['bash', '-c', 'echo $SUT_IP'],
+             property='sut_ip'
+        )
+        self.addStep(ShellCommand(
+            name='cleanup device',
+            workdir=self.workdirBase,
+            description="Cleanup Device",
+            command=['python', '../../sut_tools/cleanup.py',
+                     WithProperties("%(sut_ip)s"),
+                    ],
+            env=self.env)
+        )
+        self.addStep(ShellCommand(
+            name='install app on device',
+            workdir=self.workdirBase,
+            description="Install App on Device",
+            command=['python', '../../sut_tools/installApp.py',
+                     WithProperties("%(sut_ip)s"),
+                     WithProperties(self.workdirBase + "/%(filename)s"),
+                    ],
+            env=self.env)
+        )
 
     def addUpdateConfigStep(self):
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(self.workdirBase, "talos/"),
          branch=self.buildBranch,
          branchName=self.branchName,
+         remoteTests=self.remoteTests,
          haltOnFailure=True,
          executablePath=self.exepath,
          addOptions=self.configOptions,
          env=self.env,
          extName=TalosFactory.extName,
          addonTester=self.addonTester,
-         useSymbols=self.fetchSymbols)
+         useSymbols=self.fetchSymbols,
+         remoteExtras=self.remoteExtras)
         )
 
     def addRunTestStep(self):
@@ -7064,17 +7143,32 @@ class TalosFactory(BuildFactory):
             except:
                 pass
             return False
-        self.addStep(DisconnectStep(
-         name='reboot',
-         flunkOnFailure=False,
-         warnOnFailure=False,
-         alwaysRun=True,
-         workdir=self.workdirBase,
-         description="reboot after 1 test run",
-         command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
-         force_disconnect=do_disconnect,
-         env=self.env,
-        ))
+        if self.remoteTests:
+            self.addStep(DisconnectStep(
+                         name='reboot device',
+                         flunkOnFailure=False,
+                         warnOnFailure=False,
+                         alwaysRun=True,
+                         workdir=self.workdirBase,
+                         description="Reboot Device",
+                         command=['python', '../../sut_tools/reboot.py',
+                                  WithProperties("%(sut_ip)s"),
+                                 ],
+                         force_disconnect=do_disconnect,
+                         env=self.env)
+            )
+        else:
+            self.addStep(DisconnectStep(
+             name='reboot',
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             alwaysRun=True,
+             workdir=self.workdirBase,
+             description="reboot after 1 test run",
+             command=["python", "count_and_reboot.py", "-f", "../talos_count.txt", "-n", "1", "-z"],
+             force_disconnect=do_disconnect,
+             env=self.env,
+            ))
 
 class TryTalosFactory(TalosFactory):
     def addDownloadBuildStep(self):

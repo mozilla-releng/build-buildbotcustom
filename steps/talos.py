@@ -8,13 +8,22 @@ class MozillaUpdateConfig(ShellCommand):
     """Configure YAML file for run_tests.py"""
     name = "Update config"
 
-    def __init__(self, branch, branchName, executablePath, addOptions=None,
-            useSymbols=False, addonTester=False, extName=None, **kwargs):
+    def __init__(self, branch, branchName, executablePath,
+            addOptions=None, useSymbols=False, addonTester=False,
+            remoteTests=False, extName=None, remoteExtras=None, **kwargs):
 
         if addOptions is None:
             self.addOptions = []
         else:
             self.addOptions = addOptions[:]
+
+        if remoteExtras is not None:
+            self.remoteExtras = remoteExtras
+        else:
+            self.remoteExtras = {}
+
+        self.remoteOptions = self.remoteExtras.get('options', [])
+        self.remoteExePath = self.remoteExtras.get('exePath', 'org.mozilla.fennec')
 
         self.branch = branch
         self.branchName = branchName
@@ -22,17 +31,21 @@ class MozillaUpdateConfig(ShellCommand):
         self.useSymbols = useSymbols
         self.extName = extName
         self.addonTester = addonTester
+        self.remoteTests = remoteTests
 
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
 
         self.addFactoryArguments(branch=branch, addOptions=addOptions,
                 branchName=branchName, executablePath=executablePath,
-                useSymbols=useSymbols, extName=extName, addonTester=addonTester)
+                remoteTests=remoteTests, useSymbols=useSymbols,
+                extName=extName, addonTester=addonTester,
+                remoteExtras=self.remoteExtras)
 
     def setBuild(self, build):
         self.super_class.setBuild(self, build)
         title = build.slavename
+
         #if we are an addonTester then the addonName/addonUrl build property should be set
         #  if it's not set this will throw a key error and the run will go red - which should be the expected result
         if self.addonTester:
@@ -42,8 +55,17 @@ class MozillaUpdateConfig(ShellCommand):
         if self.useSymbols:
             self.addOptions += ['--symbolsPath', '../symbols']
 
-        self.setCommand(["python", "PerfConfigurator.py", "-v", "-e",
-            self.exePath, "-t", title, "-b", self.branch,
+        if self.remoteTests:
+            exePath = self.remoteExePath
+            perfconfigurator = "remotePerfConfigurator.py"
+            self.addOptions += ['--remoteDevice', WithProperties('%(sut_ip)s'), ]
+            self.addOptions += self.remoteOptions
+        else:
+            exePath = self.exePath
+            perfconfigurator = "PerfConfigurator.py"
+
+        self.setCommand(["python", perfconfigurator, "-v", "-e", exePath,
+            "-t", title, "-b", self.branch,
             '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
