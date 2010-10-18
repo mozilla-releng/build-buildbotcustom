@@ -2051,7 +2051,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             **extra_args
                         ))
     for tinderboxTree in branch_builders.keys():
-        branchObjects['status'].append(TinderboxMailNotifier(
+        if len(branch_builders[tinderboxTree]):
+            branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
                            tree=tinderboxTree,
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
@@ -2060,13 +2061,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            useChangeTime=False,
                            logCompression="gzip"))
     ###  Unittests need specific errorparser
-    for tinderboxTree in branch_builders.keys():
-        branchObjects['status'].append(TinderboxMailNotifier(
+    for tinderboxTree in all_test_builders.keys():
+        if len(all_test_builders[tinderboxTree]):
+            branchObjects['status'].append(TinderboxMailNotifier(
                            fromaddr="talos.buildbot@build.mozilla.org",
                            tree=tinderboxTree,
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
                            relayhost="smtp.mozilla.org",
-                           builders=all_test_builders,
+                           builders=all_test_builders[tinderboxTree],
                            useChangeTime=False,
                            errorparser="unittest",
                            logCompression="gzip"))
