@@ -822,51 +822,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 warnOnFailure=True,
                 haltOnFailure=True
             )
-        # we only want this variable for this test - this sucks
-        bloatEnv = leakEnv.copy()
-        bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1'
-        self.addStep(AliveTest,
-         env=bloatEnv,
-         workdir='build/%s/_leaktest' % self.mozillaObjdir,
-         logfile='bloat.log',
-         warnOnFailure=True,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='get_bloat_log',
-         env=self.env,
-         workdir='.',
-         command=['wget', '-O', 'bloat.log.old',
-                  'http://%s/pub/mozilla.org/%s/%s/bloat.log' % \
-                    (self.stageServer, self.productName, self.logUploadDir)],
-         warnOnFailure=True,
-         flunkOnFailure=False
-        )
-        self.addStep(ShellCommand,
-         name='mv_bloat_log',
-         env=self.env,
-         command=['mv', '%s/_leaktest/bloat.log' % self.mozillaObjdir,
-                  '../bloat.log'],
-        )
-        self.addStep(ShellCommand,
-         name='upload_bloat_log',
-         env=self.env,
-         command=['scp', '-o', 'User=%s' % self.stageUsername,
-                  '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-                  '../bloat.log',
-                  '%s:%s/%s' % (self.stageServer, self.stageBasePath,
-                                self.logUploadDir)]
-        )
-        self.addStep(CompareBloatLogs,
-         name='compare_bloat_log',
-         bloatLog='bloat.log',
-         env=self.env,
-         workdir='.',
-         mozillaDir=self.mozillaDir,
-         tbPrint=self.tbPrint,
-         warnOnFailure=True,
-         haltOnFailure=False
-        )
         self.addStep(SetProperty,
           command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
           'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -885,13 +840,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
           description=['getting', 'sourcestamp'],
           descriptionDone=['got', 'sourcestamp']
         )
-        if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
 
         if self.platform != 'macosx64':
             self.addStep(AliveTest,
