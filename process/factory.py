@@ -10,6 +10,7 @@ from buildbot.process.factory import BuildFactory
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, JSONStringDownload
 from buildbot import locks
+from buildbot.status.builder import worst_status
 
 import buildbotcustom.status.errors
 import buildbotcustom.steps.base
@@ -36,7 +37,7 @@ reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 reload(buildbotcustom.common)
 
-from buildbotcustom.status.errors import purge_error
+from buildbotcustom.status.errors import purge_error, global_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -8031,16 +8032,28 @@ class AndroidBuildFactory(MobileBuildFactory):
 
 def rc_eval_func(exit_statuses):
     def eval_func(cmd, step):
+        rc = cmd.rc
+        # Temporarily set the rc to 0 so that regex_log_evaluator won't say a
+        # command has failed because of non-zero exit code.  We're handing exit
+        # codes here.
+        try:
+            cmd.rc = 0
+            regex_status = regex_log_evaluator(cmd, step, global_errors)
+        finally:
+            cmd.rc = rc
+
         if cmd.rc in exit_statuses:
-            return exit_statuses[cmd.rc]
+            rc_status = exit_statuses[cmd.rc]
         # Use None to specify a default value if you don't want the
         # normal 0 -> SUCCESS, != 0 -> FAILURE
         elif None in exit_statuses:
-            return exit_statuses[None]
+            rc_status = exit_statuses[None]
         elif cmd.rc == 0:
-            return SUCCESS
+            rc_status = SUCCESS
         else:
-            return FAILURE
+            rc_status = FAILURE
+
+        return worst_status(regex_status, rc_status)
     return eval_func
 
 class ScriptFactory(BuildFactory):

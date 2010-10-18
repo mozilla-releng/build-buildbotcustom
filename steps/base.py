@@ -10,9 +10,13 @@ def addErrorCatching(obj):
     class C(obj):
         def evaluateCommand(self, cmd):
             lbs_status = obj.evaluateCommand(self, cmd)
-            regex_status = regex_log_evaluator(cmd, self.step_status,
-                                               global_errors)
-            return worst_status(lbs_status, regex_status)
+            # If we don't have a custom log evalution function, run through
+            # some global checks
+            if self.log_eval_func is None:
+                regex_status = regex_log_evaluator(cmd, self.step_status,
+                                                   global_errors)
+                return worst_status(lbs_status, regex_status)
+            return lbs_status
     return C
 
 LoggingBuildStep = addErrorCatching(LoggingBuildStep)
