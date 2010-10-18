@@ -435,6 +435,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix, build_dir_
             buildToolsRepoPath=config['build_tools_repo_path'],
             buildSpace=1.0,
             buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+            env=pf.get('unittest-env', {}),
             downloadSymbols=pf.get('download_symbols', True),
         )
         builder = {

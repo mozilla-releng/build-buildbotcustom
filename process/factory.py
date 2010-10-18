@@ -6560,7 +6560,7 @@ class MozillaTestFactory(MozillaBuildFactory):
 
 
 class UnittestPackagedBuildFactory(MozillaTestFactory):
-    def __init__(self, platform, test_suites, env=None, productName='firefox',
+    def __init__(self, platform, test_suites, env, productName='firefox',
                  mochitest_leak_threshold=None,
                  crashtest_leak_threshold=None, totalChunks=None,
                  thisChunk=None, chunkByDir=None, **kwargs):
