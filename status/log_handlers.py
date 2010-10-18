@@ -33,14 +33,19 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
     def setup(self):
         self.master_status = self.parent.getStatus()
         self.master_status.subscribe(self)
+        twlog.msg("Starting thread pool %s" % self.pool)
         self.pool.start()
 
     def disownServiceParent(self):
-        self.pool.stop()
         self.master_status.unsubscribe(self)
         for w in self.watched:
             w.unsubscribe(self)
         return base.StatusReceiverMultiService.disownServiceParent(self)
+
+    def stopService(self):
+        twlog.msg("Stopping thread pool %s" % self.pool)
+        self.pool.stop()
+        base.StatusReceiverMultiService.stopService(self)
 
     def builderAdded(self, name, builder):
         # only subscribe to builders we are interested in
