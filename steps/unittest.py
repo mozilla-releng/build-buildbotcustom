@@ -696,4 +696,4 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
         if re.search(r"^Traceback", cmd.logs["stdio"].getText(), re.MULTILINE):
             return WARNINGS
 
-+        return SUCCESS
+        return SUCCESS
