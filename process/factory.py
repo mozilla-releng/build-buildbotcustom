@@ -6693,6 +6693,14 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  symbols_path='symbols',
                  maxTime=2*60*60, # Two Hours
                 ))
+            elif suite == 'jetpack':
+                self.addStep(unittest_steps.MozillaPackagedJetpackTests(
+                  suite=suite,
+                  env=self.env,
+                  leakThreshold=leak_threshold,
+                  symbols_path='symbols',
+                  maxTime=120*60, # Two Hours
+                 ))
             elif suite in ('reftest', 'reftest-d2d', 'crashtest', \
                            'direct3D', 'opengl'):
                 if suite in ('direct3D', 'opengl'):

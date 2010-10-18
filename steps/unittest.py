@@ -138,6 +138,24 @@ def summarizeLogXpcshelltests(name, log):
         name, log, "Passed", "Failed", None,
         r"INFO \| (Passed|Failed): (\d+)")
 
+def summarizeLogJetpacktests(name, log):
+    infoRe = re.compile(r"(\d+) of (\d+) tests passed")
+    summary=""
+    for line in log.readlines():
+        m = infoRe.match(line)
+        if m:
+            successCount = int(m.group(1))
+            totalCount = int(m.group(2))
+            failCount = int(totalCount - successCount)
+            # Handle failCount.
+            failCountStr = str(failCount)
+            if failCount > 0:
+                failCountStr = emphasizeFailureText(failCountStr)
+            # Format the counts
+            summary = "%d/%s" % (totalCount, failCountStr)
+    # Return the summary.
+    return "TinderboxPrint: %s<br/>%s\n" % (name, summary)
+
 def summarizeTUnit(name, log):
     # Counts and flags.
     passCount = 0
@@ -646,3 +664,36 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
             return worst_status(superResult, WARNINGS)
 
         return worst_status(superResult, SUCCESS)
+
+class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
+    warnOnFailure = True
+    warnOnWarnings = True
+
+    def __init__(self, suite, symbols_path=None, leakThreshold=None, **kwargs):
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+
+        self.addFactoryArguments(suite=suite, symbols_path=symbols_path,
+                leakThreshold=leakThreshold)
+
+        self.name = suite
+
+        self.command = ['bash', '-c', WithProperties("%(toolsdir)s/buildfarm/utils/run_jetpack.sh %(platform)s")]
+
+        # TODO: When jetpack can handle symbols path and leak testing, add those
+        # until then, we skip that.
+
+    def createSummary(self, log):
+        self.addCompleteLog('summary', summarizeLogJetpacktests(self.name, log))
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        if superResult != SUCCESS:
+            return superResult
+
+        # Most likely if you get a jetpack harness error, you'll actually get
+        # a python traceback.  So in lieu of better logging, we'll look for that
+        if re.search(r"^Traceback", cmd.logs["stdio"].getText(), re.MULTILINE):
+            return WARNINGS
+
++        return SUCCESS
