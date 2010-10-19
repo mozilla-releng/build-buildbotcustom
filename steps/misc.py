@@ -435,6 +435,8 @@ class UnpackTest(ShellCommand):
                 self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'jsreftest*', 'reftest*'])
             elif self.testtype == "reftest":
                 self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'reftest*'])
+            elif self.testtype == "jetpack":
+                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'jetpack*'])
             else:
                 # If it all fails, we extract the whole shebang
                 self.setCommand(['unzip', '-o', filename])

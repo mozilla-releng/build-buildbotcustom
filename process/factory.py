@@ -6616,7 +6616,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  filename=WithProperties('%(tests_filename)s'),
                  testtype='xpcshell',
                  haltOnFailure=True,
-                 name='unpack mochitest tests',
+                 name='unpack xpcshell tests',
                  ))
 
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
@@ -6632,7 +6632,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  filename=WithProperties('%(tests_filename)s'),
                  testtype='jsreftest',
                  haltOnFailure=True,
-                 name='unpack mochitest tests',
+                 name='unpack jsreftest tests',
                  ))
  
                 self.addStep(unittest_steps.MozillaPackagedReftests(
@@ -6643,6 +6643,14 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  maxTime=2*60*60, # Two Hours
                 ))
             elif suite == 'jetpack':
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='jetpack',
+                 haltOnFailure=True,
+                 name='unpack jetpack tests',
+                 ))
+
                 self.addStep(unittest_steps.MozillaPackagedJetpackTests(
                   suite=suite,
                   env=self.env,
@@ -6659,7 +6667,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  filename=WithProperties('%(tests_filename)s'),
                  testtype='reftest',
                  haltOnFailure=True,
-                 name='unpack mochitest tests',
+                 name='unpack reftest tests',
                  ))
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
