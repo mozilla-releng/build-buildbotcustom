@@ -77,6 +77,13 @@ def getBuildId(build):
     except:
         return None
 
+def isNightly(build):
+    try:
+        if build.getProperty('nightly_build'):
+            return True
+    except:
+        return False
+
 def formatLog(tmpdir, build):
     """
     Returns a filename with the contents of the build log
@@ -193,12 +200,21 @@ if __name__ == "__main__":
                     # Exit cleanly so we don't spam twistd.log with exceptions
                     sys.exit(0)
 
+                if options.nightly or isNightly(build):
+                    uploadArgs['to_dated'] = True
+                    # Don't upload to the latest directory for now; we have no
+                    # way of purging the logs out of the latest-<branch>
+                    # directories
+                    #uploadArgs['to_latest'] = True
+                    uploadArgs['branch'] = options.branch
+
                 if options.shadowbuild:
                     uploadArgs['to_shadow'] = True
                     uploadArgs['to_tinderbox_dated'] = False
                 else:
                     uploadArgs['to_shadow'] = False
                     uploadArgs['to_tinderbox_dated'] = True
+
                 uploadArgs.update(dict(
                     upload_dir="%s-%s" % (options.branch, platform),
                     to_try=False,
