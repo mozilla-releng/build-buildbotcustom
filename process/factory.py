@@ -9,6 +9,7 @@ from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, JSONStringDownload
+from buildbot.steps.dummy import Dummy
 from buildbot import locks
 from buildbot.status.builder import worst_status
 
@@ -44,7 +45,8 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
   RepackPartners, UnpackTest
-from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff
+from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
+  SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -63,10 +65,27 @@ from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTI
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
 hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=14*3)
 
+class DummyFactory(BuildFactory):
+    def __init__(self):
+        BuildFactory.__init__(self)
+        self.addStep(Dummy())
+
+def makeDummyBuilder(name, slaves, category=None):
+    builder = {
+            'name': name,
+            'factory': DummyFactory(),
+            'builddir': name,
+            'slavenames': slaves,
+            }
+    if category:
+        builder['category'] = category
+    return builder
+
 def postUploadCmdPrefix(upload_dir=None,
         branch=None,
         product=None,
         revision=None,
+        version=None,
         who=None,
         builddir=None,
         buildid=None,
@@ -104,6 +123,8 @@ def postUploadCmdPrefix(upload_dir=None,
         cmd.extend(['-i', buildid])
     if buildNumber:
         cmd.extend(['-n', buildNumber])
+    if version:
+        cmd.extend(['-v', version])
     if revision:
         cmd.extend(['--revision', revision])
     if who:
@@ -247,20 +268,7 @@ def getPlatformMinidumpPath(platform):
     return platform_minidump_path[platform]
 
 class MozillaBuildFactory(BuildFactory):
-    ignore_dirs = [
-            'info',
-            'repo_setup',
-            'tag',
-            'source',
-            'updates',
-            'final_verification',
-            'xulrunner_source',
-            ]
-    ignore_dirs.extend(['%s_update_verify' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['%s_build' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['%s_repack' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['xulrunner_%s_build' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['%s_l10n_verification' % p for p in getSupportedPlatforms()])
+    ignore_dirs = [ 'info', 'release-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
@@ -2199,9 +2207,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
-                productName=self.productName,
+                product=self.productName,
                 version=self.version,
-                buildNumber=self.buildNumber,
+                buildNumber=str(self.buildNumber),
                 to_candidates=True,
                 as_list=False)
 
@@ -2559,7 +2567,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
                          'hg -R '+self.origSrcDir+' pull ;'+
-                         'hg -R '+self.origSrcDir+' up ;'+
+                         'hg -R '+self.origSrcDir+' up -C ;'+
                          'else ' +
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.repoPath+' ' +
@@ -3920,6 +3928,7 @@ class CCSourceFactory(ReleaseFactory):
 
 
 class ReleaseUpdatesFactory(ReleaseFactory):
+    snippetStagingDir = '/opt/aus2/snippets/staging'
     def __init__(self, cvsroot, patcherToolsTag, patcherConfig, verifyConfigs,
                  appName, productName,
                  version, appVersion, baseTag, buildNumber,
@@ -3929,7 +3938,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=14, triggerSchedulers=None, releaseNotesUrl=None,
-                 binaryName=None, oldBinaryName=None, **kwargs):
+                 binaryName=None, oldBinaryName=None, testOlderPartials=False,
+                 **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -3984,6 +3994,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.triggerSchedulers = triggerSchedulers
         self.binaryName = binaryName
         self.oldBinaryName = oldBinaryName
+        self.testOlderPartials = testOlderPartials
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4005,15 +4016,50 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.brandName = brandName or productName.capitalize()
         self.releaseNotesUrl = releaseNotesUrl
 
+        self.setChannelData()
         self.setup()
         self.bumpPatcherConfig()
         self.bumpVerifyConfigs()
         self.buildTools()
         self.downloadBuilds()
         self.createPatches()
+        if buildNumber >= 2:
+            self.createBuildNSnippets()
         self.uploadMars()
         self.uploadSnippets()
+        self.verifySnippets()
+        self.wait()
         self.trigger()
+
+    def setChannelData(self):
+        # This method figures out all the information needed to push snippets
+        # to AUS, push test snippets live, and do basic verifications on them.
+        # Test snippets always end up in the same local and remote directories
+        # All of the beta and (if applicable) release channel information
+        # is dependent on the useBetaChannel flag. When false, there is no
+        # release channel, and the beta channel is comprable to 'releasetest'
+        # rather than 'betatest'
+        baseSnippetDir = self.getSnippetDir()
+        self.dirMap = {
+            'aus2.test': '%s-test' % baseSnippetDir,
+            'aus2': baseSnippetDir
+        }
+
+        self.channels = {
+            'betatest': { 'dir': 'aus2.test' },
+            'releasetest': { 'dir': 'aus2.test' },
+            'beta': {}
+        }
+        if self.useBetaChannel:
+            self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
+            self.channels['beta']['dir'] = 'aus2.beta'
+            self.channels['release'] = {
+                'dir': 'aus2',
+                'compareTo': 'releasetest',
+            }
+        else:
+            self.channels['beta']['dir'] = 'aus2'
+            self.channels['beta']['compareTo'] = 'releasetest'
 
     def setup(self):
         # General setup
@@ -4090,9 +4136,15 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         ))
         self.addStep(TinderboxShellCommand(
          name='diff_patcher_config',
-         command=['cvs', 'diff', '-u', WithProperties(self.patcherConfigFile)],
+         command=['bash', '-c',
+                  '(cvs diff -u "%s") && (grep \
+                    "build%s/update/.platform./.locale./%s-%s.complete.mar" \
+                    "%s" || return 2)' % (self.patcherConfigFile,
+                                          self.buildNumber, self.productName,
+                                          self.version,
+                                          self.patcherConfigFile)],
          description=['diff patcher config'],
-         ignoreCodes=[1]
+         ignoreCodes=[0,1]
         ))
         if self.commitPatcherConfig:
             self.addStep(ShellCommand(
@@ -4176,6 +4228,39 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          haltOnFailure=True
         ))
 
+    def createBuildNSnippets(self):
+        command = ['python',
+                   WithProperties('%(toolsdir)s/release/generate-candidate-build-updates.py'),
+                   '--brand', self.brandName,
+                   '--product', self.productName,
+                   '--version', self.version,
+                   '--old-version', self.oldVersion,
+                   '--build-number', self.buildNumber,
+                   '--old-build-number', self.oldBuildNumber,
+                   '--channel', 'betatest', '--channel', 'releasetest',
+                   '--channel', 'beta',
+                   '--stage-server', self.stagingServer,
+                   '--old-base-snippet-dir', '.',
+                   '--workdir', '.',
+                   '--hg-server', self.getRepository('/'),
+                   '--source-repo', self.repoPath,
+                   '--verbose']
+        for p in (self.verifyConfigs.keys()):
+            command.extend(['--platform', p])
+        if self.useBetaChannel:
+            command.extend(['--channel', 'release'])
+        if self.testOlderPartials:
+            command.extend(['--generate-partials'])
+        self.addStep(ShellCommand(
+         name='create_buildN_snippets',
+         command=command,
+         description=['generate snippets', 'for prior',
+                      '%s builds' % self.version],
+         env={'PYTHONPATH': WithProperties('%(toolsdir)s/lib/python')},
+         haltOnFailure=True,
+         workdir=self.updateDir
+        ))
+
     def uploadMars(self):
         self.addStep(ShellCommand(
          name='chmod_partial_mars',
@@ -4205,27 +4290,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         ))
 
     def uploadSnippets(self):
-        # If useBetaChannel is False the unnamed snippet type will be
-        # 'beta' channel snippets (and 'release' if we're into stable releases).
-        # If useBetaChannel is True the unnamed type will be 'release'
-        # channel snippets
-        snippetTypes = ['', 'test']
-        if self.useBetaChannel:
-            snippetTypes.append('beta')
-
-        for type in snippetTypes:
-            # Patcher generates an 'aus2' directory and 'aus2.snippetType'
-            # directories for each snippetType. Typically, there is 'aus2',
-            # 'aus2.test', and (when we're out of beta) 'aus2.beta'.
-            localDir = 'aus2'
-            # On the AUS server we store each type of snippet in a directory
-            # named thusly, with the snippet type appended to it
-            remoteDir = self.getSnippetDir()
-            if type != '':
-                localDir = localDir + '.%s' % type
-                remoteDir = remoteDir + '-%s' % type
-            snippetDir = '/opt/aus2/snippets/staging/%s' % remoteDir
-
+        for localDir,remoteDir in self.dirMap.iteritems():
+            snippetDir = self.snippetStagingDir + '/' + remoteDir
             self.addStep(ShellCommand,
              name='upload_snippets',
              command=['rsync', '-av',
@@ -4233,12 +4299,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                       localDir + '/',
                       '%s@%s:%s' % (self.ausUser, self.ausHost, snippetDir)],
              workdir=self.updateDir,
-             description=['upload', '%s snippets' % type],
+             description=['upload', '%s snippets' % localDir],
              haltOnFailure=True
             )
-
             # We only push test channel snippets from automation.
-            if type == 'test':
+            if localDir.endswith('test'):
                 self.addStep(ShellCommand(
                  name='backupsnip',
                  command=['bash', '-c',
@@ -4259,13 +4324,24 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  description=['pushsnip'],
                  haltOnFailure=True
                 ))
-                # Wait for timeout on AUS's NFS caching to expire before
-                # attempting to test newly-pushed snippets
-                self.addStep(ShellCommand(
-                 name='wait_live_snippets',
-                 command=['sleep','360'],
-                 description=['wait for live snippets']
-                ))
+
+    def verifySnippets(self):
+        channelComparisons = [(c, self.channels[c]['compareTo']) for c in self.channels if 'compareTo' in self.channels[c]]
+        for chan1,chan2 in channelComparisons:
+            self.addStep(SnippetComparison(
+                chan1=chan1,
+                chan2=chan2,
+                dir1=self.channels[chan1]['dir'],
+                dir2=self.channels[chan2]['dir'],
+                workdir=self.updateDir
+            ))
+
+    def wait(self):
+        self.addStep(ShellCommand(
+         name='wait_for_nfs_cache',
+         command=['sleep', '360'],
+         description=['wait for nfs cache', 'to expire']
+        ))
 
     def trigger(self):
         if self.triggerSchedulers:
@@ -4299,6 +4375,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bcmd.extend(['--binary-name', self.binaryName])
         if self.oldBinaryName:
             bcmd.extend(['--old-binary-name', self.oldBinaryName])
+        if self.testOlderPartials:
+            bcmd.extend(['--test-older-partials'])
         return bcmd
 
     def getSnippetDir(self):
@@ -5350,6 +5428,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
+                  '--exclude=*.txt',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer, productName, version, str(buildNumber),
                     platformFtpDir),
@@ -5378,6 +5457,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.crashreporter-symbols.zip',
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
+                  '--exclude=*.txt',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer,
                     productName,
@@ -6221,7 +6301,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                          'hg clone ' +
                          'http://'+self.hgHost+'/'+self.l10nRepoPath+
                            '/'+locale+'/ ; ' +
-                         'hg -R '+locale+' up -r '+self.l10nTag+' ; '
+                         'hg -R '+locale+' up -C -r '+self.l10nTag+' ; '
                          'fi ')],
          descriptionDone="locale source",
          timeout=5*60, # 5 minutes
