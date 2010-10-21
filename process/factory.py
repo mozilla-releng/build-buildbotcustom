@@ -4233,6 +4233,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                    WithProperties('%(toolsdir)s/release/generate-candidate-build-updates.py'),
                    '--brand', self.brandName,
                    '--product', self.productName,
+                   '--app-name', self.appName,
                    '--version', self.version,
                    '--old-version', self.oldVersion,
                    '--build-number', self.buildNumber,
