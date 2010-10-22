@@ -2196,6 +2196,9 @@ def generateMobileBranchObjects(config, name):
         }
 
         builddir_base = '%s-%s-%s' % (name, mobile_repo_name, platform)
+        multi_locale = pf.get('multi_locale', False) and \
+                       pf.get('mozharness_config', False) and\
+                       config.get('enable_multi_locale', False)
 
         if 'maemo' in platform:
             factory_class = MaemoBuildFactory
@@ -2205,7 +2208,7 @@ def generateMobileBranchObjects(config, name):
                 'baseWorkDir': '%s/build/%s' % (sb_home, builddir_base),
                 'scratchboxPath': pf.get('scratchbox_path', config.get('scratchbox_path')),
                 'scratchboxPath': pf.get('scratchbox_path', config.get('scratchbox_path')),
-                'multiLocale': pf.get('multi_locale', config.get('multi_locale')),
+                'multiLocale': False,
                 'l10nRepoPath': pf.get('l10n_repo_path', config.get('l10n_repo_path')),
                 'compareLocalesTag': pf.get('compares_locale_tag', config.get('compare_locales_tag')),
                 'l10nTag': pf.get('l10n_tag', config.get('l10n_tag')),
@@ -2228,6 +2231,9 @@ def generateMobileBranchObjects(config, name):
             nightly_kwargs['nightly'] = True
             nightly_kwargs['uploadSymbols'] = pf.get('upload_symbols', False)
             nightly_kwargs['createSnippet'] = createSnippet
+            if multi_locale:
+                nightly_kwargs['multiLocale'] = multi_locale
+                nightly_kwargs['mozharnessConfig'] = pf['mozharness_config']
 
             factory = factory_class(**nightly_kwargs)
 

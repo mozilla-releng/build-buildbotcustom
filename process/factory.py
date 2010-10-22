@@ -5525,6 +5525,11 @@ class MobileBuildFactory(MozillaBuildFactory):
                  updatePlatform=None, ausHost=None,
                  downloadBaseURL=None,
                  talosMasters=None,
+                 multiLocale=False,
+                 mozharnessRepoPath="users/asasaki_mozilla.com/mozharness",
+                 mozharnessRevision="PRODUCTION",
+                 mozharnessConfig=None,
+                 mergeLocales=True,
                  try_subdir=None, **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -5591,6 +5596,16 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.mozChangesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.mobileChangesetLink = '<a href=%s/rev' % (self.mobileRepository)
         self.mobileChangesetLink += '/%(hg_revision)s title="Built from Mobile revision %(hg_revision)s">mobile:%(hg_revision)s</a>'
+
+        self.multiLocale = multiLocale
+        if multiLocale:
+            assert mozharnessConfig
+            self.mozharnessRepoPath = mozharnessRepoPath
+            self.mozharnessRevision = mozharnessRevision
+            self.mozharnessConfig = mozharnessConfig
+            self.mozharnessRepository = self.getRepository(mozharnessRepoPath)
+            self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
+            self.mergeLocales = mergeLocales
 
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
@@ -5764,6 +5779,11 @@ class MobileBuildFactory(MozillaBuildFactory):
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
                 property='got_revision'
             ))
+            if self.multiLocale:
+                self.addHgPullSteps(repository=self.mozharnessRepository,
+                                    workdir=self.baseWorkDir,
+                                    revision=self.mozharnessRevision,
+                                    cloneTimeout=60*30)
 
     def addSymbolSteps(self):
         if self.uploadSymbols:
@@ -5847,7 +5867,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                                             self.objdir)
             )
 
-    def addMakeUploadSteps(self):
+    def addMakeUploadSteps(self, subdir=None, sendchange=True,
+                           locale=None):
         self.addStep(SetProperty,
             name="get_buildid",
             command=['python', 'config/printconfigsetting.py',
@@ -5897,6 +5918,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                 uploadArgs['builddir'] = WithProperties('%(builddir)s')
             else:
                 uploadArgs['to_tinderbox_dated'] = True
+        if subdir:
+            uploadArgs['builddir'] = subdir
 
         if self.nightly:
             uploadArgs['to_dated'] = True
@@ -5905,9 +5928,12 @@ class MobileBuildFactory(MozillaBuildFactory):
 
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
 
+        makeUploadCommand = ['make', 'upload']
+        if locale:
+            makeUploadCommand += ['AB_CD=%s' % locale]
         self.addStep(SetProperty(
             name='make_upload',
-            command=['make', 'upload'],
+            command=makeUploadCommand,
             env=uploadEnv,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
                                   self.objdir),
@@ -5922,7 +5948,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 sendchangePlatform = 'android'
             if 'linux' in self.platform:
                 sendchangePlatform = 'linux'
-        if sendchangePlatform:
+        if sendchangePlatform and sendchange:
             talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
             for master, warn, retries in self.talosMasters:
                 self.addStep(SendChangeStep(
@@ -5935,6 +5961,22 @@ class MobileBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange")
                 )
+
+    def addMultiLocaleSteps(self):
+        mergeLocalesArg = "--merge-locales"
+        if not self.mergeLocales:
+            mergeLocalesArg = "--no-merge-locales"
+        self.addStep(ShellCommand(
+            name='run_multil10n',
+            command=['python', 'mozharness/scripts/multil10n.py',
+                     '--config-file', self.mozharnessConfig,
+                     mergeLocalesArg,
+                     '--only-pull-locale-source', '--only-add-locales'],
+            workdir=self.baseWorkDir,
+            description=['running', 'multil10n', 'steps'],
+            descriptionDone=['ran', 'multil10n', 'steps'],
+            haltOnFailure=True
+        ))
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
     def __init__(self, packageGlobList=['-r', 'mobile/dist/*.tar.bz2',
@@ -7900,9 +7942,18 @@ class AndroidBuildFactory(MobileBuildFactory):
         if self.createSnippet:
             self.addUpdateSteps()
         self.addSymbolSteps()
-        self.addMakeUploadSteps()
+        if self.multiLocale:
+            self.addMakeUploadSteps(subdir="en-US")
+        else:
+            self.addMakeUploadSteps()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
+        if self.multiLocale:
+            self.addMultiLocaleSteps()
+            self.addPackageSteps(locale='multi')
+            if self.createSnippet:
+                self.addUpdateSteps()
+            self.addMakeUploadSteps(sendchange=False, locale='multi')
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
@@ -7939,16 +7990,21 @@ class AndroidBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
 
-    def addPackageSteps(self):
+    def addPackageSteps(self, locale=None):
         if self.env is None:
             envJava = {}
         else:
             envJava = self.env.copy()
             envJava['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
+        makePackageCommand = ['make', 'package']
+        makePackageTestsCommand = ['make', 'package']
+        if locale:
+            makePackageCommand += ['AB_CD=%s' % locale]
+            makePackageTestsCommand += ['AB_CD=%s' % locale]
 
         self.addStep(ShellCommand,
             name='make_android_pkg',
-            command=['make', 'package'],
+            command=makePackageCommand,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
             description=['make', 'android', 'package'],
             env=envJava,
@@ -7956,7 +8012,7 @@ class AndroidBuildFactory(MobileBuildFactory):
         )
         self.addStep(ShellCommand,
            name='make_pkg_tests',
-           command=['make', 'package-tests'],
+           command=makePackageTestsCommand,
            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
            env=envJava,
            haltOnFailure=True,
@@ -7983,7 +8039,7 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addStep(SetProperty(
             name='test_previous_apk',
             property='previousApk',
-            command=['ls', 'previous.apk'],
+            command='test -s previous.apk && ls previous.apk',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             flunkOnFailure=False,
             haltOnFailure=False,
@@ -8148,10 +8204,10 @@ class AndroidBuildFactory(MobileBuildFactory):
             haltOnFailure=True,
         ))
 
-    def addMakeUploadSteps(self):
+    def addMakeUploadSteps(self, **kwargs):
         if self.createSnippet:
             self.getPreviousBuildID()
-        MobileBuildFactory.addMakeUploadSteps(self)
+        MobileBuildFactory.addMakeUploadSteps(self, **kwargs)
         # ausFullUploadDir contains an interpolation of the buildid property.
         # We expect the property to be set by the parent call to
         # addUploadSteps()
