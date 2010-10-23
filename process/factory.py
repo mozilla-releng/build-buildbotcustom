@@ -7997,7 +7997,7 @@ class AndroidBuildFactory(MobileBuildFactory):
             envJava = self.env.copy()
             envJava['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
         makePackageCommand = ['make', 'package']
-        makePackageTestsCommand = ['make', 'package']
+        makePackageTestsCommand = ['make', 'package-tests']
         if locale:
             makePackageCommand += ['AB_CD=%s' % locale]
             makePackageTestsCommand += ['AB_CD=%s' % locale]
@@ -8021,21 +8021,24 @@ class AndroidBuildFactory(MobileBuildFactory):
     def previousApkExists(self, step):
         return step.build.getProperties().has_key("previousApk") and len(step.build.getProperty("previousApk")) > 0;
 
-    def getPreviousApk(self):
+    def getPreviousApk(self, subdir=None):
+        url = '%s/nightly/%s/' % (self.downloadBaseURL, self.latestDir)
+        if subdir:
+            url += "%s/" % subdir
+        url += "%(completeMarFilename)s"
         self.addStep(ShellCommand(
             name='get_previous_apk',
             description=['get', 'previous', 'apk'],
             command=['bash', '-c',
-                     WithProperties('wget -O previous.apk %s/nightly/%s/%%(completeMarFilename)s' % \
-                     (self.downloadBaseURL, self.latestDir))],
+                     WithProperties('wget -O previous.apk %s' % url)],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             flunkOnFailure=False,
             haltOnFailure=False,
             warnOnFailure=True
         ))
 
-    def getPreviousBuildID(self):
-        self.getPreviousApk()
+    def getPreviousBuildID(self, subdir=None):
+        self.getPreviousApk(subdir=subdir)
         self.addStep(SetProperty(
             name='test_previous_apk',
             property='previousApk',
@@ -8204,10 +8207,10 @@ class AndroidBuildFactory(MobileBuildFactory):
             haltOnFailure=True,
         ))
 
-    def addMakeUploadSteps(self, **kwargs):
+    def addMakeUploadSteps(self, subdir=None, **kwargs):
         if self.createSnippet:
-            self.getPreviousBuildID()
-        MobileBuildFactory.addMakeUploadSteps(self, **kwargs)
+            self.getPreviousBuildID(subdir=subdir)
+        MobileBuildFactory.addMakeUploadSteps(self, subdir=subdir, **kwargs)
         # ausFullUploadDir contains an interpolation of the buildid property.
         # We expect the property to be set by the parent call to
         # addUploadSteps()
