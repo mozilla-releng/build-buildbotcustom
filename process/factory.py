@@ -54,12 +54,14 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", 
+    for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip|apk))",
                         "\n".join([stdout, stderr]), re.M):
         if m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
             retval['testsUrl'] = m
+        elif m.endswith("apk") and 'unsigned' in m:
+            retval['unsignedApkUrl'] = m
         else:
             retval['packageUrl'] = m
     return retval
@@ -5389,6 +5391,11 @@ class MobileBuildFactory(MozillaBuildFactory):
                  updatePlatform=None, ausHost=None,
                  downloadBaseURL=None, ausPreviousUploadDir=None,
                  ausFullUploadDir=None,
+                 multiLocale=False,
+                 mozharnessRepoPath="users/asasaki_mozilla.com/mozharness",
+                 mozharnessRevision="PRODUCTION",
+                 mozharnessConfig=None,
+                 mergeLocales=True,
                  **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -5455,6 +5462,16 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.mozChangesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.mobileChangesetLink = '<a href=%s/rev' % (self.mobileRepository)
         self.mobileChangesetLink += '/%(hg_revision)s title="Built from Mobile revision %(hg_revision)s">mobile:%(hg_revision)s</a>'
+
+        self.multiLocale = multiLocale
+        if multiLocale:
+            assert mozharnessConfig
+            self.mozharnessRepoPath = mozharnessRepoPath
+            self.mozharnessRevision = mozharnessRevision
+            self.mozharnessConfig = mozharnessConfig
+            self.mozharnessRepository = self.getRepository(self.mozharnessRepoPath)
+            self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
+            self.mergeLocales = mergeLocales
 
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
@@ -5543,6 +5560,11 @@ class MobileBuildFactory(MozillaBuildFactory):
                             changesetLink=self.mobileChangesetLink,
                             revision=self.mobileRevision,
                             targetDirectory='mobile')
+        if hasattr(self, 'mozharnessRepository'):
+            self.addHgPullSteps(repository=self.mozharnessRepository,
+                                workdir=self.baseWorkDir,
+                                revision=self.mozharnessRevision,
+                                cloneTimeout=60*30)
 
     def addSymbolSteps(self):
         if self.uploadSymbols:
@@ -5600,7 +5622,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                                         self.objdir)
         )
 
-    def addMakeUploadSteps(self):
+    def addMakeUploadSteps(self, subdir=None, locale=None):
         self.addStep(SetProperty,
             name="get_buildid",
             command=['python', 'config/printconfigsetting.py',
@@ -5638,12 +5660,17 @@ class MobileBuildFactory(MozillaBuildFactory):
             postUploadCmd += ['-b %s-%s' % (self.branchName, self.platform),
                               '--release-to-latest',
                               '--release-to-dated']
+        if subdir:
+            postUploadCommand += ['--builddir %s' % subdir]
 
         uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
 
+        makeUploadCommand=['make', 'upload']
+        if locale:
+            makeUploadCommand += ['AB_CD=%s' % locale]
         self.addStep(SetProperty(
             name='make_upload',
-            command=['make', 'upload'],
+            command=makeUploadCommand,
             env=uploadEnv,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
                                         self.objdir),
@@ -5652,6 +5679,22 @@ class MobileBuildFactory(MozillaBuildFactory):
             description=['make', 'upload'],
             timeout=40*60 # 40 minutes
         ))
+
+    def addMultiLocaleSteps(self):
+        mergeLocalesArg = "--merge-locales"
+        if not self.mergeLocales:
+            mergeLocalesArg = "--no-merge-locales"
+        self.addStep(ShellCommand(
+            name='run_multil10n',
+            command=['python', 'mozharness/scripts/multil10n.py',
+                     '--config-file', self.mozharnessConfig,
+                     mergeLocalesArg,
+                     '--only-pull-locale-source', '--only-add-locales'],
+            workdir=self.baseWorkDir,
+            description=['running', 'multil10n', 'steps'],
+            descriptionDone=['ran', 'multil10n', 'steps'],
+            haltOnFailure=True
+        )) 
 
 class MobileDesktopBuildFactory(MobileBuildFactory):
     def __init__(self, packageGlobList=['-r', 'mobile/dist/*.tar.bz2',
@@ -5917,7 +5960,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
     
-    def prepUpload(self, localeDir='en-US', uploadDir=None):
+    def prepUpload(self, localeDir='', uploadDir=None, subdir=None):
         """This function is only called by the nightly and dependent
         single-locale build since we want to upload the localeDir
         subdirectory as a whole."""
@@ -5926,6 +5969,10 @@ class MaemoBuildFactory(MobileBuildFactory):
         # scp -r maemo/en-US, which loses that directory structure.
         if not uploadDir:
             uploadDir = "dist/%s" % localeDir
+        origPackageGlob = self.packageGlob
+        self.packageGlob = '-r %s' % uploadDir
+        if subdir:
+            uploadDir += "/%s" % subdir
         self.addStep(ShellCommand,
             name='prepare_upload',
             command=['mkdir', '-p', uploadDir],
@@ -5934,12 +5981,9 @@ class MaemoBuildFactory(MobileBuildFactory):
         )
         self.addStep(ShellCommand,
             name='cp_binaries',
-            command=['sh', '-c', 'cp %s %s' % (self.packageGlob, uploadDir)],
+            command=['sh', '-c', 'cp %s %s' % (origPackageGlob, uploadDir)],
             workdir=self.objdirAbsPath,
         )
-        # Now that we have moved all the packages that we want under localeDir
-        # let's indicate that we want to upload the whole directory
-        self.packageGlob = '-r %s' % uploadDir
 
     def uploadEnUS(self):
         self.prepUpload(localeDir='en-US')
@@ -6076,12 +6120,12 @@ class MaemoReleaseBuildFactory(MaemoBuildFactory):
 
     def uploadEnUS(self):
         self.prepUpload(localeDir='%s/en-US' % self.platform,
-                        uploadDir=self.platform)
+                        uploadDir=self.platform, subdir="en-US")
         self.addUploadSteps(platform='linux')
         
     def uploadMulti(self):
         self.prepUpload(localeDir='%s/multi' % self.platform,
-                        uploadDir=self.platform)
+                        uploadDir=self.platform, subdir="multi")
         self.addStep(SetProperty,
             command=['python', 'config/printconfigsetting.py',
                      '%s/dist/bin/application.ini' % (self.objdir),
@@ -7354,7 +7398,9 @@ class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
                           '-p %s' % self.productName,
                           '-v %s' % self.version,
                           '-n %s' % self.buildNumber,
-                          '--release-to-candidates-dir']
+                          '--nightly-dir candidates',
+                          '--builddir %s' % self.platform,
+                          '--release-to-mobile-candidates-dir']
         uploadEnv['POST_UPLOAD_CMD'] = ' '.join(postUploadCmd)
         self.addStep(ShellCommand(
          name='echo_buildID',
@@ -7395,12 +7441,21 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
-        if self.createSnippet:
+        if not self.multiLocale and self.createSnippet:
             self.addUpdateSteps()
         self.addSymbolSteps()
-        self.addUploadSteps(platform=self.uploadPlatform)
+        if self.multiLocale:
+            self.addMakeUploadSteps(subdir="en-US")
+        else:
+            self.addMakeUploadSteps()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
+        if self.multiLocale:
+            self.addMultiLocaleSteps()
+            self.addPackageSteps(locale='multi')
+            if self.createSnippet:
+                self.addUpdateSteps()
+            self.addMakeUploadSteps(locale='multi')
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
@@ -7436,57 +7491,60 @@ class AndroidBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
 
-    def addPackageSteps(self):
+    def addPackageSteps(self, locale=None):
         # forcing of PATH to contain jdk6 is only required while bug #562461 is active
         if self.env is None:
             envJava = {}
         else:
             envJava = self.env.copy()
         envJava['PATH']      = '/tools/jdk6/bin:%s' % envJava.get('PATH', os.environ['PATH'])
-        envJava['JARSIGNER'] = '../../../../../tools/release/signing/mozpass.py'
+        envJava['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
+
+        makePackageCommand = ['make', 'package']
+        makePackageTestsCommand = ['make', 'package-tests']
+        if locale:
+            makePackageCommand += ['AB_CD=%s' % locale]
+            makePackageTestsCommand += ['AB_CD=%s' % locale]
 
         self.addStep(ShellCommand,
             name='make_android_pkg',
-            command=['make', '-C', 'embedding/android'],
+            command=makePackageCommand,
             workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
             description=['make', 'android', 'package'],
             env=envJava,
             haltOnFailure=True,
         )
-        # self.addStep(ShellCommand,
-        #    name='make_android_pkg',
-        #    command=['make', 'package'],
-        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-        #    description=['make', 'android', 'package'],
-        #    env=self.env,
-        #    haltOnFailure=True,
-        # )
-        # self.addStep(ShellCommand,
-        #    name='make_pkg_tests',
-        #    command=['make', 'package-tests'],
-        #    workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-        #    env=self.env,
-        #    haltOnFailure=True,
-        # )
+        self.addStep(ShellCommand,
+            name='make_pkg_tests',
+            command=makePackageTestsCommand,
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            env=self.env,
+            haltOnFailure=True,
+        )
 
-    def getPreviousApk(self):
+    def getPreviousApk(self, subdir=None, **kwargs):
+        url = '%s/nightly/%s/' % (self.downloadBaseUrl, self.latestDir)
+        if subdir:
+            url += "%s/" % subdir
+        url += "%(completeMarFilename)s" # this is probably going to break
+
         self.addStep(ShellCommand(
             name='get_previous_apk',
             description=['get', 'previous', 'apk'],
-            command=['bash', '-c', 'wget -O previous.apk %s/nightly/%s/fennec.apk' % \
-              (self.downloadBaseURL, self.latestDir)],
+            command=['bash', '-c',
+                     WithProperties('wget -O previous.apk %s' % url)],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             flunkOnFailure=False,
             haltOnFailure=False,
             warnOnFailure=True
         ))
 
-    def getPreviousBuildID(self):
-        self.getPreviousApk()
+    def getPreviousBuildID(self, subdir=None, **kwargs):
+        self.getPreviousApk(subdir=subdir, **kwargs)
         self.addStep(SetProperty(
             name='test_previous_apk',
             property='previousApk',
-            command=['ls', 'previous.apk'],
+            command='test -s previous.apk && ls previous.apk',
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             flunkOnFailure=False,
             haltOnFailure=False,
@@ -7530,8 +7588,8 @@ class AndroidBuildFactory(MobileBuildFactory):
     def addUpdateSteps(self):
         # Normally we'd make a mar first, but we'll create a snippet of
         # the apk for now.
-        self.addFilePropertiesSteps(filename='fennec.apk',
-                                    directory='%s/%s/%s/embedding/android' % \
+        self.addFilePropertiesSteps(filename='fennec*.apk',
+                                    directory='%s/%s/%s/dist' % \
                                       (self.baseWorkDir, self.branchName,
                                        self.objdir),
                                     fileType='completeMar',
@@ -7658,25 +7716,32 @@ class AndroidBuildFactory(MobileBuildFactory):
             warnOnFailure=True,
         ))
 
-    def addUploadSteps(self, platform):
+    def addMakeUploadSteps(self, subdir=None, **kwargs):
         if self.createSnippet:
-            self.getPreviousBuildID()
-        MobileBuildFactory.addUploadSteps(self, platform)
+            self.getPreviousBuildID(subdir=subdir)
+        MobileBuildFactory.addMakeUploadSteps(self, subdir=subdir, **kwargs)
         if self.createSnippet:
             self._uploadSnippet()
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
-    def __init__(self, previousCandidateDir, currentCandidateDir, **kwargs):
+    def __init__(self, previousCandidateDir, currentCandidateDir,
+                 version, previousVersion, buildNumber, **kwargs):
         self.previousCandidateDir = previousCandidateDir
         self.currentCandidateDir = currentCandidateDir
+        self.version = version
+        self.previousVersion = previousVersion
+        self.buildNumber = buildNumber
         AndroidBuildFactory.__init__(self, **kwargs)
 
-    def getPreviousApk(self):
+    def getPreviousApk(self, subdir=None, locale="en-US"):
+        url = '%s/%s/' % (self.downloadBaseURL, self.previousCandidateDir)
+        if subdir:
+            url += '%s/' % subdir
+        url += 'fennec-%s.%s.eabi-arm.apk' % (self.previousVersion, locale)
         self.addStep(ShellCommand(
             name='get_previous_apk',
             description=['get', 'previous', 'apk'],
-            command=['bash', '-c', 'wget -O previous.apk %s/%s/fennec.apk' % \
-                     (self.downloadBaseURL, self.previousCandidateDir)],
+            command=['bash', '-c', 'wget -O previous.apk %s' % url],
             workdir='%s/%s' % (self.baseWorkDir, self.branchName),
             flunkOnFailure=False,
             haltOnFailure=False,
@@ -7694,9 +7759,9 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
             hashType=self.hashType)
         )
 
-    def addUploadSteps(self, platform):
+    def addMakeUploadSteps(self, subdir=None, locale="en-US", **kwargs):
         if self.createSnippet:
-            self.getPreviousBuildID()
+            self.getPreviousBuildID(subdir=subdir, locale=locale)
         self.addStep(SetProperty,
             name="get_buildid",
             command=['python', '../config/printconfigsetting.py',
@@ -7707,36 +7772,52 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
             description=['getting', 'buildid'],
             descriptionDone=['got', 'buildid']
         )
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1',
+                          'UPLOAD_SSH_KEY': '~.ssh/%s' % self.stageSshKey})
         self.addStep(ShellCommand,
          name='echo_buildID',
          command=['bash', '-c',
                   WithProperties('echo buildID=%(buildid)s > ' + \
-                                 '%s_info.txt' % self.platform)],
-         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
+                                '%s_info.txt' % self.platform)],
+         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName,
+                                    self.objdir)
         )
-        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
-                                                    self.platform)
-        self.addStep(MozillaStageUpload,
-            name="upload_to_stage",
-            description=['upload','to','stage'],
-            objdir=self.branchName,
-            username=self.stageUsername,
-            milestone='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
-            remoteHost=self.stageServer,
-            remoteBasePath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=False,
-            releaseToDated=False,
-            releaseToTinderboxBuilds=False,
-            releaseToCandidates=True,
-            tinderboxBuildsDir='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
-            remoteCandidatesPath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
+
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
+                          'UPLOAD_USER': self.stageUsername,
+                          'UPLOAD_TO_TEMP': '1',
+                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
+        if self.stageSshKey:
+            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
+
+        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
+                                       '-p %s ' % self.productName + \
+                                       '-v %s ' % self.version + \
+                                       '-n %s ' % self.buildNumber + \
+                                       '--release-to-candidates-dir ' + \
+                                       '--nightly-dir candidates '
+        if subdir:
+             uploadEnv['POST_UPLOAD_CMD'] += '--builddir %s/%s' % (self.platform,
+                                             subdir)
+        else:
+             uploadEnv['POST_UPLOAD_CMD'] += '--builddir %s' % self.platform
+        command=['make', 'upload']
+        if locale:
+            command += ['AB_CD=%s' % locale]
+        self.addStep(SetProperty,
+         name='make_upload',
+         command=command,
+         env=uploadEnv,
+         workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
+                               self.objdir),
+         extract_fn = parse_make_upload,
+         haltOnFailure=True,
+         description=['upload'],
+         timeout=60*60 # 60 minutes
         )
         if self.createSnippet:
             self._uploadSnippet()
