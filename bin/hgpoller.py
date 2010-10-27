@@ -165,7 +165,7 @@ if __name__ == '__main__':
         'ca_certs': None,
         'interval': 300,
         'state_file': 'state.json',
-        'default_branch_only': True,
+        'default_branch_only': "yes",
         })
     config.read(options.config_file)
 
