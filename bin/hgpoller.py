@@ -124,6 +124,8 @@ def processBranch(branch, state, config):
             if c['branch'] != 'default' and config.getboolean(branch, 'default_branch_only'):
                 log.info("Skipping %s on branch %s", c['changeset'], c['branch'])
                 continue
+            # Change the comments to include the url to the revision
+            c['comments'] += ' %s/rev/%s' % (url, c['changeset'])
             sendchange(master, branch, c)
 
     except urllib2.HTTPError, e:
