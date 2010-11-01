@@ -228,15 +228,25 @@ def _nextSlowSlave(builder, available_slaves):
         log.err()
         return random.choice(available_slaves)
 
-def _nextFastSlave(builder, available_slaves):
+def _nextFastSlave(builder, available_slaves, only_fast=False):
     try:
+        if only_fast:
+            # Check that the builder has some fast slaves configured.
+            # We do this because some machines classes don't have a fast/slow distinction, and
+            # so they default to 'slow'
+            fast, slow = _partitionSlaves(builder.slaves)
+            if not fast:
+                log.msg("Builder '%s' has no fast slaves configured, but only_fast is enabled; disabling only_fast" % builder.name)
+                only_fast = False
+
         fast, slow = _partitionUnreservedSlaves(available_slaves)
+
         # Choose the fast slave that was most recently on this builder
         # If there aren't any fast slaves, choose the slow slave that was most
-        # recently on this builder
+        # recently on this builder if only_fast is False
         if fast:
             return sorted(fast, _recentSort(builder))[-1]
-        elif slow:
+        elif slow and not only_fast:
             return sorted(slow, _recentSort(builder))[-1]
         else:
             return []
@@ -885,6 +895,8 @@ def generateBranchObjects(config, name):
             'factory': mozilla2_dep_factory,
             'category': name,
             'nextSlave': _nextFastSlave,
+            # Uncomment to enable only fast slaves for dep builds.
+            #'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
             'properties': {'branch': name, 'platform': platform},
         }
         branchObjects['builders'].append(mozilla2_dep_builder)
@@ -965,7 +977,7 @@ def generateBranchObjects(config, name):
                 'builddir': '%s-%s-nightly' % (name, platform),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
-                'nextSlave': _nextFastSlave,
+                'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
                 'properties': {'branch': name, 'platform': platform},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
