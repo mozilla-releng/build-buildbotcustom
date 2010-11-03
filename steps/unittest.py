@@ -533,7 +533,7 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
     warnOnWarnings = True
 
     def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
-            chunkByDir=None, totalChunks=None, thisChunk=None,
+            chunkByDir=None, totalChunks=None, thisChunk=None, testPath=None,
             **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
@@ -543,7 +543,7 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
 
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
                 leakThreshold=leakThreshold, chunkByDir=chunkByDir,
-                totalChunks=totalChunks, thisChunk=thisChunk)
+                totalChunks=totalChunks, thisChunk=thisChunk, testPath=testPath)
 
         if totalChunks:
             self.name = 'mochitest-%s-%i' % (variant, thisChunk)
@@ -555,6 +555,8 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
                 WithProperties('--extra-profile-file=bin/plugins'),
                 '--certificate-path=certs', '--autorun', '--close-when-done',
                 '--console-level=INFO']
+        if testPath:
+            self.command.append("--test-path=%s" % testPath)
 
         if symbols_path:
             self.command.append("--symbols-path=%s" % symbols_path)
@@ -591,7 +593,7 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
 
         failIdent = r"^\d+ INFO Failed: 0"
         # Support browser-chrome result summary format which differs from MozillaMochitest's.
-        if self.name == 'mochitest-browser-chrome':
+        if 'browser-chrome' in self.name:
             failIdent = r"^\tFailed: 0"
         # Assume that having the 'failIdent' line
         # means the tests run completed (successfully).

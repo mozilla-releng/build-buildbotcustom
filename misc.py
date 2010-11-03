@@ -340,6 +340,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
         slavenames = config['platforms'][platform]['slaves']
     else:
         slavenames = slaves
+    productName = 'fennec' if 'mobile' in name_prefix else 'firefox'
+    posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
         for i in range(totalChunks):
@@ -350,6 +352,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
                 crashtest_leak_threshold=crashtestLeakThreshold,
                 hgHost=config['hghost'],
                 repoPath=config['repo_path'],
+                productName=productName,
+                posixBinarySuffix=posixBinarySuffix,
                 buildToolsRepoPath=config['build_tools_repo_path'],
                 buildSpace=1.0,
                 buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
@@ -378,6 +382,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix, build_dir_pr
             crashtest_leak_threshold=crashtestLeakThreshold,
             hgHost=config['hghost'],
             repoPath=config['repo_path'],
+            productName=productName,
+            posixBinarySuffix=posixBinarySuffix,
             buildToolsRepoPath=config['build_tools_repo_path'],
             buildSpace=1.0,
             buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
@@ -2014,6 +2020,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     testTypes.append('opt')
                 if branch_config['platforms'][platform].get('enable_debug_unittests'):
                     testTypes.append('debug')
+                if branch_config['platforms'][platform].get('enable_mobile_unittests'):
+                    testTypes.append('mobile')
 
                 merge_tests = branch_config.get('enable_merging', True)
 
@@ -2023,6 +2031,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     unittest_suites = "%s_unittest_suites" % test_type
                     if test_type == "debug":
                         slave_platform_name = "%s-debug" % slave_platform
+                    elif test_type == "mobile":
+                        slave_platform_name = "%s-mobile" % slave_platform
                     else:
                         slave_platform_name = slave_platform
 

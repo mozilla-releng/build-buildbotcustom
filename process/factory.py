@@ -6486,9 +6486,20 @@ def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
 
 class MozillaTestFactory(MozillaBuildFactory):
     def __init__(self, platform, productName='firefox',
-                 downloadSymbols=True, downloadTests=False, **kwargs):
+                 downloadSymbols=True, downloadTests=False,
+                 posixBinarySuffix='-bin', **kwargs):
+        #Note: the posixBinarySuffix is needed because some products (firefox)
+        #use 'firefox-bin' and some (fennec) use 'fennec' for the name of the
+        #actual application binary.  This is only applicable to posix-like
+        #systems.  Windows always uses productName.exe (firefox.exe and
+        #fennec.exe)
         self.platform = platform.split('-')[0]
         self.productName = productName
+        if not posixBinarySuffix:
+            #all forms of no should result in empty string
+            self.posixBinarySuffix = ''
+        else:
+            self.posixBinarySuffix = posixBinarySuffix
         self.downloadSymbols = downloadSymbols
         self.downloadTests = downloadTests
 
@@ -6568,7 +6579,7 @@ class MozillaTestFactory(MozillaBuildFactory):
         # Find the application binary!
         if self.platform.startswith('macosx'):
             self.addStep(FindFile(
-                filename="%s-bin" % self.productName,
+                filename="%s%s" % (self.productName, self.posixBinarySuffix),
                 directory=".",
                 filetype="file",
                 max_depth=4,
@@ -6583,7 +6594,8 @@ class MozillaTestFactory(MozillaBuildFactory):
         else:
             self.addStep(SetBuildProperty(
              property_name="exepath",
-             value="%s/%s-bin" % (self.productName, self.productName),
+             value="%s/%s%s" % (self.productName, self.productName,
+                                self.posixBinarySuffix),
             ))
 
         def get_exedir(build):
@@ -6713,7 +6725,31 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         # Run them!
         for suite in self.test_suites:
             leak_threshold = self.leak_thresholds.get(suite, None)
-            if suite.startswith('mochitest'):
+            if suite.startswith('mobile-mochitest'):
+                # Mobile specific mochitests need a couple things to be
+                # set differently compared to non-mobile specific tests
+                real_suite = suite[len('mobile-'):]
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='mochitest',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
+
+                variant = real_suite.split('-', 1)[1]
+                self.addStep(unittest_steps.MozillaPackagedMochitests(
+                 variant=variant,
+                 env=self.env,
+                 symbols_path='symbols',
+                 testPath='mobile',
+                 leakThreshold=leak_threshold,
+                 chunkByDir=self.chunkByDir,
+                 totalChunks=self.totalChunks,
+                 thisChunk=self.thisChunk,
+                 maxTime=90*60, # One and a half hours, to allow for slow minis
+                ))
+            elif suite.startswith('mochitest'):
                 # Unpack the tests
                 self.addStep(UnpackTest(
                  filename=WithProperties('%(tests_filename)s'),
