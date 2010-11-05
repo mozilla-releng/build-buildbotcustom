@@ -2380,6 +2380,7 @@ def generateFuzzingObjects(config, SLAVES):
     f = ScriptFactory(
             config['scripts_repo'],
             'scripts/fuzzing/fuzzer.sh',
+            interpreter='bash',
             script_timeout=1500,
             script_maxtime=1800,
             )
