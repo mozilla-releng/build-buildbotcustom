@@ -671,7 +671,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             commitPatcherConfig=(not staging),
             clobberURL=branchConfig['base_clobber_url'],
             oldRepoPath=releaseConfig['sourceRepoPath'],
-            triggerSchedulers=['major_update_verify'],
+            triggerSchedulers=[builderPrefix('major_update_verify')],
             releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
         )
 
