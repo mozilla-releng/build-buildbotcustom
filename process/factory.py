@@ -6837,6 +6837,45 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  symbols_path='symbols',
                  maxTime=2*60*60, # Two Hours
                 ))
+            elif suite == 'mozmill':
+
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='mozmill',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
+
+                # install mozmill into its virtualenv
+                self.addStep(ShellCommand(
+                    name='install mozmill',
+                    command=['python',
+                             'mozmill/installmozmill.py'],
+                    flunkOnFailure=True,
+                    haltOnFailure=True,
+                    ))
+
+                # run the mozmill tests
+                self.addStep(unittest_steps.MozillaPackagedMozmillTests(
+                    name="run_mozmill",
+                    tests_dir='tests/firefox',
+                    binary='../%(exepath)s',
+                    platform=self.platform,
+                    workdir='build/mozmill',
+                    timeout=10*60,
+                    flunkOnFailure=True
+                    ))
+                self.addStep(unittest_steps.MozillaPackagedMozmillTests(
+                    name="run_mozmill_restart",
+                    tests_dir='tests/firefox/restartTests',
+                    binary='../%(exepath)s',
+                    platform=self.platform,
+                    restart=True,
+                    workdir='build/mozmill',
+                    timeout=5*60,
+                    flunkOnFailure=True
+                    ))                    
 
 class TalosFactory(BuildFactory):
     extName = 'addon.xpi'

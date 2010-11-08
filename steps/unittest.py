@@ -187,6 +187,26 @@ def summarizeTUnit(name, log):
     return "TinderboxPrint: %s<br/>%s\n" % (name,
         summaryText(passCount, failCount, leaked = leaked))
 
+def summarizeMozmillLog(name, log):
+    log = log.getText()
+    summary = { 'Passed': None,
+                'Failed': None,
+                'Skipped': None }
+    beginnings = dict([(i, 'INFO %s:' % i) for i in summary])
+    for line in log.splitlines():
+        for condition in summary:
+            beginning = beginnings[condition]
+        if line.startswith(beginning):
+                n = line.split(beginning, 1)[-1].strip()
+                try:
+                    summary[condition] = int(n)
+                except ValueError:
+                    continue
+    
+    _summaryText = summaryText(summary.get('Passed', 0),
+                               summary.get('Failed', 0))
+    return 'TinderboxPrint: %s<br/>%s\n' % (name, _summaryText)
+
 
 class ShellCommandReportTimeout(ShellCommand):
     """We subclass ShellCommand so that we can bubble up the timeout errors
@@ -214,6 +234,69 @@ class ShellCommandReportTimeout(ShellCommand):
             return worst_status(superResult, WARNINGS)
 
         return superResult
+
+class MozillaPackagedMozmillTests(ShellCommandReportTimeout):
+    warnOnFailure=True
+    warnOnWarnings=True
+
+    def __init__(self, tests_dir, binary, platform, restart=False, **kwargs):
+        """
+        run mozmill tests;
+        should be run from the mozmill virtualenv directory
+        - tests_dir : path to the tests to run
+        - binary : path to the binary to be used
+        - platform : system platform
+        - restart : whether to run the restart tests
+        """
+        
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+
+        self.addFactoryArguments(tests_dir=tests_dir,
+                                 binary=binary,
+                                 platform=platform,
+                                 restart=restart)
+
+        # set platform-dependent python scripts
+        # relative to the created virtualenv
+        if platform == "win32":
+            python = 'Scripts/python'
+            if restart:
+                mozmill = 'Scripts/mozmill-restart-script.py'
+            else:
+                mozmill = 'Scripts/mozmill-script.py'
+        else:
+            python = 'bin/python'
+            if restart:
+                mozmill = 'bin/mozmill-restart'
+            else:
+                mozmill = 'bin/mozmill'
+
+        # command to run
+        script = [
+            python,
+            '-E',
+            mozmill,
+            '--show-all',
+            '-b', binary,
+            '-t', tests_dir,
+            ]
+        self.command = ['bash', '-c', WithProperties(' '.join(script))]
+            
+    def createSummary(self, log):
+        self.addCompleteLog('summary', summarizeMozmillLog(self.name, log))
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        if superResult == FAILURE:
+            superResult = WARNINGS
+        
+        # If we find "TEST-UNEXPECTED", then return WARNINGS
+        if "TEXT-UNEXPECTED" in cmd.logs['stdio'].getText():
+            return worst_status(superResult, WARNINGS)
+
+        return worst_status(superResult, SUCCESS)
+
 
 class MozillaCheckoutClientMk(ShellCommandReportTimeout):
     haltOnFailure = True
