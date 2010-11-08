@@ -6210,7 +6210,9 @@ class MaemoBuildFactory(MobileBuildFactory):
                 name='rm_old_builds',
                 command=['bash', '-c', 'rm -rf %s/%s/dist/fennec* ' %
                          (self.branchName, self.objdir) +
-                         '%s/%s/mobile/*.deb' %
+                         '%s/%s/mobile/*.deb ' %
+                         (self.branchName, self.objdir) +
+                         '%s/%s/dist/bin' %
                          (self.branchName, self.objdir)],
                 workdir=self.baseWorkDir,
                 description=['removing', 'old', 'builds'],
