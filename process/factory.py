@@ -5835,6 +5835,36 @@ class MobileBuildFactory(MozillaBuildFactory):
                 workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
                                       self.objdir),
             ))
+            if 'maemo5-gtk' in self.platform:
+                self.addStep(SetProperty(
+                    name='find_browser',
+                    command=['bash', '-c', 'ls fennec-*.linux-gnueabi-arm.tar.bz2'],
+                    property='browser_file',
+                    workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName,
+                                          self.objdir),
+                ))
+    
+                http_remote_path = remote_location.replace('/home/ftp/pub/', 'pub/mozilla.org/')
+                stage_dir = 'http://%s/%s' % (self.stageServer, http_remote_path)
+                browser_http_path_string = stage_dir + '/%(browser_file)s'
+    
+                files = [WithProperties(browser_http_path_string)]
+    
+                self.addStep(SendChangeStep(
+                    master='production-mobile-master.build.mozilla.org:9010',
+                    branch='tryserver-n900-gtk',
+                    files=files,
+                    revision=WithProperties('%(got_revision)s'),
+                    user=WithProperties('%(who)s'),
+                ))
+                self.addStep(SendChangeStep(
+                    master='staging-mobile-master.build.mozilla.org:9010',
+                    branch='tryserver-n900-gtk',
+                    files=files,
+                    revision=WithProperties('%(got_revision)s'),
+                    user=WithProperties('%(who)s'),
+                ))
+    
         else:
             self.addStep(SetProperty,
                 name="get_buildid",
