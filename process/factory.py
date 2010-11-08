@@ -5517,7 +5517,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  stageUsername=None, stageSshKey=None, stageServer=None,
                  stageBasePath=None, stageGroup=None,
                  baseUploadDir=None, baseWorkDir='build', nightly=False,
-                 uploadSymbols=False, productName='mobile',
+                 generateSymbols=False, uploadSymbols=False,
+                 productName='mobile',
                  clobber=False, env=None,
                  tinderboxBuildsDir=None,
                  mobileRevision='default',
@@ -5550,6 +5551,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.objdir = objdir
         self.platform = platform
         self.productName = productName
+        self.generateSymbols = generateSymbols
         self.uploadSymbols = uploadSymbols
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
@@ -5788,7 +5790,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                                     cloneTimeout=60*30)
 
     def addSymbolSteps(self):
-        if self.uploadSymbols:
+        if self.generateSymbols:
             self.addStep(ShellCommand,
                 name='make_buildsymbols',
                 command=['make', 'buildsymbols'],
@@ -5797,6 +5799,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 env=self.env,
                 haltOnFailure=True
             )
+        if self.uploadSymbols:
             self.addStep(ShellCommand,
                 name='make_uploadsymbols',
                 command=['make', 'uploadsymbols'],
@@ -6153,14 +6156,14 @@ class MaemoBuildFactory(MobileBuildFactory):
             self.addBuildSteps(extraEnv="L10NBASEDIR='../../%s'" % self.l10nRepoPath)
             # This will package the en-US single-locale build (no tests)
             self.addPackageSteps()
+            self.addSymbolSteps()
             self.uploadEnUS()
             self.useProgress = False
         else: # Normal single-locale nightly like Electrolysis and Tracemonkey
             self.addBuildSteps()
             self.addPackageSteps(packageTests=True)
+            self.addSymbolSteps()
             self.addUploadSteps(platform='linux')
-
-        self.addSymbolSteps()
 
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
@@ -6259,7 +6262,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             )
 
     def addSymbolSteps(self):
-        if self.uploadSymbols:
+        if self.generateSymbols:
             self.addStep(ShellCommand,
                 name='make_buildsymbols',
                 command=[self.scratchboxPath, '-p', '-d',
@@ -6269,6 +6272,7 @@ class MaemoBuildFactory(MobileBuildFactory):
                 env=self.env,
                 haltOnFailure=True
             )
+        if self.uploadSymbols:
             self.addStep(ShellCommand,
                 name='make_uploadsymbols',
                 command=[self.scratchboxPath, '-p', '-k', '-d',

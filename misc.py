@@ -2188,6 +2188,7 @@ def generateMobileBranchObjects(config, name):
             'stageBasePath': pf.get('stage_base_path', config.get('stage_base_path_mobile')),
             'mobileRepoPath': pf.get('mobile_repo_path', config.get('mobile_repo_path')),
             'uploadSymbols': False,
+            'generateSymbols': pf.get('generate_symbols', False),
             'platform': platform,
             'baseWorkDir': 'build', #Defaults to being under a slave builddir, which has tree info
             'baseUploadDir': '%s-%s' % (name, platform),
@@ -2251,7 +2252,7 @@ def generateMobileBranchObjects(config, name):
             builder_name = '%s nightly' % base_name
             nightly_kwargs = deepcopy(factory_kwargs)
             nightly_kwargs['nightly'] = True
-            nightly_kwargs['uploadSymbols'] = pf.get('upload_symbols', False)
+            nightly_kwargs['uploadSymbols'] = config.get('upload_mobile_symbols', False) and pf.get('generate_symbols', False)
             nightly_kwargs['createSnippet'] = createSnippet
             if multi_locale:
                 nightly_kwargs['multiLocale'] = multi_locale
