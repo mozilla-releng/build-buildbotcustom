@@ -5014,6 +5014,15 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir='build/%s' % self.objdir,
          )
 
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths.
+        if self.platform == 'win32':
+            self.addStep(SetProperty,
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
+            )
+
         if self.uploadPackages:
             self.addStep(ShellCommand,
              name='make_pkg',
@@ -5076,15 +5085,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange-unittest")
                 )
-
-        # Need to override toolsdir as set by MozillaBuildFactory because
-        # we need Windows-style paths.
-        if self.platform == 'win32':
-            self.addStep(SetProperty,
-                command=['bash', '-c', 'pwd -W'],
-                property='toolsdir',
-                workdir='tools'
-            )
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
 
