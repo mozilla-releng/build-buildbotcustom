@@ -196,7 +196,7 @@ def summarizeMozmillLog(name, log):
     for line in log.splitlines():
         for condition in summary:
             beginning = beginnings[condition]
-        if line.startswith(beginning):
+            if line.startswith(beginning):
                 n = line.split(beginning, 1)[-1].strip()
                 try:
                     summary[condition] = int(n)
