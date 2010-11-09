@@ -6947,6 +6947,7 @@ class TalosFactory(BuildFactory):
         self.productName = productName
         self.remoteExtras = remoteExtras
 
+        self.addInfoSteps()
         self.addCleanupSteps()
         self.addDmgInstaller()
         self.addDownloadBuildStep()
@@ -6962,6 +6963,12 @@ class TalosFactory(BuildFactory):
         self.addUpdateConfigStep()
         self.addRunTestStep()
         self.addRebootStep()
+
+    def addInfoSteps(self):
+        self.addStep(OutputStep(
+         name='tinderboxprint_slavename',
+         data=WithProperties('TinderboxPrint: s: %(slavename)s'),
+        ))
 
     def addCleanupSteps(self):
         if self.OS in ('xp', 'vista', 'win7', 'w764'):
