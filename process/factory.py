@@ -6545,6 +6545,10 @@ class MozillaTestFactory(MozillaBuildFactory):
 
         MozillaBuildFactory.__init__(self, **kwargs)
 
+        self.ignoreCerts = False
+        if self.branchName.lower().startswith('shadow'):
+            self.ignoreCerts = True
+
         self.addCleanupSteps()
         self.addPrepareBuildSteps()
         if self.downloadSymbols:
@@ -6606,6 +6610,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             filename_property='build_filename',
             url_property='build_url',
             haltOnFailure=True,
+            ignore_certs=self.ignoreCerts,
             name='download_build',
         ))
         self.addStep(UnpackFile(
@@ -6672,6 +6677,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             filename_property='symbols_filename',
             url_property='symbols_url',
             name='download_symbols',
+            ignore_certs=self.ignoreCerts,
             workdir='build/symbols'
         ))
         self.addStep(UnpackFile(
@@ -6697,6 +6703,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             filename_property='tests_filename',
             url_property='tests_url',
             haltOnFailure=True,
+            ignore_certs=self.ignoreCerts,
             name='download tests',
         ))
 
@@ -6932,6 +6939,9 @@ class TalosFactory(BuildFactory):
         self.supportUrlBase = supportUrlBase
         self.buildBranch = buildBranch
         self.branchName = branchName
+        self.ignoreCerts = False
+        if self.branchName.lower().startswith('shadow'):
+            self.ignoreCerts = True
         self.remoteTests = remoteTests
         self.configOptions = configOptions[:]
         self.talosCmd = talosCmd
@@ -7046,6 +7056,7 @@ class TalosFactory(BuildFactory):
          url_property="fileURL",
          filename_property="filename",
          workdir=self.workdirBase,
+         ignore_certs=self.ignoreCerts,
          name="Download build",
         ))
 
@@ -7303,6 +7314,7 @@ class TalosFactory(BuildFactory):
          url_fn=get_symbols_url,
          filename_property="symbolsFile",
          workdir=self.workdirBase,
+         ignore_certs=self.ignoreCerts,
          name="Download symbols",
         ))
         self.addStep(ShellCommand(
