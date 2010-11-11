@@ -2,9 +2,11 @@ import os
 
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
+from buildbot.status.mail import MailNotifier
 from buildbot.process.factory import BuildFactory
 
 from buildbotcustom.l10n import DependentL10n
+from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastSlave
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
@@ -22,10 +24,87 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         else:
             return "release-%s-%s" % (releaseConfig['sourceRepoName'], s)
 
+    def releasePrefix():
+        """Construct a standard format product release name from the
+           product name, version and build number stored in release_config.py
+        """
+        return "%s %s build%s" % (
+            releaseConfig['productName'].title(),
+            releaseConfig['version'],
+            releaseConfig['buildNumber'], )
+
+    def createReleaseMessage(mode, name, build, results, master_status):
+        """Construct a standard email to send to release@/release-drivers@
+           whenever a major step of the release finishes
+        """
+        msgdict = {}
+        releaseName = releasePrefix()
+        job_status = "failed" if results else "success"
+        allplatforms = list(releaseConfig['enUSPlatforms'])
+        allplatforms.extend(["xulrunner_%s" % p for p in releaseConfig['xulrunnerPlatforms']])
+        stage = name.replace(builderPrefix(""), "")
+        platform = [p for p in allplatforms if stage.startswith(p)]
+        platform = platform[0] if len(platform) >= 1 else None
+
+        stage = stage.replace("%s_" % platform, "") if platform else stage
+        #try to load a unique message template for the platform(if defined, step and results
+        #if none exists, fall back to the default template
+        possible_templates = ("%s/%s_%s_%s" % (releaseConfig['releaseTemplates'], platform, stage, job_status),
+            "%s/%s_%s" % (releaseConfig['releaseTemplates'], stage, job_status),
+            "%s/%s_default_%s" % (releaseConfig['releaseTemplates'], platform, job_status),
+            "%s/default_%s" % (releaseConfig['releaseTemplates'], job_status))
+        for t in possible_templates:
+            if os.access(t, os.R_OK):
+                template = open(t, "r", True)
+                break
+
+        if template:
+            subject = template.readline().strip() % locals()
+            body = ''.join(template.readlines())
+            template.close()
+        else:
+            raise IOError("Cannot find a template file to use")
+        msgdict['subject'] = subject % locals()
+        msgdict['body'] = body % locals() + "\n"
+        msgdict['type'] = 'plain'
+        return msgdict
+
+    def createReleaseChangeMessage(change):
+        """Construct a standard email to send to release@/release-drivers@
+           whenever a change is pushed to a release-related branch being
+           listened on"""
+        msgdict = {}
+        releaseName = releasePrefix()
+        step = None
+        if change.branch.endswith('signing'):
+            step = "signing"
+        else:
+            step = "tag"
+        #try to load a unique message template for the change
+        #if none exists, fall back to the default template
+        possible_templates = ("%s/%s_change" % (releaseConfig['releaseTemplates'], step),
+            "%s/default_change" % releaseConfig['releaseTemplates'])
+        for t in possible_templates:
+            if os.access(t, os.R_OK):
+                template = open(t, "r", True)
+                break
+
+        if template:
+            subject = template.readline().strip() % locals()
+            body = ''.join(template.readlines()) + "\n"
+            template.close()
+        else:
+            raise IOError("Cannot find a template file to use")
+        msgdict['subject'] = subject % locals()
+        msgdict['body'] = body % locals()
+        msgdict['type'] = 'plain'
+        return msgdict
+
     builders = []
     test_builders = []
     schedulers = []
     change_source = []
+    notify_builders = []
     status = []
 
     ##### Change sources and Schedulers
@@ -65,6 +144,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         )
 
     schedulers.append(tag_scheduler)
+    notify_builders.append(builderPrefix('tag'))
     source_scheduler = Dependent(
         name=builderPrefix('source'),
         upstream=tag_scheduler,
@@ -87,6 +167,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builderNames=[builderPrefix('%s_build' % platform)]
         )
         schedulers.append(build_scheduler)
+        notify_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
             repack_scheduler = DependentL10n(
                 name=builderPrefix('%s_repack' % platform),
@@ -123,6 +204,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builderNames=[builderPrefix('l10n_verification', platform)]
         )
         schedulers.append(l10n_verify_scheduler)
+        notify_builders.append(builderPrefix('l10n_verification', platform))
 
     updates_scheduler = Scheduler(
         name=builderPrefix('updates'),
@@ -131,6 +213,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builderNames=[builderPrefix('updates')]
     )
     schedulers.append(updates_scheduler)
+    notify_builders.append(builderPrefix('updates'))
 
     updateBuilderNames = []
     for platform in sorted(releaseConfig['verifyConfigs'].keys()):
@@ -141,6 +224,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builderNames=updateBuilderNames
     )
     schedulers.append(update_verify_scheduler)
+    notify_builders.extend(updateBuilderNames)
 
     if releaseConfig['majorUpdateRepoPath']:
         majorUpdateBuilderNames = []
@@ -726,6 +810,46 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'factory': bouncer_submitter_factory
     })
 
+    #send a message when we receive the sendchange and start tagging
+    status.append(ChangeNotifier(
+            fromaddr="release@mozilla.org",
+            relayhost="mail.build.mozilla.org",
+            sendToInterestedUsers=False,
+            extraRecipients=releaseConfig['AllRecipients'],
+            branches=[releaseConfig['sourceRepoPath']],
+            messageFormatter=createReleaseChangeMessage,
+        ))
+    #send a message when signing is complete
+    status.append(ChangeNotifier(
+            fromaddr="release@mozilla.org",
+            relayhost="mail.build.mozilla.org",
+            sendToInterestedUsers=False,
+            extraRecipients=releaseConfig['AllRecipients'],
+            branches=[builderPrefix('post_signing')],
+            messageFormatter=createReleaseChangeMessage,
+        ))
+
+    #send the nice(passing) release messages to release@m.o (for now)
+    status.append(MailNotifier(
+            fromaddr='release@mozilla.org',
+            sendToInterestedUsers=False,
+            extraRecipients=releaseConfig['PassRecipients'],
+            mode='passing',
+            builders=notify_builders,
+            relayhost='mail.build.mozilla.org',
+            messageFormatter=createReleaseMessage,
+        ))
+
+    #send all release messages to release@m.o (for now)
+    status.append(MailNotifier(
+            fromaddr='release@mozilla.org',
+            sendToInterestedUsers=False,
+            extraRecipients=releaseConfig['AllRecipients'],
+            mode='all',
+            categories=['release'],
+            relayhost='mail.build.mozilla.org',
+            messageFormatter=createReleaseMessage,
+        ))
 
     status.append(TinderboxMailNotifier(
         fromaddr="mozilla2.buildbot@build.mozilla.org",
