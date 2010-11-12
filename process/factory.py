@@ -538,7 +538,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, createPartial=False, doCleanup=True,
                  packageSDK=False, packageTests=False, mozillaDir=None,
-                 enable_ccache=False, **kwargs):
+                 enable_ccache=False, stageLogBaseUrl=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
         self.env = env.copy()
         self.objdir = objdir
@@ -631,8 +631,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
                          '/nightly/latest-%s' % self.branchName
 
-        self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
-                                                         self.platform)
+        self.stageLogBaseUrl = stageLogBaseUrl
+        if self.stageLogBaseUrl:
+            # yes, the branchName is needed twice here so that log uploads work for all
+            self.logUploadDir = '%s/%s-%s/' % (self.branchName, self.branchName, self.platform)
+            self.logBaseUrl = '%s/%s' % (self.stageLogBaseUrl, self.logUploadDir)
+        else:
+            self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName, self.platform)
+            self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
+                        ( self.stageServer, self.productName, self.logUploadDir)
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
@@ -865,16 +872,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
              env=self.env,
              workdir='.',
              command=['wget', '-O', 'malloc.log.old',
-                      'http://%s/pub/mozilla.org/%s/%s/malloc.log' % \
-                        (self.stageServer, self.productName, self.logUploadDir)]
+                      '%s/malloc.log' % self.logBaseUrl]
             )
             self.addStep(ShellCommand,
              name='get_sdleak_log',
              env=self.env,
              workdir='.',
              command=['wget', '-O', 'sdleak.tree.old',
-                      'http://%s/pub/mozilla.org/%s/%s/sdleak.tree' % \
-                        (self.stageServer, self.productName, self.logUploadDir)]
+                      '%s/sdleak.tree' % self.logBaseUrl]
             )
             self.addStep(ShellCommand,
              name='mv_malloc_log',
