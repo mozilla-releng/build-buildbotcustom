@@ -4425,7 +4425,13 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
         ))
         self.addStep(TinderboxShellCommand(
          name='diff_patcher_config',
-         command=['cvs', 'diff', '-Nu', WithProperties(self.patcherConfigFile)],
+         command=['bash', '-c',
+                  '(cvs diff -Nu "%s") && (grep \
+                    "build%s/update/.platform./.locale./%s-%s.complete.mar" \
+                    "%s" || return 2)' % (self.patcherConfigFile,
+                                          self.buildNumber, self.productName,
+                                          self.version,
+                                          self.patcherConfigFile)],
          description=['diff patcher config'],
          ignoreCodes=[1]
         ))
