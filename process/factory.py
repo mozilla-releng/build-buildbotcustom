@@ -1115,9 +1115,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         self.addStep(ShellCommand,
          name='get_codesize_log',
-         command=['wget', '-O', 'codesize-auto-old.log',
-          'http://%s/pub/mozilla.org/%s/%s/codesize-auto.log' % \
-           (self.stageServer, self.productName, self.logUploadDir)],
+         command=['wget', '-O', 'codesize-auto-old.log', '%s/codesize-auto.log' % self.logBaseUrl],
          workdir='.',
          env=self.env
         )
