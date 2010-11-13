@@ -7459,7 +7459,7 @@ class AndroidBuildFactory(MobileBuildFactory):
             self.addUpdateSteps()
         self.addSymbolSteps()
         if self.multiLocale:
-            self.addMakeUploadSteps(subdir="en-US")
+            self.addMakeUploadSteps(subdir="en-US", uploadSnippet=False)
         else:
             self.addMakeUploadSteps()
         if self.triggerBuilds:
@@ -7469,7 +7469,7 @@ class AndroidBuildFactory(MobileBuildFactory):
             self.addPackageSteps(locale='multi')
             if self.createSnippet:
                 self.addUpdateSteps()
-            self.addMakeUploadSteps(locale='multi')
+            self.addMakeUploadSteps(subdir="multi", locale="multi")
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
@@ -7730,11 +7730,11 @@ class AndroidBuildFactory(MobileBuildFactory):
             warnOnFailure=True,
         ))
 
-    def addMakeUploadSteps(self, subdir=None, **kwargs):
-        if self.createSnippet:
+    def addMakeUploadSteps(self, subdir=None, uploadSnippet=True, **kwargs):
+        if self.createSnippet and uploadSnippet:
             self.getPreviousBuildID(subdir=subdir)
         MobileBuildFactory.addMakeUploadSteps(self, subdir=subdir, **kwargs)
-        if self.createSnippet:
+        if self.createSnippet and uploadSnippet:
             self._uploadSnippet()
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
@@ -7773,8 +7773,9 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
             hashType=self.hashType)
         )
 
-    def addMakeUploadSteps(self, subdir=None, locale="en-US", **kwargs):
-        if self.createSnippet:
+    def addMakeUploadSteps(self, subdir=None, locale="en-US",
+                           uploadSnippet=True, **kwargs):
+        if self.createSnippet and uploadSnippet:
             self.getPreviousBuildID(subdir=subdir, locale=locale)
         self.addStep(SetProperty,
             name="get_buildid",
@@ -7815,10 +7816,10 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
                                        '--release-to-candidates-dir ' + \
                                        '--nightly-dir candidates '
         if subdir:
-             uploadEnv['POST_UPLOAD_CMD'] += '--builddir %s/%s' % (self.platform,
+             uploadEnv['POST_UPLOAD_CMD'] += '--builddir unsigned/%s/%s' % (self.platform,
                                              subdir)
         else:
-             uploadEnv['POST_UPLOAD_CMD'] += '--builddir %s' % self.platform
+             uploadEnv['POST_UPLOAD_CMD'] += '--builddir unsigned/%s' % self.platform
         command=['make', 'upload']
         if locale:
             command += ['AB_CD=%s' % locale]
@@ -7833,5 +7834,5 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
          description=['upload'],
          timeout=60*60 # 60 minutes
         )
-        if self.createSnippet:
+        if self.createSnippet and uploadSnippet:
             self._uploadSnippet()
