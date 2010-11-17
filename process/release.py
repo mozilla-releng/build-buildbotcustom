@@ -1,5 +1,8 @@
-import os
+# The absolute_import directive looks firstly at what packages are available
+# on sys.path to avoid name collisions when we import release.* from elsewhere
+from __future__ import absolute_import
 
+import os
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
@@ -16,7 +19,8 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   L10nVerifyFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
-from buildbotcustom.changes.ftppoller import FtpPoller
+from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
+from release.platforms import ftp_platform_map, sl_platform_map
 
 DEFAULT_L10N_CHUNKS = 15
 
@@ -125,7 +129,41 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     notify_builders = []
     status = []
 
+    shippedLocalesFile = "%s/%s/raw-file/%s_RELEASE/%s" % (
+                            branchConfig['hgurl'],
+                            releaseConfig['sourceRepoPath'],
+                            releaseConfig['baseTag'],
+                            releaseConfig['shippedLocalesPath'])
+
     ##### Change sources and Schedulers
+    for p in releaseConfig['l10nPlatforms']:
+        ftpPlatform = ftp_platform_map[p]
+
+        ftpURLs = ["http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/%s" % (
+                  releaseConfig['stagingServer'],
+                  releaseConfig['productName'],
+                  releaseConfig['version'],
+                  releaseConfig['buildNumber'],
+                  ftpPlatform)]
+
+        if p in ('win32', ):
+            ftpURLs.append(
+                "http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/unsigned/%s" % (
+                  releaseConfig['stagingServer'],
+                  releaseConfig['productName'],
+                  releaseConfig['version'],
+                  releaseConfig['buildNumber'],
+                  ftpPlatform))
+
+        change_source.append(LocalesFtpPoller(
+            branch=builderPrefix("post_%s_l10n" % p),
+            ftpURLs=ftpURLs,
+            pollInterval=60*5, # 5 minutes
+            platform = p,
+            localesFile = shippedLocalesFile,
+            sl_platform_map = sl_platform_map,
+        ))
+
     change_source.append(FtpPoller(
         branch=builderPrefix("post_signing"),
         ftpURLs=[
@@ -203,13 +241,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         schedulers.append(xulrunner_build_scheduler)
 
     if releaseConfig['doPartnerRepacks']:
-        partner_scheduler = Scheduler(
-            name=builderPrefix('partner_repacks'),
-            treeStableTimer=0,
-            branch=builderPrefix('post_signing'),
-            builderNames=[builderPrefix('partner_repack')],
-        )
-        schedulers.append(partner_scheduler)
+        for platform in releaseConfig['l10nPlatforms']:
+            partner_scheduler = Scheduler(
+                name=builderPrefix('partner_repacks', platform),
+                treeStableTimer=0,
+                branch=builderPrefix('post_%s_l10n' % platform),
+                builderNames=[builderPrefix('partner_repack', platform)],
+            )
+            schedulers.append(partner_scheduler)
+
     for platform in releaseConfig['l10nPlatforms']:
         l10n_verify_scheduler = Scheduler(
             name=builderPrefix('l10n_verification', platform),
@@ -572,32 +612,34 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
     if releaseConfig['doPartnerRepacks']:
-        partner_repack_factory = PartnerRepackFactory(
-            hgHost=branchConfig['hghost'],
-            repoPath=releaseConfig['sourceRepoPath'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-            productName=releaseConfig['productName'],
-            version=releaseConfig['version'],
-            buildNumber=releaseConfig['buildNumber'],
-            partnersRepoPath=releaseConfig['partnersRepoPath'],
-            stagingServer=releaseConfig['stagingServer'],
-            stageUsername=branchConfig['stage_username'],
-            stageSshKey=branchConfig['stage_ssh_key'],
-        )
-
-        if 'macosx64' in branchConfig['platforms']:
-            slaves = branchConfig['platforms']['macosx64']['slaves']
-        else:
-            slaves = branchConfig['platforms']['macosx']['slaves']
-        builders.append({
-            'name': builderPrefix('partner_repack'),
-            'slavenames': slaves,
-            'category': 'release',
-            'builddir': builderPrefix('partner_repack'),
-            'factory': partner_repack_factory,
-            'nextSlave': _nextFastSlave,
-            'env': builder_env,
-        })
+         for platform in releaseConfig['l10nPlatforms']:
+             partner_repack_factory = PartnerRepackFactory(
+                 hgHost=branchConfig['hghost'],
+                 repoPath=releaseConfig['sourceRepoPath'],
+                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                 productName=releaseConfig['productName'],
+                 version=releaseConfig['version'],
+                 buildNumber=releaseConfig['buildNumber'],
+                 partnersRepoPath=releaseConfig['partnersRepoPath'],
+                 platformList=[platform],
+                 stagingServer=releaseConfig['stagingServer'],
+                 stageUsername=branchConfig['stage_username'],
+                 stageSshKey=branchConfig['stage_ssh_key'],
+             )
+  
+             if 'macosx64' in branchConfig['platforms']:
+                 slaves = branchConfig['platforms']['macosx64']['slaves']
+             else:
+                 slaves = branchConfig['platforms']['macosx']['slaves']
+             builders.append({
+                 'name': builderPrefix('partner_repack', platform),
+                 'slavenames': slaves,
+                 'category': 'release',
+                 'builddir': builderPrefix('partner_repack', platform),
+                 'factory': partner_repack_factory,
+                 'nextSlave': _nextFastSlave,
+                 'env': builder_env
+             })
 
     for platform in releaseConfig['l10nPlatforms']:
         l10n_verification_factory = L10nVerifyFactory(
