@@ -13,12 +13,22 @@ from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, UpdateVerifyFactory, ReleaseFinalVerification, \
-  L10nVerifyFactory, ReleaseRepackFactory, \
+  L10nVerifyFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
 from buildbotcustom.changes.ftppoller import FtpPoller
 
+DEFAULT_L10N_CHUNKS = 15
+
 def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
+    l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
+    tools_repo = '%s%s' % (branchConfig['hgurl'],
+                           branchConfig['build_tools_repo_path'])
+    if staging:
+        branchConfigFile = "mozilla/staging_config.py"
+    else:
+        branchConfigFile = "mozilla/production_config.py"
+
     def builderPrefix(s, platform=None):
         if platform:
             return "release-%s-%s_%s" % (releaseConfig['sourceRepoName'], platform, s)
@@ -101,6 +111,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         msgdict['type'] = 'plain'
         return msgdict
 
+    def l10nBuilders(platform):
+        builders = {}
+        for n in range(1, l10nChunks+1):
+            builders[n] = builderPrefix("repack_%s/%s" % (n, str(l10nChunks)),
+                                        platform)
+        return builders
+
     builders = []
     test_builders = []
     schedulers = []
@@ -170,14 +187,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         schedulers.append(build_scheduler)
         notify_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
-            repack_scheduler = DependentL10n(
+            repack_scheduler = Dependent(
                 name=builderPrefix('%s_repack' % platform),
-                platform=platform,
                 upstream=build_scheduler,
-                builderNames=[builderPrefix('%s_repack' % platform)],
-                branch=releaseConfig['sourceRepoPath'],
-                baseTag='%s_RELEASE' % releaseConfig['baseTag'],
-                localesFile='browser/locales/shipped-locales',
+                builderNames=l10nBuilders(platform).values(),
             )
             schedulers.append(repack_scheduler)
 
@@ -277,6 +290,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     builder_env = {
         'BUILDBOT_CONFIGS': '%s%s' % (branchConfig['hgurl'],
                                       branchConfig['config_repo_path']),
+        'BUILDBOTCUSTOM': '%s%s' % (branchConfig['hgurl'],
+                                    branchConfig['buildbotcustom_repo_path']),
         'CLOBBERER_URL': branchConfig['base_clobber_url']
     }
 
@@ -308,8 +323,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
     if not releaseConfig.get('skip_tag'):
-        tools_repo = '%s%s' % (branchConfig['hgurl'],
-                               branchConfig['build_tools_repo_path'])
         tag_factory = ScriptFactory(
             scriptRepo=tools_repo,
             scriptName='scripts/release/tagging.sh',
@@ -322,7 +335,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'builddir': builderPrefix('tag'),
             'factory': tag_factory,
             'nextSlave': _nextFastSlave,
-            'env': builder_env + branchConfig['platforms']['linux']['env'],
+            'env': builder_env,
             'properties': {'builddir': builderPrefix('tag')}
         })
     else:
@@ -465,39 +478,29 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
         if platform in releaseConfig['l10nPlatforms']:
-            repack_factory = ReleaseRepackFactory(
-                hgHost=branchConfig['hghost'],
-                project=releaseConfig['productName'],
-                appName=releaseConfig['appName'],
-                repoPath=releaseConfig['sourceRepoPath'],
-                l10nRepoPath=releaseConfig['l10nRepoPath'],
-                stageServer=branchConfig['stage_server'],
-                stageUsername=branchConfig['stage_username'],
-                stageSshKey=branchConfig['stage_ssh_key'],
-                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-                compareLocalesRepoPath=branchConfig['compare_locales_repo_path'],
-                compareLocalesTag=branchConfig['compare_locales_tag'],
-                buildSpace=2,
-                configRepoPath=branchConfig['config_repo_path'],
-                configSubDir=branchConfig['config_subdir'],
-                mozconfig=mozconfig,
-                platform=platform + '-release',
-                buildRevision='%s_RELEASE' % releaseConfig['baseTag'],
-                version=releaseConfig['version'],
-                buildNumber=releaseConfig['buildNumber'],
-                tree='release',
-                clobberURL=branchConfig['base_clobber_url'],
-            )
-
-            builders.append({
-                'name': builderPrefix('%s_repack' % platform),
-                'slavenames': branchConfig['l10n_slaves'][platform],
-                'category': 'release',
-                'builddir': builderPrefix('%s_repack' % platform),
-                'factory': repack_factory,
-                'nextSlave': _nextFastSlave,
-                'env': builder_env,
-            })
+            for n, builderName in l10nBuilders(platform).iteritems():
+                repack_factory = ScriptFactory(
+                    scriptRepo=tools_repo,
+                    interpreter='bash',
+                    scriptName='scripts/l10n/release_repacks.sh',
+                    extra_args=[platform, branchConfigFile,
+                                str(l10nChunks), str(n)]
+                )
+                
+                builddir = builderPrefix('%s_repack' % platform) + \
+                                         '_' + str(n)
+                env = builder_env.copy()
+                env.update(pf['env'])
+                builders.append({
+                    'name': builderName,
+                    'slavenames': branchConfig['l10n_slaves'][platform],
+                    'category': 'release',
+                    'builddir': builddir,
+                    'factory': repack_factory,
+                    'nextSlave': _nextFastSlave,
+                    'env': env,
+                    'properties': {'builddir': builddir}
+                })
 
         if platform in releaseConfig['unittestPlatforms']:
             mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
