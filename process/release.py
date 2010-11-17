@@ -12,7 +12,7 @@ from buildbot.process.properties import WithProperties
 from buildbotcustom.l10n import DependentL10n
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
-  generateTestBuilderNames, generateTestBuilder, _nextFastSlave
+  generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, UpdateVerifyFactory, ReleaseFinalVerification, \
@@ -352,7 +352,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'category': 'release',
                 'builddir': builderPrefix('repo_setup'),
                 'factory': repository_setup_factory,
-                'nextSlave': _nextFastSlave,
+                'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
             })
         else:
@@ -374,7 +374,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'category': 'release',
             'builddir': builderPrefix('tag'),
             'factory': tag_factory,
-            'nextSlave': _nextFastSlave,
+            'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
             'properties': {'builddir': builderPrefix('tag')}
         })
@@ -408,7 +408,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
            'builddir': builderPrefix('source'),
            'factory': source_factory,
            'env': builder_env,
-           'nextSlave': _nextFastSlave,
+           'nextSlave': _nextFastReservedSlave,
         })
 
         if releaseConfig['xulrunnerPlatforms']:
@@ -507,7 +507,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'category': 'release',
                 'builddir': builderPrefix('%s_build' % platform),
                 'factory': build_factory,
-                'nextSlave': _nextFastSlave,
+                'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
             })
         else:
@@ -537,7 +537,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     'category': 'release',
                     'builddir': builddir,
                     'factory': repack_factory,
-                    'nextSlave': _nextFastSlave,
+                    'nextSlave': _nextFastReservedSlave,
                     'env': env,
                     'properties': {'builddir': builddir}
                 })
@@ -637,7 +637,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                  'category': 'release',
                  'builddir': builderPrefix('partner_repack', platform),
                  'factory': partner_repack_factory,
-                 'nextSlave': _nextFastSlave,
+                 'nextSlave': _nextFastReservedSlave,
                  'env': builder_env
              })
 
@@ -666,7 +666,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'category': 'release',
             'builddir': builderPrefix('l10n_verification', platform),
             'factory': l10n_verification_factory,
-            'nextSlave': _nextFastSlave,
+            'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
         })
 
@@ -718,7 +718,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'category': 'release',
         'builddir': builderPrefix('updates'),
         'factory': updates_factory,
-        'nextSlave': _nextFastSlave,
+        'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
     })
 
@@ -737,7 +737,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'category': 'release',
             'builddir': builderPrefix('%s_update_verify' % platform),
             'factory': update_verify_factory,
-            'nextSlave': _nextFastSlave,
+            'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
         })
 
@@ -755,7 +755,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'category': 'release',
         'builddir': builderPrefix('final_verification'),
         'factory': final_verification_factory,
-        'nextSlave': _nextFastSlave,
+        'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
     })
 
@@ -806,7 +806,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'category': 'release',
             'builddir': builderPrefix('major_update'),
             'factory': major_update_factory,
-            'nextSlave': _nextFastSlave,
+            'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
         })
 
@@ -824,7 +824,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'category': 'release',
                 'builddir': builderPrefix('%s_major_update_verify' % platform),
                 'factory': major_update_verify_factory,
-                'nextSlave': _nextFastSlave,
+                'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
             })
 

@@ -6,7 +6,7 @@ except:
 import collections
 import random
 import re
-import sys, os
+import sys, os, time
 from copy import deepcopy
 
 from twisted.python import log
@@ -157,7 +157,7 @@ def _partitionUnreservedSlaves(slaves):
     return fast[nReservedFastSlaves:], slow[nReservedSlowSlaves:]
 
 def _readReservedFile(filename, fast=True):
-    if not os.path.exists(filename):
+    if not filename or not os.path.exists(filename):
         n = 0
     else:
         try:
@@ -180,16 +180,6 @@ def _readReservedFile(filename, fast=True):
         if n != nReservedSlowSlaves:
             log.msg("Setting nReservedSlowSlaves to %i (was %i)" % (n, nReservedSlowSlaves))
             nReservedSlowSlaves = n
-
-_reservedFileWatcherLoop = None
-def watchReservedFile(filename, fast=True, interval=60):
-    global _reservedFileWatcherLoop
-    # Cancel the old task
-    if _reservedFileWatcherLoop and _reservedFileWatcherLoop.running:
-        _reservedFileWatcherLoop.stop()
-
-    _reservedFileWatcherLoop = LoopingCall(_readReservedFile, filename, fast)
-    _reservedFileWatcherLoop.start(interval)
 
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so
@@ -255,7 +245,18 @@ def _nextFastSlave(builder, available_slaves, only_fast=False):
         log.err()
         return random.choice(available_slaves)
 
+_checkedReservedSlaveFile = 0
+_reservedFileName = None
+def setReservedFileName(filename):
+    global _reservedFileName
+    _reservedFileName = filename
+
 def _nextFastReservedSlave(builder, available_slaves, onlyFast=True):
+    global _checkedReservedSlaveFile, _reservedFileName
+    if int(time.time() - _checkedReservedSlaveFile) > 60:
+        _readReservedFile(_reservedFileName)
+        _checkedReservedSlaveFile = int(time.time())
+
     try:
         fast, slow = _partitionSlaves(available_slaves)
         # Choose the fast slave that was most recently on this builder
