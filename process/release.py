@@ -4,13 +4,14 @@ from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.process.factory import BuildFactory
+from buildbot.process.properties import WithProperties
 
 from buildbotcustom.l10n import DependentL10n
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastSlave
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
-  ReleaseTaggingFactory, SingleSourceFactory, ReleaseBuildFactory, \
+  ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, UpdateVerifyFactory, ReleaseFinalVerification, \
   L10nVerifyFactory, ReleaseRepackFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
@@ -273,20 +274,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                                                  releaseConfig['relbranchOverride'])
         clone_repositories.update(l10n_clone_repos)
 
-    tag_repositories = {
-        releaseConfig['sourceRepoPath']: {
-            'revision': releaseConfig['sourceRepoRevision'],
-            'relbranchOverride': releaseConfig['relbranchOverride'],
-            'bumpFiles': ['config/milestone.txt', 'js/src/config/milestone.txt',
-                          'browser/config/version.txt']
-        }
+    builder_env = {
+        'BUILDBOT_CONFIGS': '%s%s' % (branchConfig['hgurl'],
+                                      branchConfig['config_repo_path']),
+        'CLOBBERER_URL': branchConfig['base_clobber_url']
     }
-    if len(releaseConfig['l10nPlatforms']) > 0:
-        l10n_tag_repos = get_l10n_repositories(releaseConfig['l10nRevisionFile'],
-                                               releaseConfig['l10nRepoPath'],
-                                               releaseConfig['relbranchOverride'])
-        tag_repositories.update(l10n_tag_repos)
-
 
     if staging:
         if not releaseConfig.get('skip_repo_setup'):
@@ -306,6 +298,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'builddir': builderPrefix('repo_setup'),
                 'factory': repository_setup_factory,
                 'nextSlave': _nextFastSlave,
+                'env': builder_env,
             })
         else:
             builders.append(makeDummyBuilder(
@@ -315,20 +308,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
     if not releaseConfig.get('skip_tag'):
-        tag_factory = ReleaseTaggingFactory(
-            hgHost=branchConfig['hghost'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-            repositories=tag_repositories,
-            productName=releaseConfig['productName'],
-            appName=releaseConfig['appName'],
-            version=releaseConfig['version'],
-            appVersion=releaseConfig['appVersion'],
-            milestone=releaseConfig['milestone'],
-            baseTag=releaseConfig['baseTag'],
-            buildNumber=releaseConfig['buildNumber'],
-            hgUsername=releaseConfig['hgUsername'],
-            hgSshKey=releaseConfig['hgSshKey'],
-            clobberURL=branchConfig['base_clobber_url'],
+        tools_repo = '%s%s' % (branchConfig['hgurl'],
+                               branchConfig['build_tools_repo_path'])
+        tag_factory = ScriptFactory(
+            scriptRepo=tools_repo,
+            scriptName='scripts/release/tagging.sh',
         )
 
         builders.append({
@@ -338,6 +322,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'builddir': builderPrefix('tag'),
             'factory': tag_factory,
             'nextSlave': _nextFastSlave,
+            'env': builder_env + branchConfig['platforms']['linux']['env'],
+            'properties': {'builddir': builderPrefix('tag')}
         })
     else:
         builders.append(makeDummyBuilder(
@@ -364,10 +350,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
 
         builders.append({
            'name': builderPrefix('source'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+           'slavenames': branchConfig['platforms']['linux']['slaves'],
            'category': 'release',
            'builddir': builderPrefix('source'),
            'factory': source_factory,
+           'env': builder_env,
            'nextSlave': _nextFastSlave,
         })
 
@@ -392,7 +379,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                'slavenames': branchConfig['platforms']['linux']['slaves'],
                'category': 'release',
                'builddir': builderPrefix('xulrunner_source'),
-               'factory': xulrunner_source_factory
+               'factory': xulrunner_source_factory,
+               'env': builder_env,
             })
     else:
         builders.append(makeDummyBuilder(
@@ -467,6 +455,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'builddir': builderPrefix('%s_build' % platform),
                 'factory': build_factory,
                 'nextSlave': _nextFastSlave,
+                'env': builder_env,
             })
         else:
             builders.append(makeDummyBuilder(
@@ -507,6 +496,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'builddir': builderPrefix('%s_repack' % platform),
                 'factory': repack_factory,
                 'nextSlave': _nextFastSlave,
+                'env': builder_env,
             })
 
         if platform in releaseConfig['unittestPlatforms']:
@@ -568,7 +558,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'slavenames': pf['slaves'],
                 'category': 'release',
                 'builddir': builderPrefix('xulrunner_%s_build' % platform),
-                'factory': xulrunner_build_factory
+                'factory': xulrunner_build_factory,
+                'env': builder_env,
             })
         else:
             builders.append(makeDummyBuilder(
@@ -602,6 +593,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'builddir': builderPrefix('partner_repack'),
             'factory': partner_repack_factory,
             'nextSlave': _nextFastSlave,
+            'env': builder_env,
         })
 
     for platform in releaseConfig['l10nPlatforms']:
@@ -630,6 +622,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'builddir': builderPrefix('l10n_verification', platform),
             'factory': l10n_verification_factory,
             'nextSlave': _nextFastSlave,
+            'env': builder_env,
         })
 
 
@@ -681,6 +674,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'builddir': builderPrefix('updates'),
         'factory': updates_factory,
         'nextSlave': _nextFastSlave,
+        'env': builder_env,
     })
 
 
@@ -699,6 +693,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'builddir': builderPrefix('%s_update_verify' % platform),
             'factory': update_verify_factory,
             'nextSlave': _nextFastSlave,
+            'env': builder_env,
         })
 
 
@@ -716,6 +711,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'builddir': builderPrefix('final_verification'),
         'factory': final_verification_factory,
         'nextSlave': _nextFastSlave,
+        'env': builder_env,
     })
 
     if releaseConfig['majorUpdateRepoPath']:
@@ -766,6 +762,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'builddir': builderPrefix('major_update'),
             'factory': major_update_factory,
             'nextSlave': _nextFastSlave,
+            'env': builder_env,
         })
 
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
@@ -783,6 +780,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'builddir': builderPrefix('%s_major_update_verify' % platform),
                 'factory': major_update_verify_factory,
                 'nextSlave': _nextFastSlave,
+                'env': builder_env,
             })
 
     bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
@@ -807,7 +805,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': 'release',
         'builddir': builderPrefix('bouncer_submitter'),
-        'factory': bouncer_submitter_factory
+        'factory': bouncer_submitter_factory,
+        'env': builder_env,
     })
 
     #send a message when we receive the sendchange and start tagging

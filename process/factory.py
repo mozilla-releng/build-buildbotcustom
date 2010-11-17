@@ -8391,6 +8391,10 @@ class ScriptFactory(BuildFactory):
             script_timeout=1200, script_maxtime=None, log_eval_func=None):
         BuildFactory.__init__(self)
 
+        self.addStep(SetBuildProperty(
+            property_name='master',
+            value=lambda b: b.builder.botmaster.parent.buildbotURL
+        ))
         env = {'PROPERTIES_FILE': 'buildprops.json'}
         self.addStep(JSONPropertiesDownload(name="download_props", slavedest="buildprops.json"))
         if extra_data:
@@ -8398,6 +8402,13 @@ class ScriptFactory(BuildFactory):
             env['EXTRA_DATA'] = 'data.json'
         self.addStep(ShellCommand(name="clobber_scripts", command=['rm', '-rf', 'scripts']))
         self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
+        self.addStep(ShellCommand(
+            name="update_scripts",
+            command=['hg', 'update', '-r', WithProperties('%(revision)s')],
+            haltOnFailure=True,
+            doStepIf=lambda b: b.getProperty('revision'),
+            workdir='build/scripts'
+        ))
 
         if scriptName[0] == '/':
             script_path = scriptName
