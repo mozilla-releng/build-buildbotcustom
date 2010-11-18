@@ -5402,8 +5402,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  downloadBaseURL=None, ausPreviousUploadDir=None,
                  ausFullUploadDir=None,
                  multiLocale=False,
-                 mozharnessRepoPath="users/asasaki_mozilla.com/mozharness",
-                 mozharnessRevision="PRODUCTION",
+                 mozharnessRepoPath="build/mozharness",
+                 mozharnessRevision="default",
                  mozharnessConfig=None,
                  mergeLocales=True,
                  **kwargs):
