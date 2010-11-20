@@ -147,13 +147,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                   ftpPlatform)]
 
         if p in ('win32', ):
-            ftpURLs.append(
+            ftpURLs = [
                 "http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/unsigned/%s" % (
                   releaseConfig['stagingServer'],
                   releaseConfig['productName'],
                   releaseConfig['version'],
                   releaseConfig['buildNumber'],
-                  ftpPlatform))
+                  ftpPlatform)]
 
         change_source.append(LocalesFtpPoller(
             branch=builderPrefix("post_%s_l10n" % p),
