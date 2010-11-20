@@ -192,7 +192,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         )
     else:
         tag_scheduler = Scheduler(
-            name='tag',
+            name=builderPrefix('tag'),
             branch=releaseConfig['sourceRepoPath'],
             treeStableTimer=None,
             builderNames=[builderPrefix('tag')],
@@ -313,19 +313,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     # from the waterfall
 
     ##### Builders
-    clone_repositories = {
-        releaseConfig['sourceRepoClonePath']: {
-            'revision': releaseConfig['sourceRepoRevision'],
-            'relbranchOverride': releaseConfig['relbranchOverride'],
-            'bumpFiles': ['config/milestone.txt', 'js/src/config/milestone.txt',
-                          'browser/config/version.txt']
+    if staging:
+        clone_repositories = {
+            releaseConfig['sourceRepoClonePath']: {
+                'revision': releaseConfig['sourceRepoRevision'],
+                'relbranchOverride': releaseConfig['relbranchOverride'],
+                'bumpFiles': ['config/milestone.txt',
+                              'js/src/config/milestone.txt',
+                              'browser/config/version.txt']
+            }
         }
-    }
-    if len(releaseConfig['l10nPlatforms']) > 0:
-        l10n_clone_repos = get_l10n_repositories(releaseConfig['l10nRevisionFile'],
-                                                 releaseConfig['l10nRepoClonePath'],
-                                                 releaseConfig['relbranchOverride'])
-        clone_repositories.update(l10n_clone_repos)
+        if len(releaseConfig['l10nPlatforms']) > 0:
+            l10n_clone_repos = get_l10n_repositories(
+                releaseConfig['l10nRevisionFile'],
+                releaseConfig['l10nRepoClonePath'],
+                releaseConfig['relbranchOverride'])
+            clone_repositories.update(l10n_clone_repos)
 
     builder_env = {
         'BUILDBOT_CONFIGS': '%s%s' % (branchConfig['hgurl'],
