@@ -2155,6 +2155,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
               master=master,
               branch=self.platform,
               revision=WithProperties("%(got_revision)s"),
+              files=files,
               user='sendchange-geriatric',
               sendchange_props=sendchange_props,
             ))
