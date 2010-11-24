@@ -13,6 +13,7 @@ from buildbot.steps.dummy import Dummy
 from buildbot import locks
 from buildbot.status.builder import worst_status
 
+import buildbotcustom.common
 import buildbotcustom.status.errors
 import buildbotcustom.steps.base
 import buildbotcustom.steps.misc
@@ -24,8 +25,8 @@ import buildbotcustom.steps.updates
 import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
 import buildbotcustom.env
-import buildbotcustom.common
 import buildbotcustom.misc_scheduler
+reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
 reload(buildbotcustom.steps.misc)
@@ -37,7 +38,6 @@ reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
-reload(buildbotcustom.common)
 
 from buildbotcustom.status.errors import purge_error, global_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
