@@ -2103,6 +2103,11 @@ class NightlyBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange")
             )
+
+        files = [WithProperties('%(packageUrl)s')]
+        if '1.9.1' not in self.branchName:
+            files.append(WithProperties('%(testsUrl)s'))
+
         for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -2111,8 +2116,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
              retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
-             files=[WithProperties('%(packageUrl)s'),
-                    WithProperties('%(testsUrl)s')],
+             files=files,
              user="sendchange-unittest")
             )
         for master, warn in self.geriatricMasters:
@@ -2122,11 +2126,10 @@ class NightlyBuildFactory(MercurialBuildFactory):
               master=master,
               branch=self.platform,
               revision=WithProperties("%(got_revision)s"),
-              files=[WithProperties('%(packageUrl)s'),
-                     WithProperties('%(testsUrl)s')],
+              files=files,
               user='sendchange-geriatric')
             )
-              
+
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
