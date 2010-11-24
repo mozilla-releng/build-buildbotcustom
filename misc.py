@@ -496,6 +496,7 @@ def generateBranchObjects(config, name):
     xulrunnerNightlyBuilders = []
     debugBuilders = []
     weeklyBuilders = []
+    coverageBuilders = []
     # These dicts provides mapping between en-US dep and nightly scheduler names
     # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
     l10nBuilders = {}
@@ -558,9 +559,11 @@ def generateBranchObjects(config, name):
                 test_builders.extend(generateTestBuilderNames('%s opt test' % base_name, suites_name, suites))
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         if config['enable_codecoverage'] and platform in ('linux',):
-            weeklyBuilders.append('%s code coverage' % base_name)
+            coverageBuilders.append('%s code coverage' % base_name)
         if config['enable_xulrunner'] and platform not in ('wince',):
             xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
+    if config['enable_weekly_bundle']:
+        weeklyBuilders.append('%s hg bundle' % name)
 
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
             is_shadow=bool(name=='shadow-central'))
@@ -607,13 +610,13 @@ def generateBranchObjects(config, name):
         logCompression="gzip",
         errorparser="unittest"
     ))
-    # Weekly builds (currently only code coverage) go to a different tree
+    # Code coverage builds go to a different tree
     branchObjects['status'].append(TinderboxMailNotifier(
         fromaddr="mozilla2.buildbot@build.mozilla.org",
         tree=config['weekly_tinderbox_tree'],
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
-        builders=weeklyBuilders,
+        builders=coverageBuilders,
         logCompression="gzip",
         errorparser="unittest"
     ))
@@ -1294,6 +1297,37 @@ def generateBranchObjects(config, name):
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
+        # -- end of per-platform loop --
+
+    if config['enable_weekly_bundle']:
+        bundle_factory = ScriptFactory(
+            config['hgurl'] + config['build_tools_repo_path'],
+            'scripts/bundle/hg-bundle.sh',
+            interpreter='bash',
+            script_timeout=3600,
+            script_maxtime=3600,
+            extra_args=[
+                name,
+                config['repo_path'],
+                config['stage_server'],
+                config['stage_username'],
+                config['stage_base_path'],
+                config['stage_ssh_key'],
+                ],
+        )
+        slaves = set()
+        for p in sorted(config['platforms'].keys()):
+            slaves.update(set(config['platforms'][p]['slaves']))
+        bundle_builder = {
+            'name': '%s hg bundle' % name,
+            'slavenames': list(slaves),
+            'builddir': '%s-bundle' % (name,),
+            'factory': bundle_factory,
+            'category': name,
+            'nextSlave': _nextSlowSlave,
+        }
+        branchObjects['builders'].append(bundle_builder)
+
     #Call out for mobile objects
     mobile_objects = generateMobileBranchObjects(config, name)
     for key in mobile_objects.keys():
@@ -1530,15 +1564,15 @@ def generateCCBranchObjects(config, name):
                                    localesFile=config['allLocalesFile']
                                   ))
 
-    for builder in weeklyBuilders:
-        weekly_scheduler=Nightly(
-            name=builder,
+    # schedule weekly builds - code coverage and generic weekly tasks
+    weekly_scheduler=Nightly(
+            name='weekly-%s' % name,
             branch=config['repo_path'],
             dayOfWeek=5, # Saturday
             hour=[3], minute=[02],
-            builderNames=[builder],
+            builderNames=coverageBuilders + weeklyBuilders,
         )
-        branchObjects['schedulers'].append(weekly_scheduler)
+    branchObjects['schedulers'].append(weekly_scheduler)
 
     for platform in sorted(config['platforms'].keys()):
         # shorthand
