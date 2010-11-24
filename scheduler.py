@@ -8,9 +8,11 @@ from twisted.python import log
 
 from buildbot.scheduler import Scheduler
 from buildbot.schedulers.base import BaseScheduler
+from buildbot.schedulers.timed import Nightly
 from buildbot.sourcestamp import SourceStamp
+from buildbot.process.properties import Properties
 
-from buildbot.util import eventual, now
+from buildbot.util import now
 
 import time
 
@@ -37,6 +39,34 @@ class MultiScheduler(Scheduler):
         # and finally retire the changes from scheduler_changes
         changeids = [c.number for c in all_changes]
         db.scheduler_retire_changes(self.schedulerid, changeids, t)
+
+class SpecificNightly(Nightly):
+    """Subclass of regular Nightly scheduler that allows you to specify a function
+    that gets called to generate a sourcestamp
+    """
+    def __init__(self, ssFunc, *args, **kwargs):
+        self.ssFunc = ssFunc
+
+        Nightly.__init__(self, *args, **kwargs)
+
+    def start_HEAD_build(self, t):
+        """Slightly mis-named, but this function is called when it's time to start a build.  We call our ssFunc to get a sourcestamp to build.
+
+        ssFunc is called in a thread with an active database transaction running.
+        """
+        d = defer.maybeDeferred(self.ssFunc, self, t)
+
+        def create_buildset(t, ss):
+            # if our function returns None, don't create any build
+            if ss is None:
+                log.msg("%s: No sourcestamp returned from ssfunc; not scheduling a build" % self.name)
+                return
+            log.msg("%s: Creating buildset with sourcestamp %s" % (self.name, ss.getText()))
+            db = self.parent.db
+            ssid = db.get_sourcestampid(ss, t)
+            self.create_buildset(ssid, self.reason, t)
+
+        d.addCallback(lambda ss: self.parent.db.runInteraction(create_buildset, ss))
 
 class PersistentScheduler(BaseScheduler):
     """Make sure at least numPending builds are pending on each of builderNames"""
@@ -177,3 +207,46 @@ class BuilderChooserScheduler(MultiScheduler):
 
         d.addCallback(lambda buildersPerChange: self.parent.db.runInteraction(do_add_build_and_remove_changes, buildersPerChange))
         return d
+
+def makePropertiesScheduler(base_class, propfuncs, *args, **kw):
+    """Return a subclass of `base_class` that will call each of `propfuncs` to
+    generate a set of properties to attach to new buildsets.
+
+    Each function of propfuncs will be passed (scheduler instance, db
+    transaction, sourcestamp id) and must return a Properties instance.  These
+    properties will be added to any new buildsets this scheduler creates."""
+    pf = propfuncs
+    class S(base_class):
+        compare_attrs = base_class.compare_attrs + ('propfuncs',)
+        propfuncs = pf
+
+        def create_buildset(self, ssid, reason, t, props=None, builderNames=None):
+            # We need a fresh set of properties each time since we expect to update
+            # the properties below
+            my_props = Properties()
+            if props is None:
+                my_props.updateFromProperties(self.properties)
+            else:
+                my_props.updateFromProperties(props)
+
+            # Update with our prop functions
+            try:
+                for func in propfuncs:
+                    try:
+                        request_props = func(self, t, ssid)
+                        log.msg("%s: propfunc returned %s" % (self.name, request_props))
+                        my_props.updateFromProperties(request_props)
+                    except:
+                        log.msg("Error running %s" % func)
+                        log.err()
+            except:
+                log.msg("%s: error calculating properties" % self.name)
+                log.err()
+
+            # Call our base class's original, with our new properties.
+            return base_class.create_buildset(self, ssid, reason, t, my_props, builderNames)
+
+    # Copy the original class' name so that buildbot's ComparableMixin works
+    S.__name__ = base_class.__name__ + "-props"
+
+    return S

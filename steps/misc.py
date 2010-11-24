@@ -28,18 +28,17 @@ from twisted.python.failure import Failure, DefaultException
 from twisted.internet import reactor
 from twisted.spread.pb import PBConnectionLost
 from twisted.python import log
-from twisted.internet.defer import DeferredList, Deferred, TimeoutError
+from twisted.internet.defer import Deferred, TimeoutError
 
 import os
-import buildbot
 import re
 
 from buildbot.process.buildstep import LoggedRemoteCommand, BuildStep
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS, worst_status
-from buildbot.clients.sendchange import Sender
 
 from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand
+from buildbotcustom.common import genBuildID, genBuildUID
 
 def errbackAfter(wrapped_d, timeout):
     # Thanks to Dustin!
@@ -114,7 +113,7 @@ class CreateDir(ShellCommand):
 
 class TinderboxShellCommand(ShellCommand):
     haltOnFailure = False
-    
+
     """This step is really just a 'do not care' buildstep for executing a
        slave command and ignoring the results. If ignoreCodes is passed,
        only exit codes listed in it will be ignored. If ignoreCodes is not
@@ -125,7 +124,7 @@ class TinderboxShellCommand(ShellCommand):
        self.super_class.__init__(self, **kwargs)
        self.addFactoryArguments(ignoreCodes=ignoreCodes)
        self.ignoreCodes = ignoreCodes
-    
+
     def evaluateCommand(self, cmd):
        # Ignore all return codes
        if not self.ignoreCodes:
@@ -137,35 +136,6 @@ class TinderboxShellCommand(ShellCommand):
           # If the return code is something else, fail
           else:
              return FAILURE
-
-class GetHgRevision(ShellCommand):
-    """Retrieves the revision from a Mercurial repository. Builds based on
-    comm-central use this to query the revision from mozilla-central which is
-    pulled in via client.py, so the revision of the platform can be displayed
-    in addition to the comm-central revision we get through got_revision.
-    """
-    name = "get hg revision"
-    command = ["hg", "identify", "-i"]
-    def __init__(self, propertyPrefix="hg", **kwargs):
-        self.propertyPrefix = propertyPrefix
-        self.super_class = ShellCommand
-        self.super_class.__init__(self, **kwargs)
-
-    def commandComplete(self, cmd):
-        rev = ""
-        try:
-            rev = cmd.logs['stdio'].getText().strip().rstrip()
-            # Locally modified ?
-            mod = rev.find('+')
-            if mod != -1:
-                rev = rev[:mod]
-                self.setProperty('%s_modified' % propertyPrefix, True)
-            self.setProperty('%s_revision' % propertyPrefix, rev)
-        except:
-            log.msg("Could not find hg revision")
-            log.msg("Output: %s" % rev)
-            return FAILURE
-        return SUCCESS
 
 class GetBuildID(ShellCommand):
     """Retrieves the BuildID from a Mozilla tree (using platform.ini) and sets
@@ -261,20 +231,21 @@ class SendChangeStep(ShellCommand):
     description = ["sendchange"]
 
     def __init__(self, master, branch, files, revision=None, user=None,
-                 comments="", timeout=1800, retries=5, **kwargs):
+                 comments="", sendchange_props=None, timeout=1800, retries=5, **kwargs):
 
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(master=master, branch=branch, files=files,
                                  revision=revision, user=user,
                                  comments=comments, timeout=timeout,
-                                 retries=retries)
+                                 sendchange_props=sendchange_props, retries=retries)
         self.master = master
         self.branch = branch
         self.files = files
         self.revision = revision
         self.user = user
         self.comments = comments
+        self.sendchange_props = sendchange_props or {}
         self.timeout = timeout
         self.retries = retries
 
@@ -283,14 +254,16 @@ class SendChangeStep(ShellCommand):
         self.sleepTime = 5
 
     def start(self):
-        master = self.master
         try:
-            properties = self.build.getProperties()
-            self.branch = properties.render(self.branch)
-            self.revision = properties.render(self.revision)
-            self.comments = properties.render(self.comments)
-            self.files = properties.render(self.files)
-            self.user = properties.render(self.user)
+            props = self.build.getProperties()
+            branch = props.render(self.branch)
+            revision = props.render(self.revision)
+            comments = props.render(self.comments)
+            files = props.render(self.files)
+            user = props.render(self.user)
+            sendchange_props = []
+            for key, value in self.sendchange_props.items():
+                sendchange_props.append( (key, props.render(value)) )
 
             self.addCompleteLog("sendchange", """\
     master: %s
@@ -298,15 +271,21 @@ class SendChangeStep(ShellCommand):
     revision: %s
     comments: %s
     user: %s
-    files: %s""" % (self.master, self.branch, self.revision, self.comments,
-                    self.user, self.files))
+    files: %s
+    properties: %s""" % (self.master, branch, revision, comments,
+                         user, files, sendchange_props))
             bb_cmd = ['buildbot', 'sendchange', '--master', self.master,
-                      '--username', self.user, '--branch', self.branch,
-                      '--revision', self.revision]
-            if self.comments:
-                bb_cmd.extend(['--comments', self.comments])
-            if self.files:
+                      '--username', user, '--branch', branch,
+                      '--revision', revision]
+            if comments:
+                bb_cmd.extend(['--comments', comments])
+
+            for key, value in sendchange_props:
+                bb_cmd.extend(['--property', '%s:%s' % (key, value)])
+
+            if files:
                 bb_cmd.extend(self.files)
+
             cmd = ['python',
                    WithProperties("%(toolsdir)s/buildfarm/utils/retry.py"),
                    '-s', str(self.sleepTime), '-t', str(self.timeout),
@@ -663,7 +642,7 @@ class DisconnectStep(ShellCommand):
 class RepackPartners(ShellCommand):
     '''This step allows a regular ShellCommand to be optionally extended
        based on provided properties. This is useful for tweaking the command
-       to be run based on, e.g., properties supplied by the user in the 
+       to be run based on, e.g., properties supplied by the user in the
        force builds web interface.
     '''
     def __init__(self, **kwargs):
@@ -680,5 +659,37 @@ class RepackPartners(ShellCommand):
             pass
         self.super_class.start(self)
 
-            
-        
+class FunctionalStep(BuildStep):
+    name = "functional_step"
+    def __init__(self, func, **kwargs):
+        self.func = func
+
+        BuildStep.__init__(self, **kwargs)
+
+        self.addFactoryArguments(func=func)
+
+    def start(self):
+        result = self.func(self, self.build)
+        return self.finished(result)
+
+def setBuildIDProps(step, build):
+    """Sets buildid and builduid properties.
+
+    On a rebuild we willl re-generate the builduid.  Otherwise, we normally get
+    them from the scheduler.
+
+    If either of buildid or builduid doesn't exist, it will be created."""
+
+    if build.reason.startswith("The web-page 'rebuild'"):
+        # Override builduid since this is a manually triggered
+        # rebuild
+        build.setProperty("builduid", genBuildUID(), "setBuildProps")
+
+    # Make sure we have required properties
+    props = build.getProperties()
+    if not props.has_key("buildid"):
+        build.setProperty("buildid", genBuildID(), "setBuildProps")
+    if not props.has_key("builduid"):
+        build.setProperty("builduid", genBuildUID(), "setBuildProps")
+
+    return SUCCESS

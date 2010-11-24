@@ -2,6 +2,10 @@ from twisted.internet import defer, reactor
 from twisted.trial import unittest
 
 from buildbot.util import json
+if not hasattr(json.decoder, 'JSONDecodeError'):
+    JSONDecodeError = ValueError
+else:
+    JSONDecodeError = json.JSONDecodeError
 
 from buildbotcustom.changes.hgpoller import BasePoller, BaseHgPoller, HgPoller, \
   HgLocalePoller, HgAllLocalesPoller, _parse_changes
@@ -231,10 +235,10 @@ class PushlogParsing(unittest.TestCase):
         self.failUnlessEqual(changes[2]['author'], 'bobbyholley@stanford.edu')
 
     def testMalformedPushlog(self):
-        self.failUnlessRaises(json.decoder.JSONDecodeError, _parse_changes, malformedPushlog)
+        self.failUnlessRaises(JSONDecodeError, _parse_changes, malformedPushlog)
 
     def testEmptyPushlog(self):
-        self.failUnlessRaises(json.decoder.JSONDecodeError, _parse_changes, "")
+        self.failUnlessRaises(JSONDecodeError, _parse_changes, "")
 
 class RepoBranchHandling(unittest.TestCase):
     def setUp(self):

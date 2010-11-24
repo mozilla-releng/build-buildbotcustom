@@ -15,7 +15,8 @@ from twisted.internet.task import LoopingCall
 from buildbot.scheduler import Nightly, Scheduler
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, \
+    EXCEPTION
 
 import buildbotcustom.changes.hgpoller
 import buildbotcustom.process.factory
@@ -46,13 +47,15 @@ from buildbotcustom.process.factory import MaemoBuildFactory, \
    MaemoNightlyRepackFactory, MobileDesktopBuildFactory, \
    MobileDesktopNightlyRepackFactory, \
    AndroidBuildFactory
-from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, PersistentScheduler
+from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
+    PersistentScheduler, makePropertiesScheduler, SpecificNightly
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup, ChangeNotifier
 from buildbot.status.mail import MailNotifier
-from buildbotcustom.status.generators import buildTryCompleteMessage, buildTryChangeMessage
+from buildbotcustom.status.generators import buildTryChangeMessage
 from buildbotcustom.env import MozillaEnvironments
-from buildbotcustom.misc_scheduler import tryChooser
+from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
+    buildUIDSchedFunc, lastGoodFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 
 # This file contains misc. helper function that don't make sense to put in
@@ -140,8 +143,8 @@ nReservedFastSlaves = 0
 nReservedSlowSlaves = 0
 
 def _partitionSlaves(slaves):
-    """Partitions the list of slaves into 'fast' and 'slow' slaves, according to
-    fastRegexes.
+    """Partitions the list of slaves into 'fast' and 'slow' slaves, according
+    to fastRegexes.
     Returns two lists, 'fast' and 'slow'."""
     fast = []
     slow = []
@@ -701,11 +704,11 @@ def generateBranchObjects(config, name):
     # in order to know what to schedule
     extra_args = {}
     if config.get('enable_try'):
-        scheduler_class = BuilderChooserScheduler
+        scheduler_class = makePropertiesScheduler(BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
     else:
-        scheduler_class = Scheduler
+        scheduler_class = makePropertiesScheduler(Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
@@ -752,10 +755,10 @@ def generateBranchObjects(config, name):
         else:
             scheduler_class = Scheduler
         branchObjects['schedulers'].append(scheduler_class(
-            name=scheduler_name, 
-            branch=scheduler_branch, 
-            builderNames=test_builders, 
-            treeStableTimer=None, 
+            name=scheduler_name,
+            branch=scheduler_branch,
+            builderNames=test_builders,
+            treeStableTimer=None,
             **extra_args
         ))
 
@@ -776,17 +779,24 @@ def generateBranchObjects(config, name):
 
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
-    for builder in nightlyBuilders + xulrunnerNightlyBuilders:
-        nightly_scheduler=Nightly(
-            name=builder,
-            branch=config['repo_path'],
-            # bug 482123 - keep the minute to avoid problems with DST changes
-            hour=config['start_hour'], minute=config['start_minute'],
-            builderNames=[builder]
+    if nightlyBuilders or xulrunnerNightlyBuilders:
+        nightly_scheduler = makePropertiesScheduler(
+                SpecificNightly,
+                [buildIDSchedFunc, buildUIDSchedFunc])(
+                    ssFunc=lastGoodFunc(config['repo_path'],
+                        builderNames=builders),
+                    name="%s nightly" % name,
+                    branch=config['repo_path'],
+                    # bug 482123 - keep the minute to avoid problems with DST
+                    # changes
+                    hour=config['start_hour'], minute=config['start_minute'],
+                    builderNames=nightlyBuilders + xulrunnerNightlyBuilders,
         )
         branchObjects['schedulers'].append(nightly_scheduler)
 
-        if config['enable_l10n'] and config['enable_nightly'] and builder in l10nNightlyBuilders:
+    for builder in nightlyBuilders + xulrunnerNightlyBuilders:
+        if config['enable_l10n'] and \
+                config['enable_nightly'] and builder in l10nNightlyBuilders:
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
             platform = l10nNightlyBuilders[builder]['platform']
             branchObjects['schedulers'].append(TriggerableL10n(
@@ -798,15 +808,14 @@ def generateBranchObjects(config, name):
                                    localesFile=config['allLocalesFile']
                                   ))
 
-    for builder in weeklyBuilders:
-        weekly_scheduler=Nightly(
-            name=builder,
+    weekly_scheduler = Nightly(
+            name='weekly-%s' % name,
             branch=config['repo_path'],
             dayOfWeek=5, # Saturday
             hour=[3], minute=[02],
-            builderNames=[builder],
-        )
-        branchObjects['schedulers'].append(weekly_scheduler)
+            builderNames=weeklyBuilders,
+            )
+    branchObjects['schedulers'].append(weekly_scheduler)
 
     for platform in sorted(config['platforms'].keys()):
         # shorthand
@@ -990,7 +999,7 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
-                'properties': {'branch': name, 'platform': platform},
+                'properties': {'branch': name, 'platform': platform, 'nightly_build': True},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 

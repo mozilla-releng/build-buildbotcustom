@@ -25,6 +25,7 @@ import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
 import buildbotcustom.env
 import buildbotcustom.common
+import buildbotcustom.misc_scheduler
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
 reload(buildbotcustom.steps.misc)
@@ -43,8 +44,8 @@ from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
-  SetBuildProperty, GetHgRevision, DisconnectStep, OutputStep, \
-  RepackPartners, UnpackTest
+  SetBuildProperty, DisconnectStep, OutputStep, \
+  RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
   SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
@@ -271,9 +272,8 @@ class MozillaBuildFactory(BuildFactory):
     ignore_dirs = [ 'info', 'release-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
-                 clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-                 branchName=None, baseWorkDir='build', triggerBuilds=False,
-                 triggeredSchedulers=None, hashType='sha512', **kwargs):
+            clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
+            branchName=None, baseWorkDir='build', hashType='sha512', **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -287,8 +287,6 @@ class MozillaBuildFactory(BuildFactory):
         self.clobberTime = clobberTime
         self.buildsBeforeReboot = buildsBeforeReboot
         self.baseWorkDir = baseWorkDir
-        self.triggerBuilds = triggerBuilds
-        self.triggeredSchedulers = triggeredSchedulers
         self.hashType = hashType
 
         self.repository = self.getRepository(repoPath)
@@ -387,22 +385,6 @@ class MozillaBuildFactory(BuildFactory):
              timeout=3600, # One hour, because Windows is slow
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error)
             )
-
-    def addTriggeredBuildsSteps(self,
-                                triggeredSchedulers=None):
-        '''Trigger other schedulers.
-        We don't include these steps by default because different
-        children may want to trigger builds at different stages.
-        '''
-        if triggeredSchedulers is None:
-            if self.triggeredSchedulers is None:
-                return True
-            triggeredSchedulers = self.triggeredSchedulers
-
-        for triggeredScheduler in triggeredSchedulers:
-            self.addStep(Trigger(
-                schedulerNames=[triggeredScheduler],
-                waitForFinish=False))
 
     def addPeriodicRebootSteps(self):
         def do_disconnect(cmd):
@@ -538,8 +520,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, createPartial=False, doCleanup=True,
                  packageSDK=False, packageTests=False, mozillaDir=None,
-                 enable_ccache=False, stageLogBaseUrl=None, **kwargs):
+                 enable_ccache=False, stageLogBaseUrl=None,
+                 triggeredSchedulers=None, triggerBuilds=False,
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
+
+        # Make sure we have a buildid and builduid
+        self.addStep(FunctionalStep(
+         name='set_buildids',
+         func=setBuildIDProps,
+        ))
+
         self.env = env.copy()
         self.objdir = objdir
         self.platform = platform
@@ -577,6 +568,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.packageSDK = packageSDK
         self.packageTests = packageTests
         self.enable_ccache = enable_ccache
+        self.triggeredSchedulers = triggeredSchedulers
+        self.triggerBuilds = triggerBuilds
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -681,6 +674,26 @@ class MercurialBuildFactory(MozillaBuildFactory):
                      flunkOnFailure=False, haltOnFailure=False, env=self.env)
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
+
+    def addTriggeredBuildsSteps(self,
+                                triggeredSchedulers=None):
+        '''Trigger other schedulers.
+        We don't include these steps by default because different
+        children may want to trigger builds at different stages.
+
+        If triggeredSchedulers is None, then the schedulers listed in
+        self.triggeredSchedulers will be triggered.
+        '''
+        if triggeredSchedulers is None:
+            if self.triggeredSchedulers is None:
+                return True
+            triggeredSchedulers = self.triggeredSchedulers
+
+        for triggeredScheduler in triggeredSchedulers:
+            self.addStep(Trigger(
+                schedulerNames=[triggeredScheduler],
+                copy_properties=['buildid', 'builduid'],
+                waitForFinish=False))
 
     def addBuildSteps(self):
         self.addPreBuildSteps()
@@ -793,7 +806,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             buildcmd = 'profiledbuild'
         self.addStep(ShellCommand,
          name='compile',
-         command=['make', '-f', 'client.mk', buildcmd],
+         command=['make', '-f', 'client.mk', buildcmd, WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')],
          description=['compile'],
          env=self.env,
          haltOnFailure=True,
@@ -1597,6 +1610,11 @@ class TryBuildFactory(MercurialBuildFactory):
         )
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.platform)
+        sendchange_props = {
+                'buildid': WithProperties('%(buildid:-)s'),
+                'builduid': WithProperties('%(builduid:-)s'),
+                }
+
         for master, warn, retries in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -1606,8 +1624,9 @@ class TryBuildFactory(MercurialBuildFactory):
              branch=talosBranch,
              revision=WithProperties('%(got_revision)s'),
              files=[WithProperties('%(packageUrl)s')],
-             user=WithProperties('%(who)s'))
-            )
+             user=WithProperties('%(who)s'),
+             sendchange_props=sendchange_props,
+            ))
         for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -1618,8 +1637,9 @@ class TryBuildFactory(MercurialBuildFactory):
              revision=WithProperties('%(got_revision)s'),
              files=[WithProperties('%(packageUrl)s'),
                      WithProperties('%(testsUrl)s')],
-             user=WithProperties('%(who)s'))
-            )
+             user=WithProperties('%(who)s'),
+             sendchange_props=sendchange_props,
+            ))
 
 class CCMercurialBuildFactory(MercurialBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
@@ -2092,6 +2112,13 @@ class NightlyBuildFactory(MercurialBuildFactory):
             ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.platform)
+        sendchange_props = {
+                'buildid': WithProperties('%(buildid:-)s'),
+                'builduid': WithProperties('%(builduid:-)s'),
+                }
+        if self.nightly:
+            sendchange_props['nightly_build'] = True
+
         for master, warn, retries in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -2101,8 +2128,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
              branch=talosBranch,
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
-             user="sendchange")
-            )
+             user="sendchange",
+             sendchange_props=sendchange_props,
+            ))
 
         files = [WithProperties('%(packageUrl)s')]
         if '1.9.1' not in self.branchName:
@@ -2117,8 +2145,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
              branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
              files=files,
-             user="sendchange-unittest")
-            )
+             user="sendchange-unittest",
+             sendchange_props=sendchange_props,
+            ))
         for master, warn in self.geriatricMasters:
             self.addStep(SendChangeStep(
               name='sendchange_%s' % master,
@@ -2126,9 +2155,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
               master=master,
               branch=self.platform,
               revision=WithProperties("%(got_revision)s"),
-              files=files,
-              user='sendchange-geriatric')
-            )
+              user='sendchange-geriatric',
+              sendchange_props=sendchange_props,
+            ))
 
 
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
@@ -2233,6 +2262,10 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
         talosBranch = "release-%s-%s-talos" % (self.branchName, self.platform)
+        sendchange_props = {
+                'buildid': WithProperties('%(buildid:-)s'),
+                'builduid': WithProperties('%(builduid:-)s'),
+                }
         for master, warn, retries in self.talosMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -2242,8 +2275,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              branch=talosBranch,
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
-             user="sendchange")
-            )
+             user="sendchange",
+             sendchange_props=sendchange_props,
+            ))
 
         for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
@@ -2255,8 +2289,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s'),
                     WithProperties('%(testsUrl)s')],
-             user="sendchange-unittest")
-            )
+             user="sendchange-unittest",
+             sendchange_props=sendchange_props,
+            ))
 
 class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
     def doUpload(self):
@@ -4753,6 +4788,10 @@ class UnittestBuildFactory(MozillaBuildFactory):
              timeout=60*60 # 60 minutes
             )
 
+            sendchange_props = {
+                    'buildid': WithProperties('%(buildid:-)s'),
+                    'builduid': WithProperties('%(builduid:-)s'),
+                    }
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -4763,8 +4802,9 @@ class UnittestBuildFactory(MozillaBuildFactory):
                  branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s'),
                         WithProperties('%(testsUrl)s')],
-                 user="sendchange-unittest")
-                )
+                 user="sendchange-unittest",
+                 sendchange_props=sendchange_props,
+                ))
 
     def addTestSteps(self):
         self.addStep(unittest_steps.MozillaCheck,
@@ -5546,7 +5586,9 @@ class MobileBuildFactory(MozillaBuildFactory):
                  mozharnessRevision="default",
                  mozharnessConfig=None,
                  mergeLocales=True,
-                 try_subdir=None, **kwargs):
+                 try_subdir=None,
+                 triggeredSchedulers=None, triggerBuilds=False,
+                 **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
     platform: the mobile platform (linux-arm)
@@ -5587,6 +5629,9 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.clobber = clobber = True
         else:
             self.clobber = clobber
+
+        self.triggeredSchedulers = triggeredSchedulers
+        self.triggerBuilds = triggerBuilds
 
         if baseUploadDir is None:
             self.baseUploadDir = self.mobileBranchName
