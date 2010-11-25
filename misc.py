@@ -561,7 +561,7 @@ def generateBranchObjects(config, name):
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         if config['enable_codecoverage'] and platform in ('linux',):
             coverageBuilders.append('%s code coverage' % base_name)
-        if config['enable_blocklist_update'] and platform in ('linux',):
+        if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
         if config['enable_xulrunner'] and platform not in ('wince',):
             xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
@@ -1255,7 +1255,7 @@ def generateBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
-        if config['enable_blocklist_update']:
+        if config.get('enable_blocklist_update', False):
             if platform == 'linux':
                 blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
                 branchObjects['builders'].append(blocklistBuilder)
@@ -1426,7 +1426,7 @@ def generateCCBranchObjects(config, name):
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % base_name)
-        if config['enable_blocklist_update'] and platform in ('linux',):
+        if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
 
     # Currently, each branch goes to a different tree
@@ -1961,7 +1961,7 @@ def generateCCBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
-        if config['enable_blocklist_update']:
+        if config.get('enable_blocklist_update', False):
             if platform == 'linux':
                 blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
                 branchObjects['builders'].append(blocklistBuilder)
