@@ -6988,7 +6988,7 @@ class TalosFactory(BuildFactory):
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             remoteTests=False, productName="firefox", remoteExtras=None,
-            talosAddOns=[], addonTester=False):
+            talosAddOns=[], addonTester=False, releaseTester=False):
 
         BuildFactory.__init__(self)
 
@@ -7015,6 +7015,7 @@ class TalosFactory(BuildFactory):
         self.exepath = None
         self.env = MozillaEnvironments[envName]
         self.addonTester = addonTester
+        self.releaseTester = releaseTester
         self.productName = productName
         self.remoteExtras = remoteExtras
 
@@ -7122,7 +7123,26 @@ class TalosFactory(BuildFactory):
         ))
 
     def addUnpackBuildSteps(self):
-        if self.OS in ('tegra_android',):
+        if (self.releaseTester and (self.OS in ('xp', 'vista', 'win7', 'w764'))): 
+            #build is packaged in a windows installer 
+            self.addStep(DownloadFile( 
+             url="%s/tools/buildfarm/utils/firefoxInstallConfig.ini" % self.supportUrlBase,
+             workdir=self.workdirBase,
+            ))
+            self.addStep(SetProperty,
+              name='set workdir path',
+              command=['pwd'],
+              property='workdir_pwd',
+              workdir=self.workdirBase,
+            )
+            self.addStep(ShellCommand(
+             name='install_release_build',
+             workdir=self.workdirBase,
+             description="install windows release build",
+             command=[WithProperties('%(filename)s'), WithProperties('/INI=%(workdir_pwd)s\\firefoxInstallConfig.ini')],
+             env=self.env)
+            )
+        elif self.OS in ('tegra_android',):
             self.addStep(UnpackFile(
              filename=WithProperties("../%(filename)s"),
              workdir="%s/%s" % (self.workdirBase, self.productName),
