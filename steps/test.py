@@ -27,7 +27,7 @@
 
 from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, EXCEPTION, \
   worst_status
-from buildbot.process.buildstep import BuildStep
+from buildbot.process.properties import WithProperties
 
 from twisted.internet.defer import DeferredList, Deferred
 from twisted.python import log
@@ -38,7 +38,6 @@ from urllib import urlencode
 from time import strptime, strftime, localtime, mktime
 import re
 import os
-import post_file
 import signal
 from os import path
 import string
@@ -383,111 +382,49 @@ class Codesighs(ShellCommand):
             summary = 'TinderboxPrint:%s:%s\n' % (slug, diff)
             self.addCompleteLog(slug, summary)
 
-class GraphServerPost(BuildStep):
+class GraphServerPost(ShellCommand):
     flunkOnFailure = True
+    name = "graph_server_post"
+    description = ["graph", "server", "post"]
+    descriptionDone = 'graph server post results complete'
 
-    def __init__(self, server, selector, branch, resultsname, timeout=120):
-        BuildStep.__init__(self)
+    def __init__(self, server, selector, branch, resultsname, timeout=120,
+                 retries=8, sleepTime=5, propertiesFile="properties.json",
+                 **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(server=server, selector=selector,
                                  branch=branch, resultsname=resultsname,
-                                 timeout=timeout)
-        self.server = server
-        self.selector = selector
-        self.graphurl = "http://%s%s" % (self.server, self.selector)
-        self.branch = branch
-        self.resultsname = resultsname.replace(' ', '_')
-        self.timeout = timeout
-        self.name = 'graph server post'
-        self.description = 'graph server post results'
-        self.descriptionDone = 'graph server post results complete'
+                                 timeout=timeout, retries=retries,
+                                 sleepTime=sleepTime,
+                                 propertiesFile=propertiesFile)
 
-    def doTinderboxPrint(self, contents, testlongname, testname, prettyval):
-        try:
-          # If there was no error, process the log
-          lines = contents.split('\n')
-          found = False
-          for line in lines:
-            if "RETURN" in line :
-              tboxPrint =  'TinderboxPrint: ' + \
-                '<a title="%s" href=\'http://%s/%s\'>%s:%s</a>\n' % \
-                (testlongname, self.server, line.split("\t")[3],
-                testname, prettyval)
-              self.stdio.addStdout(tboxPrint)
-              found = True
-          if not found:
-              self.stdio.addStderr("results not added, response: \n" + contents)
-              raise Exception("graph server did not add results successfully")
-        except Exception, e:
-          self.stdio.addStderr(str(e))
-          raise
-
-    def postResult(self, testresult, retries=8, sleepTime=5):
-        testname, testlongname, testval, prettyval = testresult
-        testval = str(testval).strip(string.letters)
-        data = self.constructString(self.resultsname, testlongname, self.branch, self.sourcestamp, self.buildid, self.timestamp, testval)
-        content_type, body = post_file.encode_multipart_formdata([("key", "value")], [("filename", "data", data)])
-        headers = {'Content-Type': content_type, 'Content-Length' : str(len(data))}
-        d = getPage(self.graphurl, timeout=self.timeout, method='POST', headers=headers, postdata=body)
-        d.addCallback(self.doTinderboxPrint, testlongname, testname,
-                      prettyval)
-        d.addErrback(lambda res: self.postFailed(testresult, retries, sleepTime, res))
-
-        return d
-        
-    def postFailed(self, testresult, retries, sleepTime, res):
-        # Go to sleep, and then try again!
-        if retries > 0:
-            self.stdio.addStderr('\nWarning: error when trying to post %s, trying again in %i seconds\n' % \
-              (testresult[1], sleepTime))
-            log.msg("Error when trying to post %s: %s.  %i tries left.  Trying again in %i seconds" % (testresult[1], str(res), retries, sleepTime))
-            d = Deferred()
-            reactor.callLater(sleepTime, d.callback, None)
-            d.addCallback(lambda res: self.postResult(testresult, retries-1, sleepTime*2))
-            return d
-
-        # This function is called when getPage() fails and simply sets
-        # self.error = True so postFinished knows that something failed.
-        self.error = True
-        self.stdio.addStderr('\nEncountered error when trying to post %s\n' % \
-          testresult[1])
-        if res:
-            self.stdio.addStderr(str(res))
-
-    def constructString(self, machine, testname, branch, sourcestamp, buildid, date, val):
-        info_format = "%s,%s,%s,%s,%s,%s\n"
-        str = ""
-        str += "START\n"
-        str += "AVERAGE\n"
-        str += info_format % (machine, testname, branch, sourcestamp, buildid, date)
-        str += "%.2f\n" % (float(val))
-        str += "END"
-        return str
+        self.command = ['python',
+                        WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
+                        '-s', str(sleepTime),
+                        '-t', str(timeout),
+                        '-r', str(retries)]
+        self.command.extend(['python',
+                             WithProperties('%(toolsdir)s/buildfarm/utils/graph_server_post.py')])
+        self.command.extend(['--server', server,
+                             '--selector', selector,
+                             '--branch', branch,
+                             '--buildid', WithProperties('%(buildid)s'),
+                             '--sourcestamp', WithProperties('%(sourcestamp)s'),
+                             '--resultsname', resultsname.replace(' ', '_'),
+                             '--properties-file', propertiesFile])
 
     def start(self):
-        self.changes = self.build.allChanges()
-        self.timestamp = int(self.step_status.build.getTimes()[0])
-        self.buildid = self.getProperty('buildid')
-        self.sourcestamp = self.getProperty('sourcestamp')
-        self.testresults = self.getProperty('testresults')
-        self.stdio = self.addLog('stdio')
-        self.error = False
-        # Make a list of Deferreds so we can properly clean up once everything
-        # has posted.
-        deferreds = []
-        for testresult in self.testresults:
-            d = self.postResult(testresult)
-            deferreds.append(d)
+        timestamp = str(int(self.step_status.build.getTimes()[0]))
+        self.command.extend(['--timestamp', timestamp])
+        self.super_class.start(self)
 
-        # Now, once *everything* has finished we need to tell Buildbot
-        # that this step is complete.
-        dl = DeferredList(deferreds)
-        dl.addCallback(self.postFinished)
-
-    def postFinished(self, results):
-        if self.error:
+    def evaluateCommand(self, cmd):
+        result = self.super_class.evaluateCommand(self, cmd)
+        if result == FAILURE:
+            result = EXCEPTION
             self.step_status.setText(["Automation", "Error:", "failed", "graph", "server", "post"])
             self.step_status.setText2(["Automation", "Error:", "failed", "graph", "server", "post"])
-            self.finished(EXCEPTION)
-        else:
+        elif result == SUCCESS:
             self.step_status.setText(["graph", "server", "post", "ok"])
-            self.finished(SUCCESS)
+        return result

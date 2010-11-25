@@ -920,12 +920,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
              haltOnFailure=True
             )
             if self.graphServer:
-                self.addStep(GraphServerPost,
-                 server=self.graphServer,
-                 selector=self.graphSelector,
-                 branch=self.graphBranch,
-                 resultsname=self.baseName
-                )
+                self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+                self.addStep(GraphServerPost(server=self.graphServer,
+                                             selector=self.graphSelector,
+                                             branch=self.graphBranch,
+                                             resultsname=self.baseName,
+                                             env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                             propertiesFile="properties.json"))
             self.addStep(CompareLeakLogs,
              name='compare_previous_leak_log',
              mallocLog='../malloc.log.old',
@@ -1164,12 +1165,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
           descriptionDone=['got', 'sourcestamp']
         )
         if self.graphServer:
-            self.addStep(GraphServerPost,
-             server=self.graphServer,
-             selector=self.graphSelector,
-             branch=self.graphBranch,
-             resultsname=self.baseName
-            )
+            self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+            self.addStep(GraphServerPost(server=self.graphServer,
+                                         selector=self.graphSelector,
+                                         branch=self.graphBranch,
+                                         resultsname=self.baseName,
+                                         env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                         propertiesFile="properties.json"))
         self.addStep(ShellCommand,
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
