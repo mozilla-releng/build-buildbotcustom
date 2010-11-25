@@ -561,6 +561,8 @@ def generateBranchObjects(config, name):
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         if config['enable_codecoverage'] and platform in ('linux',):
             coverageBuilders.append('%s code coverage' % base_name)
+        if config['enable_blocklist_update'] and platform in ('linux',):
+            weeklyBuilders.append('%s blocklist update' % base_name)
         if config['enable_xulrunner'] and platform not in ('wince',):
             xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
     if config['enable_weekly_bundle']:
@@ -1253,6 +1255,11 @@ def generateBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
+        if config['enable_blocklist_update']:
+            if platform == 'linux':
+                blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
+                branchObjects['builders'].append(blocklistBuilder)
+
         if config['enable_xulrunner'] and platform not in ('wince',):
              xr_env = pf['env'].copy()
              xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
@@ -1419,6 +1426,8 @@ def generateCCBranchObjects(config, name):
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, True))
         if config['enable_codecoverage'] and platform in ('linux',):
             weeklyBuilders.append('%s code coverage' % base_name)
+        if config['enable_blocklist_update'] and platform in ('linux',):
+            weeklyBuilders.append('%s blocklist update' % base_name)
 
     # Currently, each branch goes to a different tree
     # If this changes in the future this may have to be
@@ -1952,6 +1961,11 @@ def generateCCBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
+        if config['enable_blocklist_update']:
+            if platform == 'linux':
+                blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
+                branchObjects['builders'].append(blocklistBuilder)
+
         if config['enable_shark'] and platform.startswith('macosx'):
              mozilla2_shark_factory = CCNightlyBuildFactory(
                  env= pf['env'],
@@ -2429,6 +2443,31 @@ def generateMobileBranchObjects(config, name):
         nomergeBuilders.extend(builders + nightlyBuilders)
 
     return mobile_objects
+
+def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
+    extra_args = ['-b', config['repo_path']]
+    if config['hg_username'] is not None:
+        extra_args.extend(['-u', config['hg_username']])
+    if config['hg_ssh_key'] is not None:
+        extra_args.extend(['-k', config['hg_ssh_key']])
+    if config['blocklist_update_on_closed_tree'] is True:
+        extra_args.extend(['-c'])
+    blocklistupdate_factory = ScriptFactory(
+        "%s%s" % (config['hgurl'],
+        config['build_tools_repo_path']),
+        'scripts/blocklist/sync-hg-blocklist.sh',
+        interpreter='bash',
+        extra_args=extra_args,
+    )
+    blocklistupdate_builder = {
+        'name': '%s blocklist update' % base_name,
+        'slavenames': slaves,
+        'builddir': '%s-%s-blocklistupdate' % (branch_name, platform),
+        'factory': blocklistupdate_factory,
+        'category': branch_name,
+        'properties': {'branch': branch_name, 'platform': platform},
+    }
+    return blocklistupdate_builder
 
 def generateFuzzingObjects(config, SLAVES):
     builders = []
