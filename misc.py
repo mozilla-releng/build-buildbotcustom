@@ -113,11 +113,12 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
 # and the dep builders only obey HgPoller/Force Build triggered ones.
 
 def isHgPollerTriggered(change, hgUrl):
-    if "DONTBUILD" in change.comments:
-        return False
-
     if hgUrl in change.revlink or change.comments.find(hgUrl) > -1:
         return True
+
+def shouldBuild(change):
+    """check for commit message disabling build for this change"""
+    return "DONTBUILD" not in change.comments
 
 def isImportantL10nFile(change, l10nModules):
     for f in change.files:
@@ -723,7 +724,7 @@ def generateBranchObjects(config, name):
         name=name,
         branch=config['repo_path'],
         builderNames=builders + unittestBuilders + debugBuilders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']),
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']) and shouldBuild(c),
         **extra_args
     ))
 
@@ -1516,7 +1517,7 @@ def generateCCBranchObjects(config, name):
         branch=config['repo_path'],
         treeStableTimer=3*60,
         builderNames=builders + unittestBuilders + debugBuilders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl'])
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']) and shouldBuild(c)
     ))
 
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
@@ -2400,7 +2401,7 @@ def generateMobileBranchObjects(config, name):
         branch=config.get('repo_path'),
         treeStableTimer=None if config.get('enable_try') else 3*60,
         builderNames=builders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
+        fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')) and shouldBuild(c),
         **extra_args
     ))
 
@@ -2411,7 +2412,7 @@ def generateMobileBranchObjects(config, name):
             branch=config.get('mobile_repo_path'),
             treeStableTimer=3*60,
             builderNames=builders,
-            fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')),
+            fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')) and shouldBuild(c),
         ))
 
     if config.get('enable_mobile_nightly'):
