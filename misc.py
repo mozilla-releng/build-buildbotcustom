@@ -2445,7 +2445,7 @@ def generateMobileBranchObjects(config, name):
     return mobile_objects
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
-    extra_args = ['-b', config['repo_path']]
+    extra_args = ['-d', '-b', config['repo_path']]
     if config['hg_username'] is not None:
         extra_args.extend(['-u', config['hg_username']])
     if config['hg_ssh_key'] is not None:
