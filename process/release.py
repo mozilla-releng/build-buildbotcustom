@@ -352,7 +352,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append({
                 'name': builderPrefix('repo_setup'),
                 'slavenames': branchConfig['platforms']['linux']['slaves'],
-                'category': 'release',
+                'category': builderPrefix(''),
                 'builddir': builderPrefix('repo_setup'),
                 'factory': repository_setup_factory,
                 'nextSlave': _nextFastReservedSlave,
@@ -362,7 +362,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append(makeDummyBuilder(
                 name=builderPrefix('repo_setup'),
                 slaves=branchConfig['platforms']['linux']['slaves'],
-                category='release',
+                category=builderPrefix(''),
                 ))
 
     if not releaseConfig.get('skip_tag'):
@@ -374,7 +374,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append({
             'name': builderPrefix('tag'),
             'slavenames': branchConfig['platforms']['linux']['slaves'],
-            'category': 'release',
+            'category': builderPrefix(''),
             'builddir': builderPrefix('tag'),
             'factory': tag_factory,
             'nextSlave': _nextFastReservedSlave,
@@ -385,7 +385,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append(makeDummyBuilder(
             name=builderPrefix('tag'),
             slaves=branchConfig['platforms']['linux']['slaves'],
-            category='release',
+            category=builderPrefix(''),
             ))
 
     if not releaseConfig.get('skip_source'):
@@ -407,7 +407,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append({
            'name': builderPrefix('source'),
            'slavenames': branchConfig['platforms']['linux']['slaves'],
-           'category': 'release',
+           'category': builderPrefix(''),
            'builddir': builderPrefix('source'),
            'factory': source_factory,
            'env': builder_env,
@@ -433,7 +433,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append({
                'name': builderPrefix('xulrunner_source'),
                'slavenames': branchConfig['platforms']['linux']['slaves'],
-               'category': 'release',
+               'category': builderPrefix(''),
                'builddir': builderPrefix('xulrunner_source'),
                'factory': xulrunner_source_factory,
                'env': builder_env,
@@ -442,13 +442,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append(makeDummyBuilder(
             name=builderPrefix('source'),
             slaves=branchConfig['platforms']['linux']['slaves'],
-            category='release',
+            category=builderPrefix(''),
             ))
         if releaseConfig['xulrunnerPlatforms']:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('xulrunner_source'),
                 slaves=branchConfig['platforms']['linux']['slaves'],
-                category='release',
+                category=builderPrefix(''),
                 ))
 
     for platform in releaseConfig['enUSPlatforms']:
@@ -507,7 +507,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append({
                 'name': builderPrefix('%s_build' % platform),
                 'slavenames': pf['slaves'],
-                'category': 'release',
+                'category': builderPrefix(''),
                 'builddir': builderPrefix('%s_build' % platform),
                 'factory': build_factory,
                 'nextSlave': _nextFastReservedSlave,
@@ -517,7 +517,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append(makeDummyBuilder(
                 name=builderPrefix('%s_build' % platform),
                 slaves=branchConfig['platforms']['linux']['slaves'],
-                category='release',
+                category=builderPrefix(''),
                 ))
 
         if platform in releaseConfig['l10nPlatforms']:
@@ -537,7 +537,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 builders.append({
                     'name': builderName,
                     'slavenames': branchConfig['l10n_slaves'][platform],
-                    'category': 'release',
+                    'category': builderPrefix(''),
                     'builddir': builddir,
                     'factory': repack_factory,
                     'nextSlave': _nextFastReservedSlave,
@@ -602,7 +602,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
                 'slavenames': pf['slaves'],
-                'category': 'release',
+                'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_%s_build' % platform),
                 'factory': xulrunner_build_factory,
                 'env': builder_env,
@@ -611,7 +611,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append(makeDummyBuilder(
                 name=builderPrefix('xulrunner_%s_build' % platform),
                 slaves=branchConfig['platforms']['linux']['slaves'],
-                category='release',
+                category=builderPrefix(''),
                 ))
 
     if releaseConfig['doPartnerRepacks']:
@@ -637,7 +637,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
              builders.append({
                  'name': builderPrefix('partner_repack', platform),
                  'slavenames': slaves,
-                 'category': 'release',
+                 'category': builderPrefix(''),
                  'builddir': builderPrefix('partner_repack', platform),
                  'factory': partner_repack_factory,
                  'nextSlave': _nextFastReservedSlave,
@@ -666,7 +666,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append({
             'name': builderPrefix('l10n_verification', platform),
             'slavenames': slaves,
-            'category': 'release',
+            'category': builderPrefix(''),
             'builddir': builderPrefix('l10n_verification', platform),
             'factory': l10n_verification_factory,
             'nextSlave': _nextFastReservedSlave,
@@ -718,7 +718,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     builders.append({
         'name': builderPrefix('updates'),
         'slavenames': branchConfig['platforms']['linux']['slaves'],
-        'category': 'release',
+        'category': builderPrefix(''),
         'builddir': builderPrefix('updates'),
         'factory': updates_factory,
         'nextSlave': _nextFastReservedSlave,
@@ -737,7 +737,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append({
             'name': builderPrefix('%s_update_verify' % platform),
             'slavenames': branchConfig['platforms'][platform]['slaves'],
-            'category': 'release',
+            'category': builderPrefix(''),
             'builddir': builderPrefix('%s_update_verify' % platform),
             'factory': update_verify_factory,
             'nextSlave': _nextFastReservedSlave,
@@ -755,7 +755,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     builders.append({
         'name': builderPrefix('final_verification'),
         'slavenames': branchConfig['platforms']['linux']['slaves'],
-        'category': 'release',
+        'category': builderPrefix(''),
         'builddir': builderPrefix('final_verification'),
         'factory': final_verification_factory,
         'nextSlave': _nextFastReservedSlave,
@@ -806,7 +806,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builders.append({
             'name': builderPrefix('major_update'),
             'slavenames': branchConfig['platforms']['linux']['slaves'],
-            'category': 'release',
+            'category': builderPrefix(''),
             'builddir': builderPrefix('major_update'),
             'factory': major_update_factory,
             'nextSlave': _nextFastReservedSlave,
@@ -824,7 +824,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builders.append({
                 'name': builderPrefix('%s_major_update_verify' % platform),
                 'slavenames': branchConfig['platforms'][platform]['slaves'],
-                'category': 'release',
+                'category': builderPrefix(''),
                 'builddir': builderPrefix('%s_major_update_verify' % platform),
                 'factory': major_update_verify_factory,
                 'nextSlave': _nextFastReservedSlave,
@@ -851,7 +851,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     builders.append({
         'name': builderPrefix('bouncer_submitter'),
         'slavenames': branchConfig['platforms']['linux']['slaves'],
-        'category': 'release',
+        'category': builderPrefix(''),
         'builddir': builderPrefix('bouncer_submitter'),
         'factory': bouncer_submitter_factory,
         'env': builder_env,
@@ -893,7 +893,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['AllRecipients'],
             mode='all',
-            categories=['release'],
+            categories=[builderPrefix('')],
             relayhost='mail.build.mozilla.org',
             messageFormatter=createReleaseMessage,
         ))
