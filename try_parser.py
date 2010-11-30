@@ -6,26 +6,30 @@ import argparse, re
 
 from twisted.python import log
 
-import buildbotcustom.valid_builders
-reload(buildbotcustom.valid_builders)
-
-from buildbotcustom.valid_builders import PRETTY_NAMES, DESKTOP_PLATFORMS, MOBILE_PLATFORMS, \
-                           TALOS_SUITES, UNITTEST_SUITES
-
 '''Given a list of arguments from commit message or info file
    returns only those builder names that should be built.'''
 
-def getMochitests(suites):
-  test_suites = []
-  for s in suites:
-    if s == 'mochitests': # for 'all' unittests
-      test_suites.extend(UNITTEST_SUITES['mochitests'].values())
-    elif s.startswith('mochitest-'): # checking user submitted list of suites
-      mochitest = UNITTEST_SUITES['mochitests'][s]
-      test_suites.append(mochitest)
-    else:
-      test_suites.append(s)
-  return test_suites
+def expandTestSuites(user_suites,valid_suites):
+    test_suites = []
+    for u in user_suites:
+        if u == 'mochitests':
+            for v in valid_suites:
+                if v.startswith('mochitest'):
+                    test_suites.append(v)
+        elif u == 'mochitest-o':
+            for v in valid_suites:
+                if re.search(u,v):
+                    test_suites.append(v)
+        elif u.startswith('mochitest-'):
+            num = u.split('-')[1]
+            for v in valid_suites:
+                if v.startswith('mochitest') and re.search(num,v.split('/')[0]):
+                    test_suites.append(v)
+        else:
+            # validate other test names
+            if u in valid_suites:
+                test_suites.append(u)
+    return test_suites
 
 def processMessage(message):
     match = re.search('try:',str(message))
@@ -36,71 +40,59 @@ def processMessage(message):
         message =[""]
     return message
 
-def getDesktopBuilders(platforms, builderNames, buildTypes):
-    desktopBuilders = []
+def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
+    platformBuilders = []
 
-    if platforms != 'none':
+    if user_platforms != 'none':
+    # if user wants od - the platforms have -debug in them
         for buildType in buildTypes:
-            if buildType == 'opt':
-                buildType = 'build'
-            if buildType == 'debug':
-                buildType = 'leak test build'
+            for platform in user_platforms:
+              if buildType == 'debug':
+                  platform += '-debug'
+              if platform in prettyNames.keys():
+                  custom_builder = prettyNames[platform]
+                  if custom_builder in builderNames and custom_builder not in platformBuilders:
+                      platformBuilders.extend([custom_builder])
+    return platformBuilders
 
-            for platform in platforms:
-                platform = 'desktop_' + platform
-                if platform in PRETTY_NAMES.keys():
-                    custom_builder = "%s tryserver %s" % (PRETTY_NAMES[platform], buildType)
-                    if custom_builder in builderNames:
-                        desktopBuilders.extend([custom_builder])
-    return desktopBuilders
-
-def getMobileBuilders(platforms, builderNames):
-    mobileBuilders = []
-
-    if platforms != 'none':
-        for platform in platforms:
-            if platform in ('win32', 'macosx', 'linux'):
-                platform = 'mobile_' + platform
-            if platform in PRETTY_NAMES.keys():
-                custom_builder = "%s tryserver build" % (PRETTY_NAMES[platform])
-                if custom_builder in builderNames:
-                    mobileBuilders.extend([custom_builder])
-    return mobileBuilders
-
-def getTestBuilders(platforms, testType, tests, builderNames, buildTypes):
+def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, prettyNames, unittestPrettyNames):
     testBuilders = []
     # for all possible suites, add in the builderNames for that platform
     if tests != 'none':
         if testType == "test":
             for buildType in buildTypes:
                 for platform in platforms:
-                    for test in tests:
-                        # we only do opt unittests on Rev3 WINNT 6.1, the debug tests still run on pm02
-                        if platform == 'win32':
-                          if buildType == 'debug':
-                            custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES['desktop_win32'], buildType, testType, test)
-                          else:
-                            custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES[platform][1], buildType, testType, test)
-                        else:
-                            custom_builder = "%s tryserver %s %s %s" % (PRETTY_NAMES[platform], buildType, testType, test)
-                        if custom_builder in (builderNames):
-                            testBuilders.extend([custom_builder])
+                    # this is to catch debug unittests triggered on the build master
+                    # if the user asks for win32 with -b d
+                    if buildType == 'debug' and not platform.endswith('debug'):
+                        platform += '-debug'
+                    if platform in prettyNames.keys():
+                        for test in tests:
+                            for slave_platform in prettyNames[platform]:
+                                custom_builder = "%s tryserver %s %s %s" % (slave_platform, buildType, testType, test)
+                                # have to check that custom_builder is not already present
+                                if custom_builder in (builderNames) and custom_builder not in testBuilders:
+                                    testBuilders.extend([custom_builder])
+
+                    # we do all but debug win32 over on test masters so have to check the 
+                    # unittestPrettyNames platforms for local builder master unittests
+                    if unittestPrettyNames and unittestPrettyNames.has_key(platform):
+                         for test in tests:
+                             debug_custom_builder = "%s %s" % (unittestPrettyNames[platform], test)
+                             if debug_custom_builder in (builderNames) and debug_custom_builder not in testBuilders:
+                                 testBuilders.extend([debug_custom_builder])
+
         if testType == "talos":
             for platform in platforms:
                 for test in tests:
-                    if platform == 'win32':
-                        # we still do talos runs on win2k3 ie: WINNT 5.1
-                        for w in PRETTY_NAMES['win32']:
-                            custom_builder = "%s tryserver %s %s" % (w, testType, test)
-                            if custom_builder in (builderNames):
-                                testBuilders.extend([custom_builder])
-                    else:
-                        custom_builder = "%s tryserver %s %s" % (PRETTY_NAMES[platform], testType, test)
-                        if custom_builder in (builderNames):
+                    for slave_platform in prettyNames[platform]:
+                        custom_builder = "%s tryserver %s %s" % (slave_platform, testType, test)
+                        if custom_builder in (builderNames) and custom_builder not in testBuilders:
                             testBuilders.extend([custom_builder])
+
     return testBuilders
 
-def TryParser(message, builderNames):
+def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None):
 
     parser = argparse.ArgumentParser(description='Pass in a commit message and a list \
                                      and tryParse populates the list with the builderNames\
@@ -116,12 +108,8 @@ def TryParser(message, builderNames):
                         help='accepts the build types requested')
     parser.add_argument('--platform', '-p',
                         default='all',
-                        dest='desktop',
-                        help='provide a list of desktop platforms, or specify none (default is all)')
-    parser.add_argument('--mobile', '-m',
-                        default='all',
-                        dest='mobile',
-                        help='provide a list of mobile platform, or specify none (default is all)')
+                        dest='user_platforms',
+                        help='provide a list of platforms desired, or specify none (default is all)')
     parser.add_argument('--unittests', '-u',
                         default='all',
                         dest='test',
@@ -133,11 +121,9 @@ def TryParser(message, builderNames):
 
     (options, unknown_args) = parser.parse_known_args(processMessage(message))
 
-
     if options.do_everything:
         options.build = ['opt', 'debug']
-        options.desktop = 'all'
-        options.mobile = 'all'
+        options.user_platforms = 'all'
         options.test = 'all'
         options.talos = 'all'
 
@@ -152,31 +138,32 @@ def TryParser(message, builderNames):
         # for any input other than do/od, d, o, all set to default
         options.build = ['opt','debug']
 
-    if options.desktop == 'all':
-        options.desktop = DESKTOP_PLATFORMS
-    elif options.desktop != 'none':
-        options.desktop = options.desktop.split(',')
-
-    if options.mobile == 'all':
-        options.mobile = MOBILE_PLATFORMS
-    elif options.mobile != 'none':
-        options.mobile = options.mobile.split(',')
+    if options.user_platforms == 'all' and prettyNames:
+        options.user_platforms = prettyNames.keys()
+    elif options.user_platforms != 'none':
+        options.user_platforms = options.user_platforms.split(',')
 
     if options.test == 'all':
-        options.test = getMochitests(UNITTEST_SUITES)
+        options.test = unittestSuites
     elif options.test != 'none':
-        options.test = getMochitests(options.test.split(','))
-    if options.talos == 'all':
-        options.talos = TALOS_SUITES
-    elif options.talos != 'none':
-        options.talos = options.talos.split(',')
+        options.test = expandTestSuites(options.test.split(','), unittestSuites)
 
-    # Get the custom builder names
-    customBuilderNames = getDesktopBuilders(options.desktop, builderNames, options.build)
-    customBuilderNames.extend(getMobileBuilders(options.mobile, builderNames))
-    customBuilderNames.extend(getTestBuilders(options.desktop, "test", options.test, 
-                              builderNames, options.build))
-    customBuilderNames.extend(getTestBuilders(options.desktop, "talos", options.talos, builderNames, 
-                              options.build))
+    if talosSuites:
+      if options.talos == 'all':
+          options.talos = talosSuites
+      elif options.talos != 'none':
+          options.talos = options.talos.split(',')
+
+    # List for the custom builder names that match prettyNames passed in from misc.py
+    customBuilderNames = []
+    if options.user_platforms:
+        customBuilderNames = getPlatformBuilders(options.user_platforms, builderNames, options.build, prettyNames)
+
+        if options.test != 'none' and unittestSuites:
+            customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
+                                      builderNames, options.build, prettyNames, unittestPrettyNames))
+        if options.talos != 'none' and talosSuites is not None:
+            customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, builderNames, 
+                                      options.build, prettyNames, None))
 
     return customBuilderNames

@@ -41,11 +41,12 @@ def tryChooser(s, all_changes):
             # still need to parse a comment string to get the default set
             log.msg("No comments, passing empty string which will result in default set")
             comments = ""
-        customBuilders = TryParser(comments, s.builderNames)
+        customBuilders = TryParser(comments, s.builderNames, s.prettyNames, s.unittestPrettyNames,
+                          s.unittestSuites, s.talosSuites)
         buildersPerChange[c] = customBuilders
 
     def parseDataError(failure, c):
-        log.msg("Couldn't parse data: Requesting default try set.")
+        log.msg("Couldn't parse data: Requesting default try set. %s" % failure)
         parseData("", c)
 
     for c in all_changes:

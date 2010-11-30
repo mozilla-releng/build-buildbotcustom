@@ -1,167 +1,163 @@
 from buildbotcustom.try_parser import TryParser
 import unittest
-from valid_builders import DESKTOP_BUILDERS, MOBILE_BUILDERS, TEST_BUILDERS, TALOS_BUILDERS
 
 ###### TEST CASES #####
 
-# ALL OVERRIDE
-# test that when try comments contain --all, that an entire run of everything is generated
-# this use case is to mimic an m-c run
-MESSAGE_ALL_OVERRIDE = "try: -a"
-RESULT_ALL_OVERRIDE = ['OS X 10.5.2 tryserver build', 'OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'WINNT 5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build', 'OS X 10.5.2 tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-1/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-2/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-3/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-4/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-5/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitest-other', 'Rev3 WINNT 6.1 x64 tryserver opt test reftest', 'Rev3 WINNT 6.1 x64 tryserver opt test crashtest', 'Rev3 WINNT 6.1 x64 tryserver opt test xpcshell', 'Rev3 WINNT 6.1 x64 tryserver opt test jsreftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-1/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-2/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-4/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-5/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitest-other', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test reftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test opengl', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test opengl', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test crashtest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test xpcshell', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test jsreftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-1/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-2/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-4/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-5/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitest-other', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test reftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test crashtest', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test xpcshell', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test jsreftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-1/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-2/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-3/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-4/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-5/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitest-other', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test reftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test crashtest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test xpcshell', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test jsreftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-1/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-2/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-3/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-4/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-5/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitest-other', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test reftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test crashtest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test xpcshell', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test jsreftest', 'Rev3 WINNT 6.1 tryserver opt test mochitests-1/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-2/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-3/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-4/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-5/5', 'Rev3 WINNT 6.1 tryserver opt test mochitest-other', 'Rev3 WINNT 6.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test reftest-d2d', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver opt test xpcshell', 'Rev3 WINNT 6.1 tryserver opt test jsreftest', 'Rev3 Fedora 12x64 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12x64 tryserver opt test mochitest-other', 'Rev3 Fedora 12x64 tryserver opt test opengl', 'Rev3 Fedora 12x64 tryserver debug test opengl', 'Rev3 Fedora 12x64 tryserver opt test reftest', 'Rev3 Fedora 12x64 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test opengl', 'Rev3 Fedora 12 tryserver debug test opengl', 'Rev3 Fedora 12x64 tryserver opt test xpcshell', 'Rev3 Fedora 12x64 tryserver opt test jsreftest', 'Rev3 Fedora 12x64 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-2/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-3/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-4/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-5/5', 'Rev3 Fedora 12x64 tryserver debug test mochitest-other', 'Rev3 Fedora 12x64 tryserver debug test reftest', 'Rev3 Fedora 12x64 tryserver debug test crashtest', 'Rev3 Fedora 12x64 tryserver debug test xpcshell', 'Rev3 Fedora 12x64 tryserver debug test jsreftest', 'Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test reftest', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test xpcshell', 'Rev3 Fedora 12 tryserver opt test jsreftest', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitests-2/5', 'Rev3 Fedora 12 tryserver debug test mochitests-3/5', 'Rev3 Fedora 12 tryserver debug test mochitests-4/5', 'Rev3 Fedora 12 tryserver debug test mochitests-5/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 Fedora 12 tryserver debug test reftest', 'Rev3 Fedora 12 tryserver debug test crashtest', 'Rev3 Fedora 12 tryserver debug test xpcshell', 'Rev3 Fedora 12 tryserver debug test jsreftest', 'Rev3 WINNT 6.1 x64 tryserver talos nochrome', 'Rev3 WINNT 6.1 x64 tryserver talos dromaeo', 'Rev3 WINNT 6.1 x64 tryserver talos a11y', 'Rev3 WINNT 6.1 x64 tryserver talos svg', 'Rev3 WINNT 6.1 x64 tryserver talos chrome', 'Rev3 WINNT 6.1 x64 tryserver talos tp4', 'Rev3 WINNT 6.1 x64 tryserver talos dirty', 'Rev3 WINNT 6.1 x64 tryserver talos scroll', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos nochrome', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos cold', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos dromaeo', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos svg', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos chrome', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos dirty', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos scroll', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos nochrome', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos cold', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos dromaeo', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos svg', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos chrome', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos tp4', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos dirty', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos scroll', 'Rev3 WINNT 5.1 tryserver talos nochrome', 'Rev3 WINNT 5.1 tryserver talos dromaeo', 'Rev3 WINNT 5.1 tryserver talos a11y', 'Rev3 WINNT 5.1 tryserver talos svg', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos dirty', 'Rev3 WINNT 5.1 tryserver talos scroll', 'Rev3 WINNT 6.1 tryserver talos nochrome', 'Rev3 WINNT 6.1 tryserver talos dromaeo', 'Rev3 WINNT 6.1 tryserver talos a11y', 'Rev3 WINNT 6.1 tryserver talos svg', 'Rev3 WINNT 6.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos dirty', 'Rev3 WINNT 6.1 tryserver talos scroll', 'Rev3 Fedora 12x64 tryserver talos nochrome', 'Rev3 Fedora 12x64 tryserver talos cold', 'Rev3 Fedora 12x64 tryserver talos dromaeo', 'Rev3 Fedora 12x64 tryserver talos a11y', 'Rev3 Fedora 12x64 tryserver talos svg', 'Rev3 Fedora 12x64 tryserver talos chrome', 'Rev3 Fedora 12x64 tryserver talos tp4', 'Rev3 Fedora 12x64 tryserver talos dirty', 'Rev3 Fedora 12x64 tryserver talos scroll', 'Rev3 Fedora 12 tryserver talos nochrome', 'Rev3 Fedora 12 tryserver talos cold', 'Rev3 Fedora 12 tryserver talos dromaeo', 'Rev3 Fedora 12 tryserver talos a11y', 'Rev3 Fedora 12 tryserver talos svg', 'Rev3 Fedora 12 tryserver talos chrome', 'Rev3 Fedora 12 tryserver talos tp4', 'Rev3 Fedora 12 tryserver talos dirty', 'Rev3 Fedora 12 tryserver talos scroll', 'WINNT 5.2 tryserver debug test mochitests-1/5', 'WINNT 5.2 tryserver debug test mochitests-2/5', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-4/5', 'WINNT 5.2 tryserver debug test mochitests-5/5', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test reftest', 'WINNT 5.2 tryserver debug test crashtest', 'WINNT 5.2 tryserver debug test xpcshell', 'WINNT 5.2 tryserver debug test jsreftest']
+BUILDER_PRETTY_NAMES = {'macosx64':'OS X 10.6.2 tryserver build', 'win32':'WINNT 5.2 tryserver build', 'win32-debug':'WINNT 5.2 tryserver leak test build', 'linux-64':'Linux x86-64 tryserver build', 'linux':'Linux tryserver build', 'macosx64-debug':'OS X 10.6.2 tryserver leak test build', 'linux64-debug':'Linux x86-64 tryserver leak test build', 'linux-debug':'Linux tryserver leak test build', 'macosx-debug':'OS X 10.5.2 tryserver leak test build', 'android-r7':'Android R7 tryserver build', 'maemo5-gtk':'Maemo 5 GTK tryserver build'}
+# TODO -- need to check on how to separate out the two win32 prettynames
+TESTER_PRETTY_NAMES = {'macosx':['Rev3 MacOSX Leopard 10.5.8'], 'macosx64':['Rev3 MacOSX Snow Leopard 10.6.2', 'Rev3 MacOSX Leopard 10.5.8'], 'win32':['Rev3 WINNT 5.1', 'Rev3 WINNT 6.1'], 'linux-64':['Rev3 Fedora 12x64'], 'linux':['Rev3 Fedora 12']}
+UNITTEST_PRETTY_NAMES = {'win32-debug':'WINNT 5.2 tryserver debug test'}
 
-#  DEFAULT SET
-# nothing in comments should give all available platforms opt & debug desktop builders, all mobile, all test, no talos
-# only try: in comments same as above
-MESSAGE_DEFAULT1 = ''
-MESSAGE_DEFAULT2 = "junk"
-RESULT_DEFAULT = ['OS X 10.5.2 tryserver build', 'OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'WINNT 5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build', 'OS X 10.5.2 tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-1/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-2/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-3/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-4/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-5/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitest-other', 'Rev3 WINNT 6.1 x64 tryserver opt test reftest', 'Rev3 WINNT 6.1 x64 tryserver opt test crashtest', 'Rev3 WINNT 6.1 x64 tryserver opt test xpcshell', 'Rev3 WINNT 6.1 x64 tryserver opt test jsreftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-1/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-2/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-4/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-5/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitest-other', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test reftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test crashtest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test xpcshell', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test jsreftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-1/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-2/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-4/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitests-5/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test mochitest-other', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test reftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test crashtest', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test xpcshell', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test jsreftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-1/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-2/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-3/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-4/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-5/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitest-other', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test reftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test crashtest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test xpcshell', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test jsreftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-1/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-2/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-3/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-4/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitests-5/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test mochitest-other', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test reftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test crashtest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test xpcshell', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver debug test jsreftest', 'Rev3 WINNT 6.1 tryserver opt test mochitests-1/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-2/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-3/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-4/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-5/5', 'Rev3 WINNT 6.1 tryserver opt test mochitest-other', 'Rev3 WINNT 6.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test reftest-d2d', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver opt test xpcshell', 'Rev3 WINNT 6.1 tryserver opt test jsreftest', 'Rev3 Fedora 12x64 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12x64 tryserver opt test mochitest-other', 'Rev3 Fedora 12x64 tryserver opt test reftest', 'Rev3 Fedora 12x64 tryserver opt test crashtest', 'Rev3 Fedora 12x64 tryserver opt test xpcshell', 'Rev3 Fedora 12x64 tryserver opt test jsreftest', 'Rev3 Fedora 12x64 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-2/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-3/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-4/5', 'Rev3 Fedora 12x64 tryserver debug test mochitests-5/5', 'Rev3 Fedora 12x64 tryserver debug test mochitest-other', 'Rev3 Fedora 12x64 tryserver debug test reftest', 'Rev3 Fedora 12x64 tryserver debug test crashtest', 'Rev3 Fedora 12x64 tryserver debug test xpcshell', 'Rev3 Fedora 12x64 tryserver debug test jsreftest', 'Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test reftest', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test xpcshell', 'Rev3 Fedora 12 tryserver opt test jsreftest', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitests-2/5', 'Rev3 Fedora 12 tryserver debug test mochitests-3/5', 'Rev3 Fedora 12 tryserver debug test mochitests-4/5', 'Rev3 Fedora 12 tryserver debug test mochitests-5/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 Fedora 12 tryserver debug test reftest', 'Rev3 Fedora 12 tryserver debug test crashtest', 'Rev3 Fedora 12 tryserver debug test xpcshell', 'Rev3 Fedora 12 tryserver debug test jsreftest', 'WINNT 5.2 tryserver debug test mochitests-1/5', 'WINNT 5.2 tryserver debug test mochitests-2/5', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-4/5', 'WINNT 5.2 tryserver debug test mochitests-5/5', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test reftest', 'WINNT 5.2 tryserver debug test crashtest', 'WINNT 5.2 tryserver debug test xpcshell', 'WINNT 5.2 tryserver debug test jsreftest', 'Rev3 Fedora 12x64 tryserver opt test opengl', 'Rev3 Fedora 12x64 tryserver debug test opengl', 'Rev3 Fedora 12 tryserver opt test opengl', 'Rev3 Fedora 12 tryserver debug test opengl', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test opengl', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test opengl']
+TALOS_SUITES = ['tp4', 'chrome']
+UNITTEST_SUITES = ['reftest', 'crashtest', 'mochitests-1/5', 'mochitests-3/5', 'mochitest-other']
 
-# Test Bad data should get opt & debug linux builds since 'junk' is not a valid input
-MESSAGE_BUILD_JUNK = "try: -b junk -p linux -u none" 
-RESULT_JUNK = ['Linux tryserver build', 'Linux tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build']
-
-# SPECIFYING opt/debug
-MESSAGE_BUILD_D = "try: -b d -p linux -u none"
-MESSAGE_BUILD_O = "try: -b o -p linux -u none"
-MESSAGE_BUILD_DO = "try: -b do -p linux -u none"
-MESSAGE_BUILD_OD = "try: -b od -p linux -u none"
-# should result in those desktop, all mobile, no tests/talos
-RESULT_D = ['Linux tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build']
-RESULT_O = ['Linux tryserver build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build']
-RESULT_DO = ['Linux tryserver build', 'Linux tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build']
-RESULT_OD = ['Linux tryserver build', 'Linux tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build']
-
-# SPECIFIC PLATFORMS
-MESSAGE_MAC_ONLY = "try: -b o -p macosx,macosx64 -m none -u none"
-RESULT_MAC_ONLY = ['OS X 10.5.2 tryserver build', 'OS X 10.6.2 tryserver build']
-
-# MOBILE ONLY AND MOBILE SELECT
-#--p none -- this also tests what happens if you don't specify --build
-MESSAGE_MOBILE_ONLY = "try: -p none -u none"
-RESULT_MOBILE_ONLY = ['Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build']
-MESSAGE_MOBILE_SELECT = "try: -p none -m android-r7,maemo5-qt -u none"
-RESULT_MOBILE_SELECT = ['Android R7 tryserver build', 'Maemo 5 QT tryserver build']
-
-# TEST SUITES
-# test for 'all' and test for selective just opt
-MESSAGE_ALL_TESTS = "try: -b o -u all"
-MESSAGE_SELECT_TESTS = "try: -b o -p linux -u reftest,crashtest,mochitest-1,mochitest-4"
-MESSAGE_SELECT_MOCHITESTS = "try: -b o -p linux -u mochitests"
-RESULT_ALL_TESTS = ['OS X 10.5.2 tryserver build', 'OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-1/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-2/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-3/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-4/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitests-5/5', 'Rev3 WINNT 6.1 x64 tryserver opt test mochitest-other', 'Rev3 WINNT 6.1 x64 tryserver opt test reftest', 'Rev3 WINNT 6.1 x64 tryserver opt test crashtest', 'Rev3 WINNT 6.1 x64 tryserver opt test xpcshell', 'Rev3 WINNT 6.1 x64 tryserver opt test jsreftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-1/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-2/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-4/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitests-5/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test mochitest-other', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test reftest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test crashtest', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test xpcshell', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test jsreftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-1/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-2/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-3/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-4/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitests-5/5', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test mochitest-other', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test reftest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test crashtest', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test xpcshell', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver opt test jsreftest', 'Rev3 WINNT 6.1 tryserver opt test mochitests-1/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-2/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-3/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-4/5', 'Rev3 WINNT 6.1 tryserver opt test mochitests-5/5', 'Rev3 WINNT 6.1 tryserver opt test mochitest-other', 'Rev3 WINNT 6.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test reftest-d2d', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver opt test xpcshell', 'Rev3 WINNT 6.1 tryserver opt test jsreftest', 'Rev3 Fedora 12x64 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12x64 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12x64 tryserver opt test mochitest-other', 'Rev3 Fedora 12x64 tryserver opt test reftest', 'Rev3 Fedora 12x64 tryserver opt test crashtest', 'Rev3 Fedora 12x64 tryserver opt test xpcshell', 'Rev3 Fedora 12x64 tryserver opt test jsreftest', 'Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test reftest', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test xpcshell', 'Rev3 Fedora 12 tryserver opt test jsreftest', 'Rev3 Fedora 12x64 tryserver opt test opengl', 'Rev3 Fedora 12x64 tryserver debug test opengl', 'Rev3 Fedora 12 tryserver opt test opengl', 'Rev3 Fedora 12 tryserver debug test opengl', 'Rev3 MacOSX Leopard 10.5.8 tryserver opt test opengl', 'Rev3 MacOSX Leopard 10.5.8 tryserver debug test opengl']
-RESULT_SELECT_TESTS = ['Linux tryserver build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build', 'Rev3 Fedora 12 tryserver opt test reftest', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitests-4/5']
-RESULT_SELECT_MOCHITESTS = ['Linux tryserver build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build', 'Rev3 Fedora 12 tryserver opt test mochitests-2/5', 'Rev3 Fedora 12 tryserver opt test mochitests-3/5', 'Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitests-4/5', 'Rev3 Fedora 12 tryserver opt test mochitests-5/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other']
-  
-# TALOS SUITES
-# test for 'all' and test for selection
-MESSAGE_ALL_TALOS = "try: -b o -u none -t all"
-MESSAGE_SELECT_TALOS = "try: -b o -p linux -m none -u none -t scroll,dromaeo,tp4"
-RESULT_ALL_TALOS = ['OS X 10.5.2 tryserver build', 'OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build',  'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build','Rev3 WINNT 6.1 x64 tryserver talos nochrome', 'Rev3 WINNT 6.1 x64 tryserver talos dromaeo', 'Rev3 WINNT 6.1 x64 tryserver talos a11y', 'Rev3 WINNT 6.1 x64 tryserver talos svg', 'Rev3 WINNT 6.1 x64 tryserver talos chrome', 'Rev3 WINNT 6.1 x64 tryserver talos tp4', 'Rev3 WINNT 6.1 x64 tryserver talos dirty', 'Rev3 WINNT 6.1 x64 tryserver talos scroll', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos nochrome', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos cold', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos dromaeo', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos svg', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos chrome', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos dirty', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos scroll', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos nochrome', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos cold', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos dromaeo', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos svg', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos chrome', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos tp4', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos dirty', 'Rev3 MacOSX Snow Leopard 10.6.2 tryserver talos scroll', 'Rev3 WINNT 5.1 tryserver talos nochrome', 'Rev3 WINNT 5.1 tryserver talos dromaeo', 'Rev3 WINNT 5.1 tryserver talos a11y', 'Rev3 WINNT 5.1 tryserver talos svg', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos dirty', 'Rev3 WINNT 5.1 tryserver talos scroll', 'Rev3 WINNT 6.1 tryserver talos nochrome', 'Rev3 WINNT 6.1 tryserver talos dromaeo', 'Rev3 WINNT 6.1 tryserver talos a11y', 'Rev3 WINNT 6.1 tryserver talos svg', 'Rev3 WINNT 6.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos dirty', 'Rev3 WINNT 6.1 tryserver talos scroll', 'Rev3 Fedora 12x64 tryserver talos nochrome', 'Rev3 Fedora 12x64 tryserver talos cold', 'Rev3 Fedora 12x64 tryserver talos dromaeo', 'Rev3 Fedora 12x64 tryserver talos a11y', 'Rev3 Fedora 12x64 tryserver talos svg', 'Rev3 Fedora 12x64 tryserver talos chrome', 'Rev3 Fedora 12x64 tryserver talos tp4', 'Rev3 Fedora 12x64 tryserver talos dirty', 'Rev3 Fedora 12x64 tryserver talos scroll', 'Rev3 Fedora 12 tryserver talos nochrome', 'Rev3 Fedora 12 tryserver talos cold', 'Rev3 Fedora 12 tryserver talos dromaeo', 'Rev3 Fedora 12 tryserver talos a11y', 'Rev3 Fedora 12 tryserver talos svg', 'Rev3 Fedora 12 tryserver talos chrome', 'Rev3 Fedora 12 tryserver talos tp4', 'Rev3 Fedora 12 tryserver talos dirty', 'Rev3 Fedora 12 tryserver talos scroll']
-RESULT_SELECT_TALOS = ['Linux tryserver build', 'Rev3 Fedora 12 tryserver talos scroll', 'Rev3 Fedora 12 tryserver talos dromaeo', 'Rev3 Fedora 12 tryserver talos tp4']
-
-# TESTS AND TALOS BOTH BUILD TYPES -- note we do not have debug win32 tests yet on test-masters
-MESSAGE_TEST_AND_TALOS = "try: -b do -p win32 -u reftest -t nochrome,dirty"
-RESULT_TEST_AND_TALOS = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build', 'Maemo 5 QT tryserver build', 'Rev3 WINNT 6.1 tryserver opt test reftest', 'WINNT 5.2 tryserver debug test reftest', 'Rev3 WINNT 5.1 tryserver talos nochrome', 'Rev3 WINNT 6.1 tryserver talos nochrome', 'Rev3 WINNT 5.1 tryserver talos dirty','Rev3 WINNT 6.1 tryserver talos dirty']
+VALID_UPN = ['WINNT 5.2 tryserver debug test mochitests-1/5', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test reftest', 'WINNT 5.2 tryserver debug test crashtest']
+VALID_BUILDER_NAMES = ['OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'OS X 10.5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'WINNT 5.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build','Android R7 tryserver build', 'Maemo 5 GTK tryserver build']
+VALID_TESTER_NAMES = ['Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos chrome']
 
 class TestTryParser(unittest.TestCase):
 
-    def setUp(self):
-        self.builderNames = DESKTOP_BUILDERS + MOBILE_BUILDERS + TEST_BUILDERS + TALOS_BUILDERS
+    def test_BlankMessage(self):
+        # Should get default set with blank input
+        tm = ""
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        self.assertEqual(sorted(self.customBuilders),sorted(VALID_BUILDER_NAMES))
 
-    def test_DefaultSet(self):
-        print "Testing the default set with blank input"
-        self.customBuilders = TryParser(MESSAGE_DEFAULT1, self.builderNames)
-        for c in self.customBuilders:
-            if c not in RESULT_DEFAULT:
-                print "Missed a builder in MESSAGE_DEFAULT1"
+    def test_JunkMessageBuilders(self):
+        # Should get default set with junk input
+        tm = "try: junk"
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        self.assertEqual(sorted(self.customBuilders),sorted(VALID_BUILDER_NAMES))
 
-        print "Testing the default set with junk input"
-        self.customBuilders = TryParser(MESSAGE_DEFAULT2, self.builderNames)
-        for c in self.customBuilders:
-            if c not in RESULT_DEFAULT:
-                print "Missed a builder in MESSAGE_DEFAULT2"
+    def test_JunkMessageTesters(self):
+        # Should get default set with junk input
+        tm = "try: junk"
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = ['Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test mochitest-other']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-        print "Testing the default set with junk input for --build"
-        self.customBuilders = TryParser(MESSAGE_BUILD_JUNK, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_JUNK)
+    def test_JunkBuildMessage(self):
+        # Should get default set with junk input for --build
+        tm = "try: -b k -p linux"
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['Linux tryserver build','Linux tryserver leak test build']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_BuildType(self):
-        print "Testing build type selection: Debug only"
-        self.customBuilders = TryParser(MESSAGE_BUILD_D, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_D)
-        print "Testing build type selection: Opt only"
-        self.customBuilders = TryParser(MESSAGE_BUILD_O, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_O)
-        print "Testing build type selection: Both (DO)"
-        self.customBuilders = TryParser(MESSAGE_BUILD_DO, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_DO)
-        print "Testing build type selection: Both (OD)"
-        self.customBuilders = TryParser(MESSAGE_BUILD_OD, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_OD)
+    def test_DebugOnlyBuild(self):
+        tm = "try: -b d -p linux64,linux"
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build']
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
+
+    def test_OptOnlyBuild(self):
+        tm = "try: -b o -p macosx64,linux"
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['OS X 10.6.2 tryserver build', 'Linux tryserver build']
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
+
+    def test_BothBuildTypes(self):
+        # User can send 'do' or 'od' for both
+        tm = ['try: -b od -p win32','try: -b do -p win32']
+        for m in tm:
+            self.customBuilders = TryParser(m, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+            builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build']
+            self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_SpecificPlatform(self):
-        print "Testing a specific platform: Mac Only"
-        self.customBuilders = TryParser(MESSAGE_MAC_ONLY, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_MAC_ONLY)
+        # Testing a specific platform, eg: mac only 
+        # should specify macosx and macosx64 to get opt and debug
+        tm = 'try: -b od -p macosx64,macosx'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['OS X 10.6.2 tryserver build', 'OS X 10.6.2 tryserver leak test build', 'OS X 10.5.2 tryserver leak test build']
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
-    def test_MobileOnly(self):
-        print "Testing Mobile Only"
-        self.customBuilders = TryParser(MESSAGE_MOBILE_ONLY, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_MOBILE_ONLY)
-
-    def test_MobileSelect(self):
-        print "Testing selective Mobile platforms"
-        self.customBuilders = TryParser(MESSAGE_MOBILE_SELECT, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_MOBILE_SELECT)
+    def test_AllPlatforms(self):
+        tm = 'try: -b od -p all'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'OS X 10.5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'WINNT 5.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllTests(self):
-        print "Testing all tests"
-        self.customBuilders = TryParser(MESSAGE_ALL_TESTS, self.builderNames)
-        # Too many to put in the right order 
-        # so let's just make sure they are all present and accounted for
-        for c in self.customBuilders:
-            if c not in RESULT_ALL_TESTS:
-                print "Missed a Test builder"
+        tm = 'try: -b od -p win32 -u all'
+        # first test with getBuilders
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test mochitests-1/5', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test reftest', 'WINNT 5.2 tryserver debug test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+        # second test with getTestBuilders
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_SelectMochitests(self):
-        print "Testing select mochitests"
-        self.customBuilders = TryParser(MESSAGE_SELECT_MOCHITESTS, self.builderNames)
-        for c in self.customBuilders:
-            if c not in RESULT_SELECT_MOCHITESTS:
-                print "Missed a mochitest builder"
+    def test_MochitestAliases(self):
+        tm = 'try: -b od -p win32 -u mochitests'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-1/5']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+        tm = 'try: -b od -p win32 -u mochitest-o'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test mochitest-other']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_SelectTests(self):
-        print "Testing select tests"
-        self.customBuilders = TryParser(MESSAGE_SELECT_TESTS, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_SELECT_TESTS)
+    def test_BuildMasterDebugWin32Tests(self):
+        tm = 'try: -b d -p win32 -u mochitests'
+        # test in the getBuilders (for local builder_master unittests)
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = ['WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-1/5']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_SelecTests(self):
+        tm = 'try: -b od -p win32 -u crashtest,mochitest-other'
+        # test in the getBuilders (for local builder_master unittests)
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test crashtest', 'WINNT 5.2 tryserver debug test mochitest-other']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+        # test in the getTestBuilders (for local builder_master unittests)
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 6.1 tryserver opt test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_NoTests(self):
+        tm = 'try: -b od -p linux,win32 -u none'
+        # test in getBuilders
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = ['Linux tryserver build', 'Linux tryserver leak test build', 'WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+        # test in getTestBuilders
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = []
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllTalos(self):
-        print "Testing all talos"
-        self.customBuilders = TryParser(MESSAGE_ALL_TALOS, self.builderNames)
-        # Too many to put in the right order 
-        # so let's just make sure they are all present and accounted for
-        for c in self.customBuilders:
-            if c not in RESULT_ALL_TALOS:
-                print "Missed a Talos builder"
+        tm = 'try: -b od -p linux,win32,macosx -t all'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
+        builders = ['Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos chrome']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_SelectTalos(self):
-        print "Testing select talos"
-        self.customBuilders = TryParser(MESSAGE_SELECT_TALOS, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_SELECT_TALOS)
+    def test_SelecTalos(self):
+        tm = 'try: -b od -p win32 -t tp4'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
+        builders = ['Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_TestsTalosBothBuilds(self):
-        print "Testing test, talos both build types"
-        self.customBuilders = TryParser(MESSAGE_TEST_AND_TALOS, self.builderNames)
-        self.assertEqual(self.customBuilders, RESULT_TEST_AND_TALOS)
+    def test_NoTalos(self):
+        tm = 'try: -b od -p linux,win32 -t none'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
+        builders = []
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllOverride(self):
-        print "Testing -a override flag"
-        self.customBuilders = TryParser(MESSAGE_ALL_OVERRIDE, self.builderNames)
-        # Too many to put in the right order 
-        # so let's just make sure they are all present and accounted for
-        for c in self.customBuilders:
-            if c not in RESULT_ALL_OVERRIDE:
-                print "Missed a builder in the -a override test"
+        tm = 'try: -a'
+        # testing the getBuilders
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        self.assertEqual(sorted(self.customBuilders),sorted(VALID_BUILDER_NAMES))
+        # test getting talos builders
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
+        talosBuilders = ['Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos chrome']
+        self.assertEqual(sorted(self.customBuilders),sorted(talosBuilders))
+        # test getting test builders
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        testBuilders = ['Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver opt test mochitest-other']
+        self.assertEqual(sorted(self.customBuilders),sorted(testBuilders))
 
 if __name__ == '__main__':
     unittest.main()

@@ -498,6 +498,11 @@ def generateBranchObjects(config, name):
     debugBuilders = []
     weeklyBuilders = []
     coverageBuilders = []
+    # prettyNames is a mapping to pass to the try_parser for validation
+    PRETTY_NAME = '%s build'
+    prettyNames = {}
+    unittestPrettyNames = {}
+    unittestSuites = []
     # These dicts provides mapping between en-US dep and nightly scheduler names
     # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
     l10nBuilders = {}
@@ -509,19 +514,23 @@ def generateBranchObjects(config, name):
     for platform in config['platforms'].keys():
         pf = config['platforms'][platform]
         base_name = pf['base_name']
+        pretty_name = PRETTY_NAME % base_name
         if platform.endswith("-debug"):
-            debugBuilders.append('%s build' % base_name)
+            debugBuilders.append(pretty_name)
+            prettyNames[platform] = pretty_name
             # Debug unittests
             if pf.get('enable_unittests'):
                 test_builders = []
                 base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
                 for suites_name, suites in config['unittest_suites']:
+                    unittestPrettyNames[platform] = '%s debug test' % base_name
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
             # Skip l10n, unit tests and nightlies for debug builds
             continue
         else:
-            builders.append('%s build' % base_name)
+            builders.append(pretty_name)
+            prettyNames[platform] = pretty_name
 
         # Fill the l10n dep dict
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
@@ -552,11 +561,13 @@ def generateBranchObjects(config, name):
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
                 test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
+                unittestPrettyNames[platform] = '%s test' % base_name
             triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         # Optimized unittest builds
         if pf.get('enable_opt_unittests'):
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
+                unittestPrettyNames[platform] = '%s opt test' % base_name
                 test_builders.extend(generateTestBuilderNames('%s opt test' % base_name, suites_name, suites))
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         if config['enable_codecoverage'] and platform in ('linux',):
@@ -713,6 +724,7 @@ def generateBranchObjects(config, name):
         scheduler_class = makePropertiesScheduler(BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
+        extra_args['prettyNames'] = prettyNames
     else:
         scheduler_class = makePropertiesScheduler(Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
@@ -748,9 +760,10 @@ def generateBranchObjects(config, name):
                 }
         ))
 
-
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
         scheduler_name = scheduler_branch
+        for test in test_builders:
+            unittestSuites.append(test.split(' ')[-1])
         if not merge:
             nomergeBuilders.extend(test_builders)
         extra_args = {}
@@ -758,6 +771,9 @@ def generateBranchObjects(config, name):
             scheduler_class = BuilderChooserScheduler
             extra_args['chooserFunc'] = tryChooser
             extra_args['numberOfBuildsToTrigger'] = 1
+            extra_args['prettyNames'] = prettyNames
+            extra_args['unittestSuites'] = unittestSuites
+            extra_args['unittestPrettyNames'] = unittestPrettyNames
         else:
             scheduler_class = Scheduler
         branchObjects['schedulers'].append(scheduler_class(
@@ -2015,6 +2031,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     branch_builders = {}
     all_test_builders = {}
     all_builders = []
+    # prettyNames is a mapping to pass to the try_parser for validation
+    prettyNames = {}
 
     buildBranch = branch_config['build_branch']
     talosCmd = branch_config['talos_command']
@@ -2034,6 +2052,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
         for slave_platform in platform_config['slave_platforms']:
             platform_name = platform_config[slave_platform]['name']
+            # this is to handle how a platform has more than one slave platform
+            if prettyNames.has_key(platform):
+                prettyNames[platform].append(platform_name)
+            else:
+                prettyNames[platform] = [platform_name]
             for suite, talosConfig in SUITES.items():
                 tests, merge, extra, platforms = branch_config['%s_tests' % suite]
                 if tests == 0 or slave_platform not in platforms:
@@ -2066,6 +2089,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 if branch == "tryserver":
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
+                    extra_args['prettyNames'] = prettyNames
+                    extra_args['talosSuites'] = SUITES.keys()
                 else:
                     scheduler_class = MultiScheduler
                 s = scheduler_class(
@@ -2083,6 +2108,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
             if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
                 testTypes = []
+                # unittestSuites are gathered up for each platform from config.py
+                unittestSuites = []
 
                 if branch_config['platforms'][platform].get('enable_opt_unittests'):
                     testTypes.append('opt')
@@ -2124,6 +2151,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 platform_config[slave_platform]['slaves']))
 
                     for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
+                        for test in test_builders:
+                            unittestSuites.append(test.split(' ')[-1])
                         scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
                         if not merge:
                             nomergeBuilders.extend(test_builders)
@@ -2132,6 +2161,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             scheduler_class = BuilderChooserScheduler
                             extra_args['chooserFunc'] = tryChooser
                             extra_args['numberOfBuildsToTrigger'] = 1
+                            extra_args['prettyNames'] = prettyNames
+                            extra_args['unittestSuites'] = unittestSuites
                         else:
                             scheduler_class = Scheduler
                         branchObjects['schedulers'].append(scheduler_class(
@@ -2222,6 +2253,9 @@ def generateMobileBranchObjects(config, name):
         return mobile_objects
     builders = []
     nightlyBuilders = []
+    # prettyNames is a mapping to pass to the try_parser for validation
+    PRETTY_NAME = '%s build'
+    prettyNames = {}
     mobile_repo_name = config.get('mobile_repo_path').split('/')[-1]
     pollInterval = config.get('pollInterval', 60)
 
@@ -2237,6 +2271,7 @@ def generateMobileBranchObjects(config, name):
         }
         pf=config['mobile_platforms'][platform]
         base_name = pf.get('base_name') % render
+        pretty_name = PRETTY_NAME % base_name
 
         createSnippet = False
         if config.get('create_mobile_snippet', None) and pf.get('update_platform', None):
@@ -2343,7 +2378,8 @@ def generateMobileBranchObjects(config, name):
 
         if pf.get('enable_mobile_dep', config.get('enable_mobile_dep', True)):
             builddir = '%s-build' % builddir_base
-            builder_name = '%s build' % base_name
+            builder_name = pretty_name
+            prettyNames[platform] = pretty_name
 
             dep_kwargs = deepcopy(factory_kwargs)
             factory = factory_class(**dep_kwargs)
@@ -2407,6 +2443,7 @@ def generateMobileBranchObjects(config, name):
         scheduler_class = BuilderChooserScheduler
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
+        extra_args['prettyNames'] = prettyNames
     else:
         scheduler_class = Scheduler
 
