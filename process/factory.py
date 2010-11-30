@@ -3583,7 +3583,7 @@ class ReleaseTaggingFactory(ReleaseFactory):
             # we don't need to do any version bumping if this is a respin
             if buildNumber == 1 and len(bumpFiles) > 0:
                 command = ['perl', 'tools/scripts/release/version-bump.pl',
-                           '-w', repoName, '-t', self.releaseTag, '-a', appName,
+                           '-w', repoName, '-a', appName,
                            '-v', appVersion, '-m', milestone]
                 command.extend(bumpFiles)
                 self.addStep(ShellCommand,
