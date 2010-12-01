@@ -27,6 +27,7 @@ ErrorCatchingMercurial = addErrorCatching(UpstreamMercurial)
 
 class Mercurial(ErrorCatchingMercurial):
     def __init__(self, log_eval_func=None, **kwargs):
+        self.super_class = ErrorCatchingMercurial
         if not log_eval_func:
             log_eval_func = lambda c,s: regex_log_evaluator(c, s, hg_errors)
-        ErrorCatchingMercurial.__init__(self, log_eval_func=log_eval_func, **kwargs)
+        self.super_class.__init__(self, log_eval_func=log_eval_func, **kwargs)
