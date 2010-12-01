@@ -109,6 +109,12 @@ def buildUIDSchedFunc(sched, t, ssid):
 def lastChangeset(db, branch):
     """Returns the revision for the last changeset on the given branch"""
     for c in db.changeEventGenerator(branches=[branch]):
+        # Ignore DONTBUILD changes
+        if c.comments and "DONTBUILD" in c.comments:
+            continue
+        # Ignore changes which didn't come from the poller
+        if not c.revlink:
+            continue
         return c.revision
     return None
 
