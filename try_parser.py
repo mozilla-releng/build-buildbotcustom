@@ -57,6 +57,7 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
 
 def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, prettyNames, unittestPrettyNames):
     testBuilders = []
+    builder_test_platforms = []
     # for all possible suites, add in the builderNames for that platform
     if tests != 'none':
         if testType == "test":
@@ -65,18 +66,26 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, pretty
                     # this is to catch debug unittests triggered on the build master
                     # if the user asks for win32 with -b d
                     if buildType == 'debug' and not platform.endswith('debug'):
-                        platform += '-debug'
+                        builder_test_platforms.append('%s-debug' % platform)
                     if platform in prettyNames.keys():
                         for test in tests:
+                          # checking for list type so this is only run for test_master builders where slave_platforms are used
+                          if type(prettyNames[platform])==type(list()):
                             for slave_platform in prettyNames[platform]:
                                 custom_builder = "%s tryserver %s %s %s" % (slave_platform, buildType, testType, test)
                                 # have to check that custom_builder is not already present
                                 if custom_builder in (builderNames) and custom_builder not in testBuilders:
                                     testBuilders.extend([custom_builder])
+                          else:
+                              custom_builder = "%s tryserver %s %s %s" % (prettyNames[platform], buildType, testType, test)
+                               # have to check that custom_builder is not already present
+                              if custom_builder in (builderNames) and custom_builder not in testBuilders:
+                                  testBuilders.extend([custom_builder])
 
                     # we do all but debug win32 over on test masters so have to check the 
                     # unittestPrettyNames platforms for local builder master unittests
-                    if unittestPrettyNames and unittestPrettyNames.has_key(platform):
+                    for platform in builder_test_platforms:
+                      if unittestPrettyNames and unittestPrettyNames.has_key(platform):
                          for test in tests:
                              debug_custom_builder = "%s %s" % (unittestPrettyNames[platform], test)
                              if debug_custom_builder in (builderNames) and debug_custom_builder not in testBuilders:
@@ -143,9 +152,10 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
     elif options.user_platforms != 'none':
         options.user_platforms = options.user_platforms.split(',')
 
-    if options.test == 'all':
+    if unittestSuites:
+      if options.test == 'all':
         options.test = unittestSuites
-    elif options.test != 'none':
+      elif options.test != 'none':
         options.test = expandTestSuites(options.test.split(','), unittestSuites)
 
     if talosSuites:
@@ -157,11 +167,17 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
     # List for the custom builder names that match prettyNames passed in from misc.py
     customBuilderNames = []
     if options.user_platforms:
+        log.msg("TryChooser OPTIONS : MESSAGE %s : %s" % (options, message))
         customBuilderNames = getPlatformBuilders(options.user_platforms, builderNames, options.build, prettyNames)
 
         if options.test != 'none' and unittestSuites:
+            # get test builders for test_master first
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
-                                      builderNames, options.build, prettyNames, unittestPrettyNames))
+                                      builderNames, options.build, prettyNames, None))
+            # then add any builder_master test builders
+            if unittestPrettyNames:
+                customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
+                                      builderNames, options.build, {}, unittestPrettyNames))
         if options.talos != 'none' and talosSuites is not None:
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, builderNames, 
                                       options.build, prettyNames, None))
