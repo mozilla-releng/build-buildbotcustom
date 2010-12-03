@@ -93,6 +93,8 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, pretty
 
         if testType == "talos":
             for platform in platforms:
+              # make sure we do talos for this platform
+              if platform in prettyNames.keys():
                 for test in tests:
                     for slave_platform in prettyNames[platform]:
                         custom_builder = "%s tryserver %s %s" % (slave_platform, testType, test)

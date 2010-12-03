@@ -149,6 +149,12 @@ class TestTryParser(unittest.TestCase):
         builders = ['Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
+    def test_SelecTalosWithNoTalosPlatforms(self):
+        tm = 'try: -b od -p win32,android-r7 -t tp4'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
+        builders = ['Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
     def test_NoTalos(self):
         tm = 'try: -b od -p linux,win32 -t none'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
