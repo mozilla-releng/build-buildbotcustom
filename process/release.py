@@ -61,9 +61,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         releaseName = releasePrefix()
         job_status = "failed" if results else "success"
         allplatforms = list(releaseConfig['enUSPlatforms'])
-        allplatforms.extend(["xulrunner_%s" % p for p in releaseConfig['xulrunnerPlatforms']])
+        xrplatforms = list(releaseConfig['xulrunnerPlatforms'])
         stage = name.replace(builderPrefix(""), "")
-        platform = [p for p in allplatforms if stage.startswith(p)]
+        # Detect platform from builder name by tokenizing by '_', and matching
+        # the first token after the prefix
+        if stage.startswith("xulrunner"):
+            platform = ["xulrunner_%s" % p for p in xrplatforms
+                if stage.replace("xulrunner_", "").split('_')[0] == p]
+        else:
+            platform = [p for p in allplatforms if stage.split('_')[0] == p]
         platform = platform[0] if len(platform) >= 1 else None
         message_tag = '[release] ' if not staging else '[staging-release] '
 
