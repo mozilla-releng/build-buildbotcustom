@@ -65,6 +65,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         stage = name.replace(builderPrefix(""), "")
         platform = [p for p in allplatforms if stage.startswith(p)]
         platform = platform[0] if len(platform) >= 1 else None
+        message_tag = '[release] ' if not staging else '[staging-release] '
 
         stage = stage.replace("%s_" % platform, "") if platform else stage
         #try to load a unique message template for the platform(if defined, step and results
@@ -79,7 +80,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 break
 
         if template:
-            subject = template.readline().strip() % locals()
+            subject = message_tag + template.readline().strip() % locals()
             body = ''.join(template.readlines())
             template.close()
         else:
@@ -95,6 +96,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
            listened on"""
         msgdict = {}
         releaseName = releasePrefix()
+        message_tag = '[release] ' if not staging else '[staging-release] '
         step = None
         if change.branch.endswith('signing'):
             step = "signing"
@@ -110,7 +112,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 break
 
         if template:
-            subject = template.readline().strip() % locals()
+            subject = message_tag + template.readline().strip() % locals()
             body = ''.join(template.readlines()) + "\n"
             template.close()
         else:
