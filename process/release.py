@@ -33,6 +33,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     else:
         branchConfigFile = "mozilla/production_config.py"
 
+    if 'signedPlatforms' in releaseConfig.keys():
+        signedPlatforms = releaseConfig['signedPlatforms']
+    else:
+        signedPlatforms = ('win32',)
+
     def builderPrefix(s, platform=None):
         if platform:
             return "release-%s-%s_%s" % (releaseConfig['sourceRepoName'], platform, s)
@@ -136,33 +141,34 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                             releaseConfig['shippedLocalesPath'])
 
     ##### Change sources and Schedulers
-    for p in releaseConfig['l10nPlatforms']:
-        ftpPlatform = ftp_platform_map[p]
+    if releaseConfig['doPartnerRepacks']:
+        for p in releaseConfig['l10nPlatforms']:
+            ftpPlatform = ftp_platform_map[p]
 
-        ftpURLs = ["http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/%s" % (
-                  releaseConfig['stagingServer'],
-                  releaseConfig['productName'],
-                  releaseConfig['version'],
-                  releaseConfig['buildNumber'],
-                  ftpPlatform)]
+            ftpURLs = ["http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/%s" % (
+                      releaseConfig['stagingServer'],
+                      releaseConfig['productName'],
+                      releaseConfig['version'],
+                      releaseConfig['buildNumber'],
+                      ftpPlatform)]
 
-        if p in ('win32', ):
-            ftpURLs = [
-                "http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/unsigned/%s" % (
-                  releaseConfig['stagingServer'],
-                  releaseConfig['productName'],
-                  releaseConfig['version'],
-                  releaseConfig['buildNumber'],
-                  ftpPlatform)]
+            if p in signedPlatforms:
+                ftpURLs = [
+                    "http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/unsigned/%s" % (
+                      releaseConfig['stagingServer'],
+                      releaseConfig['productName'],
+                      releaseConfig['version'],
+                      releaseConfig['buildNumber'],
+                      ftpPlatform)]
 
-        change_source.append(LocalesFtpPoller(
-            branch=builderPrefix("post_%s_l10n" % p),
-            ftpURLs=ftpURLs,
-            pollInterval=60*5, # 5 minutes
-            platform = p,
-            localesFile = shippedLocalesFile,
-            sl_platform_map = sl_platform_map,
-        ))
+            change_source.append(LocalesFtpPoller(
+                branch=builderPrefix("post_%s_l10n" % p),
+                ftpURLs=ftpURLs,
+                pollInterval=60*5, # 5 minutes
+                platform = p,
+                localesFile = shippedLocalesFile,
+                sl_platform_map = sl_platform_map,
+            ))
 
     change_source.append(FtpPoller(
         branch=builderPrefix("post_signing"),
