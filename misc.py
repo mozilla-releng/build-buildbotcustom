@@ -2178,7 +2178,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            fromaddr="talos.buildbot@build.mozilla.org",
                            tree=tinderboxTree,
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                           relayhost="smtp.mozilla.org",
+                           relayhost="mail.build.mozilla.org",
                            builders=branch_builders[tinderboxTree],
                            useChangeTime=False,
                            logCompression="gzip"))
@@ -2189,7 +2189,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            fromaddr="talos.buildbot@build.mozilla.org",
                            tree=tinderboxTree,
                            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                           relayhost="smtp.mozilla.org",
+                           relayhost="mail.build.mozilla.org",
                            builders=all_test_builders[tinderboxTree],
                            useChangeTime=False,
                            errorparser="unittest",
@@ -2423,7 +2423,7 @@ def generateMobileBranchObjects(config, name):
             extraRecipients=config['mobile_build_failure_emails'],
             mode='failing',
             builders=builders+nightlyBuilders,
-            relayhost='smtp.mozilla.org',
+            relayhost='mail.build.mozilla.org',
         ))
 
 

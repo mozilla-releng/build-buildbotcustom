@@ -375,7 +375,25 @@ class MozillaBuildFactory(BuildFactory):
             # purge_builds.py skip the dir when it isn't present.
             command.extend(["..","/scratchbox/users/cltbld/home/cltbld/build"])
 
-            self.addStep(ShellCommand,
+            def parse_purge_builds(rc, stdout, stderr):
+                properties = {}
+                for stream in (stdout, stderr):
+                    m = re.search('unable to free (?P<size>[.\d]+) (?P<unit>\w+) ', stream, re.M)
+                    if m:
+                        properties['purge_target'] = '%s%s' % (m.group('size'), m.group('unit'))
+                    m = None
+                    m = re.search('space only (?P<size>[.\d]+) (?P<unit>\w+)', stream, re.M)
+                    if m:
+                        properties['purge_actual'] = '%s%s' % (m.group('size'), m.group('unit'))
+                    m = None
+                    m = re.search('(?P<size>[.\d]+) (?P<unit>\w+) of space available', stream, re.M)
+                    if m:
+                        properties['purge_actual'] = '%s%s' % (m.group('size'), m.group('unit'))
+                if not properties.has_key('purge_target'):
+                    properties['purge_target'] = '%sGB' % str(self.buildSpace)
+                return properties
+
+            self.addStep(SetProperty,
              name='clean_old_builds',
              command=command,
              description=['cleaning', 'old', 'builds'],
@@ -383,6 +401,7 @@ class MozillaBuildFactory(BuildFactory):
              haltOnFailure=True,
              workdir='.',
              timeout=3600, # One hour, because Windows is slow
+             extract_fn=parse_purge_builds,
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error)
             )
 
@@ -8478,7 +8497,8 @@ class ScriptFactory(BuildFactory):
         self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
         self.addStep(ShellCommand(
             name="update_scripts",
-            command=['hg', 'update', '-r', WithProperties('%(revision)s')],
+            command=['hg', 'update', '-r',
+                     WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
             doStepIf=lambda b: b.getProperty('revision'),
             workdir='build/scripts'
