@@ -2610,6 +2610,49 @@ def generateNanojitObjects(config, SLAVES):
             'status': [tbox_mailer],
             }
 
+def generateValgrindObjects(config, slaves):
+    builders = []
+    for platform in config['platforms']:
+        f = ScriptFactory(
+                config['scripts_repo'],
+                'scripts/valgrind/valgrind.sh',
+                )
+
+        env = config[platform]['env']
+        builder = {'name': 'valgrind-%s' % platform,
+                   'builddir': 'valgrind-%s' % platform,
+                   'slavenames': slaves[platform],
+                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                   'factory': f,
+                   'category': 'idle',
+                   'env': env,
+                  }
+        builders.append(builder)
+
+    # Set up scheduler
+    scheduler = PersistentScheduler(
+            name="valgrind",
+            builderNames=[b['name'] for b in builders],
+            numPending=1,
+            pollInterval=config['job_interval'],
+            )
+
+    # Tinderbox notifier
+    tbox_mailer = TinderboxMailNotifier(
+        fromaddr="mozilla2.buildbot@build.mozilla.org",
+        tree=config['tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=[b['name'] for b in builders],
+        logCompression="gzip",
+    )
+
+    return {
+            'builders': builders,
+            'schedulers': [scheduler],
+            'status': [tbox_mailer],
+            }
+
 def generateProjectObjects(project, config, SLAVES):
     builders = []
     schedulers = []
@@ -2631,6 +2674,11 @@ def generateProjectObjects(project, config, SLAVES):
     elif project == 'nanojit':
         nanojitObjects = generateNanojitObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, nanojitObjects)
+
+    # Valgrind
+    elif project == 'valgrind':
+        valgrindObjects = generateValgrindObjects(config, SLAVES)
+        buildObjects = mergeBuildObjects(buildObjects, valgrindObjects)
 
     return buildObjects
 
