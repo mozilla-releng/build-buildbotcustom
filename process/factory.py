@@ -8500,7 +8500,6 @@ class ScriptFactory(BuildFactory):
             command=['hg', 'update', '-r',
                      WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
-            doStepIf=lambda b: b.getProperty('revision'),
             workdir='build/scripts'
         ))
 
