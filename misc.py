@@ -2076,13 +2076,19 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                       platform_config[slave_platform].get('download_symbols',True),
                     **extra # Extra test specific factory parameters
                 )
+                builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                 builder = {
                     'name': "%s %s talos %s" % (platform_name, branch, suite),
                     'slavenames': platform_config[slave_platform]['slaves'],
-                    'builddir': "%s_%s_test-%s" % (branch, slave_platform, suite),
+                    'builddir': builddir,
                     'factory': factory,
                     'category': branch,
-                    'properties': {'branch': branch, 'platform': slave_platform, 'build_platform': platform},
+                    'properties': {
+                        'branch': branch,
+                        'platform': slave_platform,
+                        'build_platform': platform,
+                        'builddir': builddir,
+                        },
                 }
                 if not merge:
                     nomergeBuilders.append(builder['name'])
