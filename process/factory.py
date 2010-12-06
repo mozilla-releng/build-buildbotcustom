@@ -4003,7 +4003,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
                  ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
-                 buildSpace=14, triggerSchedulers=None, releaseNotesUrl=None,
+                 buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
                  **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
