@@ -572,7 +572,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     branchConfig, 'release', platform, builderPrefix("%s_test" % platform),
                     builderPrefix("%s-opt-unittest" % platform),
                     suites_name, suites, mochitestLeakThreshold,
-                    crashtestLeakThreshold))
+                    crashtestLeakThreshold, category=builderPrefix('')))
 
     for platform in releaseConfig['xulrunnerPlatforms']:
         pf = branchConfig['platforms'][platform]
