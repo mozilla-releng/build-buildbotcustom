@@ -587,6 +587,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.packageSDK = packageSDK
         self.packageTests = packageTests
         self.enable_ccache = enable_ccache
+        if self.enable_ccache:
+            self.env['CCACHE_BASEDIR'] = WithProperties('%(basedir:-)s')
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
 
@@ -7115,6 +7117,10 @@ class TalosFactory(BuildFactory):
              command='nohup rm -vrf *',
              env=self.env)
             )
+        if 'fed' in self.OS:
+            self.addStep(ShellCommand(
+                name='disable_screensaver',
+                command=['xset', '-s', 'reset']))
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
@@ -8500,7 +8506,6 @@ class ScriptFactory(BuildFactory):
             command=['hg', 'update', '-r',
                      WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
-            doStepIf=lambda b: b.getProperty('revision'),
             workdir='build/scripts'
         ))
 
