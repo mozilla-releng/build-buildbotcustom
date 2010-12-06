@@ -7115,6 +7115,10 @@ class TalosFactory(BuildFactory):
              command='nohup rm -vrf *',
              env=self.env)
             )
+        if 'fed' in self.OS:
+            self.addStep(ShellCommand(
+                name='disable_screensaver',
+                command=['xset', '-s', 'reset']))
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
