@@ -587,6 +587,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.packageSDK = packageSDK
         self.packageTests = packageTests
         self.enable_ccache = enable_ccache
+        if self.enable_ccache:
+            self.env['CCACHE_BASEDIR'] = WithProperties('%(basedir:-)s')
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
 
