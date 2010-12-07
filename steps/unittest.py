@@ -722,6 +722,10 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
             self.command.append('--setpref=gfx.font_rendering.directwrite.enabled=true')
             self.command.append('--setpref=mozilla.widget.render-mode=6')
             self.command.append('reftest/tests/layout/reftests/reftest.list')
+        elif suite == 'reftest-no-d2d-d3d':
+            self.command.append('--setpref=gfx.direct2d.disabled=true')
+            self.command.append('--setpref=layers.accelerate-none=true')
+            self.command.append('reftest/tests/layout/reftests/reftest.list')
         elif suite == 'jsreftest':
             self.command.append('--extra-profile-file=jsreftest/tests/user.js')
             self.command.append('jsreftest/tests/jstests.list')
