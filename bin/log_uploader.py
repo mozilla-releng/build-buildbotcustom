@@ -6,6 +6,7 @@ Uploads logs from build to the given host.
 import sys, os, cPickle, gzip, subprocess, time
 
 from buildbot import util
+from buildbot.status.builder import Results
 from buildbotcustom.process.factory import postUploadCmdPrefix
 
 def ssh(user, identity, host, remote_cmd, port=22):
@@ -94,6 +95,34 @@ def formatLog(tmpdir, build):
 
     logFile = gzip.GzipFile(os.path.join(tmpdir, build_name), "w")
 
+    # Header information
+    logFile.write("builder: %s\n" % builder_name)
+    logFile.write("slave: %s\n" % build.getSlavename())
+    logFile.write("starttime: %s\n" % build.started)
+
+    results = build.getResults()
+    try:
+        results_str = Results[results]
+    except:
+        results_str = "Unknown"
+    logFile.write("results: %s (%s)\n" % (results_str, results))
+
+    props = build.getProperties()
+    if props.getProperty('buildid') is not None:
+        logFile.write("buildid: %s\n" % props['buildid'])
+
+    if props.getProperty('builduid') is not None:
+        logFile.write("builduid: %s\n" % props['builduid'])
+
+    if props.getProperty('got_revision') is not None:
+        logFile.write("revision: %s\n" % props['got_revision'])
+    elif props.getProperty('revision') is not None:
+        logFile.write("revision: %s\n" % props['revision'])
+
+    logFile.write("\n")
+
+
+    # Steps
     for step in build.getSteps():
         times = step.getTimes()
         if not times or not times[0]:
