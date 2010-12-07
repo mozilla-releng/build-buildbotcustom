@@ -22,12 +22,15 @@ class MultiScheduler(Scheduler):
         self.numberOfBuildsToTrigger = numberOfBuildsToTrigger
         Scheduler.__init__(self, **kwargs)
 
-    def _add_build_and_remove_changes(self, t, all_changes):
+    # NOTE: this is overriding an internal scheduler method and may break unexpectedly!
+    def _add_build_and_remove_changes(self, t, important, unimportant):
+        all_changes = sorted(important + unimportant, key=lambda c : c.number)
         db = self.parent.db
         for i in range(self.numberOfBuildsToTrigger):
             if self.treeStableTimer is None:
-                # each Change gets a separate build
-                for c in all_changes:
+                # each *important* Change gets a separate build.  Unimportant
+                # builds get ignored.
+                for c in important:
                     ss = SourceStamp(changes=[c])
                     ssid = db.get_sourcestampid(ss, t)
                     self.create_buildset(ssid, "scheduler", t)
