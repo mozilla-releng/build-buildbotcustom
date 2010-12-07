@@ -4543,11 +4543,15 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
 
 
 class UpdateVerifyFactory(ReleaseFactory):
-    def __init__(self, verifyConfig, buildSpace=.3, **kwargs):
+    def __init__(self, verifyConfig, buildSpace=.3, useOldUpdater=False,
+                 **kwargs):
         ReleaseFactory.__init__(self, repoPath='nothing',
                                 buildSpace=buildSpace, **kwargs)
+        command=['bash', 'verify.sh', '-c', verifyConfig]
+        if useOldUpdater:
+            command.append('--old-updater')
         self.addStep(UpdateVerify,
-         command=['bash', 'verify.sh', '-c', verifyConfig],
+         command=command,
          workdir='tools/release/updates',
          description=['./verify.sh', verifyConfig]
         )

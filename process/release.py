@@ -750,6 +750,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             buildToolsRepoPath=branchConfig['build_tools_repo_path'],
             verifyConfig=releaseConfig['verifyConfigs'][platform],
             clobberURL=branchConfig['base_clobber_url'],
+            useOldUpdater=branchConfig['use_old_updater'],
         )
 
         builders.append({
@@ -837,6 +838,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
                 verifyConfig=releaseConfig['majorUpdateVerifyConfigs'][platform],
                 clobberURL=branchConfig['base_clobber_url'],
+                useOldUpdater=branchConfig['use_old_updater'],
             )
 
             builders.append({
