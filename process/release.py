@@ -25,6 +25,9 @@ from release.platforms import ftp_platform_map, sl_platform_map
 DEFAULT_L10N_CHUNKS = 15
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
+    # This variable is one thing that forces us into reconfiging prior to a
+    # release. It should be removed as soon as nothing depends on it.
+    releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
                            branchConfig['build_tools_repo_path'])
@@ -142,10 +145,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     notify_builders = []
     status = []
 
-    shippedLocalesFile = "%s/%s/raw-file/%s_RELEASE/%s" % (
+    shippedLocalesFile = "%s/%s/raw-file/%s/%s" % (
                             branchConfig['hgurl'],
                             releaseConfig['sourceRepoPath'],
-                            releaseConfig['baseTag'],
+                            releaseTag,
                             releaseConfig['shippedLocalesPath'])
 
     ##### Change sources and Schedulers
@@ -495,7 +498,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 configSubDir=branchConfig['config_subdir'],
                 profiledBuild=pf['profiled_build'],
                 mozconfig=mozconfig,
-                buildRevision='%s_RELEASE' % releaseConfig['baseTag'],
+                buildRevision=releaseTag,
                 stageServer=branchConfig['stage_server'],
                 stageUsername=branchConfig['stage_username'],
                 stageGroup=branchConfig['stage_group'],
@@ -594,7 +597,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 configSubDir=branchConfig['config_subdir'],
                 profiledBuild=None,
                 mozconfig = '%s/%s/xulrunner' % (platform, releaseConfig['sourceRepoName']),
-                buildRevision='%s_RELEASE' % releaseConfig['baseTag'],
+                buildRevision=releaseTag,
                 stageServer=branchConfig['stage_server'],
                 stageUsername=branchConfig['stage_username_xulrunner'],
                 stageGroup=branchConfig['stage_group'],
@@ -638,6 +641,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                  version=releaseConfig['version'],
                  buildNumber=releaseConfig['buildNumber'],
                  partnersRepoPath=releaseConfig['partnersRepoPath'],
+                 partnersRepoRevision=releaseTag,
                  platformList=[platform],
                  stagingServer=releaseConfig['stagingServer'],
                  stageUsername=branchConfig['stage_username'],
@@ -746,6 +750,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             buildToolsRepoPath=branchConfig['build_tools_repo_path'],
             verifyConfig=releaseConfig['verifyConfigs'][platform],
             clobberURL=branchConfig['base_clobber_url'],
+            useOldUpdater=branchConfig['use_old_updater'],
         )
 
         builders.append({
@@ -833,6 +838,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
                 verifyConfig=releaseConfig['majorUpdateVerifyConfigs'][platform],
                 clobberURL=branchConfig['base_clobber_url'],
+                useOldUpdater=branchConfig['use_old_updater'],
             )
 
             builders.append({
