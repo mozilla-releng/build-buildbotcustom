@@ -5283,10 +5283,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
 
-    def addStep(self, *args, **kw):
-        kw.setdefault('env', self.env)
-        return BuildFactory.addStep(self, *args, **kw)
-
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/unittest' % self.branchName,

@@ -1385,6 +1385,7 @@ def generateCCBranchObjects(config, name):
     nightlyBuilders = []
     debugBuilders = []
     weeklyBuilders = []
+    coverageBuilders = []
     # These dicts provides mapping between en-US dep and  nightly scheduler names
     # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
     l10nBuilders = {}
@@ -1588,7 +1589,6 @@ def generateCCBranchObjects(config, name):
             branchObjects['schedulers'].append(TriggerableL10n(
                                    name=l10n_builder,
                                    platform=platform,
-                                   tree=tree,
                                    builderNames=[l10n_builder],
                                    branch=config['repo_path'],
                                    baseTag='default',
