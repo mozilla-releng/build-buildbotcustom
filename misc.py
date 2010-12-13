@@ -61,6 +61,59 @@ from buildbotcustom.status.log_handlers import SubprocessLogHandler
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
 
+def reallyShort(name):
+    mappings = {
+        'mozilla': None,
+        'central': 'cen',
+        '1.9.1': '191',
+        '1.9.2': '192',
+        'tracemonkey': 'tm',
+        'places': 'plc',
+        'electrolysis': 'e10s',
+        'jaegermonkey': 'jm',
+        'shadow': 'sh',
+        'mobile': 'mb',
+        'desktop': None,
+        'debug': 'dbg',
+        'xulrunner': 'xr',
+        'build': 'bld',
+        'linux': 'lnx',
+        'win32': 'w32',
+        'macosx': 'osx',
+        'macosx64': 'osx64',
+        'linux64': 'lnx64',
+        'android': 'andrd',
+        'release': 'rel',
+        'mochitests': 'mochi',
+        'mochitest': 'm',
+        'other': 'oth',
+        'browser': 'br',
+        'nightly': 'ntly',
+        'tryserver': 'try',
+        'cedar': 'ced',
+        'birch': 'bir',
+        'maple': 'map',
+        'leopard': 'leo',
+        'snowleopard': 'snow',
+        'fedora': 'fed',
+        'fedora64': 'fed64',
+        'repack': 'rpk',
+    }
+    hyphen_seperated_words = name.split('-')
+    words = []
+    for word in hyphen_seperated_words:
+        space_seperated_words = word.split('_')
+        for word in space_seperated_words:
+            words.extend(word.split(' '))
+    new_words = []
+    for word in words:
+        if word in mappings.keys():
+            if mappings[word]:
+                new_words.append(mappings[word])
+        else:
+            new_words.append(word)
+    return '-'.join(new_words)
+
 def get_l10n_repositories(file, l10nRepoPath, relbranch):
     """Reads in a list of locale names and revisions for their associated
        repository from 'file'.
@@ -380,6 +433,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
                 'slavenames': slavenames,
                 'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
                 'nextSlave': _nextSlowSlave,
@@ -407,6 +461,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'name': '%s %s' % (name_prefix, suites_name),
             'slavenames': slavenames,
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
             'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform},
@@ -446,6 +501,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix, build_dir_
                 'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
                 'slavenames': config['platforms'][platform]['slaves'],
                 'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                'slavebuilddir': reallyShort('%s-%s-%i' % (build_dir_prefix, suites_name, i+1)),
                 'factory': factory,
                 'category': branch_name,
             }
@@ -471,6 +527,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix, build_dir_
             'name': '%s %s' % (name_prefix, suites_name),
             'slavenames': config['platforms'][platform]['slaves'],
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': reallyShort('%s-%s' % (build_dir_prefix, suites_name)),
             'factory': factory,
             'category': branch_name,
         }
@@ -939,6 +996,7 @@ def generateBranchObjects(config, name):
             'name': '%s build' % pf['base_name'],
             'slavenames': pf['slaves'],
             'builddir': '%s-%s' % (name, platform),
+            'slavebuilddir': reallyShort('%s-%s' % (name, platform)),
             'factory': mozilla2_dep_factory,
             'category': name,
             'nextSlave': _nextFastSlave,
@@ -1023,6 +1081,7 @@ def generateBranchObjects(config, name):
                 'name': nightly_builder,
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-nightly' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform)),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
@@ -1082,6 +1141,7 @@ def generateBranchObjects(config, name):
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
                         'slavenames': config['l10n_slaves'][platform],
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
+                        'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
@@ -1122,6 +1182,7 @@ def generateBranchObjects(config, name):
                     'name': '%s shark' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-shark' % (name, platform),
+                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform)),
                     'factory': mozilla2_shark_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
@@ -1156,6 +1217,7 @@ def generateBranchObjects(config, name):
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
                 'slavenames': config['l10n_slaves'][platform],
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform)),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
@@ -1204,6 +1266,7 @@ def generateBranchObjects(config, name):
                 'name': '%s unit test' % pf['base_name'],
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-unittest' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform)),
                 'factory': unittest_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
@@ -1269,6 +1332,7 @@ def generateBranchObjects(config, name):
                     'name': '%s code coverage' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-codecoverage' % (name, platform),
+                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)),
                     'factory': codecoverage_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
@@ -1319,6 +1383,7 @@ def generateBranchObjects(config, name):
                  'name': '%s xulrunner' % pf['base_name'],
                  'slavenames': pf['slaves'],
                  'builddir': '%s-%s-xulrunner' % (name, platform),
+                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)),
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
@@ -1351,6 +1416,7 @@ def generateBranchObjects(config, name):
             'name': '%s hg bundle' % name,
             'slavenames': list(slaves),
             'builddir': '%s-bundle' % (name,),
+            'slavebuilddir': reallyShort('%s-bundle' % (name,)),
             'factory': bundle_factory,
             'category': name,
             'nextSlave': _nextSlowSlave,
@@ -1694,6 +1760,7 @@ def generateCCBranchObjects(config, name):
             'name': '%s build' % pf['base_name'],
             'slavenames': pf['slaves'],
             'builddir': '%s-%s' % (name, platform),
+            'slavebuilddir': reallyShort('%s-%s' % (name, platform)),
             'factory': mozilla2_dep_factory,
             'category': name,
         }
@@ -1777,6 +1844,7 @@ def generateCCBranchObjects(config, name):
                 'name': nightly_builder,
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-nightly' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform)),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
             }
@@ -1833,6 +1901,7 @@ def generateCCBranchObjects(config, name):
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
                         'slavenames': config['l10n_slaves'][platform],
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
+                        'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                     }
@@ -1865,6 +1934,7 @@ def generateCCBranchObjects(config, name):
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
                 'slavenames': config['l10n_slaves'][platform],
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform)),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
             }
@@ -1912,6 +1982,7 @@ def generateCCBranchObjects(config, name):
                 'name': '%s unit test' % pf['base_name'],
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-unittest' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform)),
                 'factory': unittest_factory,
                 'category': name,
             }
@@ -1977,6 +2048,7 @@ def generateCCBranchObjects(config, name):
                     'name': '%s code coverage' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-codecoverage' % (name, platform),
+                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)),
                     'factory': codecoverage_factory,
                     'category': name,
                 }
@@ -2022,6 +2094,7 @@ def generateCCBranchObjects(config, name):
                  'name': '%s shark' % pf['base_name'],
                  'slavenames': pf['slaves'],
                  'builddir': '%s-%s-shark' % (name, platform),
+                 'builddir': reallyShort('%s-%s-shark' % (name, platform)),
                  'factory': mozilla2_shark_factory,
                  'category': name,
              }
@@ -2081,10 +2154,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     **extra # Extra test specific factory parameters
                 )
                 builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
+                slavebuilddir= 'test'
                 builder = {
                     'name': "%s %s talos %s" % (platform_name, branch, suite),
                     'slavenames': platform_config[slave_platform]['slaves'],
                     'builddir': builddir,
+                    'slavebuilddir': slavebuilddir,
                     'factory': factory,
                     'category': branch,
                     'properties': {
@@ -2092,6 +2167,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         'platform': slave_platform,
                         'build_platform': platform,
                         'builddir': builddir,
+                        'slavebuilddir': slavebuilddir,
                         },
                 }
                 if not merge:
@@ -2378,6 +2454,7 @@ def generateMobileBranchObjects(config, name):
                 'name': builder_name,
                 'slavenames': pf.get('slaves'),
                 'builddir': builddir,
+                'slavebuilddir': reallyShort(builddir),
                 'factory': factory,
                 'category': '%s-%s' % (name, mobile_repo_name),
                 'nextSlave': _nextFastSlave,
@@ -2399,6 +2476,7 @@ def generateMobileBranchObjects(config, name):
                 'name': builder_name,
                 'slavenames': pf.get('slaves'),
                 'builddir': builddir,
+                'slavebuilddir': reallyShort(builddir),
                 'factory': factory,
                 'category': '%s-%s' % (name, mobile_repo_name),
                 'nextSlave': _nextFastSlave,
@@ -2511,6 +2589,7 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
         'name': '%s blocklist update' % base_name,
         'slavenames': slaves,
         'builddir': '%s-%s-blocklistupdate' % (branch_name, platform),
+        'slavebuilddir': reallyShort('%s-%s-blocklistupdate' % (branch_name, platform)),
         'factory': blocklistupdate_factory,
         'category': branch_name,
         'properties': {'branch': branch_name, 'platform': platform},

@@ -269,7 +269,7 @@ def getPlatformMinidumpPath(platform):
     return platform_minidump_path[platform]
 
 class MozillaBuildFactory(BuildFactory):
-    ignore_dirs = [ 'info', 'release-*']
+    ignore_dirs = [ 'info', 'rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
             clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
