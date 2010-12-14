@@ -43,7 +43,6 @@ from os import path
 import string
 
 from buildbotcustom.steps.base import ShellCommand
-from buildbotcustom.common import getCodesighsPlatforms
 
 class AliveTest(ShellCommand):
     name = "alive test"
@@ -333,12 +332,12 @@ class Codesighs(ShellCommand):
         self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(objdir=objdir, platform=platform, type=type, tbPrint=tbPrint)
 
-        assert platform in getCodesighsPlatforms()
+        assert platform in ('win32', 'macosx', 'macosx64', 'linux', 'linux64')
         assert type in ('auto', 'base')
 
         self.objdir = objdir
         self.platform = platform
-        if 'linux' in self.platform or 'osx' in self.platform:
+        if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
             self.platform = 'unix'
         self.type = type
         self.tbPrint = tbPrint

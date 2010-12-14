@@ -259,7 +259,6 @@ class BootstrapFactory(BuildFactory):
 def getPlatformMinidumpPath(platform):
     platform_minidump_path = {
         'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
-        'linuxqt': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
