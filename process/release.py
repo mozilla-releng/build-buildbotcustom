@@ -8,6 +8,7 @@ from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.process.factory import BuildFactory
 from buildbot.process.properties import WithProperties
+from buildbot.steps.trigger import Trigger
 
 from buildbotcustom.l10n import DependentL10n
 from buildbotcustom.status.mail import ChangeNotifier
@@ -22,6 +23,8 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
 from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
 from release.platforms import ftp_platform_map, sl_platform_map
+from buildbotcustom.scheduler import TriggerBouncerCheck
+import BuildSlaves
 
 DEFAULT_L10N_CHUNKS = 15
 
@@ -32,6 +35,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
                            branchConfig['build_tools_repo_path'])
+    config_repo = '%s%s' % (branchConfig['hgurl'],
+                             branchConfig['config_repo_path'])
     if staging:
         branchConfigFile = "mozilla/staging_config.py"
     else:
@@ -325,6 +330,27 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
          builderNames=platform_test_builders,
         )
         schedulers.append(s)
+
+    mirror_scheduler1 = TriggerBouncerCheck(
+        name=builderPrefix('ready-for-qa'),
+        configRepo=config_repo,
+        minUptake=10000,
+        builderNames=[builderPrefix('ready_for_qa'),
+                      builderPrefix('final_verification')],
+        username=BuildSlaves.tuxedoUsername,
+        password=BuildSlaves.tuxedoPassword)
+
+    schedulers.append(mirror_scheduler1)
+
+    mirror_scheduler2 = TriggerBouncerCheck(
+        name=builderPrefix('ready-for-release'),
+        configRepo=config_repo,
+        minUptake=45000,
+        builderNames=[builderPrefix('ready_for_release')],
+        username=BuildSlaves.tuxedoUsername,
+        password=BuildSlaves.tuxedoPassword)
+
+    schedulers.append(mirror_scheduler2)
 
     # Purposely, there is not a Scheduler for ReleaseFinalVerification
     # This is a step run very shortly before release, and is triggered manually
@@ -799,6 +825,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         scriptName='scripts/release/push-to-mirrors.sh',
     )
 
+    push_to_mirrors_factory.addStep(Trigger(
+        schedulerNames=[builderPrefix('ready-for-qa'),
+                        builderPrefix('ready-for-release')],
+        copy_properties=['revision', 'release_config']
+    ))
+
+
     builders.append({
         'name': builderPrefix('push_to_mirrors'),
         'slavenames': branchConfig['platforms']['linux']['slaves'],
@@ -828,6 +861,21 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
     })
+    notify_builders.append(builderPrefix('final_verification'))
+
+    builders.append(makeDummyBuilder(
+        name=builderPrefix('ready_for_qa'),
+        slaves=branchConfig['platforms']['linux']['slaves'],
+        category=builderPrefix(''),
+        ))
+    notify_builders.append(builderPrefix('ready_for_qa'))
+
+    builders.append(makeDummyBuilder(
+        name=builderPrefix('ready_for_release'),
+        slaves=branchConfig['platforms']['linux']['slaves'],
+        category=builderPrefix(''),
+        ))
+    notify_builders.append(builderPrefix('ready_for_release'))
 
     if releaseConfig['majorUpdateRepoPath']:
         # Not attached to any Scheduler
