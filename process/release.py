@@ -8,11 +8,13 @@ from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.process.factory import BuildFactory
 from buildbot.process.properties import WithProperties
+from buildbot.steps.trigger import Trigger
 
 from buildbotcustom.l10n import DependentL10n
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
-  generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave
+  generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
+  reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, UpdateVerifyFactory, ReleaseFinalVerification, \
@@ -21,6 +23,8 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
 from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
 from release.platforms import ftp_platform_map, sl_platform_map
+from buildbotcustom.scheduler import TriggerBouncerCheck
+import BuildSlaves
 
 DEFAULT_L10N_CHUNKS = 15
 
@@ -31,6 +35,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
                            branchConfig['build_tools_repo_path'])
+    config_repo = '%s%s' % (branchConfig['hgurl'],
+                             branchConfig['config_repo_path'])
     if staging:
         branchConfigFile = "mozilla/staging_config.py"
     else:
@@ -325,6 +331,27 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         )
         schedulers.append(s)
 
+    mirror_scheduler1 = TriggerBouncerCheck(
+        name=builderPrefix('ready-for-qa'),
+        configRepo=config_repo,
+        minUptake=10000,
+        builderNames=[builderPrefix('ready_for_qa'),
+                      builderPrefix('final_verification')],
+        username=BuildSlaves.tuxedoUsername,
+        password=BuildSlaves.tuxedoPassword)
+
+    schedulers.append(mirror_scheduler1)
+
+    mirror_scheduler2 = TriggerBouncerCheck(
+        name=builderPrefix('ready-for-release'),
+        configRepo=config_repo,
+        minUptake=45000,
+        builderNames=[builderPrefix('ready_for_release')],
+        username=BuildSlaves.tuxedoUsername,
+        password=BuildSlaves.tuxedoPassword)
+
+    schedulers.append(mirror_scheduler2)
+
     # Purposely, there is not a Scheduler for ReleaseFinalVerification
     # This is a step run very shortly before release, and is triggered manually
     # from the waterfall
@@ -371,6 +398,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'slavenames': branchConfig['platforms']['linux']['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('repo_setup'),
+                'slavebuilddir': reallyShort(builderPrefix('repo_setup')),
                 'factory': repository_setup_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
@@ -393,6 +421,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'slavenames': branchConfig['platforms']['linux']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('tag'),
+            'slavebuilddir': reallyShort(builderPrefix('tag')),
             'factory': tag_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
@@ -426,6 +455,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
            'slavenames': branchConfig['platforms']['linux']['slaves'],
            'category': builderPrefix(''),
            'builddir': builderPrefix('source'),
+           'slavebuilddir': reallyShort(builderPrefix('source')),
            'factory': source_factory,
            'env': builder_env,
            'nextSlave': _nextFastReservedSlave,
@@ -452,6 +482,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                'slavenames': branchConfig['platforms']['linux']['slaves'],
                'category': builderPrefix(''),
                'builddir': builderPrefix('xulrunner_source'),
+               'slavebuilddir': reallyShort(builderPrefix('xulrunner_source')),
                'factory': xulrunner_source_factory,
                'env': builder_env,
             })
@@ -526,6 +557,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'slavenames': pf['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('%s_build' % platform),
+                'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform)),
                 'factory': build_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
@@ -546,7 +578,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     extra_args=[platform, branchConfigFile,
                                 str(l10nChunks), str(n)]
                 )
-                
                 builddir = builderPrefix('%s_repack' % platform) + \
                                          '_' + str(n)
                 env = builder_env.copy()
@@ -556,6 +587,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     'slavenames': branchConfig['l10n_slaves'][platform],
                     'category': builderPrefix(''),
                     'builddir': builddir,
+                    'slavebuilddir': reallyShort(builddir),
                     'factory': repack_factory,
                     'nextSlave': _nextFastReservedSlave,
                     'env': env,
@@ -621,6 +653,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'slavenames': pf['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_%s_build' % platform),
+                'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform)),
                 'factory': xulrunner_build_factory,
                 'env': builder_env,
             })
@@ -657,6 +690,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                  'slavenames': slaves,
                  'category': builderPrefix(''),
                  'builddir': builderPrefix('partner_repack', platform),
+                 'slavebuilddir': reallyShort(builderPrefix('partner_repack', platform)),
                  'factory': partner_repack_factory,
                  'nextSlave': _nextFastReservedSlave,
                  'env': builder_env
@@ -686,6 +720,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'slavenames': slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('l10n_verification', platform),
+            'slavebuilddir': reallyShort(builderPrefix('l10n_verification', platform)),
             'factory': l10n_verification_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
@@ -738,6 +773,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': builderPrefix(''),
         'builddir': builderPrefix('updates'),
+        'slavebuilddir': reallyShort(builderPrefix('updates')),
         'factory': updates_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
@@ -758,11 +794,55 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'slavenames': branchConfig['platforms'][platform]['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('%s_update_verify' % platform),
+            'slavebuilddir': reallyShort(builderPrefix('%s_up_vrfy' % platform)),
             'factory': update_verify_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
         })
 
+    pre_push_checks_factory = ScriptFactory(
+        scriptRepo=tools_repo,
+        extra_args=[branchConfigFile, 'check'],
+        script_timeout=3*60*60,
+        scriptName='scripts/release/push-to-mirrors.sh',
+    )
+
+    builders.append({
+        'name': builderPrefix('pre_push_checks'),
+        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'category': builderPrefix(''),
+        'builddir': builderPrefix('pre_push_checks'),
+        'factory': pre_push_checks_factory,
+        'nextSlave': _nextFastReservedSlave,
+        'env': builder_env,
+        'properties': {'builddir': builderPrefix('pre_push_checks')},
+    })
+
+    push_to_mirrors_factory = ScriptFactory(
+        scriptRepo=tools_repo,
+        extra_args=[branchConfigFile, 'push'],
+        script_timeout=3*60*60,
+        scriptName='scripts/release/push-to-mirrors.sh',
+    )
+
+    push_to_mirrors_factory.addStep(Trigger(
+        schedulerNames=[builderPrefix('ready-for-qa'),
+                        builderPrefix('ready-for-release')],
+        copy_properties=['revision', 'release_config']
+    ))
+
+
+    builders.append({
+        'name': builderPrefix('push_to_mirrors'),
+        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'category': builderPrefix(''),
+        'builddir': builderPrefix('push_to_mirrors'),
+        'factory': push_to_mirrors_factory,
+        'nextSlave': _nextFastReservedSlave,
+        'env': builder_env,
+        'properties': {'builddir': builderPrefix('push_to_mirrors')},
+    })
+    notify_builders.append(builderPrefix('push_to_mirrors'))
 
     final_verification_factory = ReleaseFinalVerification(
         hgHost=branchConfig['hghost'],
@@ -776,10 +856,27 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': builderPrefix(''),
         'builddir': builderPrefix('final_verification'),
+        'slavebuilddir': reallyShort(builderPrefix('fnl_verf')),
         'factory': final_verification_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
     })
+
+    notify_builders.append(builderPrefix('final_verification'))
+
+    builders.append(makeDummyBuilder(
+        name=builderPrefix('ready_for_qa'),
+        slaves=branchConfig['platforms']['linux']['slaves'],
+        category=builderPrefix(''),
+        ))
+    notify_builders.append(builderPrefix('ready_for_qa'))
+
+    builders.append(makeDummyBuilder(
+        name=builderPrefix('ready_for_release'),
+        slaves=branchConfig['platforms']['linux']['slaves'],
+        category=builderPrefix(''),
+        ))
+    notify_builders.append(builderPrefix('ready_for_release'))
 
     if releaseConfig['majorUpdateRepoPath']:
         # Not attached to any Scheduler
@@ -827,6 +924,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'slavenames': branchConfig['platforms']['linux']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('major_update'),
+            'slavebuilddir': reallyShort(builderPrefix('mu')),
             'factory': major_update_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
@@ -846,6 +944,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'slavenames': branchConfig['platforms'][platform]['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('%s_major_update_verify' % platform),
+                'slavebuilddir': reallyShort(builderPrefix('%s_mu_verify' % platform)),
                 'factory': major_update_verify_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
@@ -873,6 +972,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': builderPrefix(''),
         'builddir': builderPrefix('bouncer_submitter'),
+        'slavebuilddir': reallyShort(builderPrefix('bncr_sub')),
         'factory': bouncer_submitter_factory,
         'env': builder_env,
     })

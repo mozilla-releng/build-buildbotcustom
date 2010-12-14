@@ -269,7 +269,7 @@ def getPlatformMinidumpPath(platform):
     return platform_minidump_path[platform]
 
 class MozillaBuildFactory(BuildFactory):
-    ignore_dirs = [ 'info', 'release-*']
+    ignore_dirs = [ 'info', 'rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
             clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
@@ -541,7 +541,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  packageSDK=False, packageTests=False, mozillaDir=None,
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
-                 **kwargs):
+                 mozconfigBranch="production", **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -591,6 +591,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.env['CCACHE_BASEDIR'] = WithProperties('%(basedir:-)s')
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
+        self.mozconfigBranch = mozconfigBranch
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -806,6 +807,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['hg', 'clone', configRepo, 'configs'],
          description=['checking', 'out', 'configs'],
          descriptionDone=['checkout', 'configs'],
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='hg_update',
+         command=['hg', 'update', '-r', self.mozconfigBranch],
+         description=['updating', 'mozconfigs'],
+         workdir="build/configs",
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
@@ -1674,7 +1682,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
-        MercurialBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        MercurialBuildFactory.__init__(self, mozillaDir='mozilla',
+            mozconfigBranch='default', **kwargs)
 
     def addSourceSteps(self):
         self.addStep(Mercurial, 
@@ -2194,7 +2203,8 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
-        NightlyBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        NightlyBuildFactory.__init__(self, mozillaDir='mozilla',
+            mozconfigBranch='default', **kwargs)
 
     # MercurialBuildFactory defines those, and our inheritance chain makes us
     # look there before NightlyBuildFactory, so we need to define them here and
@@ -2359,7 +2369,8 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
-        ReleaseBuildFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        ReleaseBuildFactory.__init__(self, mozillaDir='mozilla',
+            mozconfigBranch='default', **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
                                fileType=None, maxDepth=1, haltOnFailure=False):
@@ -2404,7 +2415,8 @@ class BaseRepackFactory(MozillaBuildFactory):
                  env={}, objdir='', platform='',
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
-                 mergeLocales=True, **kwargs):
+                 mergeLocales=True, mozconfigBranch="production", 
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.env = env.copy()
@@ -2528,6 +2540,13 @@ class BaseRepackFactory(MozillaBuildFactory):
              command=['hg', 'clone', self.configRepo, 'configs'],
              description=['checkout', 'configs'],
              workdir='build/'+self.origSrcDir,
+             haltOnFailure=True
+            ))
+            self.addStep(ShellCommand(
+             name='hg_update',
+             command=['hg', 'update', '-r', self.mozconfigBranch],
+             description=['updating', 'mozconfigs'],
+             workdir="build/%s/configs" % self.origSrcDir,
              haltOnFailure=True
             ))
             self.addStep(ShellCommand(
@@ -2787,7 +2806,8 @@ class CCBaseRepackFactory(BaseRepackFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
-        BaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        BaseRepackFactory.__init__(self, mozillaDir='mozilla',
+            mozconfigBranch='default', **kwargs)
 
     def getSources(self):
         BaseRepackFactory.getSources(self)
@@ -3096,7 +3116,8 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
-        NightlyRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        NightlyRepackFactory.__init__(self, mozillaDir='mozilla',
+            mozconfigBranch='default', **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way
     # this is basically mirroring what mobile does
@@ -3323,7 +3344,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseRepackFactory):
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
-        ReleaseRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        ReleaseRepackFactory.__init__(self, mozillaDir='mozilla',
+            mozconfigBranch='default', **kwargs)
 
     def updateSources(self):
         ReleaseRepackFactory.updateSources(self)
@@ -4268,7 +4290,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   WithProperties('--config=%s' % self.patcherConfigFile)],
          description=['patcher:', 'build tools'],
          env={'HGROOT': self.mozRepository},
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=3600,
         ))
 
     def downloadBuilds(self):
@@ -5261,10 +5284,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
 
-    def addStep(self, *args, **kw):
-        kw.setdefault('env', self.env)
-        return BuildFactory.addStep(self, *args, **kw)
-
     def addCopyMozconfigStep(self):
         config_dir_map = {
                 'linux': 'linux/%s/unittest' % self.branchName,
@@ -5619,6 +5638,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  mergeLocales=True,
                  try_subdir=None,
                  triggeredSchedulers=None, triggerBuilds=False,
+                 mozconfigBranch="production",
                  **kwargs):
         """
     mobileRepoPath: the path to the mobileRepo (mobile-browser)
@@ -5663,6 +5683,7 @@ class MobileBuildFactory(MozillaBuildFactory):
 
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
+        self.mozconfigBranch = mozconfigBranch
 
         if baseUploadDir is None:
             self.baseUploadDir = self.mobileBranchName
@@ -5764,7 +5785,8 @@ class MobileBuildFactory(MozillaBuildFactory):
         )
         self.addHgPullSteps(repository=self.configRepository,
                             workdir=self.baseWorkDir,
-                            targetDirectory='configs')
+                            targetDirectory='configs',
+                            revision=self.mozconfigBranch)
         self.addStep(ShellCommand,
             name='copy_mozconfig',
             command=['cp', self.mozconfig,
@@ -6095,7 +6117,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             command=['python', 'mozharness/scripts/multil10n.py',
                      '--config-file', self.mozharnessConfig,
                      mergeLocalesArg,
-                     '--only-pull-locale-source', '--only-add-locales'],
+                     '--only-pull-locale-source', '--only-add-locales',
+                     '--only-package-multi'],
             workdir=self.baseWorkDir,
             description=['running', 'multil10n', 'steps'],
             descriptionDone=['ran', 'multil10n', 'steps'],
@@ -8195,7 +8218,6 @@ class AndroidBuildFactory(MobileBuildFactory):
             self.addTriggeredBuildsSteps()
         if self.multiLocale:
             self.addMultiLocaleSteps()
-            self.addPackageSteps(locale='multi')
             if self.createSnippet:
                 self.addUpdateSteps()
             self.addMakeUploadSteps(sendchange=False, locale='multi')
