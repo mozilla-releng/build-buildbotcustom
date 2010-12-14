@@ -6117,7 +6117,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             command=['python', 'mozharness/scripts/multil10n.py',
                      '--config-file', self.mozharnessConfig,
                      mergeLocalesArg,
-                     '--only-pull-locale-source', '--only-add-locales'],
+                     '--only-pull-locale-source', '--only-add-locales',
+                     '--only-package-multi'],
             workdir=self.baseWorkDir,
             description=['running', 'multil10n', 'steps'],
             descriptionDone=['ran', 'multil10n', 'steps'],
@@ -8217,7 +8218,6 @@ class AndroidBuildFactory(MobileBuildFactory):
             self.addTriggeredBuildsSteps()
         if self.multiLocale:
             self.addMultiLocaleSteps()
-            self.addPackageSteps(locale='multi')
             if self.createSnippet:
                 self.addUpdateSteps()
             self.addMakeUploadSteps(sendchange=False, locale='multi')
