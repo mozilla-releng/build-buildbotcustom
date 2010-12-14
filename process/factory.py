@@ -4290,7 +4290,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   WithProperties('--config=%s' % self.patcherConfigFile)],
          description=['patcher:', 'build tools'],
          env={'HGROOT': self.mozRepository},
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=3600,
         ))
 
     def downloadBuilds(self):
