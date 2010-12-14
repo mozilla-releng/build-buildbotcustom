@@ -774,6 +774,42 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'env': builder_env,
         })
 
+    pre_push_checks_factory = ScriptFactory(
+        scriptRepo=tools_repo,
+        extra_args=[branchConfigFile, 'check'],
+        script_timeout=3*60*60,
+        scriptName='scripts/release/push-to-mirrors.sh',
+    )
+
+    builders.append({
+        'name': builderPrefix('pre_push_checks'),
+        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'category': builderPrefix(''),
+        'builddir': builderPrefix('pre_push_checks'),
+        'factory': pre_push_checks_factory,
+        'nextSlave': _nextFastReservedSlave,
+        'env': builder_env,
+        'properties': {'builddir': builderPrefix('pre_push_checks')},
+    })
+
+    push_to_mirrors_factory = ScriptFactory(
+        scriptRepo=tools_repo,
+        extra_args=[branchConfigFile, 'push'],
+        script_timeout=3*60*60,
+        scriptName='scripts/release/push-to-mirrors.sh',
+    )
+
+    builders.append({
+        'name': builderPrefix('push_to_mirrors'),
+        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'category': builderPrefix(''),
+        'builddir': builderPrefix('push_to_mirrors'),
+        'factory': push_to_mirrors_factory,
+        'nextSlave': _nextFastReservedSlave,
+        'env': builder_env,
+        'properties': {'builddir': builderPrefix('push_to_mirrors')},
+    })
+    notify_builders.append(builderPrefix('push_to_mirrors'))
 
     final_verification_factory = ReleaseFinalVerification(
         hgHost=branchConfig['hghost'],
