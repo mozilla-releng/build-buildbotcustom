@@ -3,21 +3,16 @@
 # Contributor(s):
 #   Chris AtLee <catlee@mozilla.com>
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.python import log
-from twisted.internet.task import LoopingCall
-from twisted.web.client import getPage
 
 from buildbot.scheduler import Scheduler
 from buildbot.schedulers.base import BaseScheduler
 from buildbot.schedulers.timed import Nightly
-from buildbot.schedulers.triggerable import Triggerable
 from buildbot.sourcestamp import SourceStamp
 from buildbot.process.properties import Properties
 
 from buildbot.util import now
-
-from util.tuxedo import get_release_uptake
 
 import time
 
@@ -219,119 +214,6 @@ class BuilderChooserScheduler(MultiScheduler):
 
         d.addCallback(lambda buildersPerChange: self.parent.db.runInteraction(do_add_build_and_remove_changes, buildersPerChange))
         return d
-
-
-class TriggerBouncerCheck(Triggerable):
-
-    compare_attrs = Triggerable.compare_attrs + \
-                  ('minUptake', 'configRepo', 'checkMARs', 'username',
-                   'password', 'pollInterval', 'pollTimeout')
-    working = False
-    loop = None
-    release_config = None
-    revision = None
-    configRepo = None
-
-    def __init__(self, minUptake, configRepo, checkMARs=True,
-                 username=None, password=None, pollInterval=5*60,
-                 pollTimeout=12*60*60, **kwargs):
-        self.minUptake = minUptake
-        self.configRepo = configRepo
-        self.checkMARs = checkMARs
-        self.username = username
-        self.password = password
-        self.pollInterval = pollInterval
-        self.pollTimeout = pollTimeout
-        self.ss = None
-        self.set_props = None
-        Triggerable.__init__(self, **kwargs)
-
-
-    def trigger(self, ss, set_props=None):
-        self.ss = ss
-        self.set_props = set_props
-
-        props = Properties()
-        props.updateFromProperties(self.properties)
-        if set_props:
-            props.updateFromProperties(set_props)
-
-        self.revision = props.getProperty('revision')
-        assert self.revision, 'revision should be set'
-        self.release_config = props.getProperty('release_config')
-        assert self.release_config, 'release_config should be set'
-
-        def _run_loop(_):
-            self.loop = LoopingCall(self.poll)
-            reactor.callLater(0, self.loop.start, self.pollInterval)
-            reactor.callLater(self.pollTimeout, self.stopLoop,
-                              'Timeout after %s' %  self.pollTimeout)
-
-        d = self.getReleaseConfig()
-        d.addCallback(_run_loop)
-
-    def stopLoop(self, reason=None):
-        if reason:
-            log.msg('%s: Stopping uptake monitoring: %s' %
-                    (self.__class__.__name__, reason))
-        if self.loop.running:
-            self.loop.stop()
-        else:
-            log.msg('%s: Loop has been alredy stopped' %
-                    self.__class__.__name__)
-
-    def getReleaseConfig(self):
-        url = str('%s/raw-file/%s/%s' %
-                  (self.configRepo, self.revision, self.release_config))
-        d = getPage(url)
-
-        def setReleaseConfig(res):
-            c = {}
-            exec res in c
-            self.release_config = c.get('releaseConfig')
-            log.msg('%s: release_config loaded' % self.__class__.__name__)
-
-        d.addCallback(setReleaseConfig)
-        return d
-
-    def poll(self):
-        if self.working:
-            log.msg('%s: Not polling because last poll is still working'
-                    % self.__class__.__name__)
-            return defer.succeed(None)
-        self.working = True
-        log.msg('%s: polling' % self.__class__.__name__)
-        bouncerProductName = self.release_config.get('bouncerProductName') or \
-                           self.release_config.get('productName').capitalize()
-        d = get_release_uptake(
-            tuxedoServerUrl=self.release_config.get('tuxedoServerUrl'),
-            bouncerProductName=bouncerProductName,
-            version=self.release_config.get('version'),
-            oldVersion=self.release_config.get('oldVersion'),
-            checkMARs=self.checkMARs,
-            username=self.username,
-            password=self.password)
-        d.addCallback(self.checkUptake)
-        d.addCallbacks(self.finished_ok, self.finished_failure)
-        return d
-
-    def checkUptake(self, uptake):
-        log.msg('%s: uptake is %s' % (self.__class__.__name__, uptake))
-        if uptake >= self.minUptake:
-            self.stopLoop('Reached required uptake: %s' % uptake)
-            Triggerable.trigger(self, self.ss, self.set_props)
-
-    def finished_ok(self, res):
-        log.msg('%s: polling finished' % (self.__class__.__name__))
-        assert self.working
-        self.working = False
-        return res
-
-    def finished_failure(self, f):
-        log.msg('%s failed:\n%s' % (self.__class__.__name__, f.getTraceback()))
-        assert self.working
-        self.working = False
-        return None # eat the failure
 
 def makePropertiesScheduler(base_class, propfuncs, *args, **kw):
     """Return a subclass of `base_class` that will call each of `propfuncs` to
