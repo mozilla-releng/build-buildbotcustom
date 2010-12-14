@@ -1,5 +1,9 @@
 import time, uuid
 
+def getCodesighsPlatforms():
+    return ('linux', 'linuxqt','linux64', 'win32',
+            'macosx', 'macosx64')
+
 def getSupportedPlatforms():
     return ('linux', 'linux64', 'win32', 'win64', 'wince', 'macosx',
             'macosx64', 'android')
