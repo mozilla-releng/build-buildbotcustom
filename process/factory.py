@@ -5701,7 +5701,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             command=['python', 'mozharness/scripts/multil10n.py',
                      '--config-file', self.mozharnessConfig,
                      mergeLocalesArg,
-                     '--only-pull-locale-source', '--only-add-locales'],
+                     '--only-pull-locale-source', '--only-add-locales',
+                     '--only-package-multi'],
             workdir=self.baseWorkDir,
             description=['running', 'multil10n', 'steps'],
             descriptionDone=['ran', 'multil10n', 'steps'],
@@ -5922,23 +5923,27 @@ class MaemoBuildFactory(MobileBuildFactory):
 
     def addPackageSteps(self, multiLocale=False, packageTests=False):
         extraArgs=''
+        env = self.env
         if multiLocale:
             extraArgs='AB_CD=multi'
+            env['MOZ_CHROME_MULTILOCALE'] = ' '.join(self.locales)
         self.addStep(ShellCommand,
             name='make_pkg',
-            command=[self.scratchboxPath, '-p', '-d',
+            command=[self.scratchboxPath, '-p', '-k', '-d',
                      '%s' % (self.objdirRelPath),
                      'make package', extraArgs],
             description=['make', 'package'],
+            env=env,
             haltOnFailure=True
         )
         if self.debs:
             self.addStep(ShellCommand,
                          name='make_mobile_deb',
-                         command=[self.scratchboxPath, '-p', '-d',
+                         command=[self.scratchboxPath, '-p', '-k', '-d',
                                   '%s' % (self.objdirRelPath),
                                   'make deb', extraArgs],
                          description=['make', 'mobile', 'deb'],
+                         env=env,
                          haltOnFailure=True
             )
         # Build tests for multi-locale nightly builds, dependent builds
@@ -6008,12 +6013,10 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addUploadSteps(platform='linux')
 
     def addMultiLocaleSteps(self, requests=None, propertyName=None):
-        if self.locales:
-            locales = self.locales
-        else:
+        if not self.locales:
             req = requests[-1]
             # get the list of locales that has been added by the scheduler
-            locales = req.properties.getProperty(propertyName)
+            self.locales = req.properties.getProperty(propertyName)
 
         # Drop all previous multi-locale steps, to fix bug 531873.
         self.steps = self.steps[:self.nonMultiLocaleStepsLength]
@@ -6027,7 +6030,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             warnOnFailure=False,
         )
         self.compareLocalesSetup()
-        for locale in locales:
+        for locale in self.locales:
             self.checkOutLocale(locale)
             self.compareLocales(locale)
             self.addChromeLocale(locale)
@@ -7467,7 +7470,6 @@ class AndroidBuildFactory(MobileBuildFactory):
             self.addTriggeredBuildsSteps()
         if self.multiLocale:
             self.addMultiLocaleSteps()
-            self.addPackageSteps(locale='multi')
             if self.createSnippet:
                 self.addUpdateSteps()
             self.addMakeUploadSteps(subdir="multi", locale="multi")
