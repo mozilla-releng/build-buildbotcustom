@@ -1343,8 +1343,6 @@ class TryBuildFactory(MercurialBuildFactory):
         ))
 
     def addLeakTestSteps(self):
-        self.logUploadDir = '%s/%s-%s-debug' % (self.packageDir, self.branchName,
-                        self.platform)
         # we want the same thing run a few times here, with different
         # extraArgs
         leakEnv = self.env.copy()
@@ -1383,15 +1381,6 @@ class TryBuildFactory(MercurialBuildFactory):
          env=self.env,
          command=['mv', '%s/_leaktest/bloat.log' % self.mozillaObjdir,
                   '../bloat.log'],
-        )
-        self.addStep(ShellCommand,
-         name='upload_bloat_log',
-         env=self.env,
-         command=['scp', '-o', 'User=%s' % self.stageUsername,
-                  '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-                  '../bloat.log',
-                  WithProperties('%s:%s/%s' % (self.stageServer, self.stageBasePath, 
-                      self.logUploadDir))]
         )
         self.addStep(CompareBloatLogs,
          name='compare_bloat_log',
@@ -1520,15 +1509,6 @@ class TryBuildFactory(MercurialBuildFactory):
                      haltOnFailure=True
                     )
             self.addStep(ShellCommand,
-             name='upload_logs',
-             env=self.env,
-             command=['scp', '-o', 'User=%s' % self.stageUsername,
-                      '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-                      '../malloc.log', '../sdleak.tree',
-                      WithProperties('%s:%s/%s' % (self.stageServer, self.stageBasePath,
-                                    self.logUploadDir))]
-            )
-            self.addStep(ShellCommand,
              name='compare_sdleak_tree',
              env=self.env,
              workdir='.',
@@ -1537,8 +1517,6 @@ class TryBuildFactory(MercurialBuildFactory):
             )
 
     def addCodesighsSteps(self):
-        self.logUploadDir = '%s/%s-%s' % (self.packageDir, self.branchName,
-                        self.platform)
         self.addStep(ShellCommand,
          name='make_codesighs',
          command=['make'],
@@ -1586,14 +1564,6 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(ShellCommand,
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
-         workdir='build%s' % self.mozillaDir
-        )
-        self.addStep(ShellCommand,
-         name='upload_codesize_log',
-         command=['scp', '-o', 'User=%s' % self.stageUsername,
-          '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-          '../codesize-auto.log',
-          WithProperties('%s:%s/%s' % (self.stageServer, self.stageBasePath, self.logUploadDir))],
          workdir='build%s' % self.mozillaDir
         )
 
