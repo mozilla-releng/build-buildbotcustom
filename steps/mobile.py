@@ -101,11 +101,10 @@ class MobileParseTestLog(ShellCommand):
             return WARNINGS
 
         if self.name.startswith('mochitest') or self.name.startswith('chrome'):
-            # Support browser-chrome result summary format which differs
-            # from MozillaMochitest's.
-            if self.name != 'mochitest-browser-chrome':
-                if not re.search('TEST-PASS', cmdText):
-                    return WARNINGS
+            if not re.search('TEST-PASS', cmdText):
+                return WARNINGS
+        elif self.name.startswith('browser-chrome') and re.search('Failed: 0', cmdText):
+            pass
         elif not re.search('INFO Passed: [^0]', cmdText):
             return WARNINGS
 
