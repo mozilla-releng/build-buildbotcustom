@@ -46,7 +46,7 @@ def transform_times(event):
     return retval
 
 def escape(name):
-    return name.replace(".", "_")
+    return name.replace(".", "_").replace(" ", "_")
 
 class PulseStatus(StatusPush):
     compare_attrs = StatusPush.compare_attrs + ['publisher', 'ignoreBuilders',

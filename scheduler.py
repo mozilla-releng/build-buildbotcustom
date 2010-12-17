@@ -73,6 +73,9 @@ class SpecificNightly(Nightly):
 
 class PersistentScheduler(BaseScheduler):
     """Make sure at least numPending builds are pending on each of builderNames"""
+
+    compare_attrs = ['name', 'numPending', 'pollInterval', 'ssFunc', 'builderNames', 'properties']
+
     def __init__(self, numPending, pollInterval=60, ssFunc=None, properties={},
             **kwargs):
         self.numPending = numPending

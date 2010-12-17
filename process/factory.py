@@ -2404,6 +2404,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageSshKey = stageSshKey
         self.tree = tree
         self.mozconfig = mozconfig
+        self.mozconfigBranch = mozconfigBranch
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -7117,7 +7118,7 @@ class TalosFactory(BuildFactory):
         if 'fed' in self.OS:
             self.addStep(ShellCommand(
                 name='disable_screensaver',
-                command=['xset', '-s', 'reset']))
+                command=['xset', 's', 'reset']))
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
