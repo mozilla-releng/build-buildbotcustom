@@ -2404,6 +2404,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageSshKey = stageSshKey
         self.tree = tree
         self.mozconfig = mozconfig
+        self.mozconfigBranch = mozconfigBranch
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
