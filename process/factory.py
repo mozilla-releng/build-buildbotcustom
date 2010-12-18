@@ -5044,6 +5044,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
+         alwaysUseLatest=True,
          timeout=60*60 # 1 hour
         )
 
