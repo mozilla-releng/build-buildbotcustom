@@ -254,6 +254,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 builderNames=l10nBuilders(platform).values(),
             )
             schedulers.append(repack_scheduler)
+            repack_complete_scheduler = Dependent(
+                name=builderPrefix('%s_repack_complete' % platform),
+                upstream=repack_scheduler,
+                builderNames=[builderPrefix('repack_complete', platform),]
+            )
+            schedulers.append(repack_complete_scheduler)
+            notify_builders.append(builderPrefix('repack_complete', platform))
 
     for platform in releaseConfig['xulrunnerPlatforms']:
         xulrunner_build_scheduler = Dependent(
@@ -593,6 +600,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     'env': env,
                     'properties': {'builddir': builddir}
                 })
+
+            builders.append(makeDummyBuilder(
+                name=builderPrefix('repack_complete', platform),
+                slaves=branchConfig['platforms']['linux']['slaves'],
+                category=builderPrefix(''),
+            ))
 
         if platform in releaseConfig['unittestPlatforms']:
             mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
