@@ -223,7 +223,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         )
 
     schedulers.append(tag_scheduler)
-    notify_builders.append(builderPrefix('tag'))
     source_scheduler = Dependent(
         name=builderPrefix('source'),
         upstream=tag_scheduler,
@@ -288,7 +287,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builderNames=[builderPrefix('l10n_verification', platform)]
         )
         schedulers.append(l10n_verify_scheduler)
-        notify_builders.append(builderPrefix('l10n_verification', platform))
 
     updates_scheduler = Scheduler(
         name=builderPrefix('updates'),
@@ -308,7 +306,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builderNames=updateBuilderNames
     )
     schedulers.append(update_verify_scheduler)
-    notify_builders.extend(updateBuilderNames)
 
     if releaseConfig['majorUpdateRepoPath']:
         majorUpdateBuilderNames = []
@@ -894,8 +891,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
     })
-
-    notify_builders.append(builderPrefix('final_verification'))
 
     builders.append(makeDummyBuilder(
         name=builderPrefix('ready_for_qa'),
