@@ -577,6 +577,26 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
         if platform in releaseConfig['l10nPlatforms']:
+            standalone_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                interpreter='bash',
+                scriptName='scripts/l10n/standalone_repacks.sh',
+                extra_args=[platform, branchConfigFile]
+            )
+            env = builder_env.copy()
+            env.update(pf['env'])
+            builders.append({
+                'name': builderPrefix("standalone_repack", platform),
+                'slavenames': branchConfig['l10n_slaves'][platform],
+                'category': builderPrefix(''),
+                'builddir': builderPrefix("standalone_repack", platform),
+                'factory': standalone_factory,
+                'nextSlave': _nextFastReservedSlave,
+                'env': env,
+                'properties': {'builddir':
+                    builderPrefix("standalone_repack", platform)}
+            })
+
             for n, builderName in l10nBuilders(platform).iteritems():
                 repack_factory = ScriptFactory(
                     scriptRepo=tools_repo,
