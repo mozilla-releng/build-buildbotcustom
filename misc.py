@@ -674,8 +674,9 @@ def generateBranchObjects(config, name):
         tree=config['tinderbox_tree'],
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
-        builders=builders + nightlyBuilders,
-        logCompression="gzip"
+        builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
+        logCompression="gzip",
+        errorparser="unittest"
     ))
     # XULRunner builds
     branchObjects['status'].append(TinderboxMailNotifier(
@@ -685,17 +686,6 @@ def generateBranchObjects(config, name):
         relayhost="mail.build.mozilla.org",
         builders=xulrunnerNightlyBuilders,
         logCompression="gzip"
-    ))
-    # Separate notifier for unittests, since they need to be run through
-    # the unittest errorparser
-    branchObjects['status'].append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=unittestBuilders + debugBuilders,
-        logCompression="gzip",
-        errorparser="unittest"
     ))
     # Code coverage builds go to a different tree
     branchObjects['status'].append(TinderboxMailNotifier(
