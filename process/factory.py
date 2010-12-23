@@ -2372,10 +2372,7 @@ def identToProperties(default_prop=None):
 class BaseRepackFactory(MozillaBuildFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs
-    ignore_dirs.extend(['mozilla-central-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['mozilla-1.9.1-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['mozilla-1.9.2-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + ['*-nightly']
 
     extraConfigureArgs = []
 
@@ -2761,10 +2758,7 @@ class BaseRepackFactory(MozillaBuildFactory):
 class CCBaseRepackFactory(BaseRepackFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs
-    ignore_dirs.extend(['comm-central-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['comm-1.9.1-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['comm-1.9.2-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + ['*-nightly']
 
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
