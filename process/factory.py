@@ -8510,7 +8510,7 @@ class ScriptFactory(BuildFactory):
         self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
         self.addStep(ShellCommand(
             name="update_scripts",
-            command=['hg', 'update', '-r',
+            command=['hg', 'update', '-C', '-r',
                      WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
             workdir='build/scripts'
