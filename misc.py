@@ -674,8 +674,9 @@ def generateBranchObjects(config, name):
         tree=config['tinderbox_tree'],
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
-        builders=builders + nightlyBuilders,
-        logCompression="gzip"
+        builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
+        logCompression="gzip",
+        errorparser="unittest"
     ))
     # XULRunner builds
     branchObjects['status'].append(TinderboxMailNotifier(
@@ -685,17 +686,6 @@ def generateBranchObjects(config, name):
         relayhost="mail.build.mozilla.org",
         builders=xulrunnerNightlyBuilders,
         logCompression="gzip"
-    ))
-    # Separate notifier for unittests, since they need to be run through
-    # the unittest errorparser
-    branchObjects['status'].append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=unittestBuilders + debugBuilders,
-        logCompression="gzip",
-        errorparser="unittest"
     ))
     # Code coverage builds go to a different tree
     branchObjects['status'].append(TinderboxMailNotifier(
@@ -1524,6 +1514,7 @@ def generateCCBranchObjects(config, name):
             unittestBuilders.append('%s unit test' % base_name)
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
+                test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
                 unittestPrettyNames[platform] = '%s test' % base_name
             triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         # Optimized unittest builds
@@ -1590,7 +1581,8 @@ def generateCCBranchObjects(config, name):
     if config['enable_l10n']:
         l10n_builders = []
         for b in l10nBuilders:
-            l10n_builders.append(l10nBuilders[b]['l10n_builder'])
+            if config['enable_l10n_onchange']:
+                l10n_builders.append(l10nBuilders[b]['l10n_builder'])
             l10n_builders.append(l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
         l10n_binaryURL = config['enUS_binaryURL']
         if l10n_binaryURL.endswith('/'):
@@ -1803,7 +1795,7 @@ def generateCCBranchObjects(config, name):
         # on the same master.
         packageTests = pf.get('packageTests', packageTests)
 
-        if platform.find('win') > -1 or platform.find('64') > -1:
+        if platform.find('win') > -1:
             codesighs = False
 
         buildSpace = pf.get('build_space', config['default_build_space'])
@@ -1825,11 +1817,10 @@ def generateCCBranchObjects(config, name):
             extra_args['branchName'] = name
             uploadSymbols = pf.get('upload_symbols', False)
         else:
-            factory_class = NightlyBuildFactory
+            factory_class = CCNightlyBuildFactory
             uploadSymbols = pf.get('upload_symbols', False)
 
-        mozilla2_dep_factory = CCNightlyBuildFactory(
-            env=pf['env'],
+        mozilla2_dep_factory = factory_class(env=pf['env'],
             objdir=pf['platform_objdir'],
             platform=platform,
             hgHost=config['hghost'],
@@ -1970,13 +1961,16 @@ def generateCCBranchObjects(config, name):
                     # and this will disable it for now. We will fix this in bug 518359.
                     if platform is 'wince':
                         env = pf['env']
+                        objdir = pf['platform_objdir']
                         mozconfig = pf['mozconfig']
                     else:
                         env = {}
+                        objdir = ''
                         mozconfig = None
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
                         env=env,
+                        objdir=objdir,
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],
@@ -2065,7 +2059,8 @@ def generateCCBranchObjects(config, name):
                 branchObjects['builders'].append(mozilla2_shark_builder)
 
         # We still want l10n_dep builds if nightlies are off
-        if config['enable_l10n'] and platform in config['l10n_platforms']:
+        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+           config['enable_l10n_onchange']:
             mozilla2_l10n_dep_factory = CCNightlyRepackFactory(
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
@@ -2104,7 +2099,14 @@ def generateCCBranchObjects(config, name):
             if platform.startswith('macosx'):
                 runA11y = config['enable_mac_a11y']
 
-            unittest_factory = CCUnittestBuildFactory(
+            extra_args = {}
+            if config.get('enable_try'):
+                factory_class = TryUnittestBuildFactory
+                extra_args['branchName'] = name
+            else:
+                factory_class = CCUnittestBuildFactory
+
+            unittest_factory = factory_class(
                 env=pf.get('unittest-env', {}),
                 platform=platform,
                 productName=config['product_name'],
@@ -2136,6 +2138,7 @@ def generateCCBranchObjects(config, name):
                 unittestMasters=config['unittest_masters'],
                 unittestBranch="%s-%s-unittest" % (name, platform),
                 uploadPackages=True,
+                **extra_args
             )
             unittest_builder = {
                 'name': '%s unit test' % pf['base_name'],

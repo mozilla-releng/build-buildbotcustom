@@ -2372,10 +2372,7 @@ def identToProperties(default_prop=None):
 class BaseRepackFactory(MozillaBuildFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs
-    ignore_dirs.extend(['mozilla-central-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['mozilla-1.9.1-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['mozilla-1.9.2-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + ['*-nightly']
 
     extraConfigureArgs = []
 
@@ -2761,10 +2758,7 @@ class BaseRepackFactory(MozillaBuildFactory):
 class CCBaseRepackFactory(BaseRepackFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs
-    ignore_dirs.extend(['comm-central-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['comm-1.9.1-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
-    ignore_dirs.extend(['comm-1.9.2-%s-l10n-nightly' % p for p in getSupportedPlatforms()])
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + ['*-nightly']
 
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
@@ -5001,6 +4995,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
+        self.env.update(env)
 
         if self.platform == 'win32':
             self.addStep(TinderboxShellCommand,
@@ -5038,7 +5033,9 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              workdir="D:\\Utilities"
             )
 
-        self.addStep(Mercurial, mode='update',
+        self.addStep(Mercurial,
+         name='hg_update',
+         mode='update',
          baseURL='http://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          alwaysUseLatest=True,
@@ -5083,14 +5080,16 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          command=["make", "-f", "client.mk", "build"],
          description=['compile'],
          timeout=60*60, # 1 hour
-         haltOnFailure=1
+         haltOnFailure=1,
+         env=self.env,
         )
 
         self.addStep(ShellCommand,
          name='make_buildsymbols',
          command=['make', 'buildsymbols'],
          workdir='build/%s' % self.objdir,
-         )
+         env=self.env,
+        )
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
@@ -5101,6 +5100,20 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                 workdir='tools'
             )
 
+        self.doUpload()
+
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+
+        self.addPreTestSteps()
+
+        self.addTestSteps()
+
+        self.addPostTestSteps()
+
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
+
+    def doUpload(self):
         if self.uploadPackages:
             self.addStep(ShellCommand,
              name='make_pkg',
@@ -5133,15 +5146,13 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                 uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
             # Always upload builds to the dated tinderbox builds directories
-            postUploadCmd =  ['post_upload.py']
-            postUploadCmd += ['--tinderbox-builds-dir %s-%s-unittest' %
-                                    (self.branchName, self.platform),
-                              '-i %(buildid)s',
-                              '-p %s' % self.productName,
-                              '--release-to-tinderbox-dated-builds']
-
-            uploadEnv['POST_UPLOAD_CMD'] = WithProperties(' '.join(postUploadCmd))
-
+            uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
+                    as_list=False,
+                    upload_dir="%s-%s-unittest" % (self.branchName, self.platform),
+                    buildid=WithProperties("%(buildid)s"),
+                    product=self.productName,
+                    to_tinderbox_dated=True,
+                    )
             self.addStep(SetProperty,
              name='make_upload',
              command=['make', 'upload'],
@@ -5153,21 +5164,25 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              timeout=60*60 # 60 minutes
             )
 
+            sendchange_props = {
+                    'buildid': WithProperties('%(buildid:-)s'),
+                    'builduid': WithProperties('%(builduid:-)s'),
+                    }
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
                  warnOnFailure=warn,
                  master=master,
                  retries=retries,
+                 revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
-                 files=[WithProperties('%(packageUrl)s')],
-                 user="sendchange-unittest")
-                )
+                 files=[WithProperties('%(packageUrl)s'),
+                        WithProperties('%(testsUrl)s')],
+                 user="sendchange-unittest",
+                 sendchange_props=sendchange_props,
+                ))
 
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-
-        self.addPreTestSteps()
-
+    def addTestSteps(self):
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
          warnOnWarnings=True,
@@ -5228,11 +5243,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  test_name="mochitest-a11y",
                  workdir="build/%s" % self.objdir,
                 )
-
-        self.addPostTestSteps()
-
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
 
     def addPrintChangesetStep(self):
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
@@ -8500,7 +8510,7 @@ class ScriptFactory(BuildFactory):
         self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
         self.addStep(ShellCommand(
             name="update_scripts",
-            command=['hg', 'update', '-r',
+            command=['hg', 'update', '-C', '-r',
                      WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
             workdir='build/scripts'

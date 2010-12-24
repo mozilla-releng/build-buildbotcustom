@@ -223,7 +223,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         )
 
     schedulers.append(tag_scheduler)
-    notify_builders.append(builderPrefix('tag'))
     source_scheduler = Dependent(
         name=builderPrefix('source'),
         upstream=tag_scheduler,
@@ -254,6 +253,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 builderNames=l10nBuilders(platform).values(),
             )
             schedulers.append(repack_scheduler)
+            repack_complete_scheduler = Dependent(
+                name=builderPrefix('%s_repack_complete' % platform),
+                upstream=repack_scheduler,
+                builderNames=[builderPrefix('repack_complete', platform),]
+            )
+            schedulers.append(repack_complete_scheduler)
+            notify_builders.append(builderPrefix('repack_complete', platform))
 
     for platform in releaseConfig['xulrunnerPlatforms']:
         xulrunner_build_scheduler = Dependent(
@@ -281,7 +287,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             builderNames=[builderPrefix('l10n_verification', platform)]
         )
         schedulers.append(l10n_verify_scheduler)
-        notify_builders.append(builderPrefix('l10n_verification', platform))
 
     updates_scheduler = Scheduler(
         name=builderPrefix('updates'),
@@ -301,7 +306,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         builderNames=updateBuilderNames
     )
     schedulers.append(update_verify_scheduler)
-    notify_builders.extend(updateBuilderNames)
 
     if releaseConfig['majorUpdateRepoPath']:
         majorUpdateBuilderNames = []
@@ -570,6 +574,26 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
         if platform in releaseConfig['l10nPlatforms']:
+            standalone_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                interpreter='bash',
+                scriptName='scripts/l10n/standalone_repacks.sh',
+                extra_args=[platform, branchConfigFile]
+            )
+            env = builder_env.copy()
+            env.update(pf['env'])
+            builders.append({
+                'name': builderPrefix("standalone_repack", platform),
+                'slavenames': branchConfig['l10n_slaves'][platform],
+                'category': builderPrefix(''),
+                'builddir': builderPrefix("standalone_repack", platform),
+                'factory': standalone_factory,
+                'nextSlave': _nextFastReservedSlave,
+                'env': env,
+                'properties': {'builddir':
+                    builderPrefix("standalone_repack", platform)}
+            })
+
             for n, builderName in l10nBuilders(platform).iteritems():
                 repack_factory = ScriptFactory(
                     scriptRepo=tools_repo,
@@ -593,6 +617,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     'env': env,
                     'properties': {'builddir': builddir}
                 })
+
+            builders.append(makeDummyBuilder(
+                name=builderPrefix('repack_complete', platform),
+                slaves=branchConfig['platforms']['linux']['slaves'],
+                category=builderPrefix(''),
+            ))
 
         if platform in releaseConfig['unittestPlatforms']:
             mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
@@ -861,8 +891,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
     })
-
-    notify_builders.append(builderPrefix('final_verification'))
 
     builders.append(makeDummyBuilder(
         name=builderPrefix('ready_for_qa'),
