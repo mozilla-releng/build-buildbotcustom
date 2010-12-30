@@ -23,6 +23,7 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
 from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
 from release.platforms import ftp_platform_map, sl_platform_map
+from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck
 import BuildSlaves
 
@@ -62,6 +63,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             releaseConfig['version'],
             releaseConfig['buildNumber'], )
 
+    def genericFtpUrl():
+        """ Generate an FTP URL pointing to the uploaded release builds for
+        sticking into release notification messages """
+        return makeCandidatesDir(
+            releaseConfig['productName'],
+            releaseConfig['version'],
+            releaseConfig['buildNumber'],
+            protocol='ftp',
+            server=branchConfig['stage_server'])
+
     def createReleaseMessage(mode, name, build, results, master_status):
         """Construct a standard email to send to release@/release-drivers@
            whenever a major step of the release finishes
@@ -81,6 +92,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             platform = [p for p in allplatforms if stage.split('_')[0] == p]
         platform = platform[0] if len(platform) >= 1 else None
         message_tag = '[release] ' if not staging else '[staging-release] '
+        # Use a generic ftp URL non-specific to any locale
+        ftpURL = genericFtpUrl()
+        if platform:
+            if platform in signedPlatforms:
+                platformDir = 'unsigned/%s' % ftp_platform_map.get(platform, platform)
+            else:
+                platformDir = ftp_platform_map.get(platform, platform)
+            ftpURL = '/'.join([
+                ftpURL.strip('/'),
+                platformDir])
 
         stage = stage.replace("%s_" % platform, "") if platform else stage
         #try to load a unique message template for the platform(if defined, step and results
@@ -113,6 +134,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         releaseName = releasePrefix()
         message_tag = '[release] ' if not staging else '[staging-release] '
         step = None
+        ftpURL = genericFtpUrl()
         if change.branch.endswith('signing'):
             step = "signing"
         else:

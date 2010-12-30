@@ -8010,6 +8010,7 @@ class PartnerRepackFactory(ReleaseFactory):
         self.partnerUploadDir = partnerUploadDir
         self.packageDmg = packageDmg
         self.python = python
+        self.platformList = platformList
         self.createRemoteStageDir = createRemoteStageDir
         self.candidatesDir = self.getCandidatesDir(productName,
                                                    version,
@@ -8122,6 +8123,22 @@ class PartnerRepackFactory(ReleaseFactory):
          description=['upload', 'partner', 'builds'],
          haltOnFailure=True
         )
+
+        for platform in self.platformList:
+            self.addStep(ShellCommand,
+             name='upload_partner_build_status',
+             command=['bash', '-c',
+                'ssh -oIdentityFile=~/.ssh/%s %s@%s touch %s/%s/%s'
+                    % (self.stageSshKey, self.stageUsername,
+                       self.stagingServer, self.candidatesDir,
+                       self.partnerUploadDir, 'partner_build_%s' % platform),
+                 ],
+             workdir='%s/scripts/repacked_builds/%s/build%s' % (self.partnersRepackDir,
+                                                                self.version,
+                                                                str(self.buildNumber)),
+             description=['upload', 'partner', 'status'],
+             haltOnFailure=True
+            )
 
 class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
     def __init__(self, **kwargs):
