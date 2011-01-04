@@ -71,10 +71,22 @@ class TestTryParser(unittest.TestCase):
         builders = ['OS X 10.6.2 tryserver build', 'OS X 10.6.2 tryserver leak test build', 'OS X 10.5.2 tryserver leak test build']
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
-    def test_AllPlatforms(self):
+    def test_AllPlatformsBoth(self):
         tm = 'try: -b od -p all'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = ['OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'OS X 10.5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'WINNT 5.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_AllPlatformsOpt(self):
+        tm = 'try: -b o -p all'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'Android R7 tryserver build', 'Maemo 5 GTK tryserver build']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_AllPlatformsDebug(self):
+        tm = 'try: -b d -p all'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = ['OS X 10.5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'WINNT 5.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllTests(self):
