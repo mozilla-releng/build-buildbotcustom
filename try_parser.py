@@ -44,9 +44,9 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
     platformBuilders = []
 
     if user_platforms != 'none':
-    # if user wants od - the platforms have -debug in them
         for buildType in buildTypes:
             for platform in user_platforms:
+              # add -debug to the platform name
               if buildType == 'debug':
                   platform += '-debug'
               if platform in prettyNames.keys():
@@ -150,7 +150,15 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         options.build = ['opt','debug']
 
     if options.user_platforms == 'all' and prettyNames:
-        options.user_platforms = prettyNames.keys()
+        options.user_platforms = []
+        for buildType in options.build:
+            for platform in prettyNames.keys():
+                if buildType == 'debug' and platform.endswith('debug'):
+                    # append platform with the -debug stripped off
+                    # it gets tacked on in the getPlatformBuilders for buildType == debug
+                    options.user_platforms.append(platform.split('-')[0])
+                elif buildType == 'opt' and not platform.endswith('debug'):
+                    options.user_platforms.append(platform)
     elif options.user_platforms != 'none':
         options.user_platforms = options.user_platforms.split(',')
 
