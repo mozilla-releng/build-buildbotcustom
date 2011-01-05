@@ -106,9 +106,36 @@ def buildUIDSchedFunc(sched, t, ssid):
     props.setProperty('builduid', genBuildUID(), 'buildUIDSchedFunc')
     return props
 
-def lastChangeset(db, branch):
+# A version of changeEventGenerator that can be used within a db connector
+# thread.  Copied from buildbot/db/connector.py.
+def changeEventGeneratorInTransaction(dbconn, t, branches=[],
+        categories=[], committers=[], minTime=0):
+    q = "SELECT changeid FROM changes"
+    args = []
+    if branches or categories or committers:
+        q += " WHERE "
+        pieces = []
+        if branches:
+            pieces.append("branch IN %s" % dbconn.parmlist(len(branches)))
+            args.extend(list(branches))
+        if categories:
+            pieces.append("category IN %s" % dbconn.parmlist(len(categories)))
+            args.extend(list(categories))
+        if committers:
+            pieces.append("author IN %s" % dbconn.parmlist(len(committers)))
+            args.extend(list(committers))
+        if minTime:
+            pieces.append("when_timestamp > %d" % minTime)
+        q += " AND ".join(pieces)
+    q += " ORDER BY changeid DESC"
+    rows = t.execute(q, tuple(args))
+    for (changeid,) in rows:
+        yield dbconn._txn_getChangeNumberedNow(t, changeid)
+
+def lastChangeset(db, t, branch):
     """Returns the revision for the last changeset on the given branch"""
-    for c in db.changeEventGenerator(branches=[branch]):
+    #### NOTE: called in a thread!
+    for c in changeEventGeneratorInTransaction(db, t, branches=[branch]):
         # Ignore DONTBUILD changes
         if c.comments and "DONTBUILD" in c.comments:
             continue
@@ -234,6 +261,7 @@ def lastGoodFunc(branch, builderNames):
     the latest revision built on the scheduler's builders.
     """
     def ssFunc(scheduler, t):
+        #### NOTE: called in a thread!
         db = scheduler.parent.db
 
         # Look back 24 hours for a good revision to build
@@ -246,7 +274,7 @@ def lastGoodFunc(branch, builderNames):
         if rev is None:
             # Couldn't find a good revision.  Fall back to using the latest
             # revision on this branch
-            rev = lastChangeset(db, branch)
+            rev = lastChangeset(db, t, branch)
             log.msg("lastChangeset returned %s" % (rev))
 
         # Find the last revision our scheduler's builders have built.  This can
