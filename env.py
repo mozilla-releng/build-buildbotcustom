@@ -154,6 +154,8 @@ MozillaEnvironments['win32-perf-unittest'] = {
             'C:\\mozilla-build\\hg;' + \
             'C:\\mozilla-build\\7zip;' + \
             'C:\\mozilla-build\\upx203w;' + \
+            # Needed for taskkil.exe to find framedyn.dll
+            'C:\\WINDOWS\\System32\\Wbem;' + \
             'C:\\WINDOWS\\System32;' + \
             'C:\\WINDOWS;'
 }
@@ -187,3 +189,4 @@ MozillaEnvironments['android-unittest'] = {
 
 MozillaEnvironments['android-perf'] = {
 }
+
