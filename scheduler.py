@@ -58,23 +58,24 @@ class SpecificNightly(Nightly):
         Nightly.__init__(self, *args, **kwargs)
 
     def start_HEAD_build(self, t):
-        """Slightly mis-named, but this function is called when it's time to start a build.  We call our ssFunc to get a sourcestamp to build.
-
-        ssFunc is called in a thread with an active database transaction running.
         """
-        d = defer.maybeDeferred(self.ssFunc, self, t)
+        Slightly mis-named, but this function is called when it's time to start
+        a build.  We call our ssFunc to get a sourcestamp to build.
 
-        def create_buildset(t, ss):
-            # if our function returns None, don't create any build
-            if ss is None:
-                log.msg("%s: No sourcestamp returned from ssfunc; not scheduling a build" % self.name)
-                return
-            log.msg("%s: Creating buildset with sourcestamp %s" % (self.name, ss.getText()))
-            db = self.parent.db
-            ssid = db.get_sourcestampid(ss, t)
-            self.create_buildset(ssid, self.reason, t)
+        ssFunc is called in a thread with an active database transaction
+        running.  It cannot use Deferreds, nor any db.*Now methods.
+        """
+        #### NOTE: called in a thread!
+        ss = self.ssFunc(self, t)
 
-        d.addCallback(lambda ss: self.parent.db.runInteraction(create_buildset, ss))
+        # if our function returns None, don't create any build
+        if ss is None:
+            log.msg("%s: No sourcestamp returned from ssfunc; not scheduling a build" % self.name)
+            return
+        log.msg("%s: Creating buildset with sourcestamp %s" % (self.name, ss.getText()))
+        db = self.parent.db
+        ssid = db.get_sourcestampid(ss, t)
+        self.create_buildset(ssid, self.reason, t)
 
 class PersistentScheduler(BaseScheduler):
     """Make sure at least numPending builds are pending on each of builderNames"""

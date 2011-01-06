@@ -259,6 +259,7 @@ class BootstrapFactory(BuildFactory):
 def getPlatformMinidumpPath(platform):
     platform_minidump_path = {
         'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+        'linuxqt': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
@@ -6830,6 +6831,16 @@ class MozillaTestFactory(MozillaBuildFactory):
     def addTearDownSteps(self):
         self.addCleanupSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            #This step is to deal with minis running linux that don't reboot properly
+            #see bug561442
+            if 'linux' in self.platform:
+                self.addStep(ShellCommand(
+                    name='set_time',
+                    description=['set', 'time'],
+                    alwaysRun=True,
+                    command=['bash', '-c',
+                             'sudo hwclock --set --date="$(date +%m/%d/%y\ %H:%M:%S)"'],
+                ))
             self.addPeriodicRebootSteps()
 
 
@@ -7534,6 +7545,17 @@ class TalosFactory(BuildFactory):
                          env=self.env)
             )
         else:
+            #the following step is to help the linux running on mac minis reboot cleanly
+            #see bug561442
+            if 'fedora' in self.OS:
+                self.addStep(ShellCommand(
+                    name='set_time',
+                    description=['set', 'time'],
+                    alwaysRun=True,
+                    command=['bash', '-c',
+                             'sudo hwclock --set --date="$(date +%m/%d/%y\ %H:%M:%S)"'],
+                ))
+
             self.addStep(DisconnectStep(
              name='reboot',
              flunkOnFailure=False,

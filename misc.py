@@ -616,6 +616,14 @@ def generateBranchObjects(config, name):
                 l10nBuilders[base_name]['platform'] = platform
         # Check if branch wants nightly builds
         if config['enable_nightly']:
+            if pf.has_key('enable_nightly'):
+                do_nightly = pf['enable_nightly']
+            else:
+                do_nightly = True
+        else:
+            do_nightly = False
+
+        if do_nightly:
             builder = '%s nightly' % base_name
             nightlyBuilders.append(builder)
             # Fill the l10nNightly dict
@@ -1025,6 +1033,14 @@ def generateBranchObjects(config, name):
             continue
 
         if config['enable_nightly']:
+            if pf.has_key('enable_nightly'):
+                do_nightly = pf['enable_nightly']
+            else:
+                do_nightly = True
+        else:
+            do_nightly = False
+
+        if do_nightly:
             nightly_builder = '%s nightly' % pf['base_name']
 
             triggeredSchedulers=None
@@ -1352,6 +1368,10 @@ def generateBranchObjects(config, name):
              xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
              xr_env['SYMBOL_SERVER_SSH_KEY'] = \
                  xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
+             if pf.has_key('xr_mozconfig'):
+                 mozconfig = pf['xr_mozconfig']
+             else:
+                 mozconfig = '%s/%s/xulrunner' % (platform, name)
              mozilla2_xulrunner_factory = NightlyBuildFactory(
                  env=xr_env,
                  objdir=pf['platform_objdir'],
@@ -1363,7 +1383,7 @@ def generateBranchObjects(config, name):
                  configSubDir=config['config_subdir'],
                  profiledBuild=False,
                  productName='xulrunner',
-                 mozconfig='%s/%s/xulrunner' % (platform, name),
+                 mozconfig=mozconfig,
                  stageServer=config['stage_server'],
                  stageUsername=config['stage_username_xulrunner'],
                  stageGroup=config['stage_group'],
