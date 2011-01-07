@@ -437,7 +437,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 'factory': factory,
                 'category': category,
                 'nextSlave': _nextSlowSlave,
-                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform},
+                'properties': {'branch': branch_name, 'platform': platform,
+                    'build_platform': platform, 'slavebuilddir' : 'test'},
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
@@ -464,7 +465,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
-            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform},
+            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
             'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
         }
         builders.append(builder)
@@ -512,7 +513,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform},
+                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
@@ -539,7 +540,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
             'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
-            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform},
+            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
             'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
         }
         builders.append(builder)
@@ -1011,7 +1012,7 @@ def generateBranchObjects(config, name):
             'nextSlave': _nextFastSlave,
             # Uncomment to enable only fast slaves for dep builds.
             #'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
-            'properties': {'branch': name, 'platform': platform},
+            'properties': {'branch': name, 'platform': platform, 'slavebuilddir' : reallyShort('%s-%s' % (name, platform))},
         }
         branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -1102,7 +1103,8 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
-                'properties': {'branch': name, 'platform': platform, 'nightly_build': True},
+                'properties': {'branch': name, 'platform': platform,
+                    'nightly_build': True, 'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -1162,7 +1164,7 @@ def generateBranchObjects(config, name):
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
-                        'properties': {'branch': name, 'platform': platform},
+                        'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform))},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
@@ -1203,7 +1205,7 @@ def generateBranchObjects(config, name):
                     'factory': mozilla2_shark_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                   'properties': {'branch': name, 'platform': platform},
+                   'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
 
@@ -1238,7 +1240,7 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
-                'properties': {'branch': name, 'platform': platform},
+                'properties': {'branch': name, 'platform': platform,'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -1287,7 +1289,7 @@ def generateBranchObjects(config, name):
                 'factory': unittest_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
-                'properties': {'branch': name, 'platform': platform},
+                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform))},
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -1353,7 +1355,7 @@ def generateBranchObjects(config, name):
                     'factory': codecoverage_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name, 'platform': platform},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform))},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -1408,7 +1410,7 @@ def generateBranchObjects(config, name):
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
-                 'properties': {'branch': name, 'platform': platform},
+                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform))},
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
@@ -1441,6 +1443,7 @@ def generateBranchObjects(config, name):
             'factory': bundle_factory,
             'category': name,
             'nextSlave': _nextSlowSlave,
+            'properties': {'slavebuilddir': reallyShort('%s-bundle' % (name,))}
         }
         branchObjects['builders'].append(bundle_builder)
 
@@ -1887,7 +1890,7 @@ def generateCCBranchObjects(config, name):
             'slavebuilddir': reallyShort('%s-%s' % (name, platform)),
             'factory': mozilla2_dep_factory,
             'category': name,
-            'properties': {'branch': name, 'platform': platform},
+            'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s' % (name, platform))},
         }
         branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -1971,7 +1974,8 @@ def generateCCBranchObjects(config, name):
                 'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform)),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
-                'properties': {'branch': name, 'platform': platform, 'nightly_build': True},
+                'properties': {'branch': name, 'platform': platform,
+                    'nightly_build': True, 'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -2032,7 +2036,7 @@ def generateCCBranchObjects(config, name):
                         'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
-                        'properties': {'branch': name, 'platform': platform},
+                        'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform))},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
@@ -2110,7 +2114,7 @@ def generateCCBranchObjects(config, name):
                 'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform)),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
-                'properties': {'branch': name, 'platform': platform},
+                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -2167,7 +2171,7 @@ def generateCCBranchObjects(config, name):
                 'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform)),
                 'factory': unittest_factory,
                 'category': name,
-                'properties': {'branch': name, 'platform': platform},
+                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform))},
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -2232,7 +2236,7 @@ def generateCCBranchObjects(config, name):
                     'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)),
                     'factory': codecoverage_factory,
                     'category': name,
-                    'properties': {'branch': name, 'platform': platform},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform))},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -2269,6 +2273,7 @@ def generateCCBranchObjects(config, name):
             'slavebuilddir': reallyShort('%s-bundle' % (name,)),
             'factory': bundle_factory,
             'category': name,
+            'properties' : { 'slavebuilddir': reallyShort('%s-bundle' % (name,)) }
         }
         branchObjects['builders'].append(bundle_builder)
 
@@ -2631,7 +2636,7 @@ def generateMobileBranchObjects(config, name):
                 'category': '%s-%s' % (name, mobile_repo_name),
                 'nextSlave': _nextFastSlave,
                 'properties': {'branch': '%s-%s' % (name, mobile_repo_name),
-                               'platform': platform,}
+                               'platform': platform, 'slavebuilddir': reallyShort(builddir)}
             }
             nightlyBuilders.append(builder_name)
             mobile_objects['builders'].append(builder)
@@ -2653,7 +2658,7 @@ def generateMobileBranchObjects(config, name):
                 'category': '%s-%s' % (name, mobile_repo_name),
                 'nextSlave': _nextFastSlave,
                 'properties': {'branch': '%s-%s' % (name, mobile_repo_name),
-                               'platform': platform,}
+                               'platform': platform, 'slavebuilddir': reallyShort(builddir)}
             }
             builders.append(builder_name)
             mobile_objects['builders'].append(builder)
@@ -2764,7 +2769,7 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
         'slavebuilddir': reallyShort('%s-%s-blocklistupdate' % (branch_name, platform)),
         'factory': blocklistupdate_factory,
         'category': branch_name,
-        'properties': {'branch': branch_name, 'platform': platform},
+        'properties': {'branch': branch_name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-blocklistupdate' % (branch_name, platform))},
     }
     return blocklistupdate_builder
 

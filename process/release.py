@@ -428,6 +428,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'factory': repository_setup_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
+                'properties': { 'slavebuilddir':
+                    reallyShort(builderPrefix('repo_setup'))},
             })
         else:
             builders.append(makeDummyBuilder(
@@ -451,7 +453,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'factory': tag_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
-            'properties': {'builddir': builderPrefix('tag')}
+            'properties': {'builddir': builderPrefix('tag'), 'slavebuilddir': reallyShort(builderPrefix('tag'))}
         })
     else:
         builders.append(makeDummyBuilder(
@@ -485,6 +487,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
            'factory': source_factory,
            'env': builder_env,
            'nextSlave': _nextFastReservedSlave,
+           'properties': { 'slavebuilddir':
+               reallyShort(builderPrefix('source'))}
         })
 
         if releaseConfig['xulrunnerPlatforms']:
@@ -511,6 +515,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                'slavebuilddir': reallyShort(builderPrefix('xulrunner_source')),
                'factory': xulrunner_source_factory,
                'env': builder_env,
+               'properties': { 'slavebuilddir':
+                   reallyShort(builderPrefix('xulrunner_source'))}
             })
     else:
         builders.append(makeDummyBuilder(
@@ -587,6 +593,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'factory': build_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
+                'properties': { 'slavebuilddir':
+                    reallyShort(builderPrefix('%s_build' % platform))}
             })
         else:
             builders.append(makeDummyBuilder(
@@ -637,7 +645,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                     'factory': repack_factory,
                     'nextSlave': _nextFastReservedSlave,
                     'env': env,
-                    'properties': {'builddir': builddir}
+                    'properties': {'builddir': builddir, 'slavebuilddir': reallyShort(builddir)}
                 })
 
             builders.append(makeDummyBuilder(
@@ -708,6 +716,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform)),
                 'factory': xulrunner_build_factory,
                 'env': builder_env,
+                'properties': {'slavebuilddir':
+                    reallyShort(builderPrefix('xulrunner_%s_build' % platform))}
             })
         else:
             builders.append(makeDummyBuilder(
@@ -745,7 +755,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                  'slavebuilddir': reallyShort(builderPrefix('partner_repack', platform)),
                  'factory': partner_repack_factory,
                  'nextSlave': _nextFastReservedSlave,
-                 'env': builder_env
+                 'env': builder_env,
+                 'properties': {'slavebuilddir':
+                     reallyShort(builderPrefix('partner_repack', platform))}
              })
 
     for platform in releaseConfig['l10nPlatforms']:
@@ -776,6 +788,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'factory': l10n_verification_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
+            'properties': {'slavebuilddir':
+                reallyShort(builderPrefix('l10n_verification', platform))}
         })
 
 
@@ -829,6 +843,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'factory': updates_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
+        'properties': {'slavebuilddir': reallyShort(builderPrefix('updates'))}
     })
 
 
@@ -850,6 +865,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'factory': update_verify_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
+            'properties': {'slavebuilddir':
+                reallyShort(builderPrefix('%s_up_vrfy' % platform))}
         })
 
     pre_push_checks_factory = ScriptFactory(
@@ -912,6 +929,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'factory': final_verification_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
+        'properties': {'slavebuilddir':
+            reallyShort(builderPrefix('fnl_verf'))}
     })
 
     builders.append(makeDummyBuilder(
@@ -978,6 +997,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'factory': major_update_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
+            'properties': {'slavebuilddir': reallyShort(builderPrefix('mu'))}
         })
 
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
@@ -998,6 +1018,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 'factory': major_update_verify_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
+                'properties': {'slavebuilddir':
+                    reallyShort(builderPrefix('%s_mu_verify' % platform))}
             })
 
     bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
@@ -1025,6 +1047,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavebuilddir': reallyShort(builderPrefix('bncr_sub')),
         'factory': bouncer_submitter_factory,
         'env': builder_env,
+        'properties': {'slavebuilddir':
+            reallyShort(builderPrefix('bncr_sub'))}
     })
 
     #send a message when we receive the sendchange and start tagging
