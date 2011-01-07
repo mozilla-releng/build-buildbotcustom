@@ -485,7 +485,7 @@ class MozillaClobberer(ShellCommand):
             clobber_url,
             branch,
             WithProperties("%(buildername)s"),
-            WithProperties("%(builddir)s"),
+            WithProperties("%(slavebuilddir)s"),
             WithProperties("%(slavename)s"),
             WithProperties("%(master)s"),
         ])
