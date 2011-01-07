@@ -858,7 +858,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(SetProperty(
                 name='get_ctors',
                 command=['python', WithProperties('%(toolsdir)s/buildfarm/utils/count_ctors.py'),
-                    '%s/dist/bin/libxul.so' % self.objdir],
+                    '%s/dist/bin/libxul.so' % self.mozillaObjdir],
                 extract_fn=get_ctors,
                 ))
 
