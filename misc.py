@@ -595,7 +595,10 @@ def generateBranchObjects(config, name):
             # Debug unittests
             if pf.get('enable_unittests'):
                 test_builders = []
-                base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                if 'opt_base_name' in config['platforms'][platform]:
+                    base_name = config['platforms'][platform]['opt_base_name']
+                else:
+                    base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
                 for suites_name, suites in config['unittest_suites']:
                     unittestPrettyNames[platform] = '%s debug test' % base_name
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
@@ -1024,7 +1027,10 @@ def generateBranchObjects(config, name):
                         suites = suites[:]
                         suites.remove('mochitest-a11y')
 
-                    base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                    if 'opt_base_name' in config['platforms'][platform]:
+                        base_name = config['platforms'][platform]['opt_base_name']
+                    else:
+                        base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
 
                     branchObjects['builders'].extend(generateTestBuilder(
                         config, name, platform, "%s debug test" % base_name,
@@ -1499,7 +1505,10 @@ def generateCCBranchObjects(config, name):
             # Debug unittests
             if pf.get('enable_unittests'):
                 test_builders = []
-                base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                if 'opt_base_name' in config['platforms'][platform]:
+                    base_name = config['platforms'][platform]['opt_base_name']
+                else:
+                    base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
                 for suites_name, suites in config['unittest_suites']:
                     unittestPrettyNames[platform] = '%s debug test' % base_name
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
@@ -1902,7 +1911,10 @@ def generateCCBranchObjects(config, name):
                         suites = suites[:]
                         suites.remove('mochitest-a11y')
 
-                    base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                    if 'opt_base_name' in config['platforms'][platform]:
+                        base_name = config['platforms'][platform]['opt_base_name']
+                    else:
+                        base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
 
                     branchObjects['builders'].extend(generateCCTestBuilder(
                         config, name, platform, "%s debug test" % base_name,
