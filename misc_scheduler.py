@@ -128,8 +128,8 @@ def changeEventGeneratorInTransaction(dbconn, t, branches=[],
             pieces.append("when_timestamp > %d" % minTime)
         q += " AND ".join(pieces)
     q += " ORDER BY changeid DESC"
-    rows = t.execute(q, tuple(args))
-    for (changeid,) in rows:
+    t.execute(q, tuple(args))
+    for (changeid,) in t.fetchall():
         yield dbconn._txn_getChangeNumberedNow(t, changeid)
 
 def lastChangeset(db, t, branch):
