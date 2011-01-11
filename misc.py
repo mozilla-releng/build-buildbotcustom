@@ -1564,7 +1564,7 @@ def generateCCBranchObjects(config, name):
         weeklyBuilders.append('%s hg bundle' % name)
 
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'))
+            is_shadow=bool(name=='shadow-central'), product=config['product_name'])
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
@@ -2955,7 +2955,7 @@ def generateProjectObjects(project, config, SLAVES):
     return buildObjects
 
 def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
-        platform_prop="platform"):
+        platform_prop="platform", product=None):
     extra_args = []
     if config.get('enable_mail_notifier'):
         if config.get('notify_real_author'):
@@ -2982,6 +2982,9 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
          '-b', branch_name,
          '-p', WithProperties("%%(%s)s" % platform_prop),
         ] + extra_args
+
+    if product:
+        logUploadCmd.extend(['--product', product])
 
     if is_try:
         logUploadCmd.append('--try')
