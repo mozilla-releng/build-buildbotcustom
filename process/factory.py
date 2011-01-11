@@ -5703,6 +5703,26 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
             self.mergeLocales = mergeLocales
 
+    def addTriggeredBuildsSteps(self,
+                                triggeredSchedulers=None):
+        '''Trigger other schedulers.
+        We don't include these steps by default because different
+        children may want to trigger builds at different stages.
+
+        If triggeredSchedulers is None, then the schedulers listed in
+        self.triggeredSchedulers will be triggered.
+        '''
+        if triggeredSchedulers is None:
+            if self.triggeredSchedulers is None:
+                return True
+            triggeredSchedulers = self.triggeredSchedulers
+
+        for triggeredScheduler in triggeredSchedulers:
+            self.addStep(Trigger(
+                schedulerNames=[triggeredScheduler],
+                copy_properties=['buildid'],
+                waitForFinish=False))
+
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
                        cloneTimeout=60*20,
