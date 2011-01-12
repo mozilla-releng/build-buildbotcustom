@@ -439,6 +439,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 ))
 
     if not releaseConfig.get('skip_tag'):
+        pf = branchConfig['platforms']['linux']
+        tag_env = builder_env.copy()
+        if pf.get('HG_SHARE_BASE_DIR', None):
+            tag_env['HG_SHARE_BASE_DIR'] = pf['HG_SHARE_BASE_DIR']
+
         tag_factory = ScriptFactory(
             scriptRepo=tools_repo,
             scriptName='scripts/release/tagging.sh',
@@ -446,13 +451,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
 
         builders.append({
             'name': builderPrefix('tag'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': pf['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('tag'),
             'slavebuilddir': reallyShort(builderPrefix('tag')),
             'factory': tag_factory,
             'nextSlave': _nextFastReservedSlave,
-            'env': builder_env,
+            'env': tag_env,
             'properties': {'builddir': builderPrefix('tag'), 'slavebuilddir': reallyShort(builderPrefix('tag'))}
         })
     else:
