@@ -366,8 +366,7 @@ class MozillaBuildFactory(BuildFactory):
 
             for i in self.ignore_dirs:
                 command.extend(["-n", i])
-            # Ignore the current dir also.
-            command.extend(["-n", WithProperties("%(builddir)s")])
+
             # These are the base_dirs that get passed to purge_builds.py.
             # The scratchbox dir is only present on linux slaves, but since
             # not all classes that inherit from MozillaBuildFactory provide
