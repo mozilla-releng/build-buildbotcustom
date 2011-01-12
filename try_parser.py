@@ -150,15 +150,20 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         options.build = ['opt','debug']
 
     if options.user_platforms == 'all' and prettyNames:
-        options.user_platforms = []
-        for buildType in options.build:
-            for platform in prettyNames.keys():
-                if buildType == 'debug' and platform.endswith('debug'):
-                    # append platform with the -debug stripped off
-                    # it gets tacked on in the getPlatformBuilders for buildType == debug
-                    options.user_platforms.append(platform.split('-')[0])
-                elif buildType == 'opt' and not platform.endswith('debug'):
-                    options.user_platforms.append(platform)
+        # test builder pretty names don't have -debug in them, so all gets all prettyNames
+        if options.test != 'none' and unittestSuites:
+            options.user_platforms = prettyNames.keys()
+        else:
+            # for builders though, you need to check against the prettyNames for -debug
+            options.user_platforms = []
+            for buildType in options.build:
+                for platform in prettyNames.keys():
+                    if buildType == 'debug' and platform.endswith('debug'):
+                        # append platform with the -debug stripped off
+                        # it gets tacked on in the getPlatformBuilders for buildType == debug
+                        options.user_platforms.append(platform.split('-')[0])
+                    elif buildType == 'opt' and not platform.endswith('debug'):
+                        options.user_platforms.append(platform)
     elif options.user_platforms != 'none':
         options.user_platforms = options.user_platforms.split(',')
 

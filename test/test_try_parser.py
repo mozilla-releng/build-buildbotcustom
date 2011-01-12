@@ -13,7 +13,7 @@ UNITTEST_SUITES = ['reftest', 'crashtest', 'mochitests-1/5', 'mochitests-3/5', '
 
 VALID_UPN = ['WINNT 5.2 tryserver debug test mochitests-1/5', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test reftest', 'WINNT 5.2 tryserver debug test crashtest']
 VALID_BUILDER_NAMES = ['OS X 10.6.2 tryserver build', 'WINNT 5.2 tryserver build', 'Linux x86-64 tryserver build', 'Linux tryserver build', 'OS X 10.5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'WINNT 5.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build','Android R7 tryserver build', 'Maemo 5 GTK tryserver build']
-VALID_TESTER_NAMES = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos chrome']
+VALID_TESTER_NAMES = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5', 'Rev3 MacOSX Leopard 10.5.8 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos chrome', 'Rev3 WINNT 6.1 tryserver talos tp4', 'Rev3 WINNT 5.1 tryserver talos tp4', 'Rev3 WINNT 6.1 tryserver talos chrome']
 
 class TestTryParser(unittest.TestCase):
 
@@ -33,7 +33,7 @@ class TestTryParser(unittest.TestCase):
         # Should get default set with junk input to the test masters
         tm = "try: junk"
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
+        builders = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkBuildMessage(self):
@@ -89,21 +89,16 @@ class TestTryParser(unittest.TestCase):
         builders = ['OS X 10.5.2 tryserver leak test build', 'OS X 10.6.2 tryserver leak test build', 'WINNT 5.2 tryserver leak test build', 'Linux x86-64 tryserver leak test build', 'Linux tryserver leak test build']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_AllTests(self):
-        tm = 'try: -b od -p win32 -u all'
-        # first test with getBuilders
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test mochitests-1/5', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test reftest', 'WINNT 5.2 tryserver debug test crashtest']
-        self.assertEqual(sorted(self.customBuilders),sorted(builders))
-        # second test with getTestBuilders
+    def test_AllOnTestMaster(self):
+        tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
+        builders = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_MochitestAliasesOnBuilderMaster(self):
         tm = 'try: -b od -p win32 -u mochitests'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-1/5']
+        builders = ['WINNT 5.2 tryserver build', 'WINNT 5.2 tryserver leak test build', 'WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-1/5',]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
         tm = 'try: -b od -p win32 -u mochitest-o'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
@@ -111,13 +106,19 @@ class TestTryParser(unittest.TestCase):
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_MochitestAliasesOnTestMaster(self):
-        tm = 'try: -b od -p win32 -u mochitests'
+        tm = 'try: -b od -p all -u mochitests'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
+        builders = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
         tm = 'try: -b od -p win32 -u mochitest-o'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = ['Rev3 WINNT 6.1 tryserver debug test mochitest-other']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_MochitestAliasesOnTestMasterDebugOnly(self):
+        tm = 'try: -b d -p all -u mochitests'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = ['Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_BuildMasterDebugWin32Tests(self):
@@ -127,7 +128,7 @@ class TestTryParser(unittest.TestCase):
         builders = ['WINNT 5.2 tryserver debug test mochitest-other', 'WINNT 5.2 tryserver debug test mochitests-3/5', 'WINNT 5.2 tryserver debug test mochitests-1/5']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
-    def test_SelecTests(self):
+    def test_SelectTests(self):
         tm = 'try: -b od -p win32 -u crashtest,mochitest-other'
         # test in the getBuilders (for local builder_master unittests)
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES+VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
@@ -184,7 +185,7 @@ class TestTryParser(unittest.TestCase):
         self.assertEqual(sorted(self.customBuilders),sorted(talosBuilders))
         # test getting test builders
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        testBuilders = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
+        testBuilders = ['Rev3 Fedora 12 tryserver opt test mochitests-1/5', 'Rev3 Fedora 12 tryserver opt test mochitest-other', 'Rev3 Fedora 12 tryserver opt test crashtest', 'Rev3 Fedora 12 tryserver debug test mochitests-1/5', 'Rev3 Fedora 12 tryserver debug test mochitest-other', 'Rev3 WINNT 5.1 tryserver opt test reftest', 'Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest', 'Rev3 WINNT 6.1 tryserver debug test mochitest-other', 'Rev3 WINNT 6.1 tryserver debug test mochitests-3/5']
         self.assertEqual(sorted(self.customBuilders),sorted(testBuilders))
 
     def test_DebugWin32OnTestMaster(self):
