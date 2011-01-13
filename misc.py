@@ -10,13 +10,11 @@ import sys, os, time
 from copy import deepcopy
 
 from twisted.python import log
-from twisted.internet.task import LoopingCall
 
-from buildbot.scheduler import Nightly, Scheduler
+from buildbot.scheduler import Nightly, Scheduler, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, \
-    EXCEPTION
+from buildbot.status.builder import WARNINGS
 
 import buildbotcustom.changes.hgpoller
 import buildbotcustom.process.factory
@@ -44,9 +42,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
   TryUnittestBuildFactory, ScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import MaemoBuildFactory, \
-   MaemoNightlyRepackFactory, MobileDesktopBuildFactory, \
-   MobileDesktopNightlyRepackFactory, \
-   AndroidBuildFactory
+    MobileDesktopBuildFactory, AndroidBuildFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly
 from buildbotcustom.l10n import TriggerableL10n
@@ -1564,7 +1560,7 @@ def generateCCBranchObjects(config, name):
         weeklyBuilders.append('%s hg bundle' % name)
 
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'))
+            is_shadow=bool(name=='shadow-central'), product=config['product_name'])
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
@@ -2534,6 +2530,12 @@ def generateMobileBranchObjects(config, name):
     prettyNames = {}
     mobile_repo_name = config.get('mobile_repo_path').split('/')[-1]
     pollInterval = config.get('pollInterval', 60)
+    build_tools_repo = '%s%s' % (config['hgurl'],
+                                 config['build_tools_repo_path'])
+    if config.get('staging', False):
+        branch_config_file = "mozilla/staging_config.py"
+    else:
+        branch_config_file = "mozilla/production_config.py"
 
     #We could also make mobile_repo_path a list and iterate over that lise
     #here to allow for more than one mobile repository to be built against
@@ -2548,6 +2550,8 @@ def generateMobileBranchObjects(config, name):
         pf=config['mobile_platforms'][platform]
         base_name = pf.get('base_name') % render
         pretty_name = PRETTY_NAME % base_name
+        l10nSchedulerName = "%s-%s-%s-mobile-l10n" % (mobile_repo_name,
+                                                      name, platform)
 
         createSnippet = False
         if config.get('create_mobile_snippet', None) and pf.get('update_platform', None):
@@ -2636,6 +2640,9 @@ def generateMobileBranchObjects(config, name):
             if multi_locale:
                 nightly_kwargs['multiLocale'] = multi_locale
                 nightly_kwargs['mozharnessConfig'] = pf['mozharness_config']
+            if pf.get('l10n_chunks', None):
+                nightly_kwargs['triggerBuilds'] = True
+                nightly_kwargs['triggeredSchedulers'] = [l10nSchedulerName]
 
             factory = factory_class(**nightly_kwargs)
 
@@ -2674,6 +2681,43 @@ def generateMobileBranchObjects(config, name):
             }
             builders.append(builder_name)
             mobile_objects['builders'].append(builder)
+
+        if pf.get('l10n_chunks', None):
+            builder_env = pf['env'].copy()
+            builder_env.update({
+                'BUILDBOT_CONFIGS': '%s%s' % (config['hgurl'],
+                                              config['config_repo_path']),
+                'CLOBBERER_URL': config['base_clobber_url'],
+            })
+            l10nBuilders = []
+            for n in range(1, int(pf['l10n_chunks']) + 1):
+                builderName = "%s l10n nightly %s/%s" % \
+                    (base_name, n, pf['l10n_chunks'])
+                l10nBuilders.append(builderName)
+                factory = ScriptFactory(
+                    scriptRepo=build_tools_repo,
+                    interpreter='bash',
+                    scriptName='scripts/l10n/nightly_mobile_repacks.sh',
+                    extra_args=[platform, branch_config_file, mobile_repo_name,
+                                str(pf['l10n_chunks']), str(n)]
+                )
+                mobile_objects['builders'].append({
+                    'name': builderName,
+                    'slavenames': pf.get('slaves'),
+                    'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                    'slavebuilddir': reallyShort('%s-l10n_%s' % (builddir, str(n))),
+                    'factory': factory,
+                    'category': '%s-%s' % (name, mobile_repo_name),
+                    'nextSlave': _nextL10nSlave(),
+                    'properties': {'branch': '%s' % name,
+                                   'builddir': '%s-l10n_%s' % (builddir, str(n))},
+                    'env': builder_env
+                })
+
+            mobile_objects["schedulers"].append(Triggerable(
+                name=l10nSchedulerName,
+                builderNames=l10nBuilders
+            ))
 
     #For now at least, mobile results go to a different tinderbox
     mobile_objects['status'].append(TinderboxMailNotifier(
@@ -2955,7 +2999,7 @@ def generateProjectObjects(project, config, SLAVES):
     return buildObjects
 
 def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
-        platform_prop="platform"):
+        platform_prop="platform", product=None):
     extra_args = []
     if config.get('enable_mail_notifier'):
         if config.get('notify_real_author'):
@@ -2982,6 +3026,9 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
          '-b', branch_name,
          '-p', WithProperties("%%(%s)s" % platform_prop),
         ] + extra_args
+
+    if product:
+        logUploadCmd.extend(['--product', product])
 
     if is_try:
         logUploadCmd.append('--try')

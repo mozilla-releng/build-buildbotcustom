@@ -204,7 +204,7 @@ class CompareLeakLogs(ShellCommand):
     heapRe = re.compile('Maximum Heap Size: (\d+) bytes')
     bytesAllocsRe = re.compile('(\d+) bytes were allocated in (\d+) allocations')
 
-    def __init__(self, platform, mallocLog, leakFailureThreshold=7261838,
+    def __init__(self, platform, mallocLog,
                  testname="", testnameprefix="", objdir='obj-firefox',
                  tbPrint=True, **kwargs):
         assert platform.startswith('win32') or platform.startswith('macosx') \
@@ -212,13 +212,11 @@ class CompareLeakLogs(ShellCommand):
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(platform=platform, mallocLog=mallocLog,
-                                 leakFailureThreshold=leakFailureThreshold,
                                  testname=testname,
                                  testnameprefix=testnameprefix, objdir=objdir,
                                  tbPrint=tbPrint)
         self.platform = platform
         self.mallocLog = mallocLog
-        self.leakFailureThreshold = leakFailureThreshold
         self.testname = testname
         self.testnameprefix = testnameprefix
         self.objdir = objdir
@@ -245,11 +243,6 @@ class CompareLeakLogs(ShellCommand):
         except:
             log.msg("Could not find build property: leakStats")
             return worst_status(superResult, FAILURE)
-        if leakStats and \
-           leakStats['new'] and \
-           leakStats['new']['leaks'] and \
-           int(leakStats['new']['leaks']) > int(self.leakFailureThreshold):
-            return worst_status(superResult, WARNINGS)
         return superResult
             
     def createSummary(self, log):

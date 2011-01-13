@@ -366,8 +366,7 @@ class MozillaBuildFactory(BuildFactory):
 
             for i in self.ignore_dirs:
                 command.extend(["-n", i])
-            # Ignore the current dir also.
-            command.extend(["-n", WithProperties("%(builddir)s")])
+
             # These are the base_dirs that get passed to purge_builds.py.
             # The scratchbox dir is only present on linux slaves, but since
             # not all classes that inherit from MozillaBuildFactory provide
@@ -5702,6 +5701,26 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.mozharnessRepository = self.getRepository(mozharnessRepoPath)
             self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
             self.mergeLocales = mergeLocales
+
+    def addTriggeredBuildsSteps(self,
+                                triggeredSchedulers=None):
+        '''Trigger other schedulers.
+        We don't include these steps by default because different
+        children may want to trigger builds at different stages.
+
+        If triggeredSchedulers is None, then the schedulers listed in
+        self.triggeredSchedulers will be triggered.
+        '''
+        if triggeredSchedulers is None:
+            if self.triggeredSchedulers is None:
+                return True
+            triggeredSchedulers = self.triggeredSchedulers
+
+        for triggeredScheduler in triggeredSchedulers:
+            self.addStep(Trigger(
+                schedulerNames=[triggeredScheduler],
+                copy_properties=['buildid'],
+                waitForFinish=False))
 
     def addHgPullSteps(self, repository=None,
                        targetDirectory=None, workdir=None,
