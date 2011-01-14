@@ -441,8 +441,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     if not releaseConfig.get('skip_tag'):
         pf = branchConfig['platforms']['linux']
         tag_env = builder_env.copy()
-        if pf.get('HG_SHARE_BASE_DIR', None):
-            tag_env['HG_SHARE_BASE_DIR'] = pf['HG_SHARE_BASE_DIR']
+        if pf['env'].get('HG_SHARE_BASE_DIR', None):
+            tag_env['HG_SHARE_BASE_DIR'] = pf['env']['HG_SHARE_BASE_DIR']
 
         tag_factory = ScriptFactory(
             scriptRepo=tools_repo,
