@@ -1058,7 +1058,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
 
     #send a message when we receive the sendchange and start tagging
     status.append(ChangeNotifier(
-            fromaddr="release@mozilla.org",
+            fromaddr="release@mozilla.com",
             relayhost="mail.build.mozilla.org",
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['AllRecipients'],
@@ -1067,7 +1067,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         ))
     #send a message when signing is complete
     status.append(ChangeNotifier(
-            fromaddr="release@mozilla.org",
+            fromaddr="release@mozilla.com",
             relayhost="mail.build.mozilla.org",
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['AllRecipients'],
@@ -1075,9 +1075,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             messageFormatter=createReleaseChangeMessage,
         ))
 
-    #send the nice(passing) release messages to release@m.o (for now)
+    #send the nice(passing) release messages
     status.append(MailNotifier(
-            fromaddr='release@mozilla.org',
+            fromaddr='release@mozilla.com',
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['PassRecipients'],
             mode='passing',
@@ -1086,9 +1086,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             messageFormatter=createReleaseMessage,
         ))
 
-    #send all release messages to release@m.o (for now)
+    #send all release messages
     status.append(MailNotifier(
-            fromaddr='release@mozilla.org',
+            fromaddr='release@mozilla.com',
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['AllRecipients'],
             mode='all',
