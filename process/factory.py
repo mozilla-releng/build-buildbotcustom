@@ -2604,8 +2604,8 @@ class BaseRepackFactory(MozillaBuildFactory):
 
     def doUpload(self):
         self.addStep(ShellCommand,
-         name='make_l10n_upload',
-         command=['make', WithProperties('l10n-upload-%(locale)s')],
+         name='make_upload',
+         command=['make', 'upload', WithProperties('AB_CD=%(locale)s')],
          env=self.uploadEnv,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
                                        self.appName),
