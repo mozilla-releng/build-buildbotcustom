@@ -393,7 +393,7 @@ def mergeBuildObjects(d1, d2):
 def generateTestBuilder(config, branch_name, platform, name_prefix,
                         build_dir_prefix, suites_name, suites,
                         mochitestLeakThreshold, crashtestLeakThreshold,
-                        slaves=None, category=None):
+                        slaves=None, resetHwClock=False, category=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -424,6 +424,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 chunkByDir=suites.get('chunkByDir'),
                 env=pf.get('unittest-env', {}),
                 downloadSymbols=pf.get('download_symbols', True),
+                resetHwClock=resetHwClock,
             )
             builder = {
                 'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
@@ -453,6 +454,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
             downloadSymbols=pf.get('download_symbols', True),
             env=pf.get('unittest-env', {}),
+            resetHwClock=resetHwClock,
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
@@ -2420,7 +2422,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "%s_%s_test" % (branch, slave_platform_name),
                                 suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
                                 branch_config.get('crashtest_leak_threshold', None),
-                                platform_config[slave_platform]['slaves']))
+                                platform_config[slave_platform]['slaves'],
+                                resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False)))
 
                     for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
                         for test in test_builders:

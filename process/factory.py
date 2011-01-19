@@ -6638,7 +6638,7 @@ def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
 class MozillaTestFactory(MozillaBuildFactory):
     def __init__(self, platform, productName='firefox',
                  downloadSymbols=True, downloadTests=False,
-                 posixBinarySuffix='-bin', **kwargs):
+                 posixBinarySuffix='-bin', resetHwClock=False, **kwargs):
         #Note: the posixBinarySuffix is needed because some products (firefox)
         #use 'firefox-bin' and some (fennec) use 'fennec' for the name of the
         #actual application binary.  This is only applicable to posix-like
@@ -6653,6 +6653,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             self.posixBinarySuffix = posixBinarySuffix
         self.downloadSymbols = downloadSymbols
         self.downloadTests = downloadTests
+        self.resetHwClock = resetHwClock
 
         assert self.platform in getSupportedPlatforms()
 
@@ -6852,7 +6853,7 @@ class MozillaTestFactory(MozillaBuildFactory):
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             #This step is to deal with minis running linux that don't reboot properly
             #see bug561442
-            if 'linux' in self.platform:
+            if self.resetHwClock and 'linux' in self.platform:
                 self.addStep(ShellCommand(
                     name='set_time',
                     description=['set', 'time'],
