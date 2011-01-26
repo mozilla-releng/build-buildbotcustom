@@ -1217,6 +1217,7 @@ def generateBranchObjects(config, name):
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
+                platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
                 project=config['product_name'],
