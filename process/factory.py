@@ -2449,6 +2449,10 @@ class BaseRepackFactory(MozillaBuildFactory):
             self.env.update({'MOZ_OBJDIR': objdir,
                              'L10NBASEDIR':  '../../%s' % self.l10nRepoPath})            
 
+        if platform == 'macosx64':
+            # use "mac" instead of "mac64" for macosx64
+            self.env.update({'MOZ_PKG_PLATFORM': 'mac'})
+
         # Configure step gets executed before the downloadBuilds and we can't
         # render at that point of execution the environment variable 'srcdir'
         self.configure_env = self.env.copy()
@@ -2948,6 +2952,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      command=['make', 'unpack'],
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
+                     env=self.env,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      )
         self.addStep(SetProperty,
@@ -3094,6 +3099,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.addStep(ShellCommand,
          command=['make', 'unpack'],
          haltOnFailure=True,
+         env=self.env,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
                                        self.appName)
         )

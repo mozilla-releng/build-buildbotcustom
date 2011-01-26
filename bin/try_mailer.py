@@ -111,7 +111,7 @@ Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n
     if log_url:
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n" % locals()
     else:
-        text += "Please check <a href=\"http://tinderbox.mozilla.org/showbuilds.cgi?tree=MozillaTry\">Tinderbox</a> for your logs.\n"
+        text += "Please check <a href=\"http://tbpl.mozilla.org/?tree=MozillaTry&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
 
     text = re.sub("\n", "<br>\n", text)
 

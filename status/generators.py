@@ -21,6 +21,8 @@ def buildTryChangeMessage(change, packageDir):
     msgdict["body"] = """\
 Thanks for your try submission (http://hg.mozilla.org/try/pushloghtml?changeset=%(revision)s).  It's the best!
 
+Watch http://tbpl.mozilla.org/?tree=MozillaTry&rev=%(revision)s for your results to come in.
+
 Builds and logs will be available at %(packageDir)s.
 
 This directory won't be created until the first builds are uploaded, so please be patient.
@@ -120,7 +122,7 @@ successfully created and could be available for download at %(url)s\n\n" % local
                     text += "%s\n" % (test.group(0))
         text += '\n'
 
-    text += """Visit http://tinderbox.mozilla.org/showbuilds.cgi?tree=%(tinderboxTree)s to view the full logs.""" % locals()
+    text += """Visit http://tbpl.mozilla.org/?tree=%(tinderboxTree)s&rev=%(revision)s to view the full logs.""" % locals()
 
     return (text, 'plain')
 

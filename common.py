@@ -14,7 +14,7 @@ def getPlatformFtpDir(platform):
         'linux': 'linux-i686',
         'linux64': 'linux-x86_64',
         'macosx': 'mac',
-        'macosx64': 'mac64',
+        'macosx64': 'mac',
         'win32': 'win32',
         'win64': 'win64',
         'wince': 'wince-arm',
