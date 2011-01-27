@@ -64,7 +64,7 @@ from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTI
 
 # limit the number of clones of the try repository so that we don't kill
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
-hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=14*3)
+hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 
 class DummyFactory(BuildFactory):
     def __init__(self):
