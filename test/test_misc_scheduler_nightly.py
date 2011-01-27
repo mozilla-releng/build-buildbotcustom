@@ -20,13 +20,13 @@ def createTestData(db):
 
     # Change
     db.runQueryNow("""INSERT INTO changes
-                    (`changeid`, `author`, `is_dir`, `comments`, `when_timestamp`, `branch`, `revision`)
+                    (`changeid`, `author`, `is_dir`, `comments`, `when_timestamp`, `branch`, `revision`, `revlink`)
                     VALUES
-                    (1, 'me', 0, 'here', 1, 'b1', 'r1')""")
+                    (1, 'me', 0, 'here', 1, 'b1', 'r1', 'from poller')""")
     db.runQueryNow("""INSERT INTO changes
-                    (`changeid`, `author`, `is_dir`, `comments`, `when_timestamp`, `branch`, `revision`)
+                    (`changeid`, `author`, `is_dir`, `comments`, `when_timestamp`, `branch`, `revision`, `revlink`)
                     VALUES
-                    (2, 'me', 0, 'here', 1, 'b2', 'r234567890')""")
+                    (2, 'me', 0, 'here', 1, 'b2', 'r234567890', 'from poller')""")
 
     # Buildsets
     for i in range(1,3):
@@ -67,17 +67,24 @@ class TestLastGoodFuncs(unittest.TestCase):
 
     def test_lastChangeset(self):
         # First, we need to add a few changes!
-        c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important')
-        c2 = Change(who='me!', branch='b2', revision='2', files=[], comments='really important')
-        c3 = Change(who='me!', branch='b1', revision='3', files=[], comments='really important')
+        c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important', revlink='from poller')
+        c2 = Change(who='me!', branch='b2', revision='2', files=[], comments='really important', revlink='from poller')
+        c3 = Change(who='me!', branch='b1', revision='3', files=[], comments='really important', revlink='from poller')
         for c in [c1, c2, c3]:
             self.dbc.addChangeToDatabase(c)
 
-        c = lastChangeset(self.dbc, 'b1')
+        c = self.dbc.runInteractionNow(lambda t : lastChangeset(self.dbc, t, 'b1'))
         self.assertEquals(c, c3.revision)
 
-        c = lastChangeset(self.dbc, 'b2')
+        c = self.dbc.runInteractionNow(lambda t : lastChangeset(self.dbc, t, 'b2'))
         self.assertEquals(c, c2.revision)
+
+    def test_lastChangeset_ignores_changes_with_no_revlink(self):
+        c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important')
+        self.dbc.addChangeToDatabase(c1)
+
+        c = self.dbc.runInteractionNow(lambda t : lastChangeset(self.dbc, t, 'b1'))
+        self.assertEquals(c, None)
 
     def test_lastGoodRev(self):
         createTestData(self.dbc)
@@ -96,9 +103,9 @@ class TestLastGoodFuncs(unittest.TestCase):
 
     def test_getLatestRev(self):
         # First, we need to add a few changes!
-        c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important', when=1)
-        c2 = Change(who='me!', branch='b2', revision='2', files=[], comments='really important', when=2)
-        c3 = Change(who='me!', branch='b1', revision='3', files=[], comments='really important', when=3)
+        c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important', when=1, revlink='from poller')
+        c2 = Change(who='me!', branch='b2', revision='2', files=[], comments='really important', when=2, revlink='from poller')
+        c3 = Change(who='me!', branch='b1', revision='3', files=[], comments='really important', when=3, revlink='from poller')
         for c in [c1, c2, c3]:
             self.dbc.addChangeToDatabase(c)
 
