@@ -7509,7 +7509,8 @@ class TalosFactory(BuildFactory):
             command=['python', '../../sut_tools/cleanup.py',
                      WithProperties("%(sut_ip)s"),
                     ],
-            env=self.env)
+            env=self.env,
+            haltOnFailure=True)
         )
         self.addStep(ShellCommand(
             name='install app on device',
@@ -7519,7 +7520,8 @@ class TalosFactory(BuildFactory):
                      WithProperties("%(sut_ip)s"),
                      WithProperties(self.workdirBase + "/%(filename)s"),
                     ],
-            env=self.env)
+            env=self.env,
+            haltOnFailure=True)
         )
 
     def addUpdateConfigStep(self):
@@ -7559,7 +7561,7 @@ class TalosFactory(BuildFactory):
         if self.remoteTests:
             self.addStep(DisconnectStep(
                          name='reboot device',
-                         flunkOnFailure=False,
+                         flunkOnFailure=True,
                          warnOnFailure=False,
                          alwaysRun=True,
                          workdir=self.workdirBase,

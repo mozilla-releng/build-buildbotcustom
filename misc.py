@@ -2705,16 +2705,18 @@ def generateMobileBranchObjects(config, name):
                     extra_args=[platform, branch_config_file, mobile_repo_name,
                                 str(pf['l10n_chunks']), str(n)]
                 )
+                slavebuilddir = reallyShort('%s-l10n_%s' % (builddir, str(n)))
                 mobile_objects['builders'].append({
                     'name': builderName,
                     'slavenames': pf.get('slaves'),
                     'builddir': '%s-l10n_%s' % (builddir, str(n)),
-                    'slavebuilddir': reallyShort('%s-l10n_%s' % (builddir, str(n))),
+                    'slavebuilddir': slavebuilddir,
                     'factory': factory,
                     'category': '%s-%s' % (name, mobile_repo_name),
                     'nextSlave': _nextL10nSlave(),
                     'properties': {'branch': '%s' % name,
-                                   'builddir': '%s-l10n_%s' % (builddir, str(n))},
+                                   'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                                   'slavebuilddir': slavebuilddir},
                     'env': builder_env
                 })
 
