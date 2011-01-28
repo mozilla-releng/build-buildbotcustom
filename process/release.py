@@ -358,10 +358,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         schedulers.append(s)
 
     mirror_scheduler1 = TriggerBouncerCheck(
-        name=builderPrefix('ready-for-qa'),
+        name=builderPrefix('ready-for-rel-test'),
         configRepo=config_repo,
         minUptake=10000,
-        builderNames=[builderPrefix('ready_for_qa'),
+        builderNames=[builderPrefix('ready_for_releasetest_testing'),
                       builderPrefix('final_verification')],
         username=BuildSlaves.tuxedoUsername,
         password=BuildSlaves.tuxedoPassword)
@@ -900,7 +900,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     )
 
     push_to_mirrors_factory.addStep(Trigger(
-        schedulerNames=[builderPrefix('ready-for-qa'),
+        schedulerNames=[builderPrefix('ready-for-rel-test'),
                         builderPrefix('ready-for-release')],
         copy_properties=['revision', 'release_config']
     ))
@@ -939,11 +939,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     })
 
     builders.append(makeDummyBuilder(
-        name=builderPrefix('ready_for_qa'),
+        name=builderPrefix('ready_for_releasetest_testing'),
         slaves=branchConfig['platforms']['linux']['slaves'],
         category=builderPrefix(''),
         ))
-    notify_builders.append(builderPrefix('ready_for_qa'))
+    notify_builders.append(builderPrefix('ready_for_releasetest_testing'))
 
     builders.append(makeDummyBuilder(
         name=builderPrefix('ready_for_release'),
