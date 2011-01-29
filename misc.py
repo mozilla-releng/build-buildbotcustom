@@ -2004,6 +2004,7 @@ def generateCCBranchObjects(config, name):
                         mozconfig = None
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
+                        platform=platform,
                         env=env,
                         objdir=objdir,
                         platform=platform,
@@ -2097,6 +2098,7 @@ def generateCCBranchObjects(config, name):
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
             mozilla2_l10n_dep_factory = CCNightlyRepackFactory(
+                platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
                 project=config['product_name'],
