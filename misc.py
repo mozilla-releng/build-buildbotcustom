@@ -2004,7 +2004,6 @@ def generateCCBranchObjects(config, name):
                         mozconfig = None
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
-                        platform=platform,
                         env=env,
                         objdir=objdir,
                         platform=platform,
