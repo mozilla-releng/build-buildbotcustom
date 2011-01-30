@@ -472,7 +472,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
 def generateCCTestBuilder(config, branch_name, platform, name_prefix,
                           build_dir_prefix, suites_name, suites,
                           mochitestLeakThreshold, crashtestLeakThreshold,
-                          slaves=None, category=None):
+                          slaves=None, resetHwClock=False, category=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -503,6 +503,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
                 chunkByDir=suites.get('chunkByDir'),
                 env=pf.get('unittest-env', {}),
                 downloadSymbols=pf.get('download_symbols', True),
+                resetHwClock=resetHwClock,
             )
             builder = {
                 'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
@@ -511,7 +512,8 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
+                'properties': {'branch': branch_name, 'platform': platform,
+                    'build_platform': platform, 'slavebuilddir': 'test'},
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
@@ -528,17 +530,18 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
             buildToolsRepoPath=config['build_tools_repo_path'],
             buildSpace=1.0,
             buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-            env=pf.get('unittest-env', {}),
             downloadSymbols=pf.get('download_symbols', True),
+            env=pf.get('unittest-env', {}),
+            resetHwClock=resetHwClock,
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': config['platforms'][platform]['slaves'],
+            'slavenames': slavenames,
             'builddir': '%s-%s' % (build_dir_prefix, suites_name),
             'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
-            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
+            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir': 'test'},
             'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
         }
         builders.append(builder)
