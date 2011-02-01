@@ -8569,18 +8569,35 @@ class ScriptFactory(BuildFactory):
             value=lambda b: b.builder.botmaster.parent.buildbotURL
         ))
         env = {'PROPERTIES_FILE': 'buildprops.json'}
-        self.addStep(JSONPropertiesDownload(name="download_props", slavedest="buildprops.json"))
+        self.addStep(JSONPropertiesDownload(
+            name="download_props",
+            slavedest="buildprops.json",
+            workdir="."
+        ))
         if extra_data:
-            self.addStep(JSONStringDownload(extra_data, name="download_extra", slavedest="data.json"))
+            self.addStep(JSONStringDownload(
+                extra_data,
+                name="download_extra",
+                slavedest="data.json",
+                workdir="."
+            ))
             env['EXTRA_DATA'] = 'data.json'
-        self.addStep(ShellCommand(name="clobber_scripts", command=['rm', '-rf', 'scripts']))
-        self.addStep(ShellCommand(name="clone_scripts", command=['hg', 'clone', scriptRepo, 'scripts'], haltOnFailure=True))
+        self.addStep(ShellCommand(
+            name="clobber_scripts",
+            command=['rm', '-rf', 'scripts'],
+            workdir=".",
+        ))
+        self.addStep(ShellCommand(
+            name="clone_scripts",
+            command=['hg', 'clone', scriptRepo, 'scripts'],
+            workdir=".",
+            haltOnFailure=True))
         self.addStep(ShellCommand(
             name="update_scripts",
             command=['hg', 'update', '-C', '-r',
                      WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
-            workdir='build/scripts'
+            workdir='scripts'
         ))
 
         if scriptName[0] == '/':
@@ -8602,6 +8619,7 @@ class ScriptFactory(BuildFactory):
         self.addStep(ShellCommand(name="run_script", command=cmd, env=env,
             timeout=script_timeout, maxTime=script_maxtime,
             log_eval_func=log_eval_func,
+            workdir=".",
             warnOnWarnings=True))
 
 class AndroidReleaseBuildFactory(AndroidBuildFactory):
