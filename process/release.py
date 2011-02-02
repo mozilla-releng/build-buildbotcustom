@@ -71,7 +71,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             releaseConfig['version'],
             releaseConfig['buildNumber'],
             protocol='ftp',
-            server=branchConfig['stage_server'])
+            server=releaseConfig['ftpServer'])
 
     def createReleaseMessage(mode, name, build, results, master_status):
         """Construct a standard email to send to release@/release-drivers@
