@@ -1212,7 +1212,7 @@ def generateBranchObjects(config, name):
                     'factory': mozilla2_shark_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                   'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
 
@@ -1494,7 +1494,7 @@ def generateCCBranchObjects(config, name):
     l10nBuilders = {}
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
-    l10nPollInterval = config.get('l10nPollInterval', 15*60)
+    l10nPollInterval = config.get('l10nPollInterval', 5*60)
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
     for platform in config['platforms'].keys():
@@ -1522,7 +1522,8 @@ def generateCCBranchObjects(config, name):
             prettyNames[platform] = pretty_name
 
         # Fill the l10n dep dict
-        if config['enable_l10n'] and platform in config['l10n_platforms']: 
+        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+           config['enable_l10n_onchange']:
                 l10nBuilders[base_name] = {}
                 l10nBuilders[base_name]['tree'] = config['l10n_tree']
                 l10nBuilders[base_name]['l10n_builder'] = \
@@ -1531,6 +1532,14 @@ def generateCCBranchObjects(config, name):
                 l10nBuilders[base_name]['platform'] = platform
         # Check if branch wants nightly builds
         if config['enable_nightly']:
+            if pf.has_key('enable_nightly'):
+                do_nightly = pf['enable_nightly']
+            else:
+                do_nightly = True
+        else:
+            do_nightly = False
+
+        if do_nightly:
             builder = '%s nightly' % base_name
             nightlyBuilders.append(builder)
             # Fill the l10nNightly dict
@@ -1587,17 +1596,7 @@ def generateCCBranchObjects(config, name):
         tree=config['tinderbox_tree'],
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost="mail.build.mozilla.org",
-        builders=builders + nightlyBuilders,
-        logCompression="gzip"
-    ))
-    # Separate notifier for unittests, since they need to be run through
-    # the unittest errorparser
-    branchObjects['status'].append(TinderboxMailNotifier(
-        fromaddr="comm.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=unittestBuilders + debugBuilders,
+        builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
         logCompression="gzip",
         errorparser="unittest"
     ))
@@ -1612,7 +1611,32 @@ def generateCCBranchObjects(config, name):
         errorparser="unittest"
     ))
 
-    if config['enable_l10n']:
+    # Try Server notifier
+    if config.get('enable_mail_notifier'):
+        packageUrl = config['package_url']
+        packageDir = config['package_dir']
+
+        if config.get('notify_real_author'):
+            extraRecipients = []
+            sendToInterestedUsers = True
+        else:
+            extraRecipients = config['email_override']
+            sendToInterestedUsers = False
+
+        # This notifies users as soon as we receive their push, and will let them
+        # know where to find builds/logs
+        branchObjects['status'].append(ChangeNotifier(
+            fromaddr="tryserver@build.mozilla.org",
+            lookup=MercurialEmailLookup(),
+            relayhost="mail.build.mozilla.org",
+            sendToInterestedUsers=sendToInterestedUsers,
+            extraRecipients=extraRecipients,
+            branches=[config['repo_path']],
+            messageFormatter=lambda c: buildTryChangeMessage(c,
+                '/'.join([packageUrl, packageDir])),
+            ))
+
+   if config['enable_l10n']:
         l10n_builders = []
         for b in l10nBuilders:
             if config['enable_l10n_onchange']:
@@ -1665,10 +1689,11 @@ def generateCCBranchObjects(config, name):
             branch=config['repo_path'],
             pushlogUrlOverride='%s/%s/json-pushes?full=1' % (config['hgurl'],
                                                   config['mozilla_repo_path']),
+            tipsOnly=config.get('enable_try', False),
             pollInterval=pollInterval,
         ))
 
-    if config['enable_l10n']:
+    if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
                             pollInterval=l10nPollInterval)
@@ -1815,7 +1840,7 @@ def generateCCBranchObjects(config, name):
             leakTest = True
             codesighs = False
             if not pf.get('enable_unittests'):
-                uploadPackages = False
+                uploadPackages = pf.get('packageTests', False)
             else:
                 packageTests = True
             talosMasters = None
@@ -1893,6 +1918,7 @@ def generateCCBranchObjects(config, name):
             unittestBranch=unittestBranch,
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
+            **extra_args
         )
         mozilla2_dep_builder = {
             'name': '%s build' % pf['base_name'],
@@ -1926,6 +1952,14 @@ def generateCCBranchObjects(config, name):
             continue
 
         if config['enable_nightly']:
+            if pf.has_key('enable_nightly'):
+                do_nightly = pf['enable_nightly']
+            else:
+                do_nightly = True
+        else:
+            do_nightly = False
+
+        if do_nightly:
             nightly_builder = '%s nightly' % pf['base_name']
 
             triggeredSchedulers=None
@@ -2089,10 +2123,10 @@ def generateCCBranchObjects(config, name):
                     'name': '%s shark' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-shark' % (name, platform),
-                    'builddir': reallyShort('%s-%s-shark' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform)),
                     'factory': mozilla2_shark_factory,
                     'category': name,
-                    'properties': {'branch': name, 'platform': platform},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
 
@@ -2256,9 +2290,11 @@ def generateCCBranchObjects(config, name):
                 branchObjects['builders'].append(codecoverage_builder)
 
         if config.get('enable_blocklist_update', False):
-            if platform == 'linux':
-                blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
-                branchObjects['builders'].append(blocklistBuilder)
+            pass
+            # This would only update Firefox blocklist as it stands, see Bug 630526
+            #if platform == 'linux':
+            #    blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
+            #    branchObjects['builders'].append(blocklistBuilder)
 
         # -- end of per-platform loop --
 
