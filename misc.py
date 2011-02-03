@@ -1636,7 +1636,7 @@ def generateCCBranchObjects(config, name):
                 '/'.join([packageUrl, packageDir])),
             ))
 
-   if config['enable_l10n']:
+    if config['enable_l10n']:
         l10n_builders = []
         for b in l10nBuilders:
             if config['enable_l10n_onchange']:
