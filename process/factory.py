@@ -867,19 +867,21 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 ))
 
     def addLeakTestSteps(self):
-        # we want the same thing run a few times here, with different
-        # extraArgs
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-        for args in [['-register'], ['-CreateProfile', 'default'],
-                     ['-P', 'default']]:
-            self.addStep(AliveTest,
-                env=leakEnv,
-                workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                extraArgs=args,
-                warnOnFailure=True,
-                haltOnFailure=True
-            )
+        self.addStep(AliveTest,
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          extraArgs=['-register'],
+          warnOnFailure=True,
+          haltOnFailure=True
+        )
+        self.addStep(AliveTest,
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          warnOnFailure=True,
+          haltOnFailure=True
+        )
         self.addStep(SetProperty,
           command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
           'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1356,42 +1358,6 @@ class TryBuildFactory(MercurialBuildFactory):
                 warnOnFailure=True,
                 haltOnFailure=True
             )
-        # we only want this variable for this test - this sucks
-        bloatEnv = leakEnv.copy()
-        bloatEnv['XPCOM_MEM_BLOAT_LOG'] = '1'
-        self.addStep(AliveTest,
-         env=bloatEnv,
-         workdir='build/%s/_leaktest' % self.mozillaObjdir,
-         logfile='bloat.log',
-         warnOnFailure=True,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='get_bloat_log',
-         env=self.env,
-         workdir='.',
-         command=['wget', '-O', 'bloat.log.old',
-                 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/bloat.log' % \
-                     (self.stageServer, self.productName, self.platform)],
-         warnOnFailure=True,
-         flunkOnFailure=False
-        )
-        self.addStep(ShellCommand,
-         name='mv_bloat_log',
-         env=self.env,
-         command=['mv', '%s/_leaktest/bloat.log' % self.mozillaObjdir,
-                  '../bloat.log'],
-        )
-        self.addStep(CompareBloatLogs,
-         name='compare_bloat_log',
-         bloatLog='bloat.log',
-         env=self.env,
-         workdir='.',
-         mozillaDir=self.mozillaDir,
-         tbPrint=self.tbPrint,
-         warnOnFailure=True,
-         haltOnFailure=False
-        )
         self.addStep(SetProperty,
           command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
           'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1593,7 +1559,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 product=self.productName,
                 revision=WithProperties('%(got_revision)s'),
                 who=WithProperties('%(who)s'),
-                builddir=WithProperties('%(builddir)s'),
+                builddir=WithProperties('%(branch)s-%(platform)s'),
                 buildid=WithProperties('%(buildid)s'),
                 to_try=True,
                 to_dated=False,
