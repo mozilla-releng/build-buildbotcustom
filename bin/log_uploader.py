@@ -9,7 +9,6 @@ from buildbot import util
 from buildbot.status.builder import Results
 
 from buildbotcustom.process.factory import postUploadCmdPrefix
-from buildbotcustom.misc import reallyShort
 
 def ssh(user, identity, host, remote_cmd, port=22):
     devnull = open(os.devnull)
@@ -221,7 +220,7 @@ if __name__ == "__main__":
                     to_tinderbox_dated=False,
                     who=getAuthor(build),
                     revision=build.getProperty('revision')[:12],
-                    builddir=reallyShort("%s-%s" % (options.branch, platform)),
+                    builddir="%s-%s" % (options.branch, platform),
                     ))
             else:
                 buildid = getBuildId(build)

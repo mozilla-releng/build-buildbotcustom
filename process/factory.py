@@ -1559,7 +1559,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 product=self.productName,
                 revision=WithProperties('%(got_revision)s'),
                 who=WithProperties('%(who)s'),
-                builddir=WithProperties('%(builddir)s'),
+                builddir=WithProperties('%(branch)s-%(platform)s'),
                 buildid=WithProperties('%(buildid)s'),
                 to_try=True,
                 to_dated=False,
