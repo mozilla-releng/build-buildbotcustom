@@ -867,19 +867,21 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 ))
 
     def addLeakTestSteps(self):
-        # we want the same thing run a few times here, with different
-        # extraArgs
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-        for args in [['-register'], ['-CreateProfile', 'default'],
-                     ['-P', 'default']]:
-            self.addStep(AliveTest,
-                env=leakEnv,
-                workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                extraArgs=args,
-                warnOnFailure=True,
-                haltOnFailure=True
-            )
+        self.addStep(AliveTest,
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          extraArgs=['-register'],
+          warnOnFailure=True,
+          haltOnFailure=True
+        )
+        self.addStep(AliveTest,
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          warnOnFailure=True,
+          haltOnFailure=True
+        )
         self.addStep(SetProperty,
           command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
           'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
