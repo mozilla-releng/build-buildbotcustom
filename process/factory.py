@@ -541,7 +541,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  packageSDK=False, packageTests=False, mozillaDir=None,
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
-                 mozconfigBranch="production", **kwargs):
+                 mozconfigBranch="production", useSharedCheckouts=False,
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -592,6 +593,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
+        self.useSharedCheckouts = useSharedCheckouts
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -1292,9 +1294,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
 class TryBuildFactory(MercurialBuildFactory):
     def __init__(self,talosMasters=None, unittestMasters=None, packageUrl=None,
-                 packageDir=None, unittestBranch=None, tinderboxBuildsDir=None, 
+                 packageDir=None, unittestBranch=None, tinderboxBuildsDir=None,
                  **kwargs):
-        
+
         self.packageUrl = packageUrl
         # The directory the packages go into
         self.packageDir = packageDir
@@ -1317,14 +1319,49 @@ class TryBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(Mercurial,
-         name='hg_update',
-         mode='clobber',
-         baseURL='http://%s/' % self.hgHost,
-         defaultBranch=self.repoPath,
-         timeout=60*60, # 1 hour
-         locks=[hg_try_lock.access('counting')],
-        )
+        if self.useSharedCheckouts:
+            # We normally rely on the Mercurial step to clobber for us, but
+            # since we're managing the checkout ourselves...
+            self.addStep(ShellCommand(
+                name='clobber_build',
+                command=['rm', '-rf', 'build'],
+                workdir='.',
+                timeout=60*60,
+            ))
+            self.addStep(JSONPropertiesDownload(
+                name="download_props",
+                slavedest="buildprops.json",
+                workdir='.'
+            ))
+
+            env = self.env.copy()
+            env['PROPERTIES_FILE'] = 'buildprops.json'
+            cmd = [
+                    'python',
+                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                    'http://%s/%s' % (self.hgHost, self.repoPath),
+                    'build',
+                  ]
+            self.addStep(ShellCommand(
+                name='hg_update',
+                command=cmd,
+                timeout=60*60,
+                locks=[hg_try_lock.access('counting')],
+                env=env,
+                workdir='.',
+                haltOnFailure=True,
+                flunkOnFailure=True,
+            ))
+        else:
+            self.addStep(Mercurial,
+            name='hg_update',
+            mode='clobber',
+            baseURL='http://%s/' % self.hgHost,
+            defaultBranch=self.repoPath,
+            timeout=60*60, # 1 hour
+            locks=[hg_try_lock.access('counting')],
+            )
+
         if self.buildRevision:
             self.addStep(ShellCommand,
              name='hg_update',
