@@ -6,11 +6,13 @@ import os
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
-from buildbot.process.factory import BuildFactory
-from buildbot.process.properties import WithProperties
 from buildbot.steps.trigger import Trigger
 
-from buildbotcustom.l10n import DependentL10n
+import release.platforms
+import release.paths
+reload(release.platforms)
+reload(release.paths)
+
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
@@ -22,7 +24,7 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
 from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
-from release.platforms import ftp_platform_map, sl_platform_map
+from release.platforms import buildbot2ftp, sl_platform_map
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck
 import BuildSlaves
@@ -96,9 +98,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         ftpURL = genericFtpUrl()
         if platform:
             if platform in signedPlatforms:
-                platformDir = 'unsigned/%s' % ftp_platform_map.get(platform, platform)
+                platformDir = 'unsigned/%s' % buildbot2ftp(platform)
             else:
-                platformDir = ftp_platform_map.get(platform, platform)
+                platformDir = buildbot2ftp(platform)
             ftpURL = '/'.join([
                 ftpURL.strip('/'),
                 platformDir])
@@ -182,7 +184,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     ##### Change sources and Schedulers
     if releaseConfig['doPartnerRepacks']:
         for p in releaseConfig['l10nPlatforms']:
-            ftpPlatform = ftp_platform_map[p]
+            ftpPlatform = buildbot2ftp(p)
 
             ftpURLs = ["http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/%s" % (
                       releaseConfig['stagingServer'],
@@ -235,6 +237,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             upstream=repo_setup_scheduler,
             builderNames=[builderPrefix('tag')]
         )
+        release_downloader_scheduler = Scheduler(
+            name=builderPrefix('release_downloader'),
+            branch=releaseConfig['sourceRepoPath'],
+            treeStableTimer=None,
+            builderNames=[builderPrefix('release_downloader')],
+            fileIsImportant=lambda c: not isHgPollerTriggered(c,
+                branchConfig['hgurl'])
+        )
+        schedulers.append(release_downloader_scheduler)
     else:
         tag_scheduler = Scheduler(
             name=builderPrefix('tag'),
@@ -342,7 +353,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
 
     for platform in releaseConfig['unittestPlatforms']:
         platform_test_builders = []
-        base_name = branchConfig['platforms'][platform]['base_name']
         for suites_name, suites in branchConfig['unittest_suites']:
             platform_test_builders.extend(
                     generateTestBuilderNames(
@@ -434,6 +444,32 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('repo_setup'),
+                slaves=branchConfig['platforms']['linux']['slaves'],
+                category=builderPrefix(''),
+                ))
+
+        if not releaseConfig.get('skip_release_download'):
+            release_downloader_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                extra_args=[branchConfigFile],
+                scriptName='scripts/staging/release_downloader.sh',
+            )
+
+            builders.append({
+                'name': builderPrefix('release_downloader'),
+                'slavenames': branchConfig['platforms']['linux']['slaves'],
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('release_downloader'),
+                'slavebuilddir': reallyShort(builderPrefix('release_downloader')),
+                'factory': release_downloader_factory,
+                'nextSlave': _nextFastReservedSlave,
+                'env': builder_env,
+                'properties': {'builddir': builderPrefix('release_downloader'),
+                               'slavebuilddir': reallyShort(builderPrefix('release_downloader'))}
+            })
+        else:
+            builders.append(makeDummyBuilder(
+                name=builderPrefix('release_downloader'),
                 slaves=branchConfig['platforms']['linux']['slaves'],
                 category=builderPrefix(''),
                 ))
