@@ -237,6 +237,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             upstream=repo_setup_scheduler,
             builderNames=[builderPrefix('tag')]
         )
+        release_downloader_scheduler = Scheduler(
+            name=builderPrefix('release_downloader'),
+            branch=releaseConfig['sourceRepoPath'],
+            treeStableTimer=None,
+            builderNames=[builderPrefix('release_downloader')],
+            fileIsImportant=lambda c: not isHgPollerTriggered(c,
+                branchConfig['hgurl'])
+        )
+        schedulers.append(release_downloader_scheduler)
     else:
         tag_scheduler = Scheduler(
             name=builderPrefix('tag'),
@@ -435,6 +444,32 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('repo_setup'),
+                slaves=branchConfig['platforms']['linux']['slaves'],
+                category=builderPrefix(''),
+                ))
+
+        if not releaseConfig.get('skip_release_download'):
+            release_downloader_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                extra_args=[branchConfigFile],
+                scriptName='scripts/staging/release_downloader.sh',
+            )
+
+            builders.append({
+                'name': builderPrefix('release_downloader'),
+                'slavenames': branchConfig['platforms']['linux']['slaves'],
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('release_downloader'),
+                'slavebuilddir': reallyShort(builderPrefix('release_downloader')),
+                'factory': release_downloader_factory,
+                'nextSlave': _nextFastReservedSlave,
+                'env': builder_env,
+                'properties': {'builddir': builderPrefix('release_downloader'),
+                               'slavebuilddir': reallyShort(builderPrefix('release_downloader'))}
+            })
+        else:
+            builders.append(makeDummyBuilder(
+                name=builderPrefix('release_downloader'),
                 slaves=branchConfig['platforms']['linux']['slaves'],
                 category=builderPrefix(''),
                 ))
