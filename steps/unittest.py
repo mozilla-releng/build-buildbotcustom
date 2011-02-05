@@ -292,7 +292,7 @@ class MozillaPackagedMozmillTests(ShellCommandReportTimeout):
             superResult = WARNINGS
         
         # If we find "TEST-UNEXPECTED", then return WARNINGS
-        if "TEXT-UNEXPECTED" in cmd.logs['stdio'].getText():
+        if "TEST-UNEXPECTED" in cmd.logs['stdio'].getText():
             return worst_status(superResult, WARNINGS)
 
         return worst_status(superResult, SUCCESS)
