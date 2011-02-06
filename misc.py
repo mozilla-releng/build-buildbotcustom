@@ -911,7 +911,7 @@ def generateBranchObjects(config, name):
             branch=config['repo_path'],
             dayOfWeek=5, # Saturday
             hour=[3], minute=[02],
-            builderNames=weeklyBuilders,
+            builderNames=coverageBuilders + weeklyBuilders,
             )
     branchObjects['schedulers'].append(weekly_scheduler)
 
