@@ -1097,7 +1097,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             fromaddr="release@mozilla.com",
             relayhost="mail.build.mozilla.org",
             sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['AllRecipients'],
+            extraRecipients=releaseConfig['AllRecipients'] + \
+                releaseConfig['PassRecipients'],
             branches=[releaseConfig['sourceRepoPath']],
             messageFormatter=createReleaseChangeMessage,
         ))
@@ -1106,7 +1107,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             fromaddr="release@mozilla.com",
             relayhost="mail.build.mozilla.org",
             sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['AllRecipients'],
+            extraRecipients=releaseConfig['AllRecipients'] + \
+                releaseConfig['PassRecipients'],
             branches=[builderPrefix('post_signing')],
             messageFormatter=createReleaseChangeMessage,
         ))
