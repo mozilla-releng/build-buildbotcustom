@@ -846,15 +846,42 @@ class MercurialBuildFactory(MozillaBuildFactory):
                       # long time.
         )
 
+    def addBuildInfoSteps(self):
+        """Helper function for getting build information into properties.
+        Looks for self._gotBuildInfo to make sure we only run this set of steps
+        once."""
+        if not getattr(self, '_gotBuildInfo', False):
+            self.addStep(SetProperty(
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                'App', 'BuildID'],
+                property='buildid',
+                workdir='.',
+                description=['getting', 'buildid'],
+                descriptionDone=['got', 'buildid'],
+            ))
+            self.addStep(SetProperty(
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                'App', 'SourceStamp'],
+                property='sourcestamp',
+                workdir='.',
+                description=['getting', 'sourcestamp'],
+                descriptionDone=['got', 'sourcestamp']
+            ))
+            self._gotBuildInfo = True
+
     def addBuildAnalysisSteps(self):
         if self.platform in ('linux', 'linux64'):
             # Analyze the number of ctors
             def get_ctors(rc, stdout, stderr):
                 try:
                     output = stdout.split("\t")
-                    return dict(num_ctors=int(output[0]))
+                    num_ctors = int(output[0])
+                    testresults = [ ('num_ctors', 'num_ctors', num_ctors, str(num_ctors)) ]
+                    return dict(num_ctors=num_ctors, testresults=testresults)
                 except:
-                    return {}
+                    return {testresults: []}
 
             self.addStep(SetProperty(
                 name='get_ctors',
@@ -867,6 +894,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 name='tinderboxprint_ctors',
                 data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
                 ))
+
+            self.addBuildInfoSteps()
+
+            if self.graphServer:
+                self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+                self.addStep(GraphServerPost(server=self.graphServer,
+                                             selector=self.graphSelector,
+                                             branch=self.graphBranch,
+                                             resultsname=self.baseName,
+                                             env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                             propertiesFile="properties.json"))
 
     def addLeakTestSteps(self):
         leakEnv = self.env.copy()
@@ -953,6 +991,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
              haltOnFailure=True
             )
             if self.graphServer:
+                self.addBuildInfoSteps()
+
                 self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
                 self.addStep(GraphServerPost(server=self.graphServer,
                                              selector=self.graphSelector,
@@ -1179,24 +1219,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env,
          tbPrint=self.tbPrint,
         )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
-        )
+
+        self.addBuildInfoSteps()
+
         if self.graphServer:
             self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
             self.addStep(GraphServerPost(server=self.graphServer,
@@ -1395,24 +1420,9 @@ class TryBuildFactory(MercurialBuildFactory):
                 warnOnFailure=True,
                 haltOnFailure=True
             )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
-        )
+
+        self.addBuildInfoSteps()
+
         if self.platform != 'macosx64':
             self.addStep(AliveTest,
              env=leakEnv,
@@ -1546,24 +1556,9 @@ class TryBuildFactory(MercurialBuildFactory):
          env=self.env,
          tbPrint=self.tbPrint,
         )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
-        )
+
+        self.addBuildInfoSteps()
+
         self.addStep(ShellCommand,
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
