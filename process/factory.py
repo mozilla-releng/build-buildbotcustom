@@ -8243,11 +8243,11 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
-        if self.createSnippet:
+        if not self.multiLocale and self.createSnippet:
             self.addUpdateSteps()
         self.addSymbolSteps()
         if self.multiLocale:
-            self.addMakeUploadSteps(subdir="en-US")
+            self.addMakeUploadSteps(subdir="en-US", uploadSnippet=False)
         else:
             self.addMakeUploadSteps()
         if self.triggerBuilds:
@@ -8510,14 +8510,14 @@ class AndroidBuildFactory(MobileBuildFactory):
             haltOnFailure=True,
         ))
 
-    def addMakeUploadSteps(self, subdir=None, **kwargs):
-        if self.createSnippet:
+    def addMakeUploadSteps(self, subdir=None, uploadSnippet=True, **kwargs):
+        if self.createSnippet and uploadSnippet:
             self.getPreviousBuildID(subdir=subdir)
         MobileBuildFactory.addMakeUploadSteps(self, subdir=subdir, **kwargs)
         # ausFullUploadDir contains an interpolation of the buildid property.
         # We expect the property to be set by the parent call to
         # addUploadSteps()
-        if self.createSnippet:
+        if self.createSnippet and uploadSnippet:
             self._uploadSnippet()
 
 def rc_eval_func(exit_statuses):
@@ -8609,50 +8609,3 @@ class ScriptFactory(BuildFactory):
             log_eval_func=log_eval_func,
             workdir=".",
             warnOnWarnings=True))
-
-class AndroidReleaseBuildFactory(AndroidBuildFactory):
-    def __init__(self, **kwargs):
-        AndroidBuildFactory.__init__(self, **kwargs)
-
-    def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            name="get_buildid",
-            command=['python', '../config/printconfigsetting.py',
-                     'dist/bin/application.ini',
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(ShellCommand,
-         name='echo_buildID',
-         command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                 '%s_info.txt' % self.platform)],
-         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
-        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
-                                                    self.platform)
-        self.addStep(MozillaStageUpload,
-            name="upload_to_stage",
-            description=['upload','to','stage'],
-            objdir=self.branchName,
-            username=self.stageUsername,
-            milestone='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
-            remoteHost=self.stageServer,
-            remoteBasePath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=False,
-            releaseToDated=False,
-            releaseToTinderboxBuilds=False,
-            releaseToCandidates=True,
-            tinderboxBuildsDir='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
-            remoteCandidatesPath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
