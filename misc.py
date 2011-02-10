@@ -986,7 +986,7 @@ def generateBranchObjects(config, name):
             stageLogBaseUrl=config.get('stage_log_base_url', None),
             graphServer=config['graph_server'],
             graphSelector=config['graph_selector'],
-            graphBranch=config['tinderbox_tree'],
+            graphBranch=config.get('graph_branch', config['tinderbox_tree']),
             baseName=pf['base_name'],
             leakTest=leakTest,
             checkTest=checkTest,
@@ -1902,7 +1902,7 @@ def generateCCBranchObjects(config, name):
             stageLogBaseUrl=config.get('stage_log_base_url', None),
             graphServer=config['graph_server'],
             graphSelector=config['graph_selector'],
-            graphBranch=config['tinderbox_tree'],
+            graphBranch=config.get('graph_branch', config['tinderbox_tree']),
             baseName=pf['base_name'],
             leakTest=leakTest,
             checkTest=checkTest,
@@ -3017,6 +3017,74 @@ def generateValgrindObjects(config, slaves):
             'status': [tbox_mailer],
             }
 
+def generateSpiderMonkeyObjects(config, SLAVES):
+    builders = []
+    branch = os.path.basename(config['repo_path'])
+
+    for platform, variants in config['platforms'].items():
+        if 'win' in platform:
+            slaves = SLAVES[platform]
+            interpreter = 'bash'
+        elif 'arm' in platform:
+            slaves = SLAVES['linux']
+            interpreter = ['/scratchbox/moz_scratchbox', '-d',
+                    '/builds/slave/%s' % reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant))]
+        else:
+            slaves = SLAVES[platform]
+            interpreter = None
+
+        for variant in variants:
+            f = ScriptFactory(
+                    config['scripts_repo'],
+                    'scripts/spidermonkey_builds/spidermonkey.sh',
+                    interpreter=interpreter,
+                    log_eval_func=rc_eval_func({1: WARNINGS}),
+                    extra_args=(variant,),
+                    script_timeout=3600,
+                    )
+
+            builder = {'name': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
+                    'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
+                    'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
+                    'slavenames': slaves,
+                    'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                    'factory': f,
+                    'category': 'idle',
+                    'env': config['env'][platform],
+                    }
+            builders.append(builder)
+
+    def isImportant(change):
+        for f in change.files:
+            if f.startswith("js/src"):
+                return True
+        return False
+
+    # Set up scheduler
+    scheduler = Scheduler(
+            name="%s_spidermonkey" % branch,
+            branch=config['repo_path'],
+            treeStableTimer=None,
+            builderNames=[b['name'] for b in builders],
+            fileIsImportant=isImportant,
+            )
+
+    # Tinderbox notifier
+    tbox_mailer = TinderboxMailNotifier(
+        fromaddr="mozilla2.buildbot@build.mozilla.org",
+        tree=config['tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=[b['name'] for b in builders],
+        logCompression="gzip",
+    )
+
+    return {
+            'builders': builders,
+            'schedulers': [scheduler],
+            'status': [tbox_mailer],
+            }
+
 def generateProjectObjects(project, config, SLAVES):
     builders = []
     schedulers = []
@@ -3043,6 +3111,11 @@ def generateProjectObjects(project, config, SLAVES):
     elif project == 'valgrind':
         valgrindObjects = generateValgrindObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, valgrindObjects)
+
+    # Spidermonkey
+    elif project == 'spidermonkey':
+        spiderMonkeyObjects = generateSpiderMonkeyObjects(config, SLAVES)
+        buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
 
     return buildObjects
 

@@ -846,15 +846,42 @@ class MercurialBuildFactory(MozillaBuildFactory):
                       # long time.
         )
 
+    def addBuildInfoSteps(self):
+        """Helper function for getting build information into properties.
+        Looks for self._gotBuildInfo to make sure we only run this set of steps
+        once."""
+        if not getattr(self, '_gotBuildInfo', False):
+            self.addStep(SetProperty(
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                'App', 'BuildID'],
+                property='buildid',
+                workdir='.',
+                description=['getting', 'buildid'],
+                descriptionDone=['got', 'buildid'],
+            ))
+            self.addStep(SetProperty(
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                'App', 'SourceStamp'],
+                property='sourcestamp',
+                workdir='.',
+                description=['getting', 'sourcestamp'],
+                descriptionDone=['got', 'sourcestamp']
+            ))
+            self._gotBuildInfo = True
+
     def addBuildAnalysisSteps(self):
         if self.platform in ('linux', 'linux64'):
             # Analyze the number of ctors
             def get_ctors(rc, stdout, stderr):
                 try:
                     output = stdout.split("\t")
-                    return dict(num_ctors=int(output[0]))
+                    num_ctors = int(output[0])
+                    testresults = [ ('num_ctors', 'num_ctors', num_ctors, str(num_ctors)) ]
+                    return dict(num_ctors=num_ctors, testresults=testresults)
                 except:
-                    return {}
+                    return {testresults: []}
 
             self.addStep(SetProperty(
                 name='get_ctors',
@@ -867,6 +894,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 name='tinderboxprint_ctors',
                 data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
                 ))
+
+            if self.graphServer:
+                self.addBuildInfoSteps()
+                self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+                self.addStep(GraphServerPost(server=self.graphServer,
+                                             selector=self.graphSelector,
+                                             branch=self.graphBranch,
+                                             resultsname=self.baseName,
+                                             env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                             propertiesFile="properties.json"))
 
     def addLeakTestSteps(self):
         leakEnv = self.env.copy()
@@ -883,24 +920,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
           workdir='build/%s/_leaktest' % self.mozillaObjdir,
           warnOnFailure=True,
           haltOnFailure=True
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
         )
 
         if self.platform != 'macosx64':
@@ -953,6 +972,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              haltOnFailure=True
             )
             if self.graphServer:
+                self.addBuildInfoSteps()
                 self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
                 self.addStep(GraphServerPost(server=self.graphServer,
                                              selector=self.graphSelector,
@@ -1179,25 +1199,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          env=self.env,
          tbPrint=self.tbPrint,
         )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
-        )
+
         if self.graphServer:
+            self.addBuildInfoSteps()
             self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
             self.addStep(GraphServerPost(server=self.graphServer,
                                          selector=self.graphSelector,
@@ -1395,24 +1399,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 warnOnFailure=True,
                 haltOnFailure=True
             )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
-        )
+
         if self.platform != 'macosx64':
             self.addStep(AliveTest,
              env=leakEnv,
@@ -1546,24 +1533,7 @@ class TryBuildFactory(MercurialBuildFactory):
          env=self.env,
          tbPrint=self.tbPrint,
         )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'BuildID'],
-          property='buildid',
-          workdir='.',
-          description=['getting', 'buildid'],
-          descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty,
-          command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
-          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-          'App', 'SourceStamp'],
-          property='sourcestamp',
-          workdir='.',
-          description=['getting', 'sourcestamp'],
-          descriptionDone=['got', 'sourcestamp']
-        )
+
         self.addStep(ShellCommand,
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
@@ -8243,11 +8213,11 @@ class AndroidBuildFactory(MobileBuildFactory):
         self.addPreBuildSteps()
         self.addBuildSteps()
         self.addPackageSteps()
-        if self.createSnippet:
+        if not self.multiLocale and self.createSnippet:
             self.addUpdateSteps()
         self.addSymbolSteps()
         if self.multiLocale:
-            self.addMakeUploadSteps(subdir="en-US")
+            self.addMakeUploadSteps(subdir="en-US", uploadSnippet=False)
         else:
             self.addMakeUploadSteps()
         if self.triggerBuilds:
@@ -8510,14 +8480,14 @@ class AndroidBuildFactory(MobileBuildFactory):
             haltOnFailure=True,
         ))
 
-    def addMakeUploadSteps(self, subdir=None, **kwargs):
-        if self.createSnippet:
+    def addMakeUploadSteps(self, subdir=None, uploadSnippet=True, **kwargs):
+        if self.createSnippet and uploadSnippet:
             self.getPreviousBuildID(subdir=subdir)
         MobileBuildFactory.addMakeUploadSteps(self, subdir=subdir, **kwargs)
         # ausFullUploadDir contains an interpolation of the buildid property.
         # We expect the property to be set by the parent call to
         # addUploadSteps()
-        if self.createSnippet:
+        if self.createSnippet and uploadSnippet:
             self._uploadSnippet()
 
 def rc_eval_func(exit_statuses):
@@ -8609,50 +8579,3 @@ class ScriptFactory(BuildFactory):
             log_eval_func=log_eval_func,
             workdir=".",
             warnOnWarnings=True))
-
-class AndroidReleaseBuildFactory(AndroidBuildFactory):
-    def __init__(self, **kwargs):
-        AndroidBuildFactory.__init__(self, **kwargs)
-
-    def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            name="get_buildid",
-            command=['python', '../config/printconfigsetting.py',
-                     'dist/bin/application.ini',
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(ShellCommand,
-         name='echo_buildID',
-         command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                 '%s_info.txt' % self.platform)],
-         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
-        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
-                                                    self.platform)
-        self.addStep(MozillaStageUpload,
-            name="upload_to_stage",
-            description=['upload','to','stage'],
-            objdir=self.branchName,
-            username=self.stageUsername,
-            milestone='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
-            remoteHost=self.stageServer,
-            remoteBasePath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=False,
-            releaseToDated=False,
-            releaseToTinderboxBuilds=False,
-            releaseToCandidates=True,
-            tinderboxBuildsDir='%s/unsigned/%s' % (self.baseUploadDir, self.platform),
-            remoteCandidatesPath='%s/unsigned/%s' % (self.stageBasePath, self.platform),
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
