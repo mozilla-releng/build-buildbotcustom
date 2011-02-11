@@ -4543,7 +4543,7 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
                  tuxedoServerUrl, enUSPlatforms, l10nPlatforms,
                  bouncerProductName=None, brandName=None, oldVersion=None,
                  credentialsFile=None, verbose=True, dryRun=False,
-                 milestone=None, **kwargs):
+                 milestone=None, bouncerProductSuffix=None, **kwargs):
         ReleaseFactory.__init__(self, **kwargs)
 
         cmd = ['python', 'tuxedo-add.py',
@@ -4575,6 +4575,9 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
 
         if milestone:
             cmd.extend(['--milestone', milestone])
+
+        if bouncerProductSuffix:
+            cmd.extend(['--bouncer-product-suffix', bouncerProductSuffix])
 
         for platform in sorted(enUSPlatforms):
             cmd.extend(['--platform', platform])
