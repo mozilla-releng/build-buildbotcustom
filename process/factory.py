@@ -173,13 +173,6 @@ def parse_make_upload(rc, stdout, stderr):
             retval['packageUrl'] = m
     return retval
 
-def parse_email(rc, stdout, stderr):
-    ''' This function takes the output of hg parent --template author
-    and returns a clean email address'''
-    retval = {}
-    retval['who'] = stdout[stdout.find("<")+1:stdout.find(">")]
-    return retval
-
 def short_hash(rc, stdout, stderr):
     ''' This function takes an hg changeset id and returns just the first 12 chars'''
     retval = {}
