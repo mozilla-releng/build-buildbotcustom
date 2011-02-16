@@ -263,6 +263,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     )
     schedulers.append(source_scheduler)
 
+    if releaseConfig['buildNumber'] == 1:
+        bouncer_submitter_scheduler = Dependent(
+            name=builderPrefix('bouncer_submitter'),
+            upstream=tag_scheduler,
+            builderNames=[builderPrefix('bouncer_submitter')]
+        )
+        schedulers.append(bouncer_submitter_scheduler)
+
+        if releaseConfig['doPartnerRepacks']:
+            euballot_bouncer_submitter_scheduler = Dependent(
+                name=builderPrefix('euballot_bouncer_submitter'),
+                upstream=tag_scheduler,
+                builderNames=[builderPrefix('euballot_bouncer_submitter')]
+            )
+            schedulers.append(euballot_bouncer_submitter_scheduler)
+
     if releaseConfig['xulrunnerPlatforms']:
         xulrunner_source_scheduler = Dependent(
             name=builderPrefix('xulrunner_source'),
@@ -1091,6 +1107,37 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'properties': {'slavebuilddir':
             reallyShort(builderPrefix('bncr_sub'))}
     })
+
+    if releaseConfig['doPartnerRepacks']:
+        euballot_bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
+            baseTag=releaseConfig['baseTag'],
+            appName=releaseConfig['appName'],
+            config=releaseConfig['tuxedoConfig'],
+            productName=releaseConfig['productName'],
+            bouncerProductSuffix='EUballot',
+            version=releaseConfig['version'],
+            milestone=releaseConfig['milestone'],
+            tuxedoServerUrl=releaseConfig['tuxedoServerUrl'],
+            enUSPlatforms=('win32-EUballot',),
+            l10nPlatforms=None, # not needed
+            oldVersion=None, # no updates
+            hgHost=branchConfig['hghost'],
+            repoPath=releaseConfig['sourceRepoPath'],
+            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py"),
+        )
+
+        builders.append({
+            'name': builderPrefix('euballot_bouncer_submitter'),
+            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('euballot_bouncer_submitter'),
+            'slavebuilddir': reallyShort(builderPrefix('eu_bncr_sub')),
+            'factory': euballot_bouncer_submitter_factory,
+            'env': builder_env,
+            'properties': {'slavebuilddir':
+                reallyShort(builderPrefix('eu_bncr_sub'))}
+        })
 
     #send a message when we receive the sendchange and start tagging
     status.append(ChangeNotifier(
