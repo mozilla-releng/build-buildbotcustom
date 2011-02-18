@@ -938,10 +938,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': builderPrefix(''),
         'builddir': builderPrefix('pre_push_checks'),
+        'slavebuilddir': reallyShort(builderPrefix('psh_chks')),
         'factory': pre_push_checks_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
-        'properties': {'builddir': builderPrefix('pre_push_checks')},
+        'properties': {'slavebuilddir':
+                        reallyShort(builderPrefix('psh_chks'))},
     })
 
     push_to_mirrors_factory = ScriptFactory(
@@ -963,10 +965,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': builderPrefix(''),
         'builddir': builderPrefix('push_to_mirrors'),
+        'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs')),
         'factory': push_to_mirrors_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
-        'properties': {'builddir': builderPrefix('push_to_mirrors')},
+        'properties': {'slavebuilddir':
+                        reallyShort(builderPrefix('psh_mrrrs'))},
     })
     notify_builders.append(builderPrefix('push_to_mirrors'))
 
