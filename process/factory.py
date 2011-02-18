@@ -4284,7 +4284,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['generate snippets', 'for prior',
                       '%s builds' % self.version],
          env={'PYTHONPATH': WithProperties('%(toolsdir)s/lib/python')},
-         haltOnFailure=True,
+         haltOnFailure=False,
          workdir=self.updateDir
         ))
 
