@@ -2294,11 +2294,9 @@ def generateCCBranchObjects(config, name):
                 branchObjects['builders'].append(codecoverage_builder)
 
         if config.get('enable_blocklist_update', False):
-            pass
-            # This would only update Firefox blocklist as it stands, see Bug 630526
-            #if platform == 'linux':
-            #    blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
-            #    branchObjects['builders'].append(blocklistBuilder)
+            if platform == 'linux':
+                blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
+                branchObjects['builders'].append(blocklistBuilder)
 
         # -- end of per-platform loop --
 
