@@ -512,6 +512,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'env': tag_env,
             'properties': {'builddir': builderPrefix('tag'), 'slavebuilddir': reallyShort(builderPrefix('tag'))}
         })
+        notify_builders.append(builderPrefix('tag'))
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('tag'),
