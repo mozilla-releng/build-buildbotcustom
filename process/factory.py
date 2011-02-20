@@ -3063,29 +3063,26 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         Requires that we run make unpack first.
         '''
         self.addStep(ShellCommand,
-         command=['make', 'unpack'],
-         haltOnFailure=True,
-         env=self.env,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
-                                       self.appName)
-        )
+                     name='make_unpack',
+                     command=['make', 'unpack'],
+                     descriptionDone='unpacked en-US',
+                     haltOnFailure=True,
+                     env=self.env,
+                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+                     )
+        
         self.addStep(SetProperty,
-         command=['make', 'ident'],
-         haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.origSrcDir,
-                                       self.appName),
-         extract_fn=identToProperties()
-        )
+                     command=['make', 'ident'],
+                     haltOnFailure=True,
+                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+                     extract_fn=identToProperties()
+                     )
         self.addStep(ShellCommand,
-         command=['hg', 'update', '-C', '-r', WithProperties('%(comm_revision)s')],
-         haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-        )
-        self.addStep(ShellCommand,
-         command=['hg', 'update', '-C', '-r', WithProperties('%(moz_revision)s')],
-         haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
-        )
+                     name='update_enUS_revision',
+                     command=['hg', 'update', '-C', '-r',
+                              WithProperties('%(moz_revision)s')],
+                     haltOnFailure=True,
+                     workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
 
     def tinderboxPrintRevisions(self):
         self.tinderboxPrint('comm_revision',WithProperties('%(comm_revision)s'))
