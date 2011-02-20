@@ -3078,7 +3078,13 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                      extract_fn=identToProperties()
                      )
         self.addStep(ShellCommand,
-                     name='update_enUS_revision',
+                     name='update_comm_enUS_revision',
+                     command=['hg', 'update', '-C', '-r',
+                              WithProperties('%(comm_revision)s')],
+                     haltOnFailure=True,
+                     workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir))
+        self.addStep(ShellCommand,
+                     name='update_mozilla_enUS_revision',
                      command=['hg', 'update', '-C', '-r',
                               WithProperties('%(moz_revision)s')],
                      haltOnFailure=True,
