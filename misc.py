@@ -1920,6 +1920,7 @@ def generateCCBranchObjects(config, name):
             unittestBranch=unittestBranch,
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
+            useSharedCheckouts=pf.get('enable_shared_checkouts', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -2015,6 +2016,7 @@ def generateCCBranchObjects(config, name):
                 triggeredSchedulers=triggeredSchedulers,
                 tinderboxBuildsDir=tinderboxBuildsDir,
                 enable_ccache=pf.get('enable_ccache', False),
+                useSharedCheckouts=pf.get('enable_shared_checkouts', False),
             )
 
             mozilla2_nightly_builder = {
