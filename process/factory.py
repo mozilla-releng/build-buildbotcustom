@@ -874,7 +874,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                     testresults = [ ('num_ctors', 'num_ctors', num_ctors, str(num_ctors)) ]
                     return dict(num_ctors=num_ctors, testresults=testresults)
                 except:
-                    return {testresults: []}
+                    return {'testresults': []}
 
             self.addStep(SetProperty(
                 name='get_ctors',
