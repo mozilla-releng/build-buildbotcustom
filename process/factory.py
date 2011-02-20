@@ -3082,7 +3082,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                      command=['hg', 'update', '-C', '-r',
                               WithProperties('%(moz_revision)s')],
                      haltOnFailure=True,
-                     workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
+                     workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir))
 
     def tinderboxPrintRevisions(self):
         self.tinderboxPrint('comm_revision',WithProperties('%(comm_revision)s'))
