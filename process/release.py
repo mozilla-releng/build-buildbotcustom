@@ -1144,26 +1144,28 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 reallyShort(builderPrefix('eu_bncr_sub'))}
         })
 
-    #send a message when we receive the sendchange and start tagging
-    status.append(ChangeNotifier(
-            fromaddr="release@mozilla.com",
-            relayhost="mail.build.mozilla.org",
-            sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['AllRecipients'] + \
-                releaseConfig['PassRecipients'],
-            branches=[releaseConfig['sourceRepoPath']],
-            messageFormatter=createReleaseChangeMessage,
-        ))
-    #send a message when signing is complete
-    status.append(ChangeNotifier(
-            fromaddr="release@mozilla.com",
-            relayhost="mail.build.mozilla.org",
-            sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['AllRecipients'] + \
-                releaseConfig['PassRecipients'],
-            branches=[builderPrefix('post_signing')],
-            messageFormatter=createReleaseChangeMessage,
-        ))
+    # Separate email messages per list. Mailman doesn't try to avoid duplicate
+    # messages in this case. See Bug 635527 for the details.
+    for recipient in releaseConfig['AllRecipients'] + \
+                     releaseConfig['PassRecipients']:
+        #send a message when we receive the sendchange and start tagging
+        status.append(ChangeNotifier(
+                fromaddr="release@mozilla.com",
+                relayhost="mail.build.mozilla.org",
+                sendToInterestedUsers=False,
+                extraRecipients=[recipient],
+                branches=[releaseConfig['sourceRepoPath']],
+                messageFormatter=createReleaseChangeMessage,
+            ))
+        #send a message when signing is complete
+        status.append(ChangeNotifier(
+                fromaddr="release@mozilla.com",
+                relayhost="mail.build.mozilla.org",
+                sendToInterestedUsers=False,
+                extraRecipients=[recipient],
+                branches=[builderPrefix('post_signing')],
+                messageFormatter=createReleaseChangeMessage,
+            ))
 
     #send the nice(passing) release messages
     status.append(MailNotifier(
