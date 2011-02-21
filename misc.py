@@ -1178,9 +1178,13 @@ def generateBranchObjects(config, name):
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
             if config['enable_shark'] and platform.startswith('macosx'):
+                if name in ('mozilla-1.9.1','mozilla-1.9.2'):
+                    shark_objdir = config['objdir']
+                else:
+                    shark_objdir = pf['platform_objdir']
                 mozilla2_shark_factory = NightlyBuildFactory(
                     env= pf['env'],
-                    objdir=config['objdir'],
+                    objdir=shark_objdir,
                     platform=platform,
                     hgHost=config['hghost'],
                     repoPath=config['repo_path'],
