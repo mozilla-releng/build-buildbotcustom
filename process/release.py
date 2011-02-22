@@ -31,7 +31,8 @@ import BuildSlaves
 
 DEFAULT_L10N_CHUNKS = 15
 
-def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
+def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
+                                 releaseConfigFile):
     # This variable is one thing that forces us into reconfiging prior to a
     # release. It should be removed as soon as nothing depends on it.
     releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
@@ -356,6 +357,20 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     )
     schedulers.append(update_verify_scheduler)
 
+    check_permissions_scheduler = Dependent(
+        name=builderPrefix('check_permissions'),
+        upstream=updates_scheduler,
+        builderNames=[builderPrefix('check_permissions')]
+    )
+    schedulers.append(check_permissions_scheduler)
+
+    antivirus_scheduler = Dependent(
+        name=builderPrefix('antivirus'),
+        upstream=updates_scheduler,
+        builderNames=[builderPrefix('antivirus')]
+    )
+    schedulers.append(antivirus_scheduler)
+
     if releaseConfig['majorUpdateRepoPath']:
         majorUpdateBuilderNames = []
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
@@ -512,6 +527,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
             'env': tag_env,
             'properties': {'builddir': builderPrefix('tag'), 'slavebuilddir': reallyShort(builderPrefix('tag'))}
         })
+        notify_builders.append(builderPrefix('tag'))
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('tag'),
@@ -926,24 +942,46 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 reallyShort(builderPrefix('%s_up_vrfy' % platform))}
         })
 
-    pre_push_checks_factory = ScriptFactory(
+    check_permissions_factory = ScriptFactory(
         scriptRepo=tools_repo,
-        extra_args=[branchConfigFile, 'check'],
+        extra_args=[branchConfigFile, 'permissions'],
         script_timeout=3*60*60,
         scriptName='scripts/release/push-to-mirrors.sh',
     )
 
     builders.append({
-        'name': builderPrefix('pre_push_checks'),
+        'name': builderPrefix('check_permissions'),
         'slavenames': branchConfig['platforms']['linux']['slaves'],
         'category': builderPrefix(''),
-        'builddir': builderPrefix('pre_push_checks'),
-        'slavebuilddir': reallyShort(builderPrefix('psh_chks')),
-        'factory': pre_push_checks_factory,
+        'builddir': builderPrefix('check_permissions'),
+        'slavebuilddir': reallyShort(builderPrefix('chk_prms')),
+        'factory': check_permissions_factory,
         'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
-        'properties': {'slavebuilddir':
-                        reallyShort(builderPrefix('psh_chks'))},
+        'properties': {'slavebuilddir': reallyShort(builderPrefix('chk_prms')),
+                       'script_repo_revision': releaseTag,
+                       'release_config': releaseConfigFile},
+    })
+
+    antivirus_factory = ScriptFactory(
+        scriptRepo=tools_repo,
+        extra_args=[branchConfigFile, 'antivirus'],
+        script_timeout=3*60*60,
+        scriptName='scripts/release/push-to-mirrors.sh',
+    )
+
+    builders.append({
+        'name': builderPrefix('antivirus'),
+        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'category': builderPrefix(''),
+        'builddir': builderPrefix('antivirus'),
+        'slavebuilddir': reallyShort(builderPrefix('av')),
+        'factory': antivirus_factory,
+        'nextSlave': _nextFastReservedSlave,
+        'env': builder_env,
+        'properties': {'slavebuilddir': reallyShort(builderPrefix('av')),
+                       'script_repo_revision': releaseTag,
+                       'release_config': releaseConfigFile},
     })
 
     push_to_mirrors_factory = ScriptFactory(
@@ -956,7 +994,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
     push_to_mirrors_factory.addStep(Trigger(
         schedulerNames=[builderPrefix('ready-for-rel-test'),
                         builderPrefix('ready-for-release')],
-        copy_properties=['revision', 'release_config']
+        copy_properties=['script_repo_revision', 'release_config']
     ))
 
 
@@ -1143,26 +1181,28 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging):
                 reallyShort(builderPrefix('eu_bncr_sub'))}
         })
 
-    #send a message when we receive the sendchange and start tagging
-    status.append(ChangeNotifier(
-            fromaddr="release@mozilla.com",
-            relayhost="mail.build.mozilla.org",
-            sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['AllRecipients'] + \
-                releaseConfig['PassRecipients'],
-            branches=[releaseConfig['sourceRepoPath']],
-            messageFormatter=createReleaseChangeMessage,
-        ))
-    #send a message when signing is complete
-    status.append(ChangeNotifier(
-            fromaddr="release@mozilla.com",
-            relayhost="mail.build.mozilla.org",
-            sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['AllRecipients'] + \
-                releaseConfig['PassRecipients'],
-            branches=[builderPrefix('post_signing')],
-            messageFormatter=createReleaseChangeMessage,
-        ))
+    # Separate email messages per list. Mailman doesn't try to avoid duplicate
+    # messages in this case. See Bug 635527 for the details.
+    for recipient in releaseConfig['AllRecipients'] + \
+                     releaseConfig['PassRecipients']:
+        #send a message when we receive the sendchange and start tagging
+        status.append(ChangeNotifier(
+                fromaddr="release@mozilla.com",
+                relayhost="mail.build.mozilla.org",
+                sendToInterestedUsers=False,
+                extraRecipients=[recipient],
+                branches=[releaseConfig['sourceRepoPath']],
+                messageFormatter=createReleaseChangeMessage,
+            ))
+        #send a message when signing is complete
+        status.append(ChangeNotifier(
+                fromaddr="release@mozilla.com",
+                relayhost="mail.build.mozilla.org",
+                sendToInterestedUsers=False,
+                extraRecipients=[recipient],
+                branches=[builderPrefix('post_signing')],
+                messageFormatter=createReleaseChangeMessage,
+            ))
 
     #send the nice(passing) release messages
     status.append(MailNotifier(

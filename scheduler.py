@@ -233,7 +233,7 @@ class TriggerBouncerCheck(Triggerable):
     working = False
     loop = None
     release_config = None
-    revision = None
+    script_repo_revision = None
     configRepo = None
 
     def __init__(self, minUptake, configRepo, checkMARs=True,
@@ -260,8 +260,8 @@ class TriggerBouncerCheck(Triggerable):
         if set_props:
             props.updateFromProperties(set_props)
 
-        self.revision = props.getProperty('revision')
-        assert self.revision, 'revision should be set'
+        self.script_repo_revision = props.getProperty('script_repo_revision')
+        assert self.script_repo_revision, 'script_repo_revision should be set'
         self.release_config = props.getProperty('release_config')
         assert self.release_config, 'release_config should be set'
 
@@ -286,7 +286,7 @@ class TriggerBouncerCheck(Triggerable):
 
     def getReleaseConfig(self):
         url = str('%s/raw-file/%s/%s' %
-                  (self.configRepo, self.revision, self.release_config))
+                  (self.configRepo, self.script_repo_revision, self.release_config))
         d = getPage(url)
 
         def setReleaseConfig(res):

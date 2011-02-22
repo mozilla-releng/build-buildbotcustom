@@ -1178,9 +1178,13 @@ def generateBranchObjects(config, name):
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
             if config['enable_shark'] and platform.startswith('macosx'):
+                if name in ('mozilla-1.9.1','mozilla-1.9.2'):
+                    shark_objdir = config['objdir']
+                else:
+                    shark_objdir = pf['platform_objdir']
                 mozilla2_shark_factory = NightlyBuildFactory(
                     env= pf['env'],
-                    objdir=config['objdir'],
+                    objdir=shark_objdir,
                     platform=platform,
                     hgHost=config['hghost'],
                     repoPath=config['repo_path'],
@@ -1920,6 +1924,7 @@ def generateCCBranchObjects(config, name):
             unittestBranch=unittestBranch,
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
+            useSharedCheckouts=pf.get('enable_shared_checkouts', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -2015,6 +2020,7 @@ def generateCCBranchObjects(config, name):
                 triggeredSchedulers=triggeredSchedulers,
                 tinderboxBuildsDir=tinderboxBuildsDir,
                 enable_ccache=pf.get('enable_ccache', False),
+                useSharedCheckouts=pf.get('enable_shared_checkouts', False),
             )
 
             mozilla2_nightly_builder = {
@@ -2292,11 +2298,9 @@ def generateCCBranchObjects(config, name):
                 branchObjects['builders'].append(codecoverage_builder)
 
         if config.get('enable_blocklist_update', False):
-            pass
-            # This would only update Firefox blocklist as it stands, see Bug 630526
-            #if platform == 'linux':
-            #    blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
-            #    branchObjects['builders'].append(blocklistBuilder)
+            if platform == 'linux':
+                blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
+                branchObjects['builders'].append(blocklistBuilder)
 
         # -- end of per-platform loop --
 
@@ -2853,6 +2857,8 @@ def generateMobileBranchObjects(config, name):
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
     extra_args = ['-d', '-b', config['repo_path']]
+    if config['product_name'] is not None:
+        extra_args.extend(['-p', config['product_name']])
     if config['hg_username'] is not None:
         extra_args.extend(['-u', config['hg_username']])
     if config['hg_ssh_key'] is not None:
