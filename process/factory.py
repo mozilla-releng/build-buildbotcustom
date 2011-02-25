@@ -3,8 +3,6 @@ import os.path, re
 from time import strftime
 import urllib
 
-from twisted.python import log
-
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.shell import WithProperties
@@ -49,7 +47,7 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
   SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
-from buildbotcustom.steps.test import AliveTest, CompareBloatLogs, \
+from buildbotcustom.steps.test import AliveTest, \
   CompareLeakLogs, Codesighs, GraphServerPost
 from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
@@ -60,7 +58,7 @@ from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir
 import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION
+from buildbot.status.builder import SUCCESS, FAILURE
 
 # limit the number of clones of the try repository so that we don't kill
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
@@ -5590,6 +5588,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  updatePlatform=None, ausHost=None,
                  downloadBaseURL=None,
                  talosMasters=None,
+                 unittestMasters=None,
                  multiLocale=False,
                  mozharnessRepoPath="build/mozharness",
                  mozharnessRevision="default",
@@ -5629,6 +5628,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
                                                       mozconfig)
         self.talosMasters = talosMasters or []
+        self.unittestMasters = unittestMasters or []
         self.enable_try = enable_try
         if enable_try:
             self.clobber = clobber = True
@@ -6075,6 +6075,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 sendchangePlatform = 'linux'
         if sendchangePlatform and sendchange:
             talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
+            unittestBranch = "%s-%s-opt-unittest" % (self.branchName, sendchangePlatform)
             for master, warn, retries in self.talosMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6086,6 +6087,18 @@ class MobileBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange")
                 )
+            for master, warn, retries in self.unittestMasters:
+                self.addStep(SendChangeStep(
+                 name='sendchange_%s' % master,
+                 warnOnFailure=warn,
+                 master=master,
+                 retries=retries,
+                 branch=unittestBranch,
+                 revision=WithProperties("%(got_revision)s"),
+                 files=[WithProperties('%(packageUrl)s'),
+                        WithProperties('%(testsUrl)s')],
+                 user="sendchange",
+                ))
 
     def addMultiLocaleSteps(self):
         mergeLocalesArg = "--merge-locales"
@@ -7021,6 +7034,135 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     timeout=5*60,
                     flunkOnFailure=True
                     ))                    
+
+
+class RemoteUnittestFactory(MozillaTestFactory):
+    def __init__(self, platform, suites, hostUtils, productName='fennec',
+                 downloadSymbols=False, downloadTests=True,
+                 posixBinarySuffix='', **kwargs):
+        self.suites = suites
+        self.hostUtils = hostUtils
+
+        MozillaTestFactory.__init__(self, platform, productName=productName,
+                                    downloadSymbols=downloadSymbols,
+                                    downloadTests=downloadTests,
+                                    posixBinarySuffix=posixBinarySuffix,
+                                    **kwargs)
+
+    def addSetupSteps(self):
+        self.addStep(DownloadFile(
+            url=self.hostUtils,
+            filename_property='hostutils_filename',
+            url_property='hostutils_url',
+            haltOnFailure=True,
+            ignore_certs=self.ignoreCerts,
+            name='download_hostutils',
+        ))
+        self.addStep(UnpackFile(
+            filename=WithProperties('../%(hostutils_filename)s'),
+            scripts_dir='../tools/buildfarm/utils',
+            haltOnFailure=True,
+            workdir='build/hostutils',
+            name='unpack_hostutils',
+        ))
+        self.addStep(SetProperty,
+             command=['bash', '-c', 'echo $SUT_IP'],
+             property='sut_ip'
+        )
+        self.addStep(ShellCommand(
+            name='cleanup device',
+            workdir='.',
+            description="Cleanup Device",
+            command=['python', '../../sut_tools/cleanup.py',
+                     WithProperties("%(sut_ip)s"),
+                    ],
+            haltOnFailure=True)
+        )
+        self.addStep(ShellCommand(
+            name='install app on device',
+            workdir='.',
+            description="Install App on Device",
+            command=['python', '../../sut_tools/installApp.py',
+                     WithProperties("%(sut_ip)s"),
+                     WithProperties("build/%(build_filename)s"),
+                    ],
+            haltOnFailure=True)
+        )
+
+    def addPrepareBuildSteps(self):
+        def get_build_url(build):
+            '''Make sure that there is at least one build in the file list'''
+            assert len(build.source.changes[-1].files) > 0, 'Unittest sendchange has no files'
+            return parse_sendchange_files(build, exclude_substrs=['.crashreporter-symbols.',
+                                                   '.tests.'])
+        self.addStep(DownloadFile(
+            url_fn=get_build_url,
+            filename_property='build_filename',
+            url_property='build_url',
+            haltOnFailure=True,
+            ignore_certs=self.ignoreCerts,
+            name='download_build',
+        ))
+        self.addStep(UnpackFile(
+            filename=WithProperties('../%(build_filename)s'),
+            scripts_dir='../tools/buildfarm/utils',
+            haltOnFailure=True,
+            workdir='build/%s' % self.productName,
+            name='unpack_build',
+        ))
+        self.addStep(SetBuildProperty(
+         property_name="exedir",
+         value=self.productName
+        ))
+
+    def addRunTestSteps(self):
+        for suite in self.suites:
+            name = suite['suite']
+            if name.startswith('mochitest'):
+                self.addStep(UnpackTest(
+                 filename=WithProperties('../%(tests_filename)s'),
+                 testtype='mochitest',
+                 workdir='build/tests',
+                 haltOnFailure=True,
+                ))
+                variant = name.split('-', 1)[1]
+                for tp in suite.get('testPaths', []):
+                    self.addStep(unittest_steps.RemoteMochitestStep(
+                     variant=variant,
+                     testPath=tp,
+                     workdir='build/tests',
+                     timeout=2400,
+                    ))
+                else:
+                    self.addStep(unittest_steps.RemoteMochitestStep(
+                     variant=variant,
+                     workdir='build/tests',
+                     timeout=2400
+                    ))
+            elif name.startswith('reftest') or name == 'crashtest':
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('../%(tests_filename)s'),
+                 testtype='reftest',
+                 workdir='build/tests',
+                 haltOnFailure=True,
+                 ))
+                self.addStep(unittest_steps.RemoteReftestStep(
+                 suite=name,
+                 workdir='build/tests'
+                ))
+
+    def addTearDownSteps(self):
+        self.addCleanupSteps()
+        self.addStep(ShellCommand(
+         name='reboot device',
+         alwaysRun=True,
+         workdir='.',
+         description="Reboot Device",
+         command=['python', '../../sut_tools/reboot.py',
+                  WithProperties("%(sut_ip)s"),
+                 ],
+        ))
 
 class TalosFactory(BuildFactory):
     extName = 'addon.xpi'
