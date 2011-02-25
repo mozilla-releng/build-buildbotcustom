@@ -1183,8 +1183,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
 
     # Separate email messages per list. Mailman doesn't try to avoid duplicate
     # messages in this case. See Bug 635527 for the details.
-    for recipient in releaseConfig['AllRecipients'] + \
-                     releaseConfig['PassRecipients']:
+    tagging_started_recipients = releaseConfig['AllRecipients']
+    if not releaseConfig.get('skip_tag'):
+        tagging_started_recipients.extend(releaseConfig['PassRecipients'])
+    for recipient in tagging_started_recipients:
         #send a message when we receive the sendchange and start tagging
         status.append(ChangeNotifier(
                 fromaddr="release@mozilla.com",
@@ -1194,6 +1196,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 branches=[releaseConfig['sourceRepoPath']],
                 messageFormatter=createReleaseChangeMessage,
             ))
+    for recipient in releaseConfig['AllRecipients'] + \
+                     releaseConfig['PassRecipients']:
         #send a message when signing is complete
         status.append(ChangeNotifier(
                 fromaddr="release@mozilla.com",

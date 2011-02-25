@@ -42,7 +42,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
   TryUnittestBuildFactory, ScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import MaemoBuildFactory, \
-    MobileDesktopBuildFactory, AndroidBuildFactory
+    MobileDesktopBuildFactory, AndroidBuildFactory, RemoteUnittestFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly
 from buildbotcustom.l10n import TriggerableL10n
@@ -402,14 +402,72 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         slavenames = slaves
     if not category:
         category = branch_name
-    productName = 'fennec' if 'mobile' in name_prefix else 'firefox'
+    productName = 'firefox'
+    if 'mobile' in name_prefix or 'Android' in name_prefix:
+        productName = 'fennec'
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
-    if isinstance(suites, dict) and "totalChunks" in suites:
-        totalChunks = suites['totalChunks']
-        for i in range(totalChunks):
+    if pf.get('is_remote', False):
+        hostUtils = pf['host_utils_url']
+        factory = RemoteUnittestFactory(
+            platform=platform,
+            productName=productName,
+            hostUtils=hostUtils,
+            suites=suites,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            buildToolsRepoPath=config['build_tools_repo_path'],
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': {'branch': branch_name, 'platform': platform,
+                           'build_platform': platform, 'slavebuilddir': 'test'},
+        }
+        builders.append(builder)
+    else:
+        if isinstance(suites, dict) and "totalChunks" in suites:
+            totalChunks = suites['totalChunks']
+            for i in range(totalChunks):
+                factory = UnittestPackagedBuildFactory(
+                    platform=platform,
+                    test_suites=[suites['suite']],
+                    mochitest_leak_threshold=mochitestLeakThreshold,
+                    crashtest_leak_threshold=crashtestLeakThreshold,
+                    hgHost=config['hghost'],
+                    repoPath=config['repo_path'],
+                    productName=productName,
+                    posixBinarySuffix=posixBinarySuffix,
+                    buildToolsRepoPath=config['build_tools_repo_path'],
+                    buildSpace=1.0,
+                    buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+                    totalChunks=totalChunks,
+                    thisChunk=i+1,
+                    chunkByDir=suites.get('chunkByDir'),
+                    env=pf.get('unittest-env', {}),
+                    downloadSymbols=pf.get('download_symbols', True),
+                    resetHwClock=resetHwClock,
+                )
+                builder = {
+                    'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                    'slavenames': slavenames,
+                    'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                    'slavebuilddir': 'test',
+                    'factory': factory,
+                    'category': category,
+                    'nextSlave': _nextSlowSlave,
+                    'properties': {'branch': branch_name, 'platform': platform,
+                        'build_platform': platform, 'slavebuilddir' : 'test'},
+                    'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
+                }
+                builders.append(builder)
+        else:
             factory = UnittestPackagedBuildFactory(
                 platform=platform,
-                test_suites=[suites['suite']],
+                test_suites=suites,
                 mochitest_leak_threshold=mochitestLeakThreshold,
                 crashtest_leak_threshold=crashtestLeakThreshold,
                 hgHost=config['hghost'],
@@ -419,54 +477,21 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 buildToolsRepoPath=config['build_tools_repo_path'],
                 buildSpace=1.0,
                 buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-                totalChunks=totalChunks,
-                thisChunk=i+1,
-                chunkByDir=suites.get('chunkByDir'),
-                env=pf.get('unittest-env', {}),
                 downloadSymbols=pf.get('download_symbols', True),
+                env=pf.get('unittest-env', {}),
                 resetHwClock=resetHwClock,
             )
             builder = {
-                'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                'name': '%s %s' % (name_prefix, suites_name),
                 'slavenames': slavenames,
-                'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                'builddir': '%s-%s' % (build_dir_prefix, suites_name),
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'nextSlave': _nextSlowSlave,
-                'properties': {'branch': branch_name, 'platform': platform,
-                    'build_platform': platform, 'slavebuilddir' : 'test'},
+                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
-    else:
-        factory = UnittestPackagedBuildFactory(
-            platform=platform,
-            test_suites=suites,
-            mochitest_leak_threshold=mochitestLeakThreshold,
-            crashtest_leak_threshold=crashtestLeakThreshold,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            productName=productName,
-            posixBinarySuffix=posixBinarySuffix,
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            buildSpace=1.0,
-            buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-            downloadSymbols=pf.get('download_symbols', True),
-            env=pf.get('unittest-env', {}),
-            resetHwClock=resetHwClock,
-        )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
-            'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-        }
-        builders.append(builder)
     return builders
 
 def generateCCTestBuilder(config, branch_name, platform, name_prefix,
@@ -2644,6 +2669,7 @@ def generateMobileBranchObjects(config, name):
             'downloadBaseURL': config['mobile_download_base_url'],
             'updatePlatform': pf.get('update_platform', None),
             'talosMasters': pf.get('talos_masters', []),
+            'unittestMasters': pf.get('unittest_masters', []),
             # It would be great to have:
             # 'packageTests': pf.get('package_tests', False),
             # These are disabled until l10n comes up

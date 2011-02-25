@@ -28,7 +28,7 @@
 import re
 
 from buildbot.steps.shell import WithProperties
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, HEADER, worst_status
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, HEADER, worst_status
 
 from buildbotcustom.steps.base import ShellCommand
 
@@ -206,6 +206,102 @@ def summarizeMozmillLog(name, log):
     _summaryText = summaryText(summary.get('Passed', 0),
                                summary.get('Failed', 0))
     return 'TinderboxPrint: %s<br/>%s\n' % (name, _summaryText)
+
+def evaluateMochitest(name, log, superResult):
+    # When a unittest fails we mark it orange, indicating with the
+    # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+    # However, we don't want to override EXCEPTION or RETRY, so we still
+    # need to use worst_status in further status decisions.
+    if superResult == FAILURE:
+        superResult = WARNINGS
+
+    if superResult != SUCCESS:
+        return superResult
+
+    failIdent = r"^\d+ INFO Failed: 0"
+    # Support browser-chrome result summary format which differs from MozillaMochitest's.
+    if 'browser-chrome' in name:
+        failIdent = r"^\tFailed: 0"
+    # Assume that having the 'failIdent' line
+    # means the tests run completed (successfully).
+    # Also check for "^TEST-UNEXPECTED-" for harness errors.
+    if not re.search(failIdent, log, re.MULTILINE) or \
+       re.search("^TEST-UNEXPECTED-", log, re.MULTILINE):
+        return worst_status(superResult, WARNINGS)
+
+    return worst_status(superResult, SUCCESS)
+
+def evaluateReftest(log, superResult):
+    # When a unittest fails we mark it orange, indicating with the
+    # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+    # However, we don't want to override EXCEPTION or RETRY, so we still
+    # need to use worst_status in further status decisions.
+    if superResult == FAILURE:
+        superResult = WARNINGS
+
+    if superResult != SUCCESS:
+        return superResult
+
+    # Assume that having the "Unexpected: 0" line
+    # means the tests run completed (successfully).
+    # Also check for "^TEST-UNEXPECTED-" for harness errors.
+    if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", log, re.MULTILINE) or \
+       re.search("^TEST-UNEXPECTED-", log, re.MULTILINE):
+        return worst_status(superResult, WARNINGS)
+
+    return worst_status(superResult, SUCCESS)
+
+
+class MochitestMixin(object):
+    warnOnFailure = True
+    warnOnWarnings = True
+
+    def getVariantOptions(self, variant):
+        if variant == 'ipcplugins':
+            return ['--setpref=dom.ipc.plugins.enabled=false',
+                    '--test-path=modules/plugin/test']
+        elif variant != 'plain':
+            return ['--%s' % variant]
+        else:
+            return []
+
+    def createSummary(self, log):
+        self.addCompleteLog('summary', summarizeLogMochitest(self.name, log))
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        return evaluateMochitest(self.name, cmd.logs['stdio'].getText(),
+                                 superResult)
+
+class ReftestMixin(object):
+    warnOnFailure = True
+    warnOnWarnings = True
+
+    def getSuiteOptions(self, suite):
+        if suite == 'crashtest':
+            return ['reftest/tests/testing/crashtest/crashtests.list']
+        elif suite in ('reftest', 'direct3D', 'opengl'):
+            return ['reftest/tests/layout/reftests/reftest.list']
+        elif suite == 'reftest-d2d':
+            return ['--setpref=gfx.font_rendering.directwrite.enabled=true',
+                    '--setpref=mozilla.widget.render-mode=6',
+                    'reftest/tests/layout/reftests/reftest.list']
+        elif suite == 'reftest-no-d2d-d3d':
+            return ['--setpref=gfx.direct2d.disabled=true',
+                    '--setpref=layers.accelerate-none=true',
+                    'reftest/tests/layout/reftests/reftest.list']
+        elif suite == 'jsreftest':
+            return ['--extra-profile-file=jsreftest/tests/user.js',
+                    'jsreftest/tests/jstests.list']
+        elif suite == 'reftest-sanity':
+            return ['reftest/tests/layout/reftests/reftest-sanity/reftest.list']
+
+    def createSummary(self, log):
+        self.addCompleteLog('summary', summarizeLogReftest(self.name, log))
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        return evaluateReftest(cmd.logs['stdio'].getText(), superResult)
 
 
 class ShellCommandReportTimeout(ShellCommand):
@@ -611,10 +707,10 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
         return worst_status(superResult, SUCCESS)
 
 
-class MozillaPackagedMochitests(ShellCommandReportTimeout):
-    warnOnFailure = True
-    warnOnWarnings = True
-
+# MochitestMixin overrides some methods that BuildStep calls
+# In order to make sure its are called, instead of ShellCommandReportTimeout's,
+# it needs to be listed first
+class MozillaPackagedMochitests(MochitestMixin, ShellCommandReportTimeout):
     def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
             chunkByDir=None, totalChunks=None, thisChunk=None, testPath=None,
             **kwargs):
@@ -652,46 +748,10 @@ class MozillaPackagedMochitests(ShellCommandReportTimeout):
             self.command.append("--this-chunk=%d" % thisChunk)
             if chunkByDir:
                 self.command.append("--chunk-by-dir=%d" % chunkByDir)
-
-        if variant == 'ipcplugins':
-            self.command.append('--setpref=dom.ipc.plugins.enabled=false')
-            self.command.append('--test-path=modules/plugin/test')
-        elif variant != 'plain':
-            self.command.append("--%s" % variant)
-
-    def createSummary(self, log):
-        self.addCompleteLog('summary', summarizeLogMochitest(self.name, log))
-
-    def evaluateCommand(self, cmd):
-        superResult = self.super_class.evaluateCommand(self, cmd)
-        # When a unittest fails we mark it orange, indicating with the
-        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
-        # However, we don't want to override EXCEPTION or RETRY, so we still
-        # need to use worst_status in further status decisions.
-        if superResult == FAILURE:
-            superResult = WARNINGS
-
-        if superResult != SUCCESS:
-            return superResult
-
-        failIdent = r"^\d+ INFO Failed: 0"
-        # Support browser-chrome result summary format which differs from MozillaMochitest's.
-        if 'browser-chrome' in self.name:
-            failIdent = r"^\tFailed: 0"
-        # Assume that having the 'failIdent' line
-        # means the tests run completed (successfully).
-        # Also check for "^TEST-UNEXPECTED-" for harness errors.
-        if not re.search(failIdent, cmd.logs["stdio"].getText(), re.MULTILINE) or \
-           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return worst_status(superResult, WARNINGS)
-
-        return worst_status(superResult, SUCCESS)
+        self.command.extend(self.getVariantOptions(variant))
 
 
-class MozillaPackagedReftests(ShellCommandReportTimeout):
-    warnOnFailure = True
-    warnOnWarnings = True
-
+class MozillaPackagedReftests(ReftestMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, leakThreshold=None,
             **kwargs):
         self.super_class = ShellCommandReportTimeout
@@ -699,60 +759,18 @@ class MozillaPackagedReftests(ShellCommandReportTimeout):
 
         self.addFactoryArguments(suite=suite,
                 symbols_path=symbols_path, leakThreshold=leakThreshold)
-
         self.name = suite
-
         self.command = ['python', 'reftest/runreftest.py',
                 WithProperties('--appname=%(exepath)s'),
                 '--utility-path=bin',
                 '--extra-profile-file=bin/plugins',
                 ]
-
         if symbols_path:
             self.command.append("--symbols-path=%s" % symbols_path)
-
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
+        self.command.extend(self.getSuiteOptions(suite))
 
-        if suite == 'crashtest':
-            self.command.append('reftest/tests/testing/crashtest/crashtests.list')
-        elif suite in ('reftest', 'direct3D', 'opengl'):
-            self.command.append('reftest/tests/layout/reftests/reftest.list')
-        elif suite == 'reftest-d2d':
-            self.command.append('--setpref=gfx.font_rendering.directwrite.enabled=true')
-            self.command.append('--setpref=mozilla.widget.render-mode=6')
-            self.command.append('reftest/tests/layout/reftests/reftest.list')
-        elif suite == 'reftest-no-d2d-d3d':
-            self.command.append('--setpref=gfx.direct2d.disabled=true')
-            self.command.append('--setpref=layers.accelerate-none=true')
-            self.command.append('reftest/tests/layout/reftests/reftest.list')
-        elif suite == 'jsreftest':
-            self.command.append('--extra-profile-file=jsreftest/tests/user.js')
-            self.command.append('jsreftest/tests/jstests.list')
-
-    def createSummary(self, log):
-        self.addCompleteLog('summary', summarizeLogReftest(self.name, log))
-
-    def evaluateCommand(self, cmd):
-        superResult = self.super_class.evaluateCommand(self, cmd)
-        # When a unittest fails we mark it orange, indicating with the
-        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
-        # However, we don't want to override EXCEPTION or RETRY, so we still
-        # need to use worst_status in further status decisions.
-        if superResult == FAILURE:
-            superResult = WARNINGS
-
-        if superResult != SUCCESS:
-            return superResult
-
-        # Assume that having the "Unexpected: 0" line
-        # means the tests run completed (successfully).
-        # Also check for "^TEST-UNEXPECTED-" for harness errors.
-        if not re.search(r"^REFTEST INFO \| Unexpected: 0 \(", cmd.logs["stdio"].getText(), re.MULTILINE) or \
-           re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return worst_status(superResult, WARNINGS)
-
-        return worst_status(superResult, SUCCESS)
 
 class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
     warnOnFailure = True
@@ -786,3 +804,45 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
             return WARNINGS
 
         return SUCCESS
+
+
+class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
+    def __init__(self, variant, testPath=None, xrePath='../hostutils/xre',
+                 utilityPath='../hostutils/bin', certificatePath='certs',
+                 app='org.mozilla.fennec', consoleLevel='INFO', **kwargs):
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(variant=variant, testPath=testPath,
+                                 xrePath=xrePath, utilityPath=utilityPath,
+                                 certificatePath=certificatePath, app=app,
+                                 consoleLevel=consoleLevel)
+
+        self.command = ['python', 'mochitest/runtestsremote.py',
+                        '--deviceIP', WithProperties('%(sut_ip)s'),
+                        '--xre-path', xrePath,
+                        '--utility-path', utilityPath,
+                        '--certificate-path', certificatePath,
+                        '--app', app,
+                        '--console-level', consoleLevel,
+                        '--http-port', WithProperties('%(http_port)s'),
+                        '--ssl-port', WithProperties('%(ssl_port)s')]
+        self.command.extend(self.getVariantOptions(variant))
+        if testPath:
+            self.command.extend(['--test-path', testPath])
+
+class RemoteReftestStep(ReftestMixin, ShellCommandReportTimeout):
+    def __init__(self, suite, xrePath='../hostutils/xre',
+                 utilityPath='../hostutils/bin', app='org.mozilla.fennec',
+                 **kwargs):
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(suite=suite, xrePath=xrePath,
+                                 utilityPath=utilityPath, app=app)
+
+        self.command = ['python', 'reftest/remotereftest.py',
+                        '--deviceIP', WithProperties('%(sut_ip)s'),
+                        '--xre-path', xrePath,
+                        '--utility-path', utilityPath,
+                        '--app', app,
+                        ]
+        self.command.extend(self.getSuiteOptions(suite))
