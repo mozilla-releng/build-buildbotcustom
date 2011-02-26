@@ -1183,7 +1183,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
 
     # Separate email messages per list. Mailman doesn't try to avoid duplicate
     # messages in this case. See Bug 635527 for the details.
-    tagging_started_recipients = releaseConfig['AllRecipients']
+    tagging_started_recipients = releaseConfig['AllRecipients'][:]
     if not releaseConfig.get('skip_tag'):
         tagging_started_recipients.extend(releaseConfig['PassRecipients'])
     for recipient in tagging_started_recipients:
