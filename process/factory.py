@@ -8719,4 +8719,5 @@ class ScriptFactory(BuildFactory):
             timeout=script_timeout, maxTime=script_maxtime,
             log_eval_func=log_eval_func,
             workdir=".",
+            haltOnFailure=True,
             warnOnWarnings=True))
