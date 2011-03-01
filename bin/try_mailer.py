@@ -95,7 +95,7 @@ def makeTryMessage(build, log_url):
 Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n\n""" % locals()
 
     if 'packageUrl' in props:
-        url = props['packageUrl']
+        url = props['packageUrl'].replace('://stage', '://ftp')
         text += "It should be available for download at <a href=\"%(url)s\">%(url)s</a>\n\n" % locals()
 
     if task == 'test':
@@ -109,6 +109,7 @@ Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n
             text += '%s\n\n' % summary
 
     if log_url:
+        log_url = log_url.replace('://stage', '://ftp')
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n" % locals()
     else:
         text += "Please check <a href=\"http://tbpl.mozilla.org/?tree=MozillaTry&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
