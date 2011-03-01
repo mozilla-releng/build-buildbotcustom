@@ -304,6 +304,16 @@ class ReftestMixin(object):
         return evaluateReftest(cmd.logs['stdio'].getText(), superResult)
 
 
+class ChunkingMixin(object):
+    def getChunkOptions(self, totalChunks, thisChunk, chunkByDir=None):
+        if not totalChunks or not thisChunk:
+            return []
+        ret = ['--total-chunks', str(totalChunks),
+               '--this-chunk', str(thisChunk)]
+        if chunkByDir:
+            ret.extend(['--chunk-by-dir', str(chunkByDir)])
+        return ret
+
 class ShellCommandReportTimeout(ShellCommand):
     """We subclass ShellCommand so that we can bubble up the timeout errors
     to tinderbox that normally only get appended to the buildbot slave logs.
@@ -710,7 +720,7 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
 # MochitestMixin overrides some methods that BuildStep calls
 # In order to make sure its are called, instead of ShellCommandReportTimeout's,
 # it needs to be listed first
-class MozillaPackagedMochitests(MochitestMixin, ShellCommandReportTimeout):
+class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
             chunkByDir=None, totalChunks=None, thisChunk=None, testPath=None,
             **kwargs):
@@ -743,11 +753,8 @@ class MozillaPackagedMochitests(MochitestMixin, ShellCommandReportTimeout):
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
 
-        if totalChunks:
-            self.command.append("--total-chunks=%d" % totalChunks)
-            self.command.append("--this-chunk=%d" % thisChunk)
-            if chunkByDir:
-                self.command.append("--chunk-by-dir=%d" % chunkByDir)
+        self.command.extend(self.getChunkOptions(totalChunks, thisChunk,
+                                                    chunkByDir))
         self.command.extend(self.getVariantOptions(variant))
 
 
@@ -830,19 +837,23 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
         if testPath:
             self.command.extend(['--test-path', testPath])
 
-class RemoteReftestStep(ReftestMixin, ShellCommandReportTimeout):
+class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, suite, xrePath='../hostutils/xre',
                  utilityPath='../hostutils/bin', app='org.mozilla.fennec',
-                 **kwargs):
+                 totalChunks=None, thisChunk=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(suite=suite, xrePath=xrePath,
-                                 utilityPath=utilityPath, app=app)
+                                 utilityPath=utilityPath, app=app,
+                                 totalChunks=totalChunks, thisChunk=thisChunk)
 
         self.command = ['python', 'reftest/remotereftest.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
                         '--utility-path', utilityPath,
                         '--app', app,
+                        '--http-port', WithProperties('%(http_port)s'),
+                        '--ssl-port', WithProperties('%(ssl_port)s')
                         ]
         self.command.extend(self.getSuiteOptions(suite))
+        self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
