@@ -66,6 +66,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             releaseConfig['version'],
             releaseConfig['buildNumber'], )
 
+    def majorReleasePrefix():
+        return "%s %s build%s" % (
+            releaseConfig['productName'].title(),
+            releaseConfig['majorUpdateToVersion'],
+            releaseConfig['majorUpdateBuildNumber'], )
+
     def genericFtpUrl():
         """ Generate an FTP URL pointing to the uploaded release builds for
         sticking into release notification messages """
@@ -93,6 +99,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 if stage.replace("xulrunner_", "").split('_')[0] == p]
         else:
             platform = [p for p in allplatforms if stage.split('_')[0] == p]
+        if releaseConfig['majorUpdateRepoPath']:
+            majorReleaseName = majorReleasePrefix()
         platform = platform[0] if len(platform) >= 1 else None
         message_tag = '[release] ' if not staging else '[staging-release] '
         # Use a generic ftp URL non-specific to any locale
@@ -1098,6 +1106,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             'env': builder_env,
             'properties': {'slavebuilddir': reallyShort(builderPrefix('mu'))}
         })
+        notify_builders.append(builderPrefix('major_update'))
 
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
             major_update_verify_factory = UpdateVerifyFactory(
