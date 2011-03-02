@@ -2882,7 +2882,7 @@ def generateMobileBranchObjects(config, name):
     return mobile_objects
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
-    extra_args = ['-d', '-b', config['repo_path']]
+    extra_args = ['-b', config['repo_path']]
     if config['product_name'] is not None:
         extra_args.extend(['-p', config['product_name']])
     if config['hg_username'] is not None:
