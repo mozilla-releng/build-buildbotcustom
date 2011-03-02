@@ -32,9 +32,10 @@ import BuildSlaves
 DEFAULT_L10N_CHUNKS = 15
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
-                                 releaseConfigFile):
+                                 releaseConfigFile, sourceRepoKey="mozilla"):
     # This variable is one thing that forces us into reconfiging prior to a
     # release. It should be removed as soon as nothing depends on it.
+    sourceRepoInfo = releaseConfig['sourceRepositories'][sourceRepoKey]
     releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
@@ -53,9 +54,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
 
     def builderPrefix(s, platform=None):
         if platform:
-            return "release-%s-%s_%s" % (releaseConfig['sourceRepoName'], platform, s)
+            return "release-%s-%s_%s" % (sourceRepoInfo['name'], platform, s)
         else:
-            return "release-%s-%s" % (releaseConfig['sourceRepoName'], s)
+            return "release-%s-%s" % (sourceRepoInfo['name'], s)
 
     def releasePrefix():
         """Construct a standard format product release name from the
@@ -121,6 +122,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             "%s/%s_%s" % (releaseConfig['releaseTemplates'], stage, job_status),
             "%s/%s_default_%s" % (releaseConfig['releaseTemplates'], platform, job_status),
             "%s/default_%s" % (releaseConfig['releaseTemplates'], job_status))
+        template = None
         for t in possible_templates:
             if os.access(t, os.R_OK):
                 template = open(t, "r", True)
@@ -154,6 +156,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         #if none exists, fall back to the default template
         possible_templates = ("%s/%s_change" % (releaseConfig['releaseTemplates'], step),
             "%s/default_change" % releaseConfig['releaseTemplates'])
+        template = None
         for t in possible_templates:
             if os.access(t, os.R_OK):
                 template = open(t, "r", True)
@@ -186,7 +189,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
 
     shippedLocalesFile = "%s/%s/raw-file/%s/%s" % (
                             branchConfig['hgurl'],
-                            releaseConfig['sourceRepoPath'],
+                            sourceRepoInfo['path'],
                             releaseTag,
                             releaseConfig['shippedLocalesPath'])
 
@@ -234,7 +237,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
     if staging:
         repo_setup_scheduler = Scheduler(
             name=builderPrefix('repo_setup'),
-            branch=releaseConfig['sourceRepoPath'],
+            branch=sourceRepoInfo['path'],
             treeStableTimer=None,
             builderNames=[builderPrefix('repo_setup')],
             fileIsImportant=lambda c: not isHgPollerTriggered(c,
@@ -248,7 +251,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         )
         release_downloader_scheduler = Scheduler(
             name=builderPrefix('release_downloader'),
-            branch=releaseConfig['sourceRepoPath'],
+            branch=sourceRepoInfo['path'],
             treeStableTimer=None,
             builderNames=[builderPrefix('release_downloader')],
             fileIsImportant=lambda c: not isHgPollerTriggered(c,
@@ -258,7 +261,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
     else:
         tag_scheduler = Scheduler(
             name=builderPrefix('tag'),
-            branch=releaseConfig['sourceRepoPath'],
+            branch=sourceRepoInfo['path'],
             treeStableTimer=None,
             builderNames=[builderPrefix('tag')],
             fileIsImportant=lambda c: not isHgPollerTriggered(c, branchConfig['hgurl'])
@@ -433,20 +436,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
 
     ##### Builders
     if staging:
-        clone_repositories = {
-            releaseConfig['sourceRepoClonePath']: {
-                'revision': releaseConfig['sourceRepoRevision'],
-                'relbranchOverride': releaseConfig['relbranchOverride'],
-                'bumpFiles': ['config/milestone.txt',
-                              'js/src/config/milestone.txt',
-                              'browser/config/version.txt']
-            }
-        }
+        clone_repositories = dict()
+        # The repo_setup builder only needs to the repoPath, so we only give
+        # it that
+        for sr in releaseConfig['sourceRepositories'].values():
+            clone_repositories.update({sr['clonePath']: {}})
+        # get_l10n_repositories spits out more than just the repoPath
+        # It's easier to just pass it along rather than strip it out
         if len(releaseConfig['l10nPlatforms']) > 0:
             l10n_clone_repos = get_l10n_repositories(
                 releaseConfig['l10nRevisionFile'],
                 releaseConfig['l10nRepoClonePath'],
-                releaseConfig['relbranchOverride'])
+                sourceRepoInfo['relbranch'])
             clone_repositories.update(l10n_clone_repos)
 
     builder_env = {
@@ -547,7 +548,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         source_factory = SingleSourceFactory(
             hgHost=branchConfig['hghost'],
             buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-            repoPath=releaseConfig['sourceRepoPath'],
+            repoPath=sourceRepoInfo['path'],
             productName=releaseConfig['productName'],
             version=releaseConfig['version'],
             baseTag=releaseConfig['baseTag'],
@@ -576,7 +577,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             xulrunner_source_factory = SingleSourceFactory(
                 hgHost=branchConfig['hghost'],
                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-                repoPath=releaseConfig['sourceRepoPath'],
+                repoPath=sourceRepoInfo['path'],
                 productName='xulrunner',
                 version=releaseConfig['milestone'],
                 baseTag=releaseConfig['baseTag'],
@@ -615,7 +616,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
     for platform in releaseConfig['enUSPlatforms']:
         # shorthand
         pf = branchConfig['platforms'][platform]
-        mozconfig = '%s/%s/release' % (platform, releaseConfig['sourceRepoName'])
+        mozconfig = '%s/%s/release' % (platform, sourceRepoInfo['name'])
         if platform in releaseConfig['talosTestPlatforms']:
             talosMasters = branchConfig['talos_masters']
         else:
@@ -636,7 +637,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 objdir=pf['platform_objdir'],
                 platform=platform,
                 hgHost=branchConfig['hghost'],
-                repoPath=releaseConfig['sourceRepoPath'],
+                repoPath=sourceRepoInfo['path'],
                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
@@ -764,12 +765,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 objdir=pf['platform_objdir'],
                 platform=platform,
                 hgHost=branchConfig['hghost'],
-                repoPath=releaseConfig['sourceRepoPath'],
+                repoPath=sourceRepoInfo['path'],
                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
                 profiledBuild=None,
-                mozconfig = '%s/%s/xulrunner' % (platform, releaseConfig['sourceRepoName']),
+                mozconfig = '%s/%s/xulrunner' % (platform, sourceRepoInfo['name']),
                 buildRevision=releaseTag,
                 stageServer=branchConfig['stage_server'],
                 stageUsername=branchConfig['stage_username_xulrunner'],
@@ -811,7 +812,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
          for platform in releaseConfig['l10nPlatforms']:
              partner_repack_factory = PartnerRepackFactory(
                  hgHost=branchConfig['hghost'],
-                 repoPath=releaseConfig['sourceRepoPath'],
+                 repoPath=sourceRepoInfo['path'],
                  buildToolsRepoPath=branchConfig['build_tools_repo_path'],
                  productName=releaseConfig['productName'],
                  version=releaseConfig['version'],
@@ -876,7 +877,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
 
     updates_factory = ReleaseUpdatesFactory(
         hgHost=branchConfig['hghost'],
-        repoPath=releaseConfig['sourceRepoPath'],
+        repoPath=sourceRepoInfo['path'],
         buildToolsRepoPath=branchConfig['build_tools_repo_path'],
         cvsroot=releaseConfig['cvsroot'],
         patcherToolsTag=releaseConfig['patcherToolsTag'],
@@ -908,7 +909,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         # commit to
         commitPatcherConfig=(not staging),
         clobberURL=branchConfig['base_clobber_url'],
-        oldRepoPath=releaseConfig['sourceRepoPath'],
+        oldRepoPath=sourceRepoInfo['path'],
         releaseNotesUrl=releaseConfig['releaseNotesUrl'],
         binaryName=releaseConfig['binaryName'],
         oldBinaryName=releaseConfig['oldBinaryName'],
@@ -1090,7 +1091,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             # commit to
             commitPatcherConfig=(not staging),
             clobberURL=branchConfig['base_clobber_url'],
-            oldRepoPath=releaseConfig['sourceRepoPath'],
+            oldRepoPath=sourceRepoInfo['path'],
             triggerSchedulers=[builderPrefix('major_update_verify')],
             releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
         )
@@ -1142,7 +1143,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         l10nPlatforms=releaseConfig['l10nPlatforms'],
         oldVersion=releaseConfig['oldVersion'],
         hgHost=branchConfig['hghost'],
-        repoPath=releaseConfig['sourceRepoPath'],
+        repoPath=sourceRepoInfo['path'],
         buildToolsRepoPath=branchConfig['build_tools_repo_path'],
         credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py")
     )
@@ -1173,7 +1174,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             l10nPlatforms=None, # not needed
             oldVersion=None, # no updates
             hgHost=branchConfig['hghost'],
-            repoPath=releaseConfig['sourceRepoPath'],
+            repoPath=sourceRepoInfo['path'],
             buildToolsRepoPath=branchConfig['build_tools_repo_path'],
             credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py"),
         )
@@ -1202,7 +1203,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 relayhost="mail.build.mozilla.org",
                 sendToInterestedUsers=False,
                 extraRecipients=[recipient],
-                branches=[releaseConfig['sourceRepoPath']],
+                branches=[sourceRepoInfo['path']],
                 messageFormatter=createReleaseChangeMessage,
             ))
     for recipient in releaseConfig['AllRecipients'] + \
