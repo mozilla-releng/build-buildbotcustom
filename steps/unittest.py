@@ -280,8 +280,15 @@ class ReftestMixin(object):
     def getSuiteOptions(self, suite):
         if suite == 'crashtest':
             return ['reftest/tests/testing/crashtest/crashtests.list']
+        elif suite == 'crashtest-ipc':
+            return ['--setpref=browser.tabs.remote=true',
+                    'reftest/tests/testing/crashtest/crashtests.list']
         elif suite in ('reftest', 'direct3D', 'opengl'):
             return ['reftest/tests/layout/reftests/reftest.list']
+        elif suite in ('reftest-ipc'):
+            # See bug 637858 for why we are doing a subset of all reftests
+            return ['--setpref=browser.tabs.remote=true',
+                    'reftest/tests/layout/reftests/reftest-sanity/reftest.list']
         elif suite == 'reftest-d2d':
             return ['--setpref=gfx.font_rendering.directwrite.enabled=true',
                     '--setpref=mozilla.widget.render-mode=6',
