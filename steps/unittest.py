@@ -824,6 +824,9 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
                                  certificatePath=certificatePath, app=app,
                                  consoleLevel=consoleLevel)
 
+        self.name = 'mochitest-%s' % variant
+        if testPath:
+            self.name += " (%s)" % testPath
         self.command = ['python', 'mochitest/runtestsremote.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
@@ -847,6 +850,9 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                                  utilityPath=utilityPath, app=app,
                                  totalChunks=totalChunks, thisChunk=thisChunk)
 
+        self.name = suite
+        if totalChunks:
+            self.name += '-%i' % thisChunk
         self.command = ['python', 'reftest/remotereftest.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
