@@ -6977,10 +6977,12 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   symbols_path='symbols',
                   maxTime=120*60, # Two Hours
                  ))
-            elif suite in ('reftest', 'reftest-d2d', 'crashtest', \
-                           'direct3D', 'opengl', 'reftest-no-d2d-d3d'):
+            elif suite in ('reftest', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
+                           'crashtest-ipc', 'direct3D', 'opengl', 'reftest-no-d2d-d3d'):
                 if suite in ('direct3D', 'opengl'):
                     self.env.update({'MOZ_ACCELERATED':'11'})
+                if suite in ('reftest-ipc', 'crashtest-ipc'):
+                    self.env.update({'MOZ_LAYERS_FORCE_SHMEM_SURFACES':'1'})
                 # Unpack the tests
                 self.addStep(UnpackTest(
                  filename=WithProperties('%(tests_filename)s'),
