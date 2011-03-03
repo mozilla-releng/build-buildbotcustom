@@ -49,8 +49,8 @@ class MozillaUpdateConfig(ShellCommand):
         #if we are an addonTester then the addonName/addonUrl build property should be set
         #  if it's not set this will throw a key error and the run will go red - which should be the expected result
         if self.addonTester:
-            addon_prefix = self.build.getProperty('addonName')
-            self.addOptions += ['--testPrefix', addon_prefix, '--extension', self.extName]
+            addon_id = os.path.basename(self.build.getProperty('addonUrl'))
+            self.addOptions += ['--addonID', addon_id, '--extension', self.extName]
 
         if self.useSymbols:
             self.addOptions += ['--symbolsPath', '../symbols']
