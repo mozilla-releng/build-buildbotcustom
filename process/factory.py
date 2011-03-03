@@ -7128,13 +7128,14 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  haltOnFailure=True,
                 ))
                 variant = name.split('-', 1)[1]
-                for tp in suite.get('testPaths', []):
-                    self.addStep(unittest_steps.RemoteMochitestStep(
-                     variant=variant,
-                     testPath=tp,
-                     workdir='build/tests',
-                     timeout=2400,
-                    ))
+                if suite.get('testPaths', None):
+                    for tp in suite.get('testPaths', []):
+                        self.addStep(unittest_steps.RemoteMochitestStep(
+                         variant=variant,
+                         testPath=tp,
+                         workdir='build/tests',
+                         timeout=2400,
+                        ))
                 else:
                     self.addStep(unittest_steps.RemoteMochitestStep(
                      variant=variant,
@@ -7142,6 +7143,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                      timeout=2400
                     ))
             elif name.startswith('reftest') or name == 'crashtest':
+                totalChunks = suite.get('totalChunks', None)
+                thisChunk = suite.get('thisChunk', None)
                 # Unpack the tests
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
@@ -7151,7 +7154,22 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  ))
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
-                 workdir='build/tests'
+                 totalChunks=totalChunks,
+                 thisChunk=thisChunk,
+                 workdir='build/tests',
+                 timeout=2400
+                ))
+            elif name == 'jsreftest':
+                self.addStep(UnpackTest(
+                 filename=WithProperties('../%(tests_filename)s'),
+                 testtype='jsreftest',
+                 workdir='build/tests',
+                 haltOnFailure=True,
+                 ))
+                self.addStep(unittest_steps.RemoteReftestStep(
+                 suite=name,
+                 workdir='build/tests',
+                 timeout=2400
                 ))
 
     def addTearDownSteps(self):
