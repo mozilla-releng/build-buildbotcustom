@@ -663,7 +663,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                      name="clear_ccache_stats", warnOnFailure=False,
                      flunkOnFailure=False, haltOnFailure=False, env=self.env)
         self.addBuildSteps()
-        if self.uploadSymbols or self.uploadPackages or self.leakTest:
+        if self.uploadSymbols or self.packageTests or self.leakTest:
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
