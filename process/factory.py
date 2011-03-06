@@ -663,7 +663,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                      name="clear_ccache_stats", warnOnFailure=False,
                      flunkOnFailure=False, haltOnFailure=False, env=self.env)
         self.addBuildSteps()
-        if self.uploadSymbols or self.uploadPackages or self.leakTest:
+        if self.uploadSymbols or self.packageTests or self.leakTest:
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
@@ -5590,6 +5590,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  talosMasters=None,
                  unittestMasters=None,
                  multiLocale=False,
+                 compareLocalesRepoPath='build/compare-locales',
+                 compareLocalesRevision='RELEASE_AUTOMATION',
                  mozharnessRepoPath="build/mozharness",
                  mozharnessRevision="default",
                  mozharnessConfig=None,
@@ -5679,6 +5681,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.mozharnessRepository = self.getRepository(mozharnessRepoPath)
             self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
             self.mergeLocales = mergeLocales
+            self.compareLocalesRepository = self.getRepository(compareLocalesRepoPath)
+            self.compareLocalesRevision = compareLocalesRevision
 
     def addTriggeredBuildsSteps(self,
                                 triggeredSchedulers=None):
@@ -5705,11 +5709,19 @@ class MobileBuildFactory(MozillaBuildFactory):
                        cloneTimeout=60*20,
                        revision='default',
                        propertyPrefix="hg",
+                       clobber=False,
                        changesetLink=None):
         assert (repository and workdir)
         if (targetDirectory == None):
             targetDirectory = self.getRepoName(repository)
 
+        if clobber:
+            self.addStep(ShellCommand(
+                name='clobber_%s_dir' % targetDirectory,
+                command=['rm', '-rf', targetDirectory],
+                timeout=60*60,
+                workdir=workdir,
+            ))
         self.addStep(MercurialCloneCommand,
             name='checkout',
             command=['bash', '-c',
@@ -5877,6 +5889,12 @@ class MobileBuildFactory(MozillaBuildFactory):
                 self.addHgPullSteps(repository=self.mozharnessRepository,
                                     workdir=self.baseWorkDir,
                                     revision=self.mozharnessRevision,
+                                    clobber=self.clobber,
+                                    cloneTimeout=60*30)
+                self.addHgPullSteps(repository=self.compareLocalesRepository,
+                                    workdir=self.baseWorkDir,
+                                    revision=self.compareLocalesRevision,
+                                    clobber=self.clobber,
                                     cloneTimeout=60*30)
 
     def addSymbolSteps(self):
@@ -5992,6 +6010,14 @@ class MobileBuildFactory(MozillaBuildFactory):
                                             self.objdir)
             )
 
+    def processCommand(self, **kwargs):
+        '''This function is overridden by MaemoBuildFactory to
+        adjust the command and workdir appropriately for scratchbox.
+
+        Taken from BaseRepackFactory.
+        '''
+        return kwargs
+
     def addMakeUploadSteps(self, subdir=None, sendchange=True,
                            locale=None):
         self.addStep(SetProperty,
@@ -6056,7 +6082,7 @@ class MobileBuildFactory(MozillaBuildFactory):
         makeUploadCommand = ['make', 'upload']
         if locale:
             makeUploadCommand += ['AB_CD=%s' % locale]
-        self.addStep(SetProperty(
+        self.addStep(SetProperty, **self.processCommand(
             name='make_upload',
             command=makeUploadCommand,
             env=uploadEnv,
@@ -6100,13 +6126,13 @@ class MobileBuildFactory(MozillaBuildFactory):
                  user="sendchange",
                 ))
 
-    def addMultiLocaleSteps(self):
+    def addMultiLocaleSteps(self, scriptName="mozharness/scripts/multil10n.py"):
         mergeLocalesArg = "--merge-locales"
         if not self.mergeLocales:
             mergeLocalesArg = "--no-merge-locales"
         self.addStep(ShellCommand(
             name='run_multil10n',
-            command=['python', 'mozharness/scripts/multil10n.py',
+            command=['python', scriptName,
                      '--config-file', self.mozharnessConfig,
                      mergeLocalesArg,
                      '--only-pull-locale-source', '--only-add-locales',
@@ -6188,28 +6214,17 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
 class MaemoBuildFactory(MobileBuildFactory):
     def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
                  sb_target='CHINOOK-ARMEL-2007',
-                 multiLocale = False,
-                 l10nRepoPath = 'l10n-central',
-                 compareLocalesRepoPath = 'build/compare-locales',
-                 compareLocalesTag = 'RELEASE_AUTOMATION',
-                 packageGlobList=['dist/*.tar.*',
-                                  'mobile/*.deb',
-                                  'dist/deb_name.txt',
-                                  'dist/*.zip'],
-                 l10nTag='default',
+                 scratchboxHome='/scratchbox/users/cltbld/home/cltbld',
+                 packageGlobList=None,
                  debs=True,
                  mergeLocales=True,
-                 locales=None,
                  objdirRelPath=None, objdirAbsPath=None,
                  **kwargs):
         MobileBuildFactory.__init__(self, **kwargs)
         self.baseBuildDir = baseBuildDir
         self.packageGlob = ' '.join(packageGlobList)
         self.scratchboxPath = scratchboxPath
-        self.multiLocale = multiLocale
-        self.l10nRepoPath = l10nRepoPath
-        self.l10nTag = l10nTag
-        self.locales = locales
+        self.scratchboxHome = scratchboxHome
         self.mergeLocales = mergeLocales
         self.sb_target = sb_target
         self.debs = debs
@@ -6243,46 +6258,21 @@ class MaemoBuildFactory(MobileBuildFactory):
         self.addBaseRepoSteps()
         self.getMozconfig()
         self.addPreBuildSteps()
+        self.addBuildSteps()
+        self.addPackageSteps()
+        self.addSymbolSteps()
         if self.multiLocale:
-            # In the multi-locale scenario we build and upload the single-locale
-            # before the multi-locale. This packageGlob will be used to move packages
-            # into the "en-US" directory before uploading it and later on the 
-            # multi-locale overwrites it in addMultiLocaleSteps(...) 
-            self.packageGlob = "dist/*.tar.* mobile/*.deb dist/deb_name.txt"
-            self.compareLocalesRepo = self.getRepository(compareLocalesRepoPath)
-            self.compareLocalesTag = compareLocalesTag
-            self.addStep(ShellCommand,
-                name='create_dir_l10n',
-                command=['mkdir', '-p', self.l10nRepoPath],
-                workdir='%s' % self.baseWorkDir,
-                description=['create', 'l10n', 'dir']
-            )
-            self.addBuildSteps(extraEnv="L10NBASEDIR='../../%s'" % self.l10nRepoPath)
-            # This will package the en-US single-locale build (no tests)
-            self.addPackageSteps()
-            self.addSymbolSteps()
-            self.uploadEnUS()
-            self.useProgress = False
-        else: # Normal single-locale nightly like Electrolysis and Tracemonkey
-            self.addBuildSteps()
-            self.addPackageSteps(packageTests=True)
-            self.addSymbolSteps()
-            self.addUploadSteps(platform='linux')
-
+            self.addMakeUploadSteps(subdir="en-US")
+        else:
+            self.addMakeUploadSteps()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
-
         if self.multiLocale:
-            self.nonMultiLocaleStepsLength = len(self.steps)
-
+            self.addMultiLocaleSteps(scriptName="mozharness/scripts/maemo_multi_locale_build.py")
+            self.addMakeUploadSteps(locale="multi")
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
-    def newBuild(self, requests):
-        if self.multiLocale:
-            self.addMultiLocaleSteps(requests, 'locales')
-        return BuildFactory.newBuild(self, requests)
-        
     def addPreCleanSteps(self):
         self.addStep(ShellCommand,
             name='rm_logfile',
@@ -6298,14 +6288,6 @@ class MaemoBuildFactory(MobileBuildFactory):
                 workdir=self.baseWorkDir,
                 timeout=60*60
             )
-            if self.multiLocale:
-                self.addStep(ShellCommand,
-                    name='clobber_l10n_dir',
-                    command=['rm', '-rf', self.l10nRepoPath],
-                    env=self.env,
-                    workdir=self.baseWorkDir,
-                    timeout=10*60
-                )
         else:
             # Must use a workdir of self.baseWorkDir; a workdir of
             # self.objdirAbsPath can create an empty mozilla-central
@@ -6334,7 +6316,7 @@ class MaemoBuildFactory(MobileBuildFactory):
             haltOnFailure=True
         )
 
-    def addPackageSteps(self, multiLocale=False, packageTests=False):
+    def addPackageSteps(self, multiLocale=False):
         extraArgs=''
         if multiLocale:
             extraArgs='AB_CD=multi'
@@ -6357,15 +6339,14 @@ class MaemoBuildFactory(MobileBuildFactory):
             )
         # Build tests for multi-locale nightly builds, dependent builds
         # and nightly builds which are not multi-locale like Electrolysis and Tracemonkey 
-        if packageTests or not self.nightly:
-            self.addStep(ShellCommand,
-                name='make_pkg_tests',
-                command=[self.scratchboxPath, '-p', '-d',
-                         '%s' % (self.objdirRelPath),
-                         'make package-tests PYTHON=python2.5', extraArgs],
-                description=['make', 'package-tests'],
-                haltOnFailure=True
-            )
+        self.addStep(ShellCommand,
+            name='make_pkg_tests',
+            command=[self.scratchboxPath, '-p', '-d',
+                     '%s' % (self.objdirRelPath),
+                     'make package-tests PYTHON=python2.5', extraArgs],
+            description=['make', 'package-tests'],
+            haltOnFailure=True
+        )
 
     def addSymbolSteps(self):
         if self.generateSymbols:
@@ -6389,224 +6370,17 @@ class MaemoBuildFactory(MobileBuildFactory):
                 haltOnFailure=True
             )
     
-    def prepUpload(self, localeDir='en-US', uploadDir=None):
-        """This function is only called by the nightly and dependent
-        single-locale build since we want to upload the localeDir
-        subdirectory as a whole."""
-        # uploadDir allows you to use a nested directory structure in
-        # localeDir (e.g. maemo/en-US) and scp -r maemo instead of
-        # scp -r maemo/en-US, which loses that directory structure.
-        if not uploadDir:
-            uploadDir=localeDir
-        self.addStep(ShellCommand,
-            name='prepare_upload',
-            command=['mkdir', '-p', localeDir],
-            haltOnFailure=True,
-            workdir='%s/dist' % (self.objdirAbsPath)
-        )
-        self.addStep(ShellCommand,
-            name='cp_binaries',
-            command=['sh', '-c', 'cp %s dist/%s' % (self.packageGlob,
-                                                       localeDir)],
-            workdir=self.objdirAbsPath,
-        )
-        # Now that we have moved all the packages that we want under localeDir
-        # let's indicate that we want to upload the whole directory
-        self.packageGlob = '-r dist/%s' % uploadDir
-
-    def uploadEnUS(self):
-        self.prepUpload(localeDir='en-US')
-        self.addUploadSteps(platform='linux')
-
-    def uploadMulti(self):
-        self.addUploadSteps(platform='linux')
-
-    def addMultiLocaleSteps(self, requests=None, propertyName=None):
-        if self.locales:
-            locales = self.locales
-        else:
-            req = requests[-1]
-            # get the list of locales that has been added by the scheduler
-            locales = req.properties.getProperty(propertyName)
-
-        # Drop all previous multi-locale steps, to fix bug 531873.
-        self.steps = self.steps[:self.nonMultiLocaleStepsLength]
-        # remove all packages that have been created by the single locale build
-        self.addStep(ShellCommand,
-            name='rm_packages',
-            command=['sh', '-c', 'rm %s' % self.packageGlob],
-            description=['remove single-locale packages'],
-            workdir=self.objdirAbsPath,
-            flunkOnFailure=False,
-            warnOnFailure=False,
-        )
-        self.compareLocalesSetup()
-        for locale in locales:
-            self.checkOutLocale(locale)
-            self.compareLocales(locale)
-            self.addChromeLocale(locale)
-        # Let's package the multi-locale build and upload it
-        self.addPackageSteps(multiLocale=True, packageTests=True)
-        self.packageGlob="dist/fennec*.tar.* mobile/fennec*.deb " + \
-                         "dist/deb_name.txt dist/fennec*.zip"
-        self.uploadMulti()
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
-
-    def compareLocalesSetup(self):
-        self.addStep(ShellCommand,
-         name='rm_compare_locales',
-         command=['rm', '-rf', 'compare-locales'],
-         description=['remove', 'compare-locales'],
-         workdir=self.baseWorkDir,
-         haltOnFailure=True
-        )
-        self.addStep(MercurialCloneCommand,
-         name='clone_compare_locales',
-         command=['hg', 'clone', self.compareLocalesRepo, 'compare-locales'],
-         description=['checkout', 'compare-locales'],
-         workdir=self.baseWorkDir,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='update_compare_locales',
-         command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
-         description='update compare-locales',
-         workdir='%s/compare-locales' % self.baseWorkDir,
-         haltOnFailure=True
-        )
-
-    def checkOutLocale(self, locale):
-        self.addStep(MercurialCloneCommand,
-         name='get_locale_src_%s' % locale,
-         command=['sh', '-c',
-          WithProperties('if [ -d '+locale+' ]; then ' +
-                         'hg -R '+locale+' pull -r '+self.l10nTag+' ; ' +
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.l10nRepoPath+
-                           '/'+locale+'/ ; ' +
-                         'hg -R '+locale+' up -C -r '+self.l10nTag+' ; '
-                         'fi ')],
-         descriptionDone="locale source",
-         timeout=5*60, # 5 minutes
-         haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
-        )
-
-    def compareLocales(self, locale):
-        if self.mergeLocales:
-            mergeLocaleOptions = ['-m', '%s/merged' % self.objdirAbsPath]
-        else:
-            mergeLocaleOptions = []
-        self.addStep(ShellCommand,
-         name='rm_merged_%s' % locale,
-         command=['rm', '-rf', 'merged'],
-         description=['remove', 'merged'],
-         workdir=self.objdirAbsPath,
-         haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-         name='run_compare_locales_%s' % locale,
-         command=['python',
-                  '%s/compare-locales/scripts/compare-locales' % self.baseWorkDir] +
-                  mergeLocaleOptions +
-                  ["l10n.ini",
-                  "%s/%s" % (self.baseWorkDir, self.l10nRepoPath),
-                  locale],
-         description='comparing %s' % locale,
-         env={'PYTHONPATH': ['%s/compare-locales/lib' % self.baseWorkDir]},
-         flunkOnFailure=False,
-         warnOnFailure=True,
-         workdir="%s/%s/mobile/locales" % \
-                (self.baseWorkDir, self.branchName),
-        )
-
-    def addChromeLocale(self, locale):
-        if self.mergeLocales:
-            # TODO: Move '/home/cltbld' to our config files
-            # the absolute path (from within scratchbox) for the objdir...
-            # objdirAbsScratchboxPath ?
-            mergeDirArgs = ['LOCALE_MERGEDIR=/home/cltbld/%s/merged' %
-                            self.objdirRelPath]
-        else:
-            mergeDirArgs = []
-        self.addStep(ShellCommand,
-            name='make_locale_chrome_%s' % locale,
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s/mobile/locales' % self.objdirRelPath,
-                     'make chrome-%s' % locale] + mergeDirArgs,
-            env = self.env,
-            haltOnFailure=False,
-            description=['make','chrome-%s' % locale],
-        )
-
-class MaemoReleaseBuildFactory(MaemoBuildFactory):
-    def __init__(self, env, **kwargs):
-        env = env.copy()
-        MaemoBuildFactory.__init__(self, env=env, nightly=False,
-                                   clobber=True, **kwargs)
-        assert (self.stageUsername)
-
-    def uploadEnUS(self):
-        self.prepUpload(localeDir='%s/en-US' % self.platform,
-                        uploadDir=self.platform)
-        self.addUploadSteps(platform='linux')
-        
-    def uploadMulti(self):
-        self.prepUpload(localeDir='%s/multi' % self.platform,
-                        uploadDir=self.platform)
-        self.addStep(SetProperty,
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % (self.objdir),
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(ShellCommand,
-         name='echo_buildID',
-         command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                self.platform + '_info.txt')],
-         workdir='%s/dist' % (self.objdirAbsPath)
-        )
-        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
-                                                    self.platform)
-        self.addUploadSteps(platform='linux')
-
-    def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % (self.objdir),
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(MozillaStageUpload,
-            objdir="%s/%s" % (self.branchName, self.objdir),
-            username=self.stageUsername,
-            milestone=self.baseUploadDir,
-            remoteHost=self.stageServer,
-            remoteBasePath=self.stageBasePath,
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=False,
-            releaseToDated=False,
-            releaseToTinderboxBuilds=False,
-            releaseToCandidates=True,
-            tinderboxBuildsDir=self.baseUploadDir,
-            remoteCandidatesPath=self.stageBasePath,
-            dependToDated=True,
-            workdir=self.objdirAbsPath
-        )
-
+    def processCommand(self, verbose=True, **kwargs):
+        '''Modifies a command to make it suitable for Scratchbox'''
+        if kwargs['workdir'].startswith(self.scratchboxHome):
+            kwargs['workdir'] = kwargs['workdir'].replace(self.scratchboxHome+'/','')
+        kwargs['command'] = [self.scratchboxPath,
+                             '-d', kwargs['workdir']] + kwargs['command']
+        if verbose:
+            kwargs['command'].insert(1, '-p')
+        if 'env' in kwargs and kwargs['env']:
+            kwargs['command'].insert(1, '-k')
+        return kwargs
 
 def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
     '''Given a build object, figure out which files have the include_substr

@@ -238,33 +238,3 @@ class DependentL10n(Dependent, L10nMixin):
                     sses.append(ss)
                 db.scheduler_unsubscribe_buildset(self.schedulerid, bsid, t)
         return sses
-
-class MultiNightlyL10n(Nightly, L10nMixin):
-    '''This scheduler creates a property which is a list of locales.
-    The factories that want to use this should implement "newBuild(self, request)"
-    and grab the last request which contains the property "locales"
-    '''
-    def __init__(self, platform, branch=None, localesFile=None, **kwargs):
-        L10nMixin.__init__(self, platform=platform, branch=branch,
-                localesFile=localesFile)
-        Nightly.__init__(self, **kwargs)
-
-    def _cbLoadedLocales(self, t, locales, reason, set_props):
-        """
-        Instead of submitting a job per locale, we just append a list of locales
-        to a BuildSet's property and let the factory use it through the BuildRequests
-        """
-        locales = sorted(locales.keys())
-
-        props = properties.Properties()
-        props.updateFromProperties(self.properties)
-        props.setProperty('locales', locales, "MultiNightlyL10n")
-
-        ss = SourceStamp(branch=self.branch)
-        ssid = db.get_sourcestampid(ss, t)
-        self.create_buildset(ssid, reason, t, props=props)
-
-    def start_HEAD_build(self, t):
-        # This gets called by Nightly when it's time to kick off a new build
-        return self.createL10nBuilds()
-
