@@ -5405,6 +5405,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  mozharnessRepoPath="build/mozharness",
                  mozharnessRevision="default",
                  mozharnessConfig=None,
+                 compareLocalesRepoPath="build/compare-locales",
+                 compareLocalesRevision="RELEASE_AUTOMATION",
                  mergeLocales=True,
                  **kwargs):
         """
@@ -5482,6 +5484,9 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.mozharnessConfig = mozharnessConfig
             self.mozharnessRepository = self.getRepository(self.mozharnessRepoPath)
             self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
+            self.compareLocalesRepoPath = compareLocalesRepoPath
+            self.compareLocalesRepository = self.getRepository(self.compareLocalesRepoPath)
+            self.compareLocalesRevision = compareLocalesRevision
             self.mergeLocales = mergeLocales
 
     def addHgPullSteps(self, repository=None,
@@ -5575,6 +5580,11 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.addHgPullSteps(repository=self.mozharnessRepository,
                                 workdir=self.baseWorkDir,
                                 revision=self.mozharnessRevision,
+                                cloneTimeout=60*30)
+        if hasattr(self, 'compareLocalesRepository'):
+            self.addHgPullSteps(repository=self.compareLocalesRepository,
+                                workdir=self.baseWorkDir,
+                                revision=self.compareLocalesRevision,
                                 cloneTimeout=60*30)
 
     def addSymbolSteps(self):
