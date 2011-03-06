@@ -5405,6 +5405,8 @@ class MobileBuildFactory(MozillaBuildFactory):
                  mozharnessRepoPath="build/mozharness",
                  mozharnessRevision="default",
                  mozharnessConfig=None,
+                 compareLocalesRepoPath="build/compare-locales",
+                 compareLocalesRevision="RELEASE_AUTOMATION",
                  mergeLocales=True,
                  **kwargs):
         """
@@ -5482,6 +5484,9 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.mozharnessConfig = mozharnessConfig
             self.mozharnessRepository = self.getRepository(self.mozharnessRepoPath)
             self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
+            self.compareLocalesRepoPath = compareLocalesRepoPath
+            self.compareLocalesRepository = self.getRepository(self.compareLocalesRepoPath)
+            self.compareLocalesRevision = compareLocalesRevision
             self.mergeLocales = mergeLocales
 
     def addHgPullSteps(self, repository=None,
@@ -5575,6 +5580,11 @@ class MobileBuildFactory(MozillaBuildFactory):
             self.addHgPullSteps(repository=self.mozharnessRepository,
                                 workdir=self.baseWorkDir,
                                 revision=self.mozharnessRevision,
+                                cloneTimeout=60*30)
+        if hasattr(self, 'compareLocalesRepository'):
+            self.addHgPullSteps(repository=self.compareLocalesRepository,
+                                workdir=self.baseWorkDir,
+                                revision=self.compareLocalesRevision,
                                 cloneTimeout=60*30)
 
     def addSymbolSteps(self):
@@ -7249,8 +7259,7 @@ class PartnerRepackFactory(ReleaseFactory):
                  buildNumber=1, partnersRepoRevision='default',
                  nightlyDir="nightly", platformList=None, packageDmg=True,
                  partnerUploadDir='unsigned/partner-repacks',
-                 baseWorkDir='.', python='python',
-                 createRemoteStageDir=False, **kwargs):
+                 baseWorkDir='.', python='python', **kwargs):
         ReleaseFactory.__init__(self, baseWorkDir=baseWorkDir, **kwargs)
         self.productName = productName
         self.version = version
@@ -7264,7 +7273,6 @@ class PartnerRepackFactory(ReleaseFactory):
         self.partnerUploadDir = partnerUploadDir
         self.packageDmg = packageDmg
         self.python = python
-        self.createRemoteStageDir = createRemoteStageDir
         self.candidatesDir = self.getCandidatesDir(productName,
                                                    version,
                                                    buildNumber,
@@ -7349,30 +7357,17 @@ class PartnerRepackFactory(ReleaseFactory):
         )
 
     def uploadPartnerRepacks(self):
-        if self.createRemoteStageDir:
-            self.addStep(ShellCommand(
-                name='create_remote_stage_dir',
-                command=['bash', '-c', 'ssh -i ~/.ssh/%s %s@%s mkdir -p %s/%s' % \
-                         (self.stageSshKey, self.stageUsername,
-                          self.stagingServer, self.candidatesDir,
-                          self.partnerUploadDir)],
-                description=['create', 'remote', 'upload', 'dir'],
-                haltOnFailure=True,
-            ))
-            
         self.addStep(ShellCommand,
          name='upload_partner_builds',
          command=['rsync', '-av',
                   '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
-                  '.',
-                  '%s@%s:%s' % (self.stageUsername,
+                  'build%s/' % str(self.buildNumber),
+                  '%s@%s:%s/' % (self.stageUsername,
                                 self.stagingServer,
-                                self.candidatesDir) + \
-                  self.partnerUploadDir,
+                                self.candidatesDir)
                   ],
-         workdir='%s/scripts/repacked_builds/%s/build%s' % (self.partnersRepackDir,
-                                                            self.version,
-                                                            str(self.buildNumber)),
+         workdir='%s/scripts/repacked_builds/%s' % (self.partnersRepackDir,
+                                                    self.version),
          description=['upload', 'partner', 'builds'],
          haltOnFailure=True
         )
