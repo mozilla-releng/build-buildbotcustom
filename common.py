@@ -22,9 +22,10 @@ def getPlatformFtpDir(platform):
     }
     return platform_ftp_map.get(platform)
 
-def genBuildID():
+def genBuildID(now=None):
     """Return a buildid based on the current time"""
-    now = time.time()
+    if not now:
+        now = time.time()
     return time.strftime("%Y%m%d%H%M%S", time.localtime(now))
 
 def genBuildUID():
