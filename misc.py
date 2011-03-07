@@ -3060,15 +3060,16 @@ def generateSpiderMonkeyObjects(config, SLAVES):
     branch = os.path.basename(config['repo_path'])
 
     for platform, variants in config['platforms'].items():
+        base_platform = platform.split('-', 1)[0]
         if 'win' in platform:
-            slaves = SLAVES[platform]
+            slaves = SLAVES[base_platform]
             interpreter = 'bash'
         elif 'arm' in platform:
             slaves = SLAVES['linux']
             interpreter = ['/scratchbox/moz_scratchbox', '-d',
                     '/builds/slave/%s' % reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant))]
         else:
-            slaves = SLAVES[platform]
+            slaves = SLAVES[base_platform]
             interpreter = None
 
         for variant in variants:
