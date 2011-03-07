@@ -405,6 +405,9 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     productName = 'firefox'
     if 'mobile' in name_prefix or 'Android' in name_prefix:
         productName = 'fennec'
+    branchProperty = branch_name
+    if pf.get('branch_extra', None):
+        branchProperty += '-%s' % pf['branch_extra']
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     if pf.get('is_remote', False):
         hostUtils = pf['host_utils_url']
@@ -424,7 +427,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
-            'properties': {'branch': branch_name, 'platform': platform,
+            'properties': {'branch': branchProperty, 'platform': platform,
                            'build_platform': platform, 'slavebuilddir': 'test'},
         }
         builders.append(builder)
@@ -459,7 +462,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     'factory': factory,
                     'category': category,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': branch_name, 'platform': platform,
+                    'properties': {'branch': branchProperty, 'platform': platform,
                         'build_platform': platform, 'slavebuilddir' : 'test'},
                     'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
                 }
@@ -488,7 +491,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
+                'properties': {'branch': branchProperty, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
@@ -2387,6 +2390,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if tinderboxTree not in all_test_builders:
             all_test_builders[tinderboxTree] = []
 
+        branchProperty = branch
+        if platform_config.get('branch_extra', None):
+            branchProperty += '-%s' % platform_config['branch_extra']
+
         for slave_platform in platform_config['slave_platforms']:
             platform_name = platform_config[slave_platform]['name']
             # this is to handle how a platform has more than one slave platform
@@ -2422,7 +2429,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     'factory': factory,
                     'category': branch,
                     'properties': {
-                        'branch': branch,
+                        'branch': branchProperty,
                         'platform': slave_platform,
                         'build_platform': platform,
                         'builddir': builddir,
