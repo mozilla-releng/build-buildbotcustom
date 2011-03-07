@@ -268,49 +268,24 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         )
 
     schedulers.append(tag_scheduler)
-    source_scheduler = Dependent(
-        name=builderPrefix('source'),
-        upstream=tag_scheduler,
-        builderNames=[builderPrefix('source')]
-    )
-    schedulers.append(source_scheduler)
+
+    tag_downstream = [builderPrefix('source')]
 
     if releaseConfig['buildNumber'] == 1:
-        bouncer_submitter_scheduler = Dependent(
-            name=builderPrefix('bouncer_submitter'),
-            upstream=tag_scheduler,
-            builderNames=[builderPrefix('bouncer_submitter')]
-        )
-        schedulers.append(bouncer_submitter_scheduler)
+        tag_downstream.append(builderPrefix('bouncer_submitter'))
 
         if releaseConfig['doPartnerRepacks']:
-            euballot_bouncer_submitter_scheduler = Dependent(
-                name=builderPrefix('euballot_bouncer_submitter'),
-                upstream=tag_scheduler,
-                builderNames=[builderPrefix('euballot_bouncer_submitter')]
-            )
-            schedulers.append(euballot_bouncer_submitter_scheduler)
+            tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
 
     if releaseConfig['xulrunnerPlatforms']:
-        xulrunner_source_scheduler = Dependent(
-            name=builderPrefix('xulrunner_source'),
-            upstream=tag_scheduler,
-            builderNames=[builderPrefix('xulrunner_source')]
-        )
-        schedulers.append(xulrunner_source_scheduler)
+        tag_downstream.append(builderPrefix('xulrunner_source'))
 
     for platform in releaseConfig['enUSPlatforms']:
-        build_scheduler = Dependent(
-            name=builderPrefix('%s_build' % platform),
-            upstream=tag_scheduler,
-            builderNames=[builderPrefix('%s_build' % platform)]
-        )
-        schedulers.append(build_scheduler)
+        tag_downstream.append(builderPrefix('%s_build' % platform))
         notify_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
-            repack_scheduler = Dependent(
+            repack_scheduler = Triggerable(
                 name=builderPrefix('%s_repack' % platform),
-                upstream=build_scheduler,
                 builderNames=l10nBuilders(platform).values(),
             )
             schedulers.append(repack_scheduler)
@@ -323,12 +298,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             notify_builders.append(builderPrefix('repack_complete', platform))
 
     for platform in releaseConfig['xulrunnerPlatforms']:
-        xulrunner_build_scheduler = Dependent(
-            name=builderPrefix('xulrunner_%s_build' % platform),
+        tag_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
+
+    DependentID = makePropertiesScheduler(Dependent, [buildIDSchedFunc, buildUIDSchedFunc])
+
+    schedulers.append(
+        DependentID(
+            name=builderPrefix('build'),
             upstream=tag_scheduler,
-            builderNames=[builderPrefix('xulrunner_%s_build' % platform)]
-        )
-        schedulers.append(xulrunner_build_scheduler)
+            builderNames=tag_downstream,
+        ))
 
     if releaseConfig['doPartnerRepacks']:
         for platform in releaseConfig['l10nPlatforms']:
@@ -664,6 +643,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 unittestMasters=unittestMasters,
                 unittestBranch=unittestBranch,
                 clobberURL=branchConfig['base_clobber_url'],
+                triggerBuilds=True,
+                triggeredSchedulers=[builderPrefix('%s_repack' % platform)],
             )
 
             builders.append({
