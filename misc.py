@@ -799,6 +799,17 @@ def generateBranchObjects(config, name):
             binaryURL=l10n_binaryURL
         ))
 
+        # Log uploads for dep l10n repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n'],
+            builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
+        ))
+        # and for nightly repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n', '--nightly'],
+            builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
+        ))
+
     # change sources - if try is enabled, tipsOnly will be true which  makes 
     # every push only show up as one changeset
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
@@ -3184,8 +3195,11 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
          '-u', config['stage_username'],
          '-i', os.path.expanduser("~/.ssh/%s" % config['stage_ssh_key']),
          '-b', branch_name,
-         '-p', WithProperties("%%(%s)s" % platform_prop),
-        ] + extra_args
+         ]
+
+    if platform_prop:
+        logUploadCmd += ['-p', WithProperties("%%(%s)s" % platform_prop)]
+    logUploadCmd += extra_args
 
     if product:
         logUploadCmd.extend(['--product', product])

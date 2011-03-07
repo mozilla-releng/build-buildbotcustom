@@ -16,7 +16,7 @@ reload(release.paths)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  reallyShort
+  reallyShort, makeLogUploadCommand
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, UpdateVerifyFactory, ReleaseFinalVerification, \
@@ -26,7 +26,9 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
 from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
 from release.platforms import buildbot2ftp, sl_platform_map
 from release.paths import makeCandidatesDir
-from buildbotcustom.scheduler import TriggerBouncerCheck
+from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
+from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
+from buildbotcustom.status.log_handlers import SubprocessLogHandler
 import BuildSlaves
 
 DEFAULT_L10N_CHUNKS = 15
@@ -1227,7 +1229,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
         relayhost="mail.build.mozilla.org",
         builders=[b['name'] for b in builders],
-        logCompression="bzip2")
+        logCompression="gzip")
     )
 
     status.append(TinderboxMailNotifier(
@@ -1236,11 +1238,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
         relayhost="mail.build.mozilla.org",
         builders=[b['name'] for b in test_builders],
-        logCompression="bzip2",
+        logCompression="gzip",
         errorparser="unittest")
     )
 
     builders.extend(test_builders)
+
+    logUploadCmd = makeLogUploadCommand(sourceRepoInfo['name'], branchConfig,
+            platform_prop=None)
+
+    status.append(SubprocessLogHandler(
+        logUploadCmd + [
+            '--release', '%s/%s' % (
+                releaseConfig['appVersion'], releaseConfig['buildNumber'])
+            ],
+        builders=[b['name'] for b in builders + test_builders],
+    ))
 
     return {
             "builders": builders,

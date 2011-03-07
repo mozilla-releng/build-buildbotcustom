@@ -86,13 +86,13 @@ def isNightly(build):
     except:
         return False
 
-def formatLog(tmpdir, build):
+def formatLog(tmpdir, build, builder_suffix=''):
     """
     Returns a filename with the contents of the build log
     written to it.
     """
     builder_name = build.builder.name
-    build_name = "%s-build%s.txt.gz" % (builder_name, build_number)
+    build_name = "%s%s-build%s.txt.gz" % (builder_name, builder_suffix, build_number)
 
     logFile = gzip.GzipFile(os.path.join(tmpdir, build_name), "w")
 
@@ -157,8 +157,10 @@ if __name__ == "__main__":
     parser = OptionParser(__doc__)
     parser.set_defaults(
             nightly=False,
+            release=None,
             trybuild=False,
             shadowbuild=False,
+            l10n=False,
             user=os.environ.get("USER"),
             product="firefox",
             )
@@ -169,6 +171,10 @@ if __name__ == "__main__":
     parser.add_option("--product", dest="product", help="product directory")
     parser.add_option("--nightly", dest="nightly", action="store_true",
             help="upload to nightly dir")
+    parser.add_option("--release", dest="release",
+            help="upload to release candidates dir")
+    parser.add_option("--l10n", dest="l10n", action="store_true",
+            help="include locale value in log filename")
     parser.add_option("--try", dest="trybuild", action="store_true",
             help="upload to try build directory")
     parser.add_option("--shadow", dest="shadowbuild", action="store_true",
@@ -179,7 +185,7 @@ if __name__ == "__main__":
     if not options.branch:
         parser.error("branch required")
 
-    if not options.platform:
+    if not options.platform and not options.release:
         parser.error("platform required")
 
     if len(args) != 3:
@@ -192,16 +198,30 @@ if __name__ == "__main__":
     try:
         # Format the log into a compressed text file
         build = getBuild(builder_path, build_number)
-        logfile = formatLog(local_tmpdir, build)
+        if options.l10n:
+            suffix = '-%s' % build.getProperty('locale')
+            logfile = formatLog(local_tmpdir, build, suffix)
+        else:
+            logfile = formatLog(local_tmpdir, build)
 
         # Now....upload it!
         remote_tmpdir = ssh(user=options.user, identity=options.identity, host=host,
                 remote_cmd="mktemp -d")
         try:
-            scp(user=options.user, identity=options.identity, host=host,
-                    files=[logfile], remote_dir=remote_tmpdir)
+            # Release logs go into the 'logs' directory
+            if options.release:
+                # Create the logs directory
+                ssh(user=options.user, identity=options.identity, host=host,
+                        remote_cmd="mkdir %s/logs" % remote_tmpdir)
+                scp(user=options.user, identity=options.identity, host=host,
+                        files=[logfile], remote_dir='%s/logs' % remote_tmpdir)
+                remote_files = [os.path.join(remote_tmpdir, 'logs', os.path.basename(f)) for f in [logfile]]
+            else:
+                scp(user=options.user, identity=options.identity, host=host,
+                        files=[logfile], remote_dir=remote_tmpdir)
 
-            remote_files = [os.path.join(remote_tmpdir, os.path.basename(f)) for f in [logfile]]
+                remote_files = [os.path.join(remote_tmpdir, os.path.basename(f)) for f in [logfile]]
+
             uploadArgs = dict(
                 branch=options.branch,
                 product=options.product,
@@ -211,8 +231,9 @@ if __name__ == "__main__":
             # Test builders don't have the '-debug' distinction in the platform
             # string, so check in the builder name to make sure.
             platform = options.platform
-            if '-debug' in builder_path and '-debug' not in platform:
-                platform += "-debug"
+            if platform:
+                if '-debug' in builder_path and '-debug' not in platform:
+                    platform += "-debug"
 
             if options.trybuild:
                 uploadArgs.update(dict(
@@ -224,29 +245,46 @@ if __name__ == "__main__":
                     ))
             else:
                 buildid = getBuildId(build)
-                if buildid is None:
-                    # No build id, so we don't know where to upload this :(
-                    print "No build id for %s/%s, giving up" % (builder_path, build_number)
-                    # Exit cleanly so we don't spam twistd.log with exceptions
-                    sys.exit(0)
 
-                if options.nightly or isNightly(build):
-                    uploadArgs['to_dated'] = True
-                    # Don't upload to the latest directory for now; we have no
-                    # way of purging the logs out of the latest-<branch>
-                    # directories
-                    #uploadArgs['to_latest'] = True
-                    uploadArgs['branch'] = options.branch
+                if options.release:
+                    uploadArgs['to_candidates'] = True
+                    version, buildNumber = options.release.split('/')
+                    uploadArgs['version'] = version
+                    uploadArgs['buildNumber'] = buildNumber
+                elif options.l10n:
+                    uploadArgs['branch'] += '-l10n'
+                    if options.nightly:
+                        uploadArgs['to_tinderbox_dated'] = False
+                        uploadArgs['to_dated'] = True
+                        uploadArgs['to_latest'] = True
+                    else:
+                        uploadArgs['to_tinderbox_builds'] = True
+                        uploadArgs['upload_dir'] = uploadArgs['branch']
 
-                if options.shadowbuild:
-                    uploadArgs['to_shadow'] = True
-                    uploadArgs['to_tinderbox_dated'] = False
                 else:
-                    uploadArgs['to_shadow'] = False
-                    uploadArgs['to_tinderbox_dated'] = True
+                    uploadArgs['upload_dir'] = "%s-%s" % (options.branch, platform)
+                    if buildid is None:
+                        # No build id, so we don't know where to upload this :(
+                        print "No build id for %s/%s, giving up" % (builder_path, build_number)
+                        # Exit cleanly so we don't spam twistd.log with exceptions
+                        sys.exit(0)
+
+                    if options.nightly or isNightly(build):
+                        uploadArgs['to_dated'] = True
+                        # Don't upload to the latest directory for now; we have no
+                        # way of purging the logs out of the latest-<branch>
+                        # directories
+                        #uploadArgs['to_latest'] = True
+                        uploadArgs['branch'] = options.branch
+
+                    if options.shadowbuild:
+                        uploadArgs['to_shadow'] = True
+                        uploadArgs['to_tinderbox_dated'] = False
+                    else:
+                        uploadArgs['to_shadow'] = False
+                        uploadArgs['to_tinderbox_dated'] = True
 
                 uploadArgs.update(dict(
-                    upload_dir="%s-%s" % (options.branch, platform),
                     to_try=False,
                     who=None,
                     revision=None,
