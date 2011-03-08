@@ -405,6 +405,9 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     productName = 'firefox'
     if 'mobile' in name_prefix or 'Android' in name_prefix:
         productName = 'fennec'
+    branchProperty = branch_name
+    if pf.get('branch_extra', None):
+        branchProperty += '-%s' % pf['branch_extra']
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     if pf.get('is_remote', False):
         hostUtils = pf['host_utils_url']
@@ -424,7 +427,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
-            'properties': {'branch': branch_name, 'platform': platform,
+            'properties': {'branch': branchProperty, 'platform': platform,
                            'build_platform': platform, 'slavebuilddir': 'test'},
         }
         builders.append(builder)
@@ -459,7 +462,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     'factory': factory,
                     'category': category,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': branch_name, 'platform': platform,
+                    'properties': {'branch': branchProperty, 'platform': platform,
                         'build_platform': platform, 'slavebuilddir' : 'test'},
                     'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
                 }
@@ -488,7 +491,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'properties': {'branch': branch_name, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
+                'properties': {'branch': branchProperty, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
@@ -794,6 +797,17 @@ def generateBranchObjects(config, name):
             logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
+        ))
+
+        # Log uploads for dep l10n repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n'],
+            builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
+        ))
+        # and for nightly repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n', '--nightly'],
+            builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
     # change sources - if try is enabled, tipsOnly will be true which  makes 
@@ -2387,6 +2401,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if tinderboxTree not in all_test_builders:
             all_test_builders[tinderboxTree] = []
 
+        branchProperty = branch
+        if platform_config.get('branch_extra', None):
+            branchProperty += '-%s' % platform_config['branch_extra']
+
         for slave_platform in platform_config['slave_platforms']:
             platform_name = platform_config[slave_platform]['name']
             # this is to handle how a platform has more than one slave platform
@@ -2422,7 +2440,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     'factory': factory,
                     'category': branch,
                     'properties': {
-                        'branch': branch,
+                        'branch': branchProperty,
                         'platform': slave_platform,
                         'build_platform': platform,
                         'builddir': builddir,
@@ -3053,15 +3071,16 @@ def generateSpiderMonkeyObjects(config, SLAVES):
     branch = os.path.basename(config['repo_path'])
 
     for platform, variants in config['platforms'].items():
+        base_platform = platform.split('-', 1)[0]
         if 'win' in platform:
-            slaves = SLAVES[platform]
+            slaves = SLAVES[base_platform]
             interpreter = 'bash'
         elif 'arm' in platform:
             slaves = SLAVES['linux']
             interpreter = ['/scratchbox/moz_scratchbox', '-d',
                     '/builds/slave/%s' % reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant))]
         else:
-            slaves = SLAVES[platform]
+            slaves = SLAVES[base_platform]
             interpreter = None
 
         for variant in variants:
@@ -3176,8 +3195,11 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
          '-u', config['stage_username'],
          '-i', os.path.expanduser("~/.ssh/%s" % config['stage_ssh_key']),
          '-b', branch_name,
-         '-p', WithProperties("%%(%s)s" % platform_prop),
-        ] + extra_args
+         ]
+
+    if platform_prop:
+        logUploadCmd += ['-p', WithProperties("%%(%s)s" % platform_prop)]
+    logUploadCmd += extra_args
 
     if product:
         logUploadCmd.extend(['--product', product])

@@ -3,6 +3,8 @@ import os.path, re
 from time import strftime
 import urllib
 
+from twisted.python import log
+
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.shell import WithProperties
@@ -53,7 +55,7 @@ from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
-from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir
+from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, genBuildID
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -260,7 +262,57 @@ def getPlatformMinidumpPath(platform):
         }
     return platform_minidump_path[platform]
 
-class MozillaBuildFactory(BuildFactory):
+class RequestSortingBuildFactory(BuildFactory):
+    """Base class used for sorting build requests according to buildid.
+
+    In most cases the buildid of the request is calculated at the time when the
+    build is scheduled.  For tests, the buildid of the sendchange corresponds
+    to the buildid of the build. Sorting the test requests by buildid allows us
+    to order them according to the order in which the builds were scheduled.
+    This avoids the problem where build A of revision 1 completes (and triggers
+    tests) after build B of revision 2. Without the explicit sorting done here,
+    the test requests would be sorted [r2, r1], and buildbot would choose the
+    latest of the set to run.
+
+    We sort according to the following criteria:
+        * If the request looks like a rebuild, use the request's submission time
+        * If the request or any of the changes contains a 'buildid' property,
+          use the greatest of these property values
+        * Otherwise use the request's submission time
+    """
+    def newBuild(self, requests):
+        def sortkey(request):
+            # Ignore any buildids if we're rebuilding
+            # Catch things like "The web-page 'rebuild' ...", or self-serve
+            # messages, "Rebuilt by ..."
+            if 'rebuil' in request.reason.lower():
+                return int(genBuildID(request.submittedAt))
+
+            buildids = []
+
+            props = [request.properties] + [c.properties for c in request.source.changes]
+
+            for p in props:
+                try:
+                    buildids.append(int(p['buildid']))
+                except:
+                    pass
+
+            if buildids:
+                return max(buildids)
+            return int(genBuildID(request.submittedAt))
+
+        try:
+            sorted_requests = sorted(requests, key=sortkey)
+            return BuildFactory.newBuild(self, sorted_requests)
+        except:
+            # Something blew up!
+            # Return the orginal list
+            log.msg("Error sorting build requests")
+            log.err()
+            return BuildFactory.newBuild(self, requests)
+
+class MozillaBuildFactory(RequestSortingBuildFactory):
     ignore_dirs = [ 'info', 'rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
@@ -6958,7 +7010,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  ],
         ))
 
-class TalosFactory(BuildFactory):
+class TalosFactory(RequestSortingBuildFactory):
     extName = 'addon.xpi'
     """Create working talos build factory"""
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
