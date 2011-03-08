@@ -189,7 +189,7 @@ class PulseStatus(StatusPush):
 
             if self.max_idle_time:
                 # Set timer for idle time
-                if self._idle_timer:
+                if self._idle_timer and self._idle_timer.active():
                     self._idle_timer.cancel()
                 self._idle_timer = reactor.callLater(
                         self.max_idle_time, self._disconnect,
