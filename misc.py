@@ -3135,6 +3135,67 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             'status': [tbox_mailer],
             }
 
+def generateJetpackObjects(config, SLAVES):
+    builders = []
+    for platform in config['platforms'].keys():
+        if platform in ('xp', 'win7', 'w764'):
+            slaves = SLAVES[platform]
+            interpreter = 'bash'
+        else:
+            slaves = SLAVES[platform]
+            interpreter = None
+
+        jetpackTarball = "%s/%s/%s" % (config['hgurl'] , config['repo_path'], config['jetpack_tarball'])
+        f = ScriptFactory(
+                config['scripts_repo'],
+                'buildfarm/utils/run_jetpack.sh',
+                interpreter=interpreter,
+                extra_args=(platform, jetpackTarball, config['ftp_url'], config['platforms'][platform]['ext']),
+                log_eval_func=rc_eval_func({1: WARNINGS}),
+                )
+
+        builder = {'name': 'jetpack-%s' % platform,
+                   'builddir': 'jetpack-%s' % platform,
+                   'slavenames': slaves,
+                   'factory': f,
+                   'category': 'jetpack',
+                   'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
+                  }
+        builders.append(builder)
+        nomergeBuilders.append(builder)
+
+    # Set up polling
+    poller = HgPoller(
+            hgURL=config['hgurl'],
+            branch=config['repo_path'],
+            pollInterval=5*60,
+            )
+
+    # Set up scheduler
+    scheduler = Scheduler(
+            name="jetpack",
+            branch=config['repo_path'],
+            treeStableTimer=None,
+            builderNames=[b['name'] for b in builders],
+            )
+
+    # Tinderbox notifier
+    tbox_mailer = TinderboxMailNotifier(
+        fromaddr="mozilla2.buildbot@build.mozilla.org",
+        tree=config['tinderbox_tree'],
+        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+        relayhost="mail.build.mozilla.org",
+        builders=[b['name'] for b in builders],
+        logCompression="gzip",
+    )
+
+    return {
+            'builders': builders,
+            'change_source': [poller],
+            'schedulers': [scheduler],
+            'status': [tbox_mailer],
+            }
+
 def generateProjectObjects(project, config, SLAVES):
     builders = []
     schedulers = []
@@ -3161,6 +3222,11 @@ def generateProjectObjects(project, config, SLAVES):
     elif project == 'valgrind':
         valgrindObjects = generateValgrindObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, valgrindObjects)
+
+    # Jetpack
+    elif project == 'jetpack':
+        jetpackObjects = generateJetpackObjects(config, SLAVES)
+        buildObjects = mergeBuildObjects(buildObjects, jetpackObjects)
 
     # Spidermonkey
     elif project == 'spidermonkey':
