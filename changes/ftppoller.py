@@ -8,15 +8,6 @@ from twisted.web.client import getPage
 from buildbot.changes import base, changes
 from buildbotcustom.l10n import ParseLocalesFile
 
-class InvalidResultError(Exception):
-    def __init__(self, value="InvalidResultError"):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
-
-class EmptyResult(Exception):
-    pass
-
 class FtpPollerBase(base.ChangeSource):
     """This source will poll an ftp directory searching for a specific file and when found
     trigger a change to the change master."""
@@ -28,7 +19,7 @@ class FtpPollerBase(base.ChangeSource):
     volatile = ['loop']
     working = 0
 
-    def __init__(self, branch="", pollInterval=30, ftpURLs=[], timeout=30):
+    def __init__(self, branch="", pollInterval=30, ftpURLs=None, timeout=30):
         """
         @type   ftpURLs:            list of strings
         @param  ftpURLs:            The ftp directories to monitor
@@ -41,7 +32,7 @@ class FtpPollerBase(base.ChangeSource):
                                     changes
         """
 
-        self.ftpURLs = ftpURLs
+        self.ftpURLs = ftpURLs or []
         self.branch = branch
         self.pollInterval = pollInterval
         self.timeout = timeout
@@ -53,7 +44,8 @@ class FtpPollerBase(base.ChangeSource):
         reactor.callLater(0, self.loop.start, self.pollInterval)
 
     def stopService(self):
-        self.loop.stop()
+        if self.loop.running:
+            self.loop.stop()
         return base.ChangeSource.stopService(self)
 
     def describe(self):
@@ -63,7 +55,7 @@ class FtpPollerBase(base.ChangeSource):
 
     def poll(self):
         if self.working > 0:
-            log.msg("Not polling Tinderbox because last poll is still working (%s)" % (str(self.working)))
+            log.msg("Not polling FtpPollerBase because last poll is still working (%s)" % (str(self.working)))
         else:
             for url in self.ftpURLs:
                 self.working = self.working + 1
@@ -72,7 +64,7 @@ class FtpPollerBase(base.ChangeSource):
                 d.addBoth(self._finished)
         return
 
-    def _finished(self, res):
+    def _finished(self, _):
         self.working = self.working - 1
 
     def _get_changes(self, url):
@@ -88,6 +80,7 @@ class FtpPollerBase(base.ChangeSource):
 
 
 class FtpPoller(FtpPollerBase):
+    compare_attrs = FtpPollerBase.compare_attrs + ['searchString']
     gotFile = 1
 
     def __init__(self, searchString="", **kwargs):
@@ -125,6 +118,8 @@ class LocalesFtpPoller(FtpPollerBase):
     as in FtpPoller) and fire a sendchange to the given branch when ALL of
     the strings are present
     """
+    compare_attrs = FtpPollerBase.compare_attrs + ['localesFile', 'platform',
+                                                   'sl_platform_map']
     gotAllFiles = True
     localesFile = None
     platform = None
@@ -161,7 +156,7 @@ class LocalesFtpPoller(FtpPollerBase):
            then use the list of locales to check against the locales
            available on the ftp page"""
         if self.working > 0:
-            log.msg("Not polling Tinderbox because last poll is still working (%s)" % (str(self.working)))
+            log.msg("Not polling LocalesFtpPoller because last poll is still working (%s)" % (str(self.working)))
         else:
             self.working = self.working + 1
             d = self._get_page(self.localesFile)
@@ -214,3 +209,38 @@ class LocalesFtpPoller(FtpPollerBase):
             self.parent.addChange(c)
         #return the locales list for the next ftp poller in the callback chain
         return locales
+
+class UrlPoller(FtpPollerBase):
+    compare_attrs = FtpPollerBase.compare_attrs + ['url']
+    gotFile = True
+
+    def __init__(self, url, **kwargs):
+        self.url = url
+        FtpPollerBase.__init__(self, **kwargs)
+
+    def poll(self):
+        if self.working > 0:
+            log.msg("Not polling UrlPoller because last poll is still working (%s)" \
+                    % self.working)
+        else:
+            self.working = self.working + 1
+            d = self._get_changes(self.url)
+            d.addCallback(self._process_changes, self.url)
+            d.addErrback(self._process_errback)
+            d.addBoth(self._finished)
+        return
+
+    def _process_errback(self, _):
+        # First 404/500/etc, reset the state to False
+        self.gotFile = False
+
+    def parseContents(self, _):
+        # First 200, stop polling
+        log.msg("Stopping UrlPoller for %s" % self.url)
+        self.stopService()
+
+        if not self.gotFile:
+            return True
+        else:
+            # Got the file after buildbot restart
+            return False
