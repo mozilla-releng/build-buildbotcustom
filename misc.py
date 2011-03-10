@@ -2662,7 +2662,7 @@ def generateMobileBranchObjects(config, name):
             'stageSshKey': pf.get('stage_ssh_key', config.get('stage_ssh_mobile_key')),
             'stageServer': pf.get('stage_server', config.get('stage_server')),
             'stageBasePath': pf.get('stage_base_path', config.get('stage_base_path_mobile')),
-            'mobileRepoPath': pf.get('mobile_repo_path', config.get('mobile_repo_path')),
+            'mobileRepoPath': config['mobile_repo_path'],
             'compareLocalesRepoPath': pf.get('compare_locales_repo_path', config.get('compare_locales_repo_path')),
             'compareLocalesRevision': pf.get('compare_locales_tag', config.get('compare_locales_tag')),
             'mozharnessRepoPath': pf.get('mozharness_repo_path', config.get('mozharness_repo_path')),
@@ -2791,7 +2791,7 @@ def generateMobileBranchObjects(config, name):
                     scriptRepo=build_tools_repo,
                     interpreter='bash',
                     scriptName='scripts/l10n/nightly_mobile_repacks.sh',
-                    extra_args=[platform, branch_config_file, mobile_repo_name,
+                    extra_args=[platform, branch_config_file, config['mobile_repo_path'],
                                 str(pf['l10n_chunks']), str(n)]
                 )
                 slavebuilddir = reallyShort('%s-l10n_%s' % (builddir, str(n)))
@@ -2803,7 +2803,7 @@ def generateMobileBranchObjects(config, name):
                     'factory': factory,
                     'category': '%s-%s' % (name, mobile_repo_name),
                     'nextSlave': _nextL10nSlave(),
-                    'properties': {'branch': '%s' % name,
+                    'properties': {'branch': '%s' % config['repo_path'],
                                    'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                    'slavebuilddir': slavebuilddir},
                     'env': builder_env
