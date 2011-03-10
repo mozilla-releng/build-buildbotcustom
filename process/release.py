@@ -10,8 +10,10 @@ from buildbot.steps.trigger import Trigger
 
 import release.platforms
 import release.paths
+import buildbotcustom.changes.ftppoller
 reload(release.platforms)
 reload(release.paths)
+reload(buildbotcustom.changes.ftppoller)
 
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
@@ -23,7 +25,7 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   L10nVerifyFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
-from buildbotcustom.changes.ftppoller import FtpPoller, LocalesFtpPoller
+from buildbotcustom.changes.ftppoller import UrlPoller, LocalesFtpPoller
 from release.platforms import buildbot2ftp, sl_platform_map
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
@@ -225,15 +227,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
                 sl_platform_map = sl_platform_map,
             ))
 
-    change_source.append(FtpPoller(
+    change_source.append(UrlPoller(
         branch=builderPrefix("post_signing"),
-        ftpURLs=[
-            "http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/" % (
-                   releaseConfig['stagingServer'],
-                   releaseConfig['productName'], releaseConfig['version'],
-                   releaseConfig['buildNumber'])],
-        pollInterval= 60*10,
-        searchString='win32_signing_build'
+        url='http://%s/pub/mozilla.org/%s/nightly/%s-candidates/build%s/win32_signing_build%s.log' % (
+            releaseConfig['stagingServer'],
+            releaseConfig['productName'], releaseConfig['version'],
+            releaseConfig['buildNumber'], releaseConfig['buildNumber']),
+        pollInterval=60*10,
     ))
 
     if staging:
