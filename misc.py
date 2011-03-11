@@ -2966,17 +2966,20 @@ def generateNanojitObjects(config, SLAVES):
     for platform in config['platforms']:
         if 'win' in platform:
             slaves = SLAVES[platform]
+            nanojit_script = 'scripts/nanojit/nanojit.sh'
             interpreter = 'bash'
         elif 'arm' in platform:
             slaves = SLAVES['linux']
-            interpreter = ['/scratchbox/moz_scratchbox', '-d', '/builds/slave/nanojit-arm/build']
+            nanojit_script = '/builds/slave/nanojit-arm/scripts/nanojit/nanojit.sh'
+            interpreter = ['/scratchbox/moz_scratchbox', '-d', '/builds/slave/nanojit-arm']
         else:
             slaves = SLAVES[platform]
+            nanojit_script = 'scripts/nanojit/nanojit.sh'
             interpreter = None
 
         f = ScriptFactory(
                 config['scripts_repo'],
-                'scripts/nanojit/nanojit.sh',
+                nanojit_script,
                 interpreter=interpreter,
                 log_eval_func=rc_eval_func({1: WARNINGS}),
                 )
