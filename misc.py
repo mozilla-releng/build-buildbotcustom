@@ -2970,7 +2970,7 @@ def generateNanojitObjects(config, SLAVES):
             interpreter = 'bash'
         elif 'arm' in platform:
             slaves = SLAVES['linux']
-            nanojit_script = '/builds/slave/nanojit-arm/scripts/nanojit/nanojit.sh'
+            nanojit_script = '/builds/slave/nanojit-arm/scripts/scripts/nanojit/nanojit.sh'
             interpreter = ['/scratchbox/moz_scratchbox', '-d', '/builds/slave/nanojit-arm']
         else:
             slaves = SLAVES[platform]
