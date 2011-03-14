@@ -377,6 +377,8 @@ def _nextSlowIdleSlave(nReserved):
 
 nomergeBuilders = []
 def mergeRequests(builder, req1, req2):
+    if builder.category == "release":
+        return False
     if builder.name in nomergeBuilders:
         return False
     return req1.canBeMergedWith(req2)
