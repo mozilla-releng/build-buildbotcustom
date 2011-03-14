@@ -2844,7 +2844,7 @@ def generateMobileBranchObjects(config, name):
         ))
 
 
-    if not config.get('enable_try', True):
+    if not config.get('enable_try', False):
         #This change source is for the mobile_repo.  There is an assumption
         #that there will be a change source created for the main repository
         mobile_objects['change_source'].append(HgPoller(
