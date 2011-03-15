@@ -4017,7 +4017,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
-                 **kwargs):
+                 fakeMacInfoTxt=False, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4037,6 +4037,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                         Apps not rooted in the Mozilla repo need this.
            brandName: The brand name as used on the updates server. If omitted,
                       the first letter of the brand name is uppercased.
+           fakeMacInfoTxt: When True, symlink macosx64_info.txt to
+                           macosx_info.txt in the candidates directory on the
+                           staging server (to cope with the transition in mac
+                           builds, see bug 630085)
         """
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
@@ -4073,6 +4077,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.binaryName = binaryName
         self.oldBinaryName = oldBinaryName
         self.testOlderPartials = testOlderPartials
+        self.fakeMacInfoTxt = fakeMacInfoTxt
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4476,6 +4481,15 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                                      ' && cvs add ' + self.patcherConfigFile + 
                                      '; fi')],
              description=['add patcher config'],
+            ))
+        if self.fakeMacInfoTxt:
+            self.addStep(ShellCommand(
+                name='symlink_mac_info_txt',
+                command=['ssh', '-oIdentityFile=~/.ssh/%s' % self.stageSshKey,
+                         '%s@%s' % (self.stageUsername, self.stagingServer),
+                         'cd %s && ln -sf macosx64_info.txt macosx_info.txt' % self.candidatesDir],
+                description='symlink macosx64_info.txt to macosx_info.txt',
+                haltOnFailure=True,
             ))
         bumpCommand = ['perl', '../tools/release/patcher-config-creator.pl',
                        '-p', self.productName, '-r', self.brandName,
