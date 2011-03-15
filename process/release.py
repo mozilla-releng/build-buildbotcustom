@@ -1045,7 +1045,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             repoPath=releaseConfig['majorUpdateRepoPath'],
             buildToolsRepoPath=branchConfig['build_tools_repo_path'],
             cvsroot=releaseConfig['cvsroot'],
-            patcherToolsTag=releaseConfig['patcherToolsTag'],
+            patcherToolsTag=releaseConfig['majorPatcherToolsTag'],
             patcherConfig=releaseConfig['majorUpdatePatcherConfig'],
             verifyConfigs=releaseConfig['majorUpdateVerifyConfigs'],
             appName=releaseConfig['appName'],
@@ -1077,6 +1077,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
             oldRepoPath=sourceRepoInfo['path'],
             triggerSchedulers=[builderPrefix('major_update_verify')],
             releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
+            fakeMacInfoTxt=releaseConfig['majorFakeMacInfoTxt']
         )
 
         builders.append({
