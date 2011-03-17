@@ -26,6 +26,7 @@ import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
 import buildbotcustom.env
 import buildbotcustom.misc_scheduler
+import build.paths
 reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
@@ -38,6 +39,7 @@ reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
+reload(build.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
@@ -4465,8 +4467,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         return bcmd
 
     def getSnippetDir(self):
-        date = strftime('%Y%m%d')
-        return '%s-%s-%s' % (date, self.brandName, self.version)
+        return build.paths.getSnippetDir(self.brandName, self.version,
+                                          self.buildNumber)
 
 
 
@@ -4564,9 +4566,9 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
         return cmd
 
     def getSnippetDir(self):
-        date = strftime('%Y%m%d')
-        return '%s-%s-%s-%s-MU' % (date, self.brandName, self.oldVersion,
-                                   self.version)
+        return build.paths.getMUSnippetDir(self.brandName, self.oldVersion,
+                                            self.oldBuildNumber, self.version,
+                                            self.buildNumber)
 
 
 class UpdateVerifyFactory(ReleaseFactory):
@@ -5557,6 +5559,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '--exclude=*.txt',
+                  '--exclude=logs',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer, productName, version, str(buildNumber),
                     platformFtpDir),
@@ -5587,6 +5590,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '--exclude=*.txt',
+                  '--exclude=logs',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer,
                     productName,
