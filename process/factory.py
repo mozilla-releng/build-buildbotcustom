@@ -5559,6 +5559,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '--exclude=*.txt',
+                  '--exclude=logs',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer, productName, version, str(buildNumber),
                     platformFtpDir),
@@ -5589,6 +5590,7 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '--exclude=*.txt',
+                  '--exclude=logs',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer,
                     productName,
