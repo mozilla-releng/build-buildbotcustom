@@ -1251,7 +1251,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig, staging,
     status.append(SubprocessLogHandler(
         logUploadCmd + [
             '--release', '%s/%s' % (
-                releaseConfig['appVersion'], releaseConfig['buildNumber'])
+                releaseConfig['version'], releaseConfig['buildNumber'])
             ],
         builders=[b['name'] for b in builders + test_builders],
     ))
