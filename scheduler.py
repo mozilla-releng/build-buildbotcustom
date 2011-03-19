@@ -17,6 +17,8 @@ from buildbot.process.properties import Properties
 
 from buildbot.util import now
 
+import util.tuxedo
+reload(util.tuxedo)
 from util.tuxedo import get_release_uptake
 
 import time
