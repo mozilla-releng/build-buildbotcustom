@@ -26,7 +26,6 @@ import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
 import buildbotcustom.env
 import buildbotcustom.misc_scheduler
-import build.paths
 reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
@@ -39,7 +38,6 @@ reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
-reload(build.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
@@ -4019,7 +4017,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
-                 fakeMacInfoTxt=False, **kwargs):
+                 **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4039,10 +4037,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                         Apps not rooted in the Mozilla repo need this.
            brandName: The brand name as used on the updates server. If omitted,
                       the first letter of the brand name is uppercased.
-           fakeMacInfoTxt: When True, symlink macosx64_info.txt to
-                           macosx_info.txt in the candidates directory on the
-                           staging server (to cope with the transition in mac
-                           builds, see bug 630085)
         """
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
@@ -4079,7 +4073,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.binaryName = binaryName
         self.oldBinaryName = oldBinaryName
         self.testOlderPartials = testOlderPartials
-        self.fakeMacInfoTxt = fakeMacInfoTxt
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4467,8 +4460,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         return bcmd
 
     def getSnippetDir(self):
-        return build.paths.getSnippetDir(self.brandName, self.version,
-                                          self.buildNumber)
+        date = strftime('%Y%m%d')
+        return '%s-%s-%s' % (date, self.brandName, self.version)
 
 
 
@@ -4483,15 +4476,6 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                                      ' && cvs add ' + self.patcherConfigFile + 
                                      '; fi')],
              description=['add patcher config'],
-            ))
-        if self.fakeMacInfoTxt:
-            self.addStep(ShellCommand(
-                name='symlink_mac_info_txt',
-                command=['ssh', '-oIdentityFile=~/.ssh/%s' % self.stageSshKey,
-                         '%s@%s' % (self.stageUsername, self.stagingServer),
-                         'cd %s && ln -sf macosx64_info.txt macosx_info.txt' % self.candidatesDir],
-                description='symlink macosx64_info.txt to macosx_info.txt',
-                haltOnFailure=True,
             ))
         bumpCommand = ['perl', '../tools/release/patcher-config-creator.pl',
                        '-p', self.productName, '-r', self.brandName,
@@ -4566,9 +4550,9 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
         return cmd
 
     def getSnippetDir(self):
-        return build.paths.getMUSnippetDir(self.brandName, self.oldVersion,
-                                            self.oldBuildNumber, self.version,
-                                            self.buildNumber)
+        date = strftime('%Y%m%d')
+        return '%s-%s-%s-%s-MU' % (date, self.brandName, self.oldVersion,
+                                   self.version)
 
 
 class UpdateVerifyFactory(ReleaseFactory):
@@ -5559,7 +5543,6 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '--exclude=*.txt',
-                  '--exclude=logs',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer, productName, version, str(buildNumber),
                     platformFtpDir),
@@ -5590,7 +5573,6 @@ class L10nVerifyFactory(ReleaseFactory):
                   '--exclude=*.tests.zip',
                   '--exclude=*.tests.tar.bz2',
                   '--exclude=*.txt',
-                  '--exclude=logs',
                   '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
                    (stagingServer,
                     productName,

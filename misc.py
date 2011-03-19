@@ -269,50 +269,34 @@ def _nextSlowSlave(builder, available_slaves):
         elif fast:
             return sorted(fast, _recentSort(builder))[-1]
         else:
-            return None
+            return []
     except:
         log.msg("Error choosing next slow slave for builder '%s', choosing randomly instead" % builder.name)
         log.err()
         return random.choice(available_slaves)
 
-def _nextFastSlave(builder, available_slaves, only_fast=False, reserved=False):
-    # Check if our reserved slaves count needs updating
-    global _checkedReservedSlaveFile, _reservedFileName
-    if int(time.time() - _checkedReservedSlaveFile) > 60:
-        _readReservedFile(_reservedFileName)
-        _checkedReservedSlaveFile = int(time.time())
-
+def _nextFastSlave(builder, available_slaves, only_fast=False):
     try:
         if only_fast:
-            # Check that the builder has some fast slaves configured.  We do
-            # this because some machines classes don't have a fast/slow
-            # distinction, and so they default to 'slow'
-            # We should look at the full set of slaves here regardless of if
-            # we're only supposed to be returning unreserved slaves so we get
-            # the full set of slaves on the builder.
+            # Check that the builder has some fast slaves configured.
+            # We do this because some machines classes don't have a fast/slow distinction, and
+            # so they default to 'slow'
             fast, slow = _partitionSlaves(builder.slaves)
             if not fast:
                 log.msg("Builder '%s' has no fast slaves configured, but only_fast is enabled; disabling only_fast" % builder.name)
                 only_fast = False
 
-        if reserved:
-            # We have access to the full set of slaves!
-            fast, slow = _partitionSlaves(available_slaves)
-        else:
-            # We only have access to unreserved slaves
-            fast, slow = _partitionUnreservedSlaves(available_slaves)
+        fast, slow = _partitionUnreservedSlaves(available_slaves)
 
         # Choose the fast slave that was most recently on this builder
         # If there aren't any fast slaves, choose the slow slave that was most
         # recently on this builder if only_fast is False
-        if not fast and only_fast:
-            return None
-        elif fast:
+        if fast:
             return sorted(fast, _recentSort(builder))[-1]
         elif slow and not only_fast:
             return sorted(slow, _recentSort(builder))[-1]
         else:
-            return None
+            return []
     except:
         log.msg("Error choosing next fast slave for builder '%s', choosing randomly instead" % builder.name)
         log.err()
@@ -324,8 +308,28 @@ def setReservedFileName(filename):
     global _reservedFileName
     _reservedFileName = filename
 
-def _nextFastReservedSlave(builder, available_slaves, only_fast=True):
-    return _nextFastSlave(builder, available_slaves, only_fast, reserved=True)
+def _nextFastReservedSlave(builder, available_slaves, onlyFast=True):
+    global _checkedReservedSlaveFile, _reservedFileName
+    if int(time.time() - _checkedReservedSlaveFile) > 60:
+        _readReservedFile(_reservedFileName)
+        _checkedReservedSlaveFile = int(time.time())
+
+    try:
+        fast, slow = _partitionSlaves(available_slaves)
+        # Choose the fast slave that was most recently on this builder
+        # If there aren't any fast slaves, choose the slow slave that was most
+        # recently on this builder if onlyFast isn't set
+        if fast:
+            return sorted(fast, _recentSort(builder))[-1]
+        elif not onlyFast and slow:
+            return sorted(slow, _recentSort(builder))[-1]
+        else:
+            log.msg("No fast or slow slaves found for builder '%s', choosing randomly instead" % builder.name)
+            return random.choice(available_slaves)
+    except:
+        log.msg("Error choosing next fast slave for builder '%s', choosing randomly instead" % builder.name)
+        log.err()
+        return random.choice(available_slaves)
 
 def _nextL10nSlave(n=8):
     """Return a nextSlave function that restricts itself to choosing amongst
@@ -2842,7 +2846,7 @@ def generateMobileBranchObjects(config, name):
         ))
 
 
-    if not config.get('enable_try', False):
+    if not config.get('enable_try', True):
         #This change source is for the mobile_repo.  There is an assumption
         #that there will be a change source created for the main repository
         mobile_objects['change_source'].append(HgPoller(
