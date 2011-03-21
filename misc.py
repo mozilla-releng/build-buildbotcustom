@@ -1040,6 +1040,7 @@ def generateBranchObjects(config, name):
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
             useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+            testPrettyNames=pf.get('test_pretty_names', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -1137,6 +1138,7 @@ def generateBranchObjects(config, name):
                 tinderboxBuildsDir=tinderboxBuildsDir,
                 enable_ccache=pf.get('enable_ccache', False),
                 useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+                testPrettyNames=pf.get('test_pretty_names', False),
             )
 
             mozilla2_nightly_builder = {
