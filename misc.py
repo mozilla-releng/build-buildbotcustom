@@ -1040,6 +1040,7 @@ def generateBranchObjects(config, name):
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
             useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+            testPrettyNames=pf.get('test_pretty_names', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -1137,6 +1138,7 @@ def generateBranchObjects(config, name):
                 tinderboxBuildsDir=tinderboxBuildsDir,
                 enable_ccache=pf.get('enable_ccache', False),
                 useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+                testPrettyNames=pf.get('test_pretty_names', False),
             )
 
             mozilla2_nightly_builder = {
@@ -2401,7 +2403,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if platform_config.get('branch_extra', None):
             branchProperty += '-%s' % platform_config['branch_extra']
 
-        for slave_platform in platform_config['slave_platforms']:
+        # to check for overriding slave_platforms at the branch level
+        slave_platforms = branch_config['platforms'][platform].get('slave_platforms', platform_config['slave_platforms'])
+        for slave_platform in slave_platforms:
             platform_name = platform_config[slave_platform]['name']
             # this is to handle how a platform has more than one slave platform
             if prettyNames.has_key(platform):
@@ -2470,7 +2474,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 testTypes = []
                 # unittestSuites are gathered up for each platform from config.py
                 unittestSuites = []
-
                 if branch_config['platforms'][platform].get('enable_opt_unittests'):
                     testTypes.append('opt')
                 if branch_config['platforms'][platform].get('enable_debug_unittests'):

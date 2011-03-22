@@ -587,7 +587,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
                  mozconfigBranch="production", useSharedCheckouts=False,
-                 **kwargs):
+                 testPrettyNames=False, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -639,6 +639,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
         self.useSharedCheckouts = useSharedCheckouts
+        self.testPrettyNames = testPrettyNames
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -723,6 +724,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addUploadSymbolsStep()
         if self.uploadPackages:
             self.addUploadSteps()
+        if self.testPrettyNames:
+            self.addTestPrettyNamesSteps()
         if self.leakTest:
             self.addLeakTestSteps()
         if self.checkTest:
@@ -1125,6 +1128,31 @@ class MercurialBuildFactory(MozillaBuildFactory):
             fileType='completeMar',
             haltOnFailure=True,
         )
+
+    def addTestPrettyNamesSteps(self):
+        pkg_targets = ['package']
+        if 'win' in self.platform:
+            pkg_targets.append('installer')
+        for t in pkg_targets:
+            self.addStep(ShellCommand,
+             name='make %s pretty' % t,
+             command=['make', t, 'MOZ_PKG_PRETTYNAMES=1'],
+             env=self.env,
+             workdir='build/%s' % self.objdir,
+             haltOnFailure=False,
+             flunkOnFailure=False,
+             warnOnFailure=True,
+            )
+        self.addStep(ShellCommand,
+             name='make update pretty',
+             command=['make', '-C',
+                      '%s/tools/update-packaging' % self.mozillaObjdir,
+                      'MOZ_PKG_PRETTYNAMES=1'],
+             env=self.env,
+             haltOnFailure=False,
+             flunkOnFailure=False,
+             warnOnFailure=True,
+         )
 
     def addUploadSteps(self, pkgArgs=None):
         pkgArgs = pkgArgs or []
