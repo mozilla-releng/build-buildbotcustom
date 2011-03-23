@@ -1702,54 +1702,14 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             mozconfigBranch='default', **kwargs)
 
     def addSourceSteps(self):
-        if self.useSharedCheckouts:
-            self.addStep(JSONPropertiesDownload(
-                name="download_props",
-                slavedest="buildprops.json",
-                workdir='.'
-            ))
-            
-            env = self.env.copy()
-            env['PROPERTIES_FILE'] = 'buildprops.json'
-            cc_cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    self.getRepository(self.repoPath),
-                    'build',
-                    ]
-            self.addStep(ShellCommand(
-                name='hg_update',
-                command=cc_cmd,
-                timeout=60*60,
-                env=env,
-                workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
-            moz_cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    self.getRepository(self.mozRepoPath),
-                    'build/mozilla',
-                    ]
-            self.addStep(ShellCommand(
-                name='moz_hg_update',
-                command=moz_cmd,
-                timeout=60*60,
-                env=env,
-                workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
-        else:
-            self.addStep(Mercurial,
-                name='hg_update',
-                mode='update',
-                baseURL='http://%s/' % self.hgHost,
-                defaultBranch=self.repoPath,
-                alwaysUseLatest=True,
-                timeout=60*60 # 1 hour
-            )
+        self.addStep(Mercurial, 
+         name='hg_update',
+         mode='update',
+         baseURL='http://%s/' % self.hgHost,
+         defaultBranch=self.repoPath,
+         alwaysUseLatest=True,
+         timeout=60*60 # 1 hour
+        )
 
         if self.buildRevision:
             self.addStep(ShellCommand,
