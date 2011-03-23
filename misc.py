@@ -25,6 +25,7 @@ import buildbotcustom.status.mail
 import buildbotcustom.status.generators
 import buildbotcustom.status.log_handlers
 import buildbotcustom.misc_scheduler
+import build.paths
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -34,6 +35,7 @@ reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
 reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
+reload(build.paths)
 
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
@@ -53,6 +55,7 @@ from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
     buildUIDSchedFunc, lastGoodFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
+from build.paths import getRealpath
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -2626,10 +2629,7 @@ def generateMobileBranchObjects(config, name):
     pollInterval = config.get('pollInterval', 60)
     build_tools_repo = '%s%s' % (config['hgurl'],
                                  config['build_tools_repo_path'])
-    if config.get('staging', False):
-        branch_config_file = "mozilla/staging_config.py"
-    else:
-        branch_config_file = "mozilla/production_config.py"
+    branch_config_file = getRealpath('localconfig.py')
 
     #We could also make mobile_repo_path a list and iterate over that lise
     #here to allow for more than one mobile repository to be built against
