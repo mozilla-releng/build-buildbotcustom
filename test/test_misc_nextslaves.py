@@ -1,3 +1,4 @@
+from __future__ import with_statement
 import time
 import tempfile
 
@@ -156,3 +157,36 @@ class TestNextSlaveFuncs(unittest.TestCase):
             slave = _nextFastReservedSlave(self.builder, available_slaves, only_fast=True)
             self.assert_(slave.slave.slavename == 'fast2')
 
+    def test_update_reserved_blank(self):
+        """Test that updates to the reserved file are obeyed, and that calls to
+        the _nextFast functions pick it up."""
+        reservedFile = tempfile.NamedTemporaryFile()
+        reservedFile.write('5')
+        reservedFile.flush()
+        buildbotcustom.misc._checkedReservedSlaveFile = 0
+        # Need to fake out time.time
+        with mock.patch.object(time, 'time') as time_method:
+            setReservedFileName(reservedFile.name)
+            time_method.return_value = 61
+            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 0)
+
+            # Only one fast slave available, but all are reserved yet
+            available_slaves = [s for s in self.slaves if s.slave.slavename == 'fast2']
+            slave = _nextFastSlave(self.builder, available_slaves)
+            self.assert_(slave is None)
+            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 5)
+
+            # Empty out reserved slaves file
+            reservedFile.seek(0)
+            reservedFile.write('')
+            reservedFile.truncate()
+            reservedFile.flush()
+            time_method.return_value = buildbotcustom.misc._checkedReservedSlaveFile + 61
+
+            # Only one fast slave available, but none are reserved
+            available_slaves = [s for s in self.slaves if s.slave.slavename == 'fast2']
+
+            # Check that the regular function gets it
+            slave = _nextFastSlave(self.builder, available_slaves, only_fast=True)
+            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 0)
+            self.assert_(slave.slave.slavename == 'fast2')

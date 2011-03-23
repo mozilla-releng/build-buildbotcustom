@@ -221,7 +221,11 @@ def _readReservedFile(filename, fast=True):
         n = 0
     else:
         try:
-            n = int(open(filename).read())
+            data = open(filename).read().strip()
+            if data == '':
+                n = 0
+            else:
+                n = int(data)
         except IOError:
             log.msg("Unable to open '%s' for reading" % filename)
             log.err()
