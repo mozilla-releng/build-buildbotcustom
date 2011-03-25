@@ -7024,6 +7024,19 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  workdir='build/tests',
                  haltOnFailure=True,
                  ))
+
+                if name.startswith('reftest'):
+                    self.addStep(ShellCommand(
+                        name='configure device',
+                        workdir='.',
+                        description="Configure Device",
+                        command=['python', '../../sut_tools/config.py',
+                                 WithProperties("%(sut_ip)s"),
+                                 name,
+                                ],
+                        haltOnFailure=True)
+                    )
+
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
                  totalChunks=totalChunks,
@@ -7046,14 +7059,16 @@ class RemoteUnittestFactory(MozillaTestFactory):
 
     def addTearDownSteps(self):
         self.addCleanupSteps()
-        self.addStep(ShellCommand(
-         name='reboot device',
-         alwaysRun=True,
-         workdir='.',
-         description="Reboot Device",
-         command=['python', '../../sut_tools/reboot.py',
-                  WithProperties("%(sut_ip)s"),
-                 ],
+        self.addStep(DisconnectStep(
+            name='reboot device',
+            alwaysRun=True,
+            force_disconnect=True,
+            warnOnFailure=False,
+            flunkOnFailure=False,
+            description='Reboot Device',
+            command=['python', '../../sut_tools/reboot.py',
+                      WithProperties("%(sut_ip)s"),
+                     ],
         ))
 
 class TalosFactory(RequestSortingBuildFactory):
