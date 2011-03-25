@@ -402,8 +402,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         name=builderPrefix('ready-for-rel-test'),
         configRepo=config_repo,
         minUptake=10000,
-        builderNames=[builderPrefix('ready_for_releasetest_testing'),
-                      builderPrefix('final_verification')],
+        builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
+                      [builderPrefix('final_verification', platform)
+                       for platform in releaseConfig['verifyConfigs'].keys()],
         username=BuildSlaves.tuxedoUsername,
         password=BuildSlaves.tuxedoPassword)
 
@@ -1006,25 +1007,27 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     })
     notify_builders.append(builderPrefix('push_to_mirrors'))
 
-    final_verification_factory = ReleaseFinalVerification(
-        hgHost=branchConfig['hghost'],
-        buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-        verifyConfigs=releaseConfig['verifyConfigs'],
-        clobberURL=branchConfig['base_clobber_url'],
-    )
+    for platform in releaseConfig['verifyConfigs'].keys():
+        final_verification_factory = ReleaseFinalVerification(
+            hgHost=branchConfig['hghost'],
+            platforms=[platform],
+            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            verifyConfigs=releaseConfig['verifyConfigs'],
+            clobberURL=branchConfig['base_clobber_url'],
+        )
 
-    builders.append({
-        'name': builderPrefix('final_verification'),
-        'slavenames': branchConfig['platforms']['linux']['slaves'],
-        'category': builderPrefix(''),
-        'builddir': builderPrefix('final_verification'),
-        'slavebuilddir': reallyShort(builderPrefix('fnl_verf')),
-        'factory': final_verification_factory,
-        'nextSlave': _nextFastReservedSlave,
-        'env': builder_env,
-        'properties': {'slavebuilddir':
-            reallyShort(builderPrefix('fnl_verf'))}
-    })
+        builders.append({
+            'name': builderPrefix('final_verification', platform),
+            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('final_verification', platform),
+            'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform)),
+            'factory': final_verification_factory,
+            'nextSlave': _nextFastReservedSlave,
+            'env': builder_env,
+            'properties': {'slavebuilddir':
+                           reallyShort(builderPrefix('fnl_verf', platform))}
+        })
 
     builders.append(makeDummyBuilder(
         name=builderPrefix('ready_for_releasetest_testing'),

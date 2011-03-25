@@ -4615,11 +4615,12 @@ class UpdateVerifyFactory(ReleaseFactory):
 
 
 class ReleaseFinalVerification(ReleaseFactory):
-    def __init__(self, verifyConfigs, **kwargs):
+    def __init__(self, verifyConfigs, platforms=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
         verifyCommand = ['bash', 'final-verification.sh']
-        for platform in sorted(verifyConfigs.keys()):
+        platforms = platforms or sorted(verifyConfigs.keys())
+        for platform in platforms:
             verifyCommand.append(verifyConfigs[platform])
         self.addStep(ShellCommand,
          name='final_verification',
