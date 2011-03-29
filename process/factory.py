@@ -4632,11 +4632,13 @@ class ReleaseFinalVerification(ReleaseFactory):
 class TuxedoEntrySubmitterFactory(ReleaseFactory):
     def __init__(self, baseTag, appName, config, productName, version,
                  tuxedoServerUrl, enUSPlatforms, l10nPlatforms,
-                 bouncerProductName=None, brandName=None, oldVersion=None,
-                 credentialsFile=None, verbose=True, dryRun=False,
-                 milestone=None, bouncerProductSuffix=None, **kwargs):
+                 extraPlatforms=None, bouncerProductName=None, brandName=None,
+                 oldVersion=None, credentialsFile=None, verbose=True,
+                 dryRun=False, milestone=None, bouncerProductSuffix=None,
+                 **kwargs):
         ReleaseFactory.__init__(self, **kwargs)
 
+        extraPlatforms = extraPlatforms or []
         cmd = ['python', 'tuxedo-add.py',
                '--config', config,
                '--product', productName,
@@ -4671,6 +4673,9 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
             cmd.extend(['--bouncer-product-suffix', bouncerProductSuffix])
 
         for platform in sorted(enUSPlatforms):
+            cmd.extend(['--platform', platform])
+
+        for platform in sorted(extraPlatforms):
             cmd.extend(['--platform', platform])
 
         if credentialsFile:
