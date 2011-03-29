@@ -4615,11 +4615,12 @@ class UpdateVerifyFactory(ReleaseFactory):
 
 
 class ReleaseFinalVerification(ReleaseFactory):
-    def __init__(self, verifyConfigs, **kwargs):
+    def __init__(self, verifyConfigs, platforms=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
         verifyCommand = ['bash', 'final-verification.sh']
-        for platform in sorted(verifyConfigs.keys()):
+        platforms = platforms or sorted(verifyConfigs.keys())
+        for platform in platforms:
             verifyCommand.append(verifyConfigs[platform])
         self.addStep(ShellCommand,
          name='final_verification',
@@ -4631,11 +4632,13 @@ class ReleaseFinalVerification(ReleaseFactory):
 class TuxedoEntrySubmitterFactory(ReleaseFactory):
     def __init__(self, baseTag, appName, config, productName, version,
                  tuxedoServerUrl, enUSPlatforms, l10nPlatforms,
-                 bouncerProductName=None, brandName=None, oldVersion=None,
-                 credentialsFile=None, verbose=True, dryRun=False,
-                 milestone=None, bouncerProductSuffix=None, **kwargs):
+                 extraPlatforms=None, bouncerProductName=None, brandName=None,
+                 oldVersion=None, credentialsFile=None, verbose=True,
+                 dryRun=False, milestone=None, bouncerProductSuffix=None,
+                 **kwargs):
         ReleaseFactory.__init__(self, **kwargs)
 
+        extraPlatforms = extraPlatforms or []
         cmd = ['python', 'tuxedo-add.py',
                '--config', config,
                '--product', productName,
@@ -4670,6 +4673,9 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
             cmd.extend(['--bouncer-product-suffix', bouncerProductSuffix])
 
         for platform in sorted(enUSPlatforms):
+            cmd.extend(['--platform', platform])
+
+        for platform in sorted(extraPlatforms):
             cmd.extend(['--platform', platform])
 
         if credentialsFile:
@@ -7024,6 +7030,19 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  workdir='build/tests',
                  haltOnFailure=True,
                  ))
+
+                if name.startswith('reftest'):
+                    self.addStep(ShellCommand(
+                        name='configure device',
+                        workdir='.',
+                        description="Configure Device",
+                        command=['python', '../../sut_tools/config.py',
+                                 WithProperties("%(sut_ip)s"),
+                                 name,
+                                ],
+                        haltOnFailure=True)
+                    )
+
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
                  totalChunks=totalChunks,
@@ -7046,14 +7065,16 @@ class RemoteUnittestFactory(MozillaTestFactory):
 
     def addTearDownSteps(self):
         self.addCleanupSteps()
-        self.addStep(ShellCommand(
-         name='reboot device',
-         alwaysRun=True,
-         workdir='.',
-         description="Reboot Device",
-         command=['python', '../../sut_tools/reboot.py',
-                  WithProperties("%(sut_ip)s"),
-                 ],
+        self.addStep(DisconnectStep(
+            name='reboot device',
+            alwaysRun=True,
+            force_disconnect=True,
+            warnOnFailure=False,
+            flunkOnFailure=False,
+            description='Reboot Device',
+            command=['python', '../../sut_tools/reboot.py',
+                      WithProperties("%(sut_ip)s"),
+                     ],
         ))
 
 class TalosFactory(RequestSortingBuildFactory):

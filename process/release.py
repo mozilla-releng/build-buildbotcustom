@@ -51,6 +51,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                              branchConfig['config_repo_path'])
 
     branchConfigFile = getRealpath('localconfig.py')
+    unix_slaves = branchConfig['platforms'].get('linux', {}).get('slaves', []) + \
+                branchConfig['platforms'].get('linux64', {}).get('slaves', []) + \
+                branchConfig['platforms'].get('macosx', {}).get('slaves', []) + \
+                branchConfig['platforms'].get('macosx64', {}).get('slaves', [])
+    all_slaves = unix_slaves + \
+               branchConfig['platforms'].get('win32', {}).get('slaves', []) + \
+               branchConfig['platforms'].get('win64', {}).get('slaves', [])
 
     if 'signedPlatforms' in releaseConfig.keys():
         signedPlatforms = releaseConfig['signedPlatforms']
@@ -395,8 +402,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         name=builderPrefix('ready-for-rel-test'),
         configRepo=config_repo,
         minUptake=10000,
-        builderNames=[builderPrefix('ready_for_releasetest_testing'),
-                      builderPrefix('final_verification')],
+        builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
+                      [builderPrefix('final_verification', platform)
+                       for platform in releaseConfig['verifyConfigs'].keys()],
         username=BuildSlaves.tuxedoUsername,
         password=BuildSlaves.tuxedoPassword)
 
@@ -452,12 +460,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                 'name': builderPrefix('repo_setup'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'],
+                'slavenames': unix_slaves,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('repo_setup'),
                 'slavebuilddir': reallyShort(builderPrefix('repo_setup')),
                 'factory': repository_setup_factory,
-                'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
                 'properties': { 'slavebuilddir':
                     reallyShort(builderPrefix('repo_setup'))},
@@ -465,7 +472,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('repo_setup'),
-                slaves=branchConfig['platforms']['linux']['slaves'],
+                slaves=all_slaves,
                 category=builderPrefix(''),
                 ))
 
@@ -478,12 +485,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                 'name': builderPrefix('release_downloader'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'],
+                'slavenames': unix_slaves,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('release_downloader'),
                 'slavebuilddir': reallyShort(builderPrefix('release_downloader')),
                 'factory': release_downloader_factory,
-                'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
                 'properties': {'builddir': builderPrefix('release_downloader'),
                                'slavebuilddir': reallyShort(builderPrefix('release_downloader'))}
@@ -491,7 +497,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('release_downloader'),
-                slaves=branchConfig['platforms']['linux']['slaves'],
+                slaves=all_slaves,
                 category=builderPrefix(''),
                 ))
 
@@ -521,7 +527,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('tag'),
-            slaves=branchConfig['platforms']['linux']['slaves'],
+            slaves=all_slaves,
             category=builderPrefix(''),
             ))
 
@@ -584,13 +590,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('source'),
-            slaves=branchConfig['platforms']['linux']['slaves'],
+            slaves=all_slaves,
             category=builderPrefix(''),
             ))
         if releaseConfig['xulrunnerPlatforms']:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('xulrunner_source'),
-                slaves=branchConfig['platforms']['linux']['slaves'],
+                slaves=all_slaves,
                 category=builderPrefix(''),
                 ))
 
@@ -664,7 +670,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('%s_build' % platform),
-                slaves=branchConfig['platforms']['linux']['slaves'],
+                slaves=all_slaves,
                 category=builderPrefix(''),
                 ))
 
@@ -715,7 +721,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append(makeDummyBuilder(
                 name=builderPrefix('repack_complete', platform),
-                slaves=branchConfig['platforms']['linux']['slaves'],
+                slaves=all_slaves,
                 category=builderPrefix(''),
             ))
 
@@ -787,7 +793,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('xulrunner_%s_build' % platform),
-                slaves=branchConfig['platforms']['linux']['slaves'],
+                slaves=all_slaves,
                 category=builderPrefix(''),
                 ))
 
@@ -943,12 +949,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     builders.append({
         'name': builderPrefix('check_permissions'),
-        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'slavenames': unix_slaves,
         'category': builderPrefix(''),
         'builddir': builderPrefix('check_permissions'),
         'slavebuilddir': reallyShort(builderPrefix('chk_prms')),
         'factory': check_permissions_factory,
-        'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
         'properties': {'slavebuilddir': reallyShort(builderPrefix('chk_prms')),
                        'script_repo_revision': releaseTag,
@@ -964,12 +969,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     builders.append({
         'name': builderPrefix('antivirus'),
-        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'slavenames': unix_slaves,
         'category': builderPrefix(''),
         'builddir': builderPrefix('antivirus'),
         'slavebuilddir': reallyShort(builderPrefix('av')),
         'factory': antivirus_factory,
-        'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
         'properties': {'slavebuilddir': reallyShort(builderPrefix('av')),
                        'script_repo_revision': releaseTag,
@@ -992,48 +996,49 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     builders.append({
         'name': builderPrefix('push_to_mirrors'),
-        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'slavenames': unix_slaves,
         'category': builderPrefix(''),
         'builddir': builderPrefix('push_to_mirrors'),
         'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs')),
         'factory': push_to_mirrors_factory,
-        'nextSlave': _nextFastReservedSlave,
         'env': builder_env,
         'properties': {'slavebuilddir':
                         reallyShort(builderPrefix('psh_mrrrs'))},
     })
     notify_builders.append(builderPrefix('push_to_mirrors'))
 
-    final_verification_factory = ReleaseFinalVerification(
-        hgHost=branchConfig['hghost'],
-        buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-        verifyConfigs=releaseConfig['verifyConfigs'],
-        clobberURL=branchConfig['base_clobber_url'],
-    )
+    for platform in releaseConfig['verifyConfigs'].keys():
+        final_verification_factory = ReleaseFinalVerification(
+            hgHost=branchConfig['hghost'],
+            platforms=[platform],
+            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            verifyConfigs=releaseConfig['verifyConfigs'],
+            clobberURL=branchConfig['base_clobber_url'],
+        )
 
-    builders.append({
-        'name': builderPrefix('final_verification'),
-        'slavenames': branchConfig['platforms']['linux']['slaves'],
-        'category': builderPrefix(''),
-        'builddir': builderPrefix('final_verification'),
-        'slavebuilddir': reallyShort(builderPrefix('fnl_verf')),
-        'factory': final_verification_factory,
-        'nextSlave': _nextFastReservedSlave,
-        'env': builder_env,
-        'properties': {'slavebuilddir':
-            reallyShort(builderPrefix('fnl_verf'))}
-    })
+        builders.append({
+            'name': builderPrefix('final_verification', platform),
+            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('final_verification', platform),
+            'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform)),
+            'factory': final_verification_factory,
+            'nextSlave': _nextFastReservedSlave,
+            'env': builder_env,
+            'properties': {'slavebuilddir':
+                           reallyShort(builderPrefix('fnl_verf', platform))}
+        })
 
     builders.append(makeDummyBuilder(
         name=builderPrefix('ready_for_releasetest_testing'),
-        slaves=branchConfig['platforms']['linux']['slaves'],
+        slaves=all_slaves,
         category=builderPrefix(''),
         ))
     notify_builders.append(builderPrefix('ready_for_releasetest_testing'))
 
     builders.append(makeDummyBuilder(
         name=builderPrefix('ready_for_release'),
-        slaves=branchConfig['platforms']['linux']['slaves'],
+        slaves=all_slaves,
         category=builderPrefix(''),
         ))
     notify_builders.append(builderPrefix('ready_for_release'))
@@ -1125,6 +1130,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         tuxedoServerUrl=releaseConfig['tuxedoServerUrl'],
         enUSPlatforms=releaseConfig['enUSPlatforms'],
         l10nPlatforms=releaseConfig['l10nPlatforms'],
+        extraPlatforms=releaseConfig.get('extraBouncerPlatforms'),
         oldVersion=releaseConfig['oldVersion'],
         hgHost=branchConfig['hghost'],
         repoPath=sourceRepoInfo['path'],
