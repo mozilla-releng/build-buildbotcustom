@@ -1732,6 +1732,7 @@ def generateCCBranchObjects(config, name):
             branch=config['repo_path'],
             tipsOnly=config.get('enable_try', False),
             pollInterval=pollInterval,
+            storeRev="polled_comm_revision",
         ))
         # for Mozilla tree, need valid branch, so override pushlog URL
         branchObjects['change_source'].append(HgPoller(
@@ -1741,6 +1742,7 @@ def generateCCBranchObjects(config, name):
                                                   config['mozilla_repo_path']),
             tipsOnly=config.get('enable_try', False),
             pollInterval=pollInterval,
+            storeRev="polled_moz_revision",
         ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
