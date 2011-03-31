@@ -25,6 +25,7 @@ import buildbotcustom.status.mail
 import buildbotcustom.status.generators
 import buildbotcustom.status.log_handlers
 import buildbotcustom.misc_scheduler
+import build.paths
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -34,6 +35,7 @@ reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
 reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
+reload(build.paths)
 
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
@@ -53,6 +55,7 @@ from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
     buildUIDSchedFunc, lastGoodFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
+from build.paths import getRealpath
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -218,7 +221,11 @@ def _readReservedFile(filename, fast=True):
         n = 0
     else:
         try:
-            n = int(open(filename).read())
+            data = open(filename).read().strip()
+            if data == '':
+                n = 0
+            else:
+                n = int(data)
         except IOError:
             log.msg("Unable to open '%s' for reading" % filename)
             log.err()
@@ -1042,6 +1049,7 @@ def generateBranchObjects(config, name):
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
             useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+            testPrettyNames=pf.get('test_pretty_names', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -1139,6 +1147,7 @@ def generateBranchObjects(config, name):
                 tinderboxBuildsDir=tinderboxBuildsDir,
                 enable_ccache=pf.get('enable_ccache', False),
                 useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+                testPrettyNames=pf.get('test_pretty_names', False),
             )
 
             mozilla2_nightly_builder = {
@@ -1725,6 +1734,7 @@ def generateCCBranchObjects(config, name):
             branch=config['repo_path'],
             tipsOnly=config.get('enable_try', False),
             pollInterval=pollInterval,
+            storeRev="polled_comm_revision",
         ))
         # for Mozilla tree, need valid branch, so override pushlog URL
         branchObjects['change_source'].append(HgPoller(
@@ -1734,6 +1744,7 @@ def generateCCBranchObjects(config, name):
                                                   config['mozilla_repo_path']),
             tipsOnly=config.get('enable_try', False),
             pollInterval=pollInterval,
+            storeRev="polled_moz_revision",
         ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
@@ -2403,138 +2414,141 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if platform_config.get('branch_extra', None):
             branchProperty += '-%s' % platform_config['branch_extra']
 
-        for slave_platform in platform_config['slave_platforms']:
-            platform_name = platform_config[slave_platform]['name']
-            # this is to handle how a platform has more than one slave platform
-            if prettyNames.has_key(platform):
-                prettyNames[platform].append(platform_name)
-            else:
-                prettyNames[platform] = [platform_name]
-            for suite, talosConfig in SUITES.items():
-                tests, merge, extra, platforms = branch_config['%s_tests' % suite]
-                if tests == 0 or slave_platform not in platforms:
-                    continue
+        # if platform is in the branch config check for overriding slave_platforms at the branch level
+        # before creating the builders & schedulers
+        if branch_config['platforms'].get(platform):
+            slave_platforms = branch_config['platforms'][platform].get('slave_platforms', platform_config.get('slave_platforms', []))
+            for slave_platform in slave_platforms:
+                platform_name = platform_config[slave_platform]['name']
+                # this is to handle how a platform has more than one slave platform
+                if prettyNames.has_key(platform):
+                    prettyNames[platform].append(platform_name)
+                else:
+                    prettyNames[platform] = [platform_name]
+                for suite, talosConfig in SUITES.items():
+                    tests, merge, extra, platforms = branch_config['%s_tests' % suite]
+                    if tests == 0 or slave_platform not in platforms:
+                        continue
 
-                factory = factory_class(
-                    OS=slave_platform.split('-')[0],
-                    supportUrlBase=branch_config['support_url_base'],
-                    envName=platform_config['env_name'],
-                    workdirBase="../talos-data",
-                    buildBranch=buildBranch,
-                    branchName=branchName,
-                    configOptions=talosConfig,
-                    talosCmd=talosCmd,
-                    fetchSymbols=branch_config['fetch_symbols'] and
-                      platform_config[slave_platform].get('download_symbols',True),
-                    **extra # Extra test specific factory parameters
-                )
-                builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
-                slavebuilddir= 'test'
-                builder = {
-                    'name': "%s %s talos %s" % (platform_name, branch, suite),
-                    'slavenames': platform_config[slave_platform]['slaves'],
-                    'builddir': builddir,
-                    'slavebuilddir': slavebuilddir,
-                    'factory': factory,
-                    'category': branch,
-                    'properties': {
-                        'branch': branchProperty,
-                        'platform': slave_platform,
-                        'build_platform': platform,
+                    factory = factory_class(
+                        OS=slave_platform.split('-')[0],
+                        supportUrlBase=branch_config['support_url_base'],
+                        envName=platform_config['env_name'],
+                        workdirBase="../talos-data",
+                        buildBranch=buildBranch,
+                        branchName=branchName,
+                        configOptions=talosConfig,
+                        talosCmd=talosCmd,
+                        fetchSymbols=branch_config['fetch_symbols'] and
+                          platform_config[slave_platform].get('download_symbols',True),
+                        **extra # Extra test specific factory parameters
+                    )
+                    builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
+                    slavebuilddir= 'test'
+                    builder = {
+                        'name': "%s %s talos %s" % (platform_name, branch, suite),
+                        'slavenames': platform_config[slave_platform]['slaves'],
                         'builddir': builddir,
                         'slavebuilddir': slavebuilddir,
-                        },
-                }
-                if not merge:
-                    nomergeBuilders.append(builder['name'])
-                extra_args = {}
-                if branch == "tryserver":
-                    scheduler_class = BuilderChooserScheduler
-                    extra_args['chooserFunc'] = tryChooser
-                    extra_args['prettyNames'] = prettyNames
-                    extra_args['talosSuites'] = SUITES.keys()
-                else:
-                    scheduler_class = MultiScheduler
-                s = scheduler_class(
-                        name='tests-%s-%s-%s-talos' % (branch, slave_platform, suite),
-                        branch='%s-%s-talos' % (branch, platform),
-                        treeStableTimer=None,
-                        builderNames=[builder['name']],
-                        numberOfBuildsToTrigger=tests,
-                        **extra_args
-                        )
-                branchObjects['schedulers'].append(s)
-                branchObjects['builders'].append(builder)
-                branch_builders[tinderboxTree].append(builder['name'])
-                all_builders.append(builder['name'])
-
-            if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
-                testTypes = []
-                # unittestSuites are gathered up for each platform from config.py
-                unittestSuites = []
-
-                if branch_config['platforms'][platform].get('enable_opt_unittests'):
-                    testTypes.append('opt')
-                if branch_config['platforms'][platform].get('enable_debug_unittests'):
-                    testTypes.append('debug')
-                if branch_config['platforms'][platform].get('enable_mobile_unittests'):
-                    testTypes.append('mobile')
-
-                merge_tests = branch_config.get('enable_merging', True)
-
-                for test_type in testTypes:
-                    test_builders = []
-                    triggeredUnittestBuilders = []
-                    unittest_suites = "%s_unittest_suites" % test_type
-                    if test_type == "debug":
-                        slave_platform_name = "%s-debug" % slave_platform
-                    elif test_type == "mobile":
-                        slave_platform_name = "%s-mobile" % slave_platform
+                        'factory': factory,
+                        'category': branch,
+                        'properties': {
+                            'branch': branchProperty,
+                            'platform': slave_platform,
+                            'build_platform': platform,
+                            'builddir': builddir,
+                            'slavebuilddir': slavebuilddir,
+                            },
+                    }
+                    if not merge:
+                        nomergeBuilders.append(builder['name'])
+                    extra_args = {}
+                    if branch == "tryserver":
+                        scheduler_class = BuilderChooserScheduler
+                        extra_args['chooserFunc'] = tryChooser
+                        extra_args['prettyNames'] = prettyNames
+                        extra_args['talosSuites'] = SUITES.keys()
                     else:
-                        slave_platform_name = slave_platform
-
-                    # create builder names for TinderboxMailNotifier
-                    for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
-                        test_builders.extend(generateTestBuilderNames(
-                            '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
-                    # Collect test builders for the TinderboxMailNotifier
-                    all_test_builders[tinderboxTree].extend(test_builders)
-                    all_builders.extend(test_builders)
-
-                    triggeredUnittestBuilders.append(('tests-%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, merge_tests))
-
-                    for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
-                        # create the builders
-                        branchObjects['builders'].extend(generateTestBuilder(
-                                branch_config, branch, platform, "%s %s %s test" % (platform_name, branch, test_type),
-                                "%s_%s_test" % (branch, slave_platform_name),
-                                suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
-                                branch_config.get('crashtest_leak_threshold', None),
-                                platform_config[slave_platform]['slaves'],
-                                resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False)))
-
-                    for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
-                        for test in test_builders:
-                            unittestSuites.append(test.split(' ')[-1])
-                        scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
-                        if not merge:
-                            nomergeBuilders.extend(test_builders)
-                        extra_args = {}
-                        if branch == "tryserver":
-                            scheduler_class = BuilderChooserScheduler
-                            extra_args['chooserFunc'] = tryChooser
-                            extra_args['numberOfBuildsToTrigger'] = 1
-                            extra_args['prettyNames'] = prettyNames
-                            extra_args['unittestSuites'] = unittestSuites
-                        else:
-                            scheduler_class = Scheduler
-                        branchObjects['schedulers'].append(scheduler_class(
-                            name=scheduler_name,
-                            branch=scheduler_branch,
-                            builderNames=test_builders,
+                        scheduler_class = MultiScheduler
+                    s = scheduler_class(
+                            name='tests-%s-%s-%s-talos' % (branch, slave_platform, suite),
+                            branch='%s-%s-talos' % (branch, platform),
                             treeStableTimer=None,
+                            builderNames=[builder['name']],
+                            numberOfBuildsToTrigger=tests,
                             **extra_args
-                        ))
+                            )
+                    branchObjects['schedulers'].append(s)
+                    branchObjects['builders'].append(builder)
+                    branch_builders[tinderboxTree].append(builder['name'])
+                    all_builders.append(builder['name'])
+
+                if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
+                    testTypes = []
+                    # unittestSuites are gathered up for each platform from config.py
+                    unittestSuites = []
+                    if branch_config['platforms'][platform].get('enable_opt_unittests'):
+                        testTypes.append('opt')
+                    if branch_config['platforms'][platform].get('enable_debug_unittests'):
+                        testTypes.append('debug')
+                    if branch_config['platforms'][platform].get('enable_mobile_unittests'):
+                        testTypes.append('mobile')
+
+                    merge_tests = branch_config.get('enable_merging', True)
+
+                    for test_type in testTypes:
+                        test_builders = []
+                        triggeredUnittestBuilders = []
+                        unittest_suites = "%s_unittest_suites" % test_type
+                        if test_type == "debug":
+                            slave_platform_name = "%s-debug" % slave_platform
+                        elif test_type == "mobile":
+                            slave_platform_name = "%s-mobile" % slave_platform
+                        else:
+                            slave_platform_name = slave_platform
+
+                        # create builder names for TinderboxMailNotifier
+                        for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
+                            test_builders.extend(generateTestBuilderNames(
+                                '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
+                        # Collect test builders for the TinderboxMailNotifier
+                        all_test_builders[tinderboxTree].extend(test_builders)
+                        all_builders.extend(test_builders)
+
+                        triggeredUnittestBuilders.append(('tests-%s-%s-%s-unittest' % (branch, slave_platform, test_type), test_builders, merge_tests))
+
+                        for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
+                            # create the builders
+                            branchObjects['builders'].extend(generateTestBuilder(
+                                    branch_config, branch, platform, "%s %s %s test" % (platform_name, branch, test_type),
+                                    "%s_%s_test" % (branch, slave_platform_name),
+                                    suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
+                                    branch_config.get('crashtest_leak_threshold', None),
+                                    platform_config[slave_platform]['slaves'],
+                                    resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False)))
+
+                        for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
+                            for test in test_builders:
+                                unittestSuites.append(test.split(' ')[-1])
+                            scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
+                            if not merge:
+                                nomergeBuilders.extend(test_builders)
+                            extra_args = {}
+                            if branch == "tryserver":
+                                scheduler_class = BuilderChooserScheduler
+                                extra_args['chooserFunc'] = tryChooser
+                                extra_args['numberOfBuildsToTrigger'] = 1
+                                extra_args['prettyNames'] = prettyNames
+                                extra_args['unittestSuites'] = unittestSuites
+                            else:
+                                scheduler_class = Scheduler
+                            branchObjects['schedulers'].append(scheduler_class(
+                                name=scheduler_name,
+                                branch=scheduler_branch,
+                                builderNames=test_builders,
+                                treeStableTimer=None,
+                                **extra_args
+                            ))
     for tinderboxTree in branch_builders.keys():
         if len(branch_builders[tinderboxTree]):
             branchObjects['status'].append(TinderboxMailNotifier(
@@ -2623,10 +2637,7 @@ def generateMobileBranchObjects(config, name):
     pollInterval = config.get('pollInterval', 60)
     build_tools_repo = '%s%s' % (config['hgurl'],
                                  config['build_tools_repo_path'])
-    if config.get('staging', False):
-        branch_config_file = "mozilla/staging_config.py"
-    else:
-        branch_config_file = "mozilla/production_config.py"
+    branch_config_file = getRealpath('localconfig.py')
 
     #We could also make mobile_repo_path a list and iterate over that lise
     #here to allow for more than one mobile repository to be built against
@@ -3128,6 +3139,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
         relayhost="mail.build.mozilla.org",
         builders=[b['name'] for b in builders],
         logCompression="gzip",
+        errorparser="unittest"
     )
 
     return {
