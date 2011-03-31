@@ -6607,7 +6607,6 @@ class MozillaTestFactory(MozillaBuildFactory):
             self.addStep(FindFile(
                 filename="%s%s" % (self.productName, self.posixBinarySuffix),
                 directory=".",
-                filetype="file",
                 max_depth=4,
                 property_name="exepath",
                 name="find_executable",
@@ -7272,7 +7271,6 @@ class TalosFactory(RequestSortingBuildFactory):
              max_depth=4,
              property_name="exepath",
              name="Find executable",
-             filetype="file",
             ))
         elif self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(SetBuildProperty(
