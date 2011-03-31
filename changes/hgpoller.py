@@ -311,13 +311,14 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
     the built-in RSS feed for changes and submit them to the
     change master."""
 
-    compare_attrs = ['hgURL', 'branch', 'pollInterval']
+    compare_attrs = ['hgURL', 'branch', 'pollInterval',
+                     'pushlogUrlOverride', 'tipsOnly', 'storeRev']
     parent = None
     loop = None
     volatile = ['loop']
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
-                 tipsOnly=False, pollInterval=30):
+                 tipsOnly=False, pollInterval=30, storeRev=None):
         """
         @type   hgURL:          string
         @param  hgURL:          The base URL of the Hg repo
@@ -327,15 +328,20 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         @type   pollInterval:   int
         @param  pollInterval:   The time (in seconds) between queries for
                                 changes
-        @type  tipsOnly:        bool
-        @param tipsOnly:        Make the pushlog only show the tips of pushes.
+        @type   tipsOnly:       bool
+        @param  tipsOnly:       Make the pushlog only show the tips of pushes.
                                 With this enabled every push will only show up
                                 as *one* changeset
+        @type   storeRev:       string
+        @param  storeRev:       A name of a property to set on the resulting
+                                Change to help identify the specific repository
+                                if multiple HgPollers are used in one branch.
         """
 
         BaseHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
                               tipsOnly, repo_branch="default")
         self.pollInterval = pollInterval
+        self.storeRev = storeRev
 
     def startService(self):
         self.loop = LoopingCall(self.poll)
@@ -352,6 +358,10 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
 
     def __str__(self):
         return "<HgPoller for %s%s>" % (self.hgURL, self.branch)
+
+    def changeHook(self, change):
+        if self.storeRev:
+            change.properties.setProperty(self.storeRev, change.revision, 'HgPoller')
 
 class HgLocalePoller(BaseHgPoller):
     """This helper class for HgAllLocalesPoller polls a single locale and
