@@ -1130,6 +1130,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addTestPrettyNamesSteps(self):
+        if 'mac' in self.platform:
+            # Need to run this target or else the packaging targets will
+            # fail.
+            self.addStep(ShellCommand,
+             name='postflight_all',
+             command=['make', '-f', 'client.mk', 'postflight_all'],
+             env=self.env,
+             haltOnFailure=False,
+             flunkOnFailure=False,
+             warnOnFailure=False,
+            )
         pkg_targets = ['package']
         if 'win' in self.platform:
             pkg_targets.append('installer')
@@ -1148,6 +1159,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
              command=['make', '-C',
                       '%s/tools/update-packaging' % self.mozillaObjdir,
                       'MOZ_PKG_PRETTYNAMES=1'],
+             env=self.env,
+             haltOnFailure=False,
+             flunkOnFailure=False,
+             warnOnFailure=True,
+         )
+        self.addStep(ShellCommand,
+             name='make l10n check pretty',
+             command=['make', 'l10n-check', 'MOZ_PKG_PRETTYNAMES=1'],
              env=self.env,
              haltOnFailure=False,
              flunkOnFailure=False,
@@ -1240,6 +1259,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 workdir='.',
                 name='get_app_version',
             ))
+        self.addStep(ShellCommand,
+             name='make l10n check',
+             command=['make', 'l10n-check'],
+             env=self.env,
+             haltOnFailure=False,
+             flunkOnFailure=False,
+             warnOnFailure=True,
+         )
 
         if self.createSnippet:
             self.addCreateUpdateSteps();
@@ -2429,7 +2456,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
                  mergeLocales=True, mozconfigBranch="production", 
-                 **kwargs):
+                 testPrettyNames=False, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.env = env.copy()
@@ -2448,6 +2475,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tree = tree
         self.mozconfig = mozconfig
         self.mozconfigBranch = mozconfigBranch
+        self.testPrettyNames = testPrettyNames
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -2537,6 +2565,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.compareLocales()
         self.doRepack()
         self.doUpload()
+        if self.testPrettyNames:
+            self.doTestPrettyNames()
 
     def processCommand(self, **kwargs):
         '''This function is overriden by MaemoNightlyRepackFactory to
@@ -2803,6 +2833,57 @@ class BaseRepackFactory(MozillaBuildFactory):
          description="rm dist/update",
          workdir=self.baseWorkDir,
          haltOnFailure=True
+        )
+
+    def doTestPrettyNames(self):
+        # Need to re-download this file because it gets removed earlier
+        self.addStep(ShellCommand,
+         name='wget_enUS',
+         command=['make', 'wget-en-US'],
+         description='wget en-US',
+         env=self.env,
+         haltOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName)
+        )
+        self.addStep(ShellCommand,
+         name='make_unpack',
+         command=['make', 'unpack'],
+         description='unpack en-US',
+         haltOnFailure=True,
+         env=self.env,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName)
+        )
+        # We need to override ZIP_IN because it defaults to $(PACKAGE), which
+        # will be the pretty name version here.
+        self.addStep(SetProperty,
+         command=['make', '--no-print-directory', 'echo-variable-ZIP_IN'],
+         property='zip_in',
+         env=self.env,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+         haltOnFailure=True,
+        )
+        prettyEnv = self.env.copy()
+        prettyEnv['MOZ_PKG_PRETTYNAMES'] = '1'
+        prettyEnv['ZIP_IN'] = WithProperties('%(zip_in)s')
+        if self.platform.startswith('win'):
+            self.addStep(SetProperty,
+             command=['make', '--no-print-directory', 'echo-variable-WIN32_INSTALLER_IN'],
+             property='win32_installer_in',
+             env=self.env,
+             workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+             haltOnFailure=True,
+            )
+            prettyEnv['WIN32_INSTALLER_IN'] = WithProperties('%(win32_installer_in)s')
+        self.addStep(ShellCommand,
+         name='repack_installers_pretty',
+         description=['repack', 'installers', 'pretty'],
+         command=['sh', '-c',
+                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+         env=prettyEnv,
+         haltOnFailure=False,
+         flunkOnFailure=False,
+         warnOnFailure=True,
+         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
         )
 
 class CCBaseRepackFactory(BaseRepackFactory):
