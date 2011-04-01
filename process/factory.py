@@ -1168,6 +1168,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              name='make l10n check pretty',
              command=['make', 'l10n-check', 'MOZ_PKG_PRETTYNAMES=1'],
              env=self.env,
+             workdir='build/%s' % self.objdir,
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=True,
@@ -1263,6 +1264,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              name='make l10n check',
              command=['make', 'l10n-check'],
              env=self.env,
+             workdir='build/%s' % self.objdir,
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=True,
@@ -7078,6 +7080,17 @@ class RemoteUnittestFactory(MozillaTestFactory):
     def addRunTestSteps(self):
         for suite in self.suites:
             name = suite['suite']
+
+            self.addStep(ShellCommand(
+                name='configure device',
+                workdir='.',
+                description="Configure Device",
+                command=['python', '../../sut_tools/config.py',
+                         WithProperties("%(sut_ip)s"),
+                         name,
+                        ],
+                haltOnFailure=True)
+            )
             if name.startswith('mochitest'):
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
@@ -7110,19 +7123,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  workdir='build/tests',
                  haltOnFailure=True,
                  ))
-
-                if name.startswith('reftest'):
-                    self.addStep(ShellCommand(
-                        name='configure device',
-                        workdir='.',
-                        description="Configure Device",
-                        command=['python', '../../sut_tools/config.py',
-                                 WithProperties("%(sut_ip)s"),
-                                 name,
-                                ],
-                        haltOnFailure=True)
-                    )
-
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
                  totalChunks=totalChunks,
