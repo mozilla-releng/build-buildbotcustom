@@ -496,6 +496,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             packageFilename = '*.dmg'
         elif platform.startswith("win32"):
             packageFilename = '*.win32.zip'
+        elif platform.startswith("win64"):
+            packageFilename = '*.win64-x86_64.zip'
         elif platform.startswith("wince"):
             packageFilename = '*.wince-arm.zip'
         else:
@@ -706,7 +708,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
-        if self.platform == 'win32':
+        if self.platform.startswith('win'):
             self.addStep(SetProperty,
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',
@@ -1207,7 +1209,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
-        if self.platform.startswith("win32") and \
+        if self.platform.startswith("win") and \
            self.productName != 'xulrunner':
             self.addStep(ShellCommand,
                 name='make_installer',
@@ -4901,7 +4903,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
-        if self.platform == 'win32':
+        if self.platform.startswith('win'):
             self.addStep(SetProperty,
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',

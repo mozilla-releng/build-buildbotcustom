@@ -78,6 +78,7 @@ def reallyShort(name):
         'build': 'bld',
         'linux': 'lnx',
         'win32': 'w32',
+        'win64': 'w64',
         'macosx': 'osx',
         'macosx64': 'osx64',
         'linux64': 'lnx64',

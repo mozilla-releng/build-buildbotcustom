@@ -49,8 +49,10 @@ def buildTryCompleteMessage(attrs, packageDir, tinderboxTree):
         platform = 'mac64'
     elif 'OS X 10.5' in builder:
         platform = 'mac'
-    elif 'WINNT' in builder:
+    elif 'WINNT 5.2' in builder:
         platform = 'win32'
+    elif 'WINNT 6.1' in builder:
+        platform = 'win64'
     elif 'Maemo' in builder:
         platform = 'maemo'
 
