@@ -474,7 +474,7 @@ class UpdateClobberFiles(ShellCommandReportTimeout):
             self.logDir = kwargs['logDir']
         if self.platform.startswith('win32'):
             self.tboxClobberModule = 'mozilla/tools/tinderbox-configs/firefox/win32'
-        else if self.platform.startswith('win64'):
+        elif self.platform.startswith('win64'):
             self.tboxClobberModule = 'mozilla/tools/tinderbox-configs/firefox/win64'
         else:
             self.tboxClobberModule = 'mozilla/tools/tinderbox-configs/firefox/' + self.platform
