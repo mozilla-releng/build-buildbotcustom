@@ -1739,14 +1739,60 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             mozconfigBranch='default', **kwargs)
 
     def addSourceSteps(self):
-        self.addStep(Mercurial, 
-         name='hg_update',
-         mode='update',
-         baseURL='http://%s/' % self.hgHost,
-         defaultBranch=self.repoPath,
-         alwaysUseLatest=True,
-         timeout=60*60 # 1 hour
-        )
+        # First set our revisions, if no property by the name, use 'default'
+        comm_rev = WithProperties("%(polled_comm_revision:-default)s")
+        moz_rev = WithProperties("%(polled_moz_revision:-default)s")
+
+        if self.useSharedCheckouts:
+            self.addStep(JSONPropertiesDownload(
+                name="download_props",
+                slavedest="buildprops.json",
+                workdir='.'
+            ))
+            
+            env = self.env.copy()
+            env['PROPERTIES_FILE'] = 'buildprops.json'
+            cc_cmd = [
+                    'python',
+                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                    self.getRepository(self.repoPath),
+                    '-r', comm_rev,
+                    'build',
+                    ]
+            self.addStep(ShellCommand(
+                name='hg_update',
+                command=cc_cmd,
+                timeout=60*60,
+                env=env,
+                workdir='.',
+                haltOnFailure=True,
+                flunkOnFailure=True,
+            ))
+            moz_cmd = [
+                    'python',
+                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                    self.getRepository(self.mozRepoPath),
+                    '-r', moz_rev,
+                    'build%s' % self.mozillaDir,
+                    ]
+            self.addStep(ShellCommand(
+                name='moz_hg_update',
+                command=moz_cmd,
+                timeout=60*60,
+                env=env,
+                workdir='.',
+                haltOnFailure=True,
+                flunkOnFailure=True,
+            ))
+        else:
+            self.addStep(Mercurial,
+                name='hg_update',
+                mode='update',
+                baseURL='http://%s/' % self.hgHost,
+                defaultBranch=self.repoPath,
+                alwaysUseLatest=True,
+                timeout=60*60 # 1 hour
+            )
 
         if self.buildRevision:
             self.addStep(ShellCommand,
@@ -1754,11 +1800,11 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              haltOnFailure=True
             )
-            self.addStep(SetProperty,
-             name='hg_ident_revision',
-             command=['hg', 'identify', '-i'],
-             property='got_revision'
-            )
+        self.addStep(SetProperty,
+         name='set_got_revision',
+         command=['hg', 'identify', '-i'],
+         property='got_revision'
+        )
         changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
@@ -1767,7 +1813,9 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         ))
         # build up the checkout command with all options
         co_command = ['python', 'client.py', 'checkout']
-        if self.mozRepoPath:
+        # comm-* is handled by code above, no need to do network churn here
+        co_command.append("--skip-comm")
+        if (not self.useSharedCheckouts) and self.mozRepoPath:
             co_command.append('--mozilla-repo=%s' % self.getRepository(self.mozRepoPath))
         if self.inspectorRepoPath:
             co_command.append('--inspector-repo=%s' % self.getRepository(self.inspectorRepoPath))
@@ -1784,7 +1832,6 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         if self.cvsroot:
             co_command.append('--cvsroot=%s' % self.cvsroot)
         if self.buildRevision:
-            co_command.append('--comm-rev=%s' % self.buildRevision)
             co_command.append('--mozilla-rev=%s' % self.buildRevision)
             co_command.append('--inspector-rev=%s' % self.buildRevision)
             co_command.append('--venkman-rev=%s' % self.buildRevision)
