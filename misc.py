@@ -78,6 +78,7 @@ def reallyShort(name):
         'build': 'bld',
         'linux': 'lnx',
         'win32': 'w32',
+        'win64': 'w64',
         'macosx': 'osx',
         'macosx64': 'osx64',
         'linux64': 'lnx64',
@@ -1721,6 +1722,17 @@ def generateCCBranchObjects(config, name):
             logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
+        ))
+
+        # Log uploads for dep l10n repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n'],
+            builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
+        ))
+        # and for nightly repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n', '--nightly'],
+            builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
     # change sources - if try is enabled, tipsOnly will be true which  makes 

@@ -496,6 +496,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             packageFilename = '*.dmg'
         elif platform.startswith("win32"):
             packageFilename = '*.win32.zip'
+        elif platform.startswith("win64"):
+            packageFilename = '*.win64-x86_64.zip'
         elif platform.startswith("wince"):
             packageFilename = '*.wince-arm.zip'
         else:
@@ -706,7 +708,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
-        if self.platform == 'win32':
+        if self.platform.startswith('win'):
             self.addStep(SetProperty,
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',
@@ -1187,7 +1189,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
-        if self.platform.startswith("win32") and \
+        if self.platform.startswith("win") and \
            self.productName != 'xulrunner':
             self.addStep(ShellCommand,
                 name='make_installer',
@@ -4818,7 +4820,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
-        if self.platform == 'win32':
+        if self.platform.startswith('win'):
             self.addStep(SetProperty,
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',
@@ -6607,7 +6609,6 @@ class MozillaTestFactory(MozillaBuildFactory):
             self.addStep(FindFile(
                 filename="%s%s" % (self.productName, self.posixBinarySuffix),
                 directory=".",
-                filetype="file",
                 max_depth=4,
                 property_name="exepath",
                 name="find_executable",
@@ -6998,6 +6999,17 @@ class RemoteUnittestFactory(MozillaTestFactory):
     def addRunTestSteps(self):
         for suite in self.suites:
             name = suite['suite']
+
+            self.addStep(ShellCommand(
+                name='configure device',
+                workdir='.',
+                description="Configure Device",
+                command=['python', '../../sut_tools/config.py',
+                         WithProperties("%(sut_ip)s"),
+                         name,
+                        ],
+                haltOnFailure=True)
+            )
             if name.startswith('mochitest'):
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
@@ -7030,19 +7042,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  workdir='build/tests',
                  haltOnFailure=True,
                  ))
-
-                if name.startswith('reftest'):
-                    self.addStep(ShellCommand(
-                        name='configure device',
-                        workdir='.',
-                        description="Configure Device",
-                        command=['python', '../../sut_tools/config.py',
-                                 WithProperties("%(sut_ip)s"),
-                                 name,
-                                ],
-                        haltOnFailure=True)
-                    )
-
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
                  totalChunks=totalChunks,
@@ -7272,7 +7271,6 @@ class TalosFactory(RequestSortingBuildFactory):
              max_depth=4,
              property_name="exepath",
              name="Find executable",
-             filetype="file",
             ))
         elif self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(SetBuildProperty(
