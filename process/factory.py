@@ -1705,8 +1705,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
 
     def addSourceSteps(self):
         # First set our revisions, if no property by the name, use 'default'
-        comm_rev = WithProperties("%(polled_comm_revision:-default)")
-        moz_rev = WithProperties("%(polled_moz_revision:-default)")
+        comm_rev = WithProperties("%(polled_comm_revision:-default)s")
+        moz_rev = WithProperties("%(polled_moz_revision:-default)s")
 
         if self.useSharedCheckouts:
             self.addStep(JSONPropertiesDownload(
