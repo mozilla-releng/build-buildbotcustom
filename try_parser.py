@@ -32,13 +32,13 @@ def expandTestSuites(user_suites,valid_suites):
     return test_suites
 
 def processMessage(message):
-    match = re.search('try:',str(message))
-    if match:
-        message = message.strip().split('try: ', 1)
-        message = message[1].split(' ')
-    else:
-        message =[""]
-    return message
+    for line in message.split('\n'):
+        match = re.search('try: ',str(line))
+        if match:
+            line = line.strip().split('try: ', 1)
+            line = line[1].split(' ')
+            return line
+    return [""]
 
 def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
     platformBuilders = []
