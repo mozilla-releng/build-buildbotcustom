@@ -207,7 +207,7 @@ class CompareLeakLogs(ShellCommand):
     def __init__(self, platform, mallocLog,
                  testname="", testnameprefix="", objdir='obj-firefox',
                  tbPrint=True, **kwargs):
-        assert platform.startswith('win32') or platform.startswith('macosx') \
+        assert platform.startswith('win') or platform.startswith('macosx') \
           or platform.startswith('linux')
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
@@ -229,7 +229,7 @@ class CompareLeakLogs(ShellCommand):
         if len(self.testnameprefix) > 0:
             self.testnameprefix += " "
 
-        if platform.startswith("win32"):
+        if platform.startswith("win"):
             self.command = ['%s\\dist\\bin\\leakstats.exe' % re.sub(r'/', r'\\', self.objdir),
                              self.mallocLog]
         else:

@@ -2,7 +2,7 @@ import time, uuid
 
 def getCodesighsPlatforms():
     return ('linux', 'linuxqt','linux64',
-            'win32', 'macosx', 'macosx64')
+            'win32', 'win64', 'macosx', 'macosx64')
 
 def getSupportedPlatforms():
     return ('linux', 'linuxqt','linux64',
@@ -16,7 +16,7 @@ def getPlatformFtpDir(platform):
         'macosx': 'mac',
         'macosx64': 'mac',
         'win32': 'win32',
-        'win64': 'win64',
+        'win64': 'win64-x86_64',
         'wince': 'wince-arm',
         'android': 'android-r7',
     }

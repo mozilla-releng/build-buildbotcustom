@@ -372,7 +372,7 @@ class MozillaPackagedMozmillTests(ShellCommandReportTimeout):
 
         # set platform-dependent python scripts
         # relative to the created virtualenv
-        if platform == "win32":
+        if platform.startswith("win"):
             python = 'Scripts/python'
             if restart:
                 mozmill = 'Scripts/mozmill-restart-script.py'
@@ -472,8 +472,10 @@ class UpdateClobberFiles(ShellCommandReportTimeout):
             self.clobberFilePath = kwargs['clobberFilePath']
         if 'logDir' in kwargs:
             self.logDir = kwargs['logDir']
-        if self.platform.startswith('win'):
+        if self.platform.startswith('win32'):
             self.tboxClobberModule = 'mozilla/tools/tinderbox-configs/firefox/win32'
+        elif self.platform.startswith('win64'):
+            self.tboxClobberModule = 'mozilla/tools/tinderbox-configs/firefox/win64'
         else:
             self.tboxClobberModule = 'mozilla/tools/tinderbox-configs/firefox/' + self.platform
         if 'cvsroot' in kwargs:

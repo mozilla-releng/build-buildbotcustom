@@ -78,6 +78,7 @@ def reallyShort(name):
         'build': 'bld',
         'linux': 'lnx',
         'win32': 'w32',
+        'win64': 'w64',
         'macosx': 'osx',
         'macosx64': 'osx64',
         'linux64': 'lnx64',
@@ -1721,6 +1722,17 @@ def generateCCBranchObjects(config, name):
             binaryURL=l10n_binaryURL
         ))
 
+        # Log uploads for dep l10n repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n'],
+            builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
+        ))
+        # and for nightly repacks
+        branchObjects['status'].append(SubprocessLogHandler(
+            logUploadCmd + ['--l10n', '--nightly'],
+            builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
+        ))
+
     # change sources - if try is enabled, tipsOnly will be true which  makes 
     # every push only show up as one changeset
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
@@ -2631,7 +2643,11 @@ def generateMobileBranchObjects(config, name):
     # prettyNames is a mapping to pass to the try_parser for validation
     PRETTY_NAME = '%s build'
     prettyNames = {}
-    mobile_repo_name = config.get('mobile_repo_path').split('/')[-1]
+    long_repo_name = name[:]
+    if 'mobile_repo_path' in config:
+        mobile_repo_name = config['mobile_repo_path'].split('/')[-1]
+        long_repo_name = '%s-%s' % (name, mobile_repo_name)
+
     pollInterval = config.get('pollInterval', 60)
     build_tools_repo = '%s%s' % (config['hgurl'],
                                  config['build_tools_repo_path'])
@@ -2644,14 +2660,13 @@ def generateMobileBranchObjects(config, name):
     #implement this.
     for platform in config.get('mobile_platforms', {}).keys():
         render = {'branch': name,
-                  'mobile_branch': mobile_repo_name,
                   'platform': platform,
         }
         pf=config['mobile_platforms'][platform]
         base_name = pf.get('base_name') % render
         pretty_name = PRETTY_NAME % base_name
-        l10nSchedulerName = "%s-%s-%s-mobile-l10n" % (mobile_repo_name,
-                                                      name, platform)
+        l10nSchedulerName = "%s-%s-mobile-l10n" % (long_repo_name,
+                                                      platform)
 
         createSnippet = False
         if config.get('create_mobile_snippet', None) and pf.get('update_platform', None):
@@ -2669,7 +2684,7 @@ def generateMobileBranchObjects(config, name):
             'stageSshKey': pf.get('stage_ssh_key', config.get('stage_ssh_mobile_key')),
             'stageServer': pf.get('stage_server', config.get('stage_server')),
             'stageBasePath': pf.get('stage_base_path', config.get('stage_base_path_mobile')),
-            'mobileRepoPath': config['mobile_repo_path'],
+            'mobileRepoPath': config.get('mobile_repo_path', None),
             'compareLocalesRepoPath': pf.get('compare_locales_repo_path', config.get('compare_locales_repo_path')),
             'compareLocalesRevision': pf.get('compare_locales_tag', config.get('compare_locales_tag')),
             'mozharnessRepoPath': pf.get('mozharness_repo_path', config.get('mozharness_repo_path')),
@@ -2690,7 +2705,7 @@ def generateMobileBranchObjects(config, name):
             'try_subdir': config.get('package_dir', None),
             'packageGlobList': pf.get('package_globlist'),
             'mozRevision': pf.get('mozilla_revision'),
-            'mobileRevision': pf.get('mobile_revision'),
+            'mobileRevision': pf.get('mobile_revision', None),
             'ausUser': config.get('aus2_user', None),
             'ausSshKey': config.get('aus2_ssh_key', None),
             'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', None),
@@ -2706,7 +2721,7 @@ def generateMobileBranchObjects(config, name):
             #'triggeredSchedulers': triggeredSchedulers,
         }
 
-        builddir_base = '%s-%s-%s' % (name, mobile_repo_name, platform)
+        builddir_base = '%s-mob-%s' % (name, platform)
         multi_locale = pf.get('multi_locale', False) and \
                        pf.get('mozharness_config', False) and\
                        config.get('enable_multi_locale', False)
@@ -2752,9 +2767,9 @@ def generateMobileBranchObjects(config, name):
                 'builddir': builddir,
                 'slavebuilddir': reallyShort(builddir),
                 'factory': factory,
-                'category': '%s-%s' % (name, mobile_repo_name),
+                'category': long_repo_name,
                 'nextSlave': _nextFastSlave,
-                'properties': {'branch': '%s-%s' % (name, mobile_repo_name),
+                'properties': {'branch': long_repo_name,
                                'platform': platform, 'slavebuilddir': reallyShort(builddir)}
             }
             nightlyBuilders.append(builder_name)
@@ -2774,9 +2789,9 @@ def generateMobileBranchObjects(config, name):
                 'builddir': builddir,
                 'slavebuilddir': reallyShort(builddir),
                 'factory': factory,
-                'category': '%s-%s' % (name, mobile_repo_name),
+                'category': long_repo_name,
                 'nextSlave': _nextFastSlave,
-                'properties': {'branch': '%s-%s' % (name, mobile_repo_name),
+                'properties': {'branch': long_repo_name,
                                'platform': platform, 'slavebuilddir': reallyShort(builddir)}
             }
             builders.append(builder_name)
@@ -2798,7 +2813,8 @@ def generateMobileBranchObjects(config, name):
                     scriptRepo=build_tools_repo,
                     interpreter='bash',
                     scriptName='scripts/l10n/nightly_mobile_repacks.sh',
-                    extra_args=[platform, branch_config_file, config['mobile_repo_path'],
+                    extra_args=[platform, branch_config_file,
+                                config.get('mobile_repo_path', ''),
                                 str(pf['l10n_chunks']), str(n)]
                 )
                 slavebuilddir = reallyShort('%s-l10n_%s' % (builddir, str(n)))
@@ -2808,7 +2824,7 @@ def generateMobileBranchObjects(config, name):
                     'builddir': '%s-l10n_%s' % (builddir, str(n)),
                     'slavebuilddir': slavebuilddir,
                     'factory': factory,
-                    'category': '%s-%s' % (name, mobile_repo_name),
+                    'category': long_repo_name,
                     'nextSlave': _nextL10nSlave(),
                     'properties': {'branch': '%s' % config['repo_path'],
                                    'builddir': '%s-l10n_%s' % (builddir, str(n)),
@@ -2851,7 +2867,7 @@ def generateMobileBranchObjects(config, name):
         ))
 
 
-    if not config.get('enable_try', False):
+    if not config.get('enable_try', False) and 'mobile_repo_path' in config:
         #This change source is for the mobile_repo.  There is an assumption
         #that there will be a change source created for the main repository
         mobile_objects['change_source'].append(HgPoller(
@@ -2872,7 +2888,7 @@ def generateMobileBranchObjects(config, name):
         scheduler_class = Scheduler
 
     mobile_objects['schedulers'].append(scheduler_class(
-        name='%s-%s-build-mozilla' % (name, mobile_repo_name),
+        name='%s-build-mozilla' % long_repo_name,
         branch=config.get('repo_path'),
         treeStableTimer=None if config.get('enable_try') else 3*60,
         builderNames=builders,
@@ -2883,8 +2899,8 @@ def generateMobileBranchObjects(config, name):
     if not config.get('enable_try', False):
         #this scheduler is to trigger mobile builds on a mobile change
         mobile_objects['schedulers'].append(Scheduler(
-            name='%s-%s-build-mobile' % (mobile_repo_name, name),
-            branch=config.get('mobile_repo_path'),
+            name='%s-build-mobile' % long_repo_name,
+            branch=config.get('mobile_repo_path', config['repo_path']),
             treeStableTimer=3*60,
             builderNames=builders,
             fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')) and shouldBuild(c),
@@ -2893,8 +2909,8 @@ def generateMobileBranchObjects(config, name):
     if config.get('enable_mobile_nightly'):
         #Mobile nightlies on this branch
         mobile_objects['schedulers'].append(Nightly(
-            name='%s-%s-nightly' % (name, mobile_repo_name),
-            branch=config.get('mobile_repo_path'),
+            name='%s-nightly' % long_repo_name,
+            branch=config.get('mobile_repo_path', config['repo_path']),
             hour=config.get('start_hour'),
             minute=config.get('start_minute'),
             builderNames=nightlyBuilders
