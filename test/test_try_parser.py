@@ -1,4 +1,4 @@
-from buildbotcustom.try_parser import TryParser
+from buildbotcustom.try_parser import TryParser, processMessage
 import unittest
 
 ###### TEST CASES #####
@@ -216,6 +216,107 @@ class TestTryParser(unittest.TestCase):
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = ['Rev3 WINNT 6.1 tryserver opt test crashtest', 'Rev3 WINNT 6.1 tryserver debug test crashtest']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def _testNewLineProcessMessage(self, message, value=None):
+        if not value:
+            value = ['-a', '-b', '-c']
+        self.assertEqual(processMessage(message), value)
+
+    def test_SingleLine(self):
+        self._testNewLineProcessMessage("""try: -a -b -c""")
+
+    def test_SingleLineSpace(self):
+        self._testNewLineProcessMessage("""try: -a -b -c """)
+
+    def test_CommentSingleLine(self):
+        self._testNewLineProcessMessage("""blah blah try: -a -b -c""")
+
+    def test_CommentSingleLineSpace(self):
+        self._testNewLineProcessMessage("""blah blah try: -a -b -c """)
+
+    def test_FirstLineNewLine(self):
+        self._testNewLineProcessMessage("""try: -a -b -c
+some other comment
+lines
+blah""")
+
+    def test_FirstLineSpaceNewLine(self):
+        self._testNewLineProcessMessage("""try: -a -b -c 
+some other comment
+lines
+blah""")
+
+    def test_CommentFirstLineNewLine(self):
+        self._testNewLineProcessMessage("""blah blah try: -a -b -c
+some other comment
+lines
+blah""")
+
+    def test_CommentFirstLineSpaceNewLine(self):
+        self._testNewLineProcessMessage("""blah blah try: -a -b -c 
+some other comment
+lines
+blah""")
+
+    def test_MiddleLineNewLine(self):
+        self._testNewLineProcessMessage("""blah blah
+try: -a -b -c
+some other comment
+lines
+blah""")
+
+    def test_MiddleLineSpaceNewLine(self):
+        self._testNewLineProcessMessage("""blah blah
+try: -a -b -c 
+some other comment
+lines
+blah""")
+
+    def test_CommentMiddleLineNewLine(self):
+        self._testNewLineProcessMessage("""blah blah
+blah blah try: -a -b -c
+some other comment
+lines
+blah""")
+
+    def test_CommentMiddleLineSpaceNewLine(self):
+        self._testNewLineProcessMessage("""blah blah
+blah blah try: -a -b -c 
+some other comment
+lines
+blah""")
+
+    def test_LastLine(self):
+        self._testNewLineProcessMessage("""blah blah
+some other comment
+lines
+try: -a -b -c""")
+
+    def test_LastLineSpace(self):
+        self._testNewLineProcessMessage("""blah blah
+some other comment
+lines
+try: -a -b -c """)
+
+    def test_CommentLastLine(self):
+        self._testNewLineProcessMessage("""blah blah
+some other comment
+lines
+blah blah try: -a -b -c""")
+
+    def test_CommentLastLineSpace(self):
+        self._testNewLineProcessMessage("""blah blah
+some other comment
+lines
+blah blah try: -a -b -c """)
+
+    def test_DuplicateTryLines(self):
+        self._testNewLineProcessMessage("""try: -a -b -c
+try: -this -should -be -ignored""")
+
+    def test_IgnoreTryColonNoSpace(self):
+        self._testNewLineProcessMessage("""Should ignore this try:
+try: -a -b -c""")
 
 
 if __name__ == '__main__':
