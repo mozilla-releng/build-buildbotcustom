@@ -1049,6 +1049,7 @@ def generateBranchObjects(config, name):
             enable_ccache=pf.get('enable_ccache', False),
             useSharedCheckouts=pf.get('enable_shared_checkouts', False),
             testPrettyNames=pf.get('test_pretty_names', False),
+            l10nCheckTest=pf.get('l10n_check_test', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -1147,6 +1148,7 @@ def generateBranchObjects(config, name):
                 enable_ccache=pf.get('enable_ccache', False),
                 useSharedCheckouts=pf.get('enable_shared_checkouts', False),
                 testPrettyNames=pf.get('test_pretty_names', False),
+                l10nCheckTest=pf.get('l10n_check_test', False),
             )
 
             mozilla2_nightly_builder = {
