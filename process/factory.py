@@ -7207,7 +7207,8 @@ class TalosFactory(RequestSortingBuildFactory):
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             remoteTests=False, productName="firefox", remoteExtras=None,
-            talosAddOns=[], addonTester=False, releaseTester=False):
+            talosAddOns=[], addonTester=False, releaseTester=False,
+            talosBranch=None):
 
         BuildFactory.__init__(self)
 
@@ -7237,6 +7238,11 @@ class TalosFactory(RequestSortingBuildFactory):
         self.releaseTester = releaseTester
         self.productName = productName
         self.remoteExtras = remoteExtras
+        if talosBranch is None:
+            self.talosBranch = branchName
+        else:
+            self.talosBranch = talosBranch
+
 
         self.addInfoSteps()
         self.addCleanupSteps()
@@ -7677,7 +7683,7 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addStep(talos_steps.MozillaUpdateConfig(
          workdir=os.path.join(self.workdirBase, "talos/"),
          branch=self.buildBranch,
-         branchName=self.branchName,
+         branchName=self.talosBranch,
          remoteTests=self.remoteTests,
          haltOnFailure=True,
          executablePath=self.exepath,

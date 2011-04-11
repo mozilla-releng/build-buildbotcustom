@@ -2413,9 +2413,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if platform_config.get('is_mobile', False):
             branchName = branch_config['mobile_branch_name']
             tinderboxTree = branch_config['mobile_tinderbox_tree']
+            talosBranch = branch_config.get('mobile_talos_branch', branch_config['mobile_tinderbox_tree'])
         else:
             branchName = branch_config['branch_name']
             tinderboxTree = branch_config['tinderbox_tree']
+            talosBranch = branch_config['tinderbox_tree']
 
         if tinderboxTree not in branch_builders:
             branch_builders[tinderboxTree] = []
@@ -2449,6 +2451,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         workdirBase="../talos-data",
                         buildBranch=buildBranch,
                         branchName=branchName,
+                        talosBranch=talosBranch,
                         configOptions=talosConfig,
                         talosCmd=talosCmd,
                         fetchSymbols=branch_config['fetch_symbols'] and
