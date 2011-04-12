@@ -6038,6 +6038,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                   'echo "Missing mobile/ and mobile-repo! Exiting!"; '+
                   'exit -1 ; fi'],
                 property='mobile_repo',
+                description=["read", "mobile-repo"],
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
                 haltOnFailure=True,
                 doStepIf=self.missingMobileDir
@@ -6050,6 +6051,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                   'echo default ; fi'],
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
                 property='requested_mobile_rev',
+                description=["read", "mobile-rev"],
                 doStepIf=self.missingMobileDir
             ))
             mobile_clone_cmd = 'hg clone -U http://%s/' % self.hgHost
@@ -6058,6 +6060,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 name='mobile_clone',
                 command=['bash', '-c', WithProperties(mobile_clone_cmd)],
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
+                description=["clone", "mobile-repo"],
                 haltOnFailure=True,
                 doStepIf=self.missingMobileDir
             ))
@@ -6067,6 +6070,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 command=['bash', '-c', WithProperties(mobile_update_cmd)],
                 workdir='%s/%s/mobile' % (self.baseWorkDir, self.branchName),
                 haltOnFailure=True,
+                description=["update", "mobile-repo"],
                 doStepIf=self.missingMobileDir
             ))
             self.addStep(SetProperty(
@@ -6074,6 +6078,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 command=['hg', 'ident', '-R', 'mobile', '-i'],
                 workdir='%s/%s' % (self.baseWorkDir, self.branchName),
                 property='mobile_rev',
+                description=["set", "mobile_rev"],
                 doStepIf=self.missingMobileDir
             ))
             self.addStep(OutputStep(
