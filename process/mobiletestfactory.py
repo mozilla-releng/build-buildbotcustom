@@ -141,7 +141,9 @@ class MobileTalosFactory(BuildFactory):
     def addCleanupSteps(self):
         self.addStep(ShellCommand(
             command=['sh', '-c',
-                     "rm talos/page_load_tests/tp4 ; rm -rf %s" % self.cleanup_glob],
+                     "rm -f talos/page_load_tests/tp4; " + \
+                     "rm -f talos/page_load_tests/mobile_tp4; " + \
+                     "rm -rf %s" % self.cleanup_glob],
             # If you don't delete the tp4 symlink before cleanup
             # bad things happen!
             workdir=self.base_dir,
@@ -210,9 +212,9 @@ class MobileTalosFactory(BuildFactory):
         if 'tp4' in self.test:
             self.addTarballTp4Steps()
             self.addStep(ShellCommand(
-                command=['ln', '-s', '%s/tp4' % self.tp4_parent_dir, '.'],
+                command=['ln', '-s', '%s/mobile_tp4' % self.tp4_parent_dir, '.'],
                 workdir='%s/talos/page_load_test' % self.base_dir,
-                description=['create', 'tp4', 'symlink'],
+                description=['create', 'mobile_tp4', 'symlink'],
                 name='tp4_symlink',
                 haltOnFailure=True,
             ))
@@ -241,22 +243,22 @@ class MobileTalosFactory(BuildFactory):
 
     def addTarballTp4Steps(self):
         self.addStep(ShellCommand(
-            command='if [ ! -d tp4 ] ; then '+
-                     'wget %s -O tp4.tar.bz2; fi' % self.tp4_tarball,
+            command='if [ ! -d mobile_tp4 ] ; then '+
+                     'wget %s -O mobile_tp4.tar.bz2; fi' % self.tp4_tarball,
             workdir=self.tp4_parent_dir,
             description=['get', 'tp4'],
             name='get_tp4',
             haltOnFailure=True,
         ))
         self.addStep(ShellCommand(
-            command='if [ ! -d tp4 ] ; then tar jxvf tp4.tar.bz2; fi',
+            command='if [ ! -d mobile_tp4 ] ; then tar jxvf mobile_tp4.tar.bz2; fi',
             workdir=self.tp4_parent_dir,
             description=['unpack', 'tp4'],
             name='unpack_tp4',
             haltOnFailure=True,
         ))
         self.addStep(ShellCommand(
-            command=['chmod', '-R', 'go+rwx', 'tp4'],
+            command=['chmod', '-R', 'go+rwx', 'mobile_tp4'],
             workdir=self.tp4_parent_dir,
             description=['chmod', 'tp4'],
             name='chmod_tp4',
