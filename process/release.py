@@ -95,6 +95,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             protocol='ftp',
             server=releaseConfig['ftpServer'])
 
+    def genericHttpsUrl():
+        """ Generate an HTTPS URL pointing to the uploaded release builds for
+        sticking into release notification messages """
+        return makeCandidatesDir(
+            releaseConfig['productName'],
+            releaseConfig['version'],
+            releaseConfig['buildNumber'],
+            protocol='https',
+            server=releaseConfig['ftpServer'])
+
     def createReleaseMessage(mode, name, build, results, master_status):
         """Construct a standard email to send to release@/release-drivers@
            whenever a major step of the release finishes
@@ -199,7 +209,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         productName = releaseConfig['productName'].title()
         version = releaseConfig['version']
-        ftpURL = genericFtpUrl()
+        buildsURL = genericHttpsUrl()
 
         msgdict = {}
         msgdict['subject'] = subject % locals()
