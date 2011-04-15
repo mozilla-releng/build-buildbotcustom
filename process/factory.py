@@ -1,5 +1,6 @@
 from datetime import datetime
 import os.path, re
+import posixpath
 from time import strftime
 import urllib
 
@@ -163,9 +164,15 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk))",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm))",
                         "\n".join([stdout, stderr]), re.M):
-        if m.endswith("crashreporter-symbols.zip"):
+        if 'devel' in m and m.endswith('.rpm'):
+            retval['develRpmUrl'] = m
+        elif 'tests' in m and m.endswith('.rpm'):
+            retval['testsRpmUrl'] = m
+        elif m.endswith('.rpm'):
+            retval['packageRpmUrl'] = m
+        elif m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
             retval['testsUrl'] = m
@@ -589,7 +596,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
                  mozconfigBranch="production", useSharedCheckouts=False,
-                 testPrettyNames=False, l10nCheckTest=False, **kwargs):
+                 stagePlatform=None, testPrettyNames=False, l10nCheckTest=False, 
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -667,8 +675,30 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                           (self.ausBaseUploadDir, 
                                            self.updatePlatform)
 
+        self.complete_platform = self.platform
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
+        # We need to know what the platform that we should use on
+        # stage should be.  It would be great to be able to do this
+        # programatically, but some variations work differently to others.
+        # Instead of changing the world. lets keep the modification to platforms
+        # that opt in
+        if stagePlatform:
+            self.stagePlatform = stagePlatform
+        else:
+            self.stagePlatform = self.platform
+        # it turns out that the cruft is useful for dealing with multiple types
+        # of builds that are all done using the same self.platform.
+        # Examples of what happens:
+        #   platform = 'linux' sets self.platform_variation to []
+        #   platform = 'linux-opt' sets self.platform_variation to ['opt']
+        #   platform = 'linux-opt-rpm' sets self.platform_variation to ['opt','rpm']
+        platform_chunks = self.complete_platform.split('-', 1)
+        if len(platform_chunks) > 1:
+                self.platform_variation = platform_chunks[1].split('-')
+        else:
+                self.platform_variation = []
+
         assert self.platform in getSupportedPlatforms()
 
         if self.graphServer is not None:
@@ -700,10 +730,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.stageLogBaseUrl = stageLogBaseUrl
         if self.stageLogBaseUrl:
             # yes, the branchName is needed twice here so that log uploads work for all
-            self.logUploadDir = '%s/%s-%s/' % (self.branchName, self.branchName, self.platform)
+            self.logUploadDir = '%s/%s-%s/' % (self.branchName, self.branchName,
+                                               self.stagePlatform)
             self.logBaseUrl = '%s/%s' % (self.stageLogBaseUrl, self.logUploadDir)
         else:
-            self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName, self.platform)
+            self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
+                                                             self.stagePlatform)
             self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
                         ( self.stageServer, self.productName, self.logUploadDir)
 
@@ -1193,6 +1225,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
     def addUploadSteps(self, pkgArgs=None):
         pkgArgs = pkgArgs or []
+        if 'rpm' in self.platform_variation:
+            pkgArgs.append("MOZ_PKG_FORMAT=RPM")
         if self.packageSDK:
             self.addStep(ShellCommand,
              name='make_sdk',
@@ -1218,7 +1252,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         # Get package details
         packageFilename = self.getPackageFilename(self.platform)
-        if packageFilename:
+        if packageFilename and 'rpm' not in self.platform_variation:
             self.addFilePropertiesSteps(filename=packageFilename, 
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
@@ -2197,7 +2231,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         # Always upload builds to the dated tinderbox builds directories
         if self.tinderboxBuildsDir is None:
-            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
+            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.stagePlatform)
         else:
             tinderboxBuildsDir = self.tinderboxBuildsDir
 
@@ -2232,9 +2266,15 @@ class NightlyBuildFactory(MercurialBuildFactory):
              timeout=60*60 # 60 minutes
             )
         else:
+            # Because of how the RPM packaging works,
+            # we need to tell make upload to look for RPMS
+            if 'rpm' in self.complete_platform:
+                upload_vars = ["MOZ_PKG_FORMAT=RPM"]
+            else:
+                upload_vars = []
             self.addStep(SetProperty(
                 name='make_upload',
-                command=['make', 'upload'],
+                command=['make', 'upload'] + upload_vars,
                 env=uploadEnv,
                 workdir='%s/%s' % (self.baseWorkDir, self.objdir),
                 extract_fn = parse_make_upload,
