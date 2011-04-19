@@ -926,9 +926,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          description=['compile'],
          env=self.env,
          haltOnFailure=True,
-         timeout=7200 # 120 minutes, because windows PGO builds take a long time,
-                      # and because 10.6 builds on minis with 1 GB RAM take a REALLY
-                      # long time.
+         timeout=10800,
+         # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose
+         # the root cause of the linker time out.  
         )
 
     def addBuildInfoSteps(self):
