@@ -69,6 +69,8 @@ from buildbot.status.builder import SUCCESS, FAILURE
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
 hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 
+hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
+
 class DummyFactory(BuildFactory):
     def __init__(self):
         BuildFactory.__init__(self)
@@ -2791,39 +2793,40 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
     def getSources(self):
-        self.addStep(MercurialCloneCommand,
+        self.addStep(ShellCommand(
          name='get_enUS_src',
-         command=['sh', '-c',
-          WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
-                         'hg -R '+self.origSrcDir+' pull ;'+
-                         'hg -R '+self.origSrcDir+' up -C ;'+
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.repoPath+' ' +
-                         self.origSrcDir+' ; ' +
-                         'fi ' +
-                         '&& hg -R '+self.origSrcDir+' update -C -r %(en_revision)s')],
+         command=[
+                  'python',
+                  WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                  WithProperties("--rev=%(en_revision)s"),
+                  'http://%s/%s' % (self.hgHost, self.repoPath),
+                  self.origSrcDir,
+                 ],
+         env=self.env,
          descriptionDone="en-US source",
          workdir=self.baseWorkDir,
+         locks=[hg_l10n_lock.access('counting')],
          haltOnFailure=True,
+         flunkOnFailure=True,
          timeout=30*60 # 30 minutes
-        )
-        self.addStep(MercurialCloneCommand,
+        ))
+        self.addStep(ShellCommand(
          name='get_locale_src',
-         command=['sh', '-c',
-          WithProperties('if [ -d %(locale)s ]; then ' +
-                         'hg -R %(locale)s pull -r default ; ' +
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.l10nRepoPath+ 
-                           '/%(locale)s/ ; ' +
-                         'fi ' +
-                         '&& hg -R %(locale)s update -C -r %(l10n_revision)s')],
+         command=[
+                  'python',
+                  WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                  WithProperties("--rev=%(l10n_revision)s"),
+                  WithProperties("http://" + self.hgHost + "/" + \
+                                 self.l10nRepoPath + "/%(locale)s")
+                 ],
+         env=self.env,
          descriptionDone="locale source",
-         timeout=5*60, # 5 minutes
+         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
+         locks=[hg_l10n_lock.access('counting')],
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
-        )
+         flunkOnFailure=True,
+         timeout=5*60, # 5 minutes
+        ))
 
     def updateEnUS(self):
         '''Update the en-US source files to the revision used by
