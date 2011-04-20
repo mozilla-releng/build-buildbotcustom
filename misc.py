@@ -2649,6 +2649,7 @@ def generateMobileBranchObjects(config, name):
         return mobile_objects
     builders = []
     nightlyBuilders = []
+    debugBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
     PRETTY_NAME = '%s build'
     prettyNames = {}
@@ -2784,16 +2785,21 @@ def generateMobileBranchObjects(config, name):
             nightlyBuilders.append(builder_name)
             mobile_objects['builders'].append(builder)
 
+        factory = None
         if pf.get('enable_mobile_dep', config.get('enable_mobile_dep', True)):
-            builddir = '%s-build' % builddir_base
-            builder_name = pretty_name
-            prettyNames[platform] = pretty_name
+            if platform.endswith("-debug"):
+                builddir = '%s-dbg' % builddir_base
+                debugBuilders.append(pretty_name)
+            else:
 
+                builddir = '%s-build' % builddir_base
+                builders.append(pretty_name)
+            prettyNames[platform] = pretty_name
             dep_kwargs = deepcopy(factory_kwargs)
             factory = factory_class(**dep_kwargs)
 
-            builder ={
-                'name': builder_name,
+            builder = {
+                'name': pretty_name,
                 'slavenames': pf.get('slaves'),
                 'builddir': builddir,
                 'slavebuilddir': reallyShort(builddir),
@@ -2803,7 +2809,6 @@ def generateMobileBranchObjects(config, name):
                 'properties': {'branch': long_repo_name,
                                'platform': platform, 'slavebuilddir': reallyShort(builddir)}
             }
-            builders.append(builder_name)
             mobile_objects['builders'].append(builder)
 
         if pf.get('l10n_chunks', None):
@@ -2852,7 +2857,7 @@ def generateMobileBranchObjects(config, name):
         tree=config.get('mobile_tinderbox_tree'),
         extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
         relayhost='mail.build.mozilla.org',
-        builders=builders + nightlyBuilders,
+        builders=builders + nightlyBuilders + debugBuilders,
         logCompression='gzip',
     ))
 
@@ -2862,7 +2867,7 @@ def generateMobileBranchObjects(config, name):
 
     mobile_objects['status'].append(SubprocessLogHandler(
         logUploadCmd,
-        builders=builders,
+        builders=builders + debugBuilders,
     ))
 
     if config.get('mobile_build_failure_emails'):
@@ -2871,7 +2876,7 @@ def generateMobileBranchObjects(config, name):
             sendToInterestedUsers=False,
             extraRecipients=config['mobile_build_failure_emails'],
             mode='failing',
-            builders=builders+nightlyBuilders,
+            builders=builders+nightlyBuilders+debugBuilders,
             relayhost='mail.build.mozilla.org',
         ))
 
@@ -2900,7 +2905,7 @@ def generateMobileBranchObjects(config, name):
         name='%s-build-mozilla' % long_repo_name,
         branch=config.get('repo_path'),
         treeStableTimer=None if config.get('enable_try') else 3*60,
-        builderNames=builders,
+        builderNames=builders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')) and shouldBuild(c),
         **extra_args
     ))
@@ -2926,7 +2931,7 @@ def generateMobileBranchObjects(config, name):
         ))
 
     if not config.get('enable_merging', True):
-        nomergeBuilders.extend(builders + nightlyBuilders)
+        nomergeBuilders.extend(builders + nightlyBuilders + debugBuilders)
 
     return mobile_objects
 
