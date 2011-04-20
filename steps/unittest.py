@@ -844,7 +844,9 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
                         '--app', app,
                         '--console-level', consoleLevel,
                         '--http-port', WithProperties('%(http_port)s'),
-                        '--ssl-port', WithProperties('%(ssl_port)s')]
+                        '--ssl-port', WithProperties('%(ssl_port)s'),
+                        '--pidfile', WithProperties('%(basedir)s/../runtestsremote.pid')
+                       ]
         self.command.extend(self.getVariantOptions(variant))
         if testPath:
             self.command.extend(['--test-path', testPath])
@@ -868,7 +870,8 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--utility-path', utilityPath,
                         '--app', app,
                         '--http-port', WithProperties('%(http_port)s'),
-                        '--ssl-port', WithProperties('%(ssl_port)s')
-                        ]
+                        '--ssl-port', WithProperties('%(ssl_port)s'),
+                        '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid')
+                       ]
         self.command.extend(self.getSuiteOptions(suite))
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
