@@ -871,7 +871,8 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--app', app,
                         '--http-port', WithProperties('%(http_port)s'),
                         '--ssl-port', WithProperties('%(ssl_port)s'),
-                        '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid')
+                        '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
+                        '--enable-privilege'
                        ]
         self.command.extend(self.getSuiteOptions(suite))
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
