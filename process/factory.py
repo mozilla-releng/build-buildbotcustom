@@ -6421,14 +6421,12 @@ class MobileBuildFactory(MozillaBuildFactory):
             timeout=40*60 # 40 minutes
         ))
         sendchangePlatform = None
-        if self.talosMasters:
-            if self.platform == 'android-r7':
-                sendchangePlatform = 'android'
-            if 'linux' in self.platform:
-                sendchangePlatform = 'linux'
-        if sendchangePlatform and sendchange:
+        if self.platform == 'android-r7':
+            sendchangePlatform = 'android'
+        if 'linux' in self.platform:
+            sendchangePlatform = 'linux'
+        if len(self.talosMasters) > 0 and sendchange:
             talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
-            unittestBranch = "%s-%s-opt-unittest" % (self.branchName, sendchangePlatform)
             for master, warn, retries in self.talosMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6440,6 +6438,11 @@ class MobileBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange")
                 )
+        if len(self.unittestMasters) > 0 and sendchange:
+            unittestType = 'mobile' if 'linux' in self.platform else 'opt'
+            unittestBranch = "%s-%s-%s-unittest" % (self.branchName,
+                                                    sendchangePlatform,
+                                                    unittestType)
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6487,7 +6490,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addSymbolSteps()
-        self.addMakeUploadSteps()
+        do_sendchange = True if 'linux' in self.platform else False
+        self.addMakeUploadSteps(sendchange=do_sendchange)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
