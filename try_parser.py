@@ -72,12 +72,12 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, pretty
                           # checking for list type so this is only run for test_master builders where slave_platforms are used
                           if type(prettyNames[platform])==type(list()):
                             for slave_platform in prettyNames[platform]:
-                                custom_builder = "%s tryserver %s %s %s" % (slave_platform, buildType, testType, test)
+                                custom_builder = "%s try %s %s %s" % (slave_platform, buildType, testType, test)
                                 # have to check that custom_builder is not already present
                                 if custom_builder in (builderNames) and custom_builder not in testBuilders:
                                     testBuilders.extend([custom_builder])
                           else:
-                              custom_builder = "%s tryserver %s %s %s" % (prettyNames[platform], buildType, testType, test)
+                              custom_builder = "%s try %s %s %s" % (prettyNames[platform], buildType, testType, test)
                                # have to check that custom_builder is not already present
                               if custom_builder in (builderNames) and custom_builder not in testBuilders:
                                   testBuilders.extend([custom_builder])
@@ -97,7 +97,7 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, pretty
               if platform in prettyNames.keys():
                 for test in tests:
                     for slave_platform in prettyNames[platform]:
-                        custom_builder = "%s tryserver %s %s" % (slave_platform, testType, test)
+                        custom_builder = "%s try %s %s" % (slave_platform, testType, test)
                         if custom_builder in (builderNames) and custom_builder not in testBuilders:
                             testBuilders.extend([custom_builder])
 
