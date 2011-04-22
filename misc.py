@@ -2482,7 +2482,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     if not merge:
                         nomergeBuilders.append(builder['name'])
                     extra_args = {}
-                    if branch == "tryserver":
+                    if branch == "try":
                         scheduler_class = BuilderChooserScheduler
                         extra_args['chooserFunc'] = tryChooser
                         extra_args['prettyNames'] = prettyNames
@@ -2553,7 +2553,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if not merge:
                                 nomergeBuilders.extend(test_builders)
                             extra_args = {}
-                            if branch == "tryserver":
+                            if branch == "try":
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
                                 extra_args['numberOfBuildsToTrigger'] = 1
@@ -2592,7 +2592,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                            logCompression="gzip"))
 
     logUploadCmd = makeLogUploadCommand(branch, branch_config,
-            is_try=bool(branch=='tryserver'),
+            is_try=bool(branch=='try'),
             is_shadow=bool(branch=='shadow-central'),
             platform_prop='build_platform')
 

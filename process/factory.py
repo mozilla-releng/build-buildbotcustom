@@ -142,7 +142,7 @@ def postUploadCmdPrefix(upload_dir=None,
     if to_tinderbox_builds:
         cmd.append('--release-to-tinderbox-builds')
     if to_try:
-        cmd.append('--release-to-tryserver-builds')
+        cmd.append('--release-to-try-builds')
     if to_latest:
         cmd.append("--release-to-latest")
     if to_dated:
@@ -362,7 +362,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
          name='tinderboxsummarymessage_buildername',
          data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
         ))
-        if self.branchName in ('tryserver',):
+        if self.branchName in ('try',):
             self.addStep(OutputStep(
              name='tinderboxprint_revision',
              data=WithProperties('TinderboxPrint: s: %(revision)s'),
@@ -1704,7 +1704,7 @@ class TryBuildFactory(MercurialBuildFactory):
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
-        # Set up the post upload to the custom tryserver tinderboxBuildsDir
+        # Set up the post upload to the custom try tinderboxBuildsDir
         tinderboxBuildsDir = self.packageDir
 
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
@@ -6254,7 +6254,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 property_name='who',
                 value=lambda x: str(x.source.changes[0].who),
             ))
-            remote_location = '%s/%s/tryserver-%s' % (self.stageBasePath,
+            remote_location = '%s/%s/try-%s' % (self.stageBasePath,
                             self.try_subdir, self.platform)
             ssh_string = 'ssh -i ~/.ssh/%s %s@%s mkdir -p %s' % \
                     (self.stageSshKey, self.stageUsername,
