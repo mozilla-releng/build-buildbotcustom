@@ -2643,6 +2643,15 @@ class BaseRepackFactory(MozillaBuildFactory):
 
         self.preClean()
 
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths.
+        if self.platform.startswith('win'):
+            self.addStep(SetProperty,
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
+            )
+
         self.addStep(ShellCommand,
          name='mkdir_l10nrepopath',
          command=['sh', '-c', 'mkdir -p %s' % self.l10nRepoPath],
