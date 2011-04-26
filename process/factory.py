@@ -8024,6 +8024,8 @@ class PartnerRepackFactory(ReleaseFactory):
                      '--version', str(self.version),
                      '--build-number', str(self.buildNumber),
                      '--staging-server', self.stagingServer,
+                     '--dmg-extract-script',
+                     WithProperties('%(toolsdir)s/release/common/unpack-diskimage.sh'),
                     ] + self.extraRepackArgs,
             description=['repacking', 'partner', 'builds'],
             descriptionDone=['repacked', 'partner', 'builds'],
