@@ -3606,26 +3606,32 @@ class StagingRepositorySetupFactory(ReleaseFactory):
        the staging buildTools repository should _not_ be recloned, as it is
        used by many other builders, too.
     """
-    def __init__(self, username, sshKey, repositories, **kwargs):
+    def __init__(self, username, sshKey, repositories, userRepoRoot,
+                 **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
+            userRepoURL = '%s/%s' % (self.getRepository(userRepoRoot), repoName)
 
             # test for existence
-            command = 'wget -O- %s >/dev/null' % repo
-            command += ' && '
+            command = 'wget -O /dev/null %s' % repo
+            command += ' && { '
+            command += 'if wget -q -O /dev/null %s; then ' % userRepoURL
             # if it exists, delete it
-            command += 'ssh -l %s -i %s %s edit %s delete YES' % \
+            command += 'echo "Deleting %s"; ' % repoName
+            command += 'ssh -l %s -i %s %s edit %s delete YES; ' % \
               (username, sshKey, self.hgHost, repoName)
+            command += 'else echo "Not deleting %s"; exit 0; fi }' % repoName
 
-            self.addStep(ShellCommand,
+            self.addStep(ShellCommand(
              name='delete_repo',
              command=['bash', '-c', command],
              description=['delete', repoName],
+             haltOnFailure=True,
              timeout=30*60 # 30 minutes
-            )
+            ))
 
         # Wait for hg.m.o to catch up
         self.addStep(ShellCommand,

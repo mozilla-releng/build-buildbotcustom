@@ -488,6 +488,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 sshKey=releaseConfig['hgSshKey'],
                 repositories=clone_repositories,
                 clobberURL=branchConfig['base_clobber_url'],
+                userRepoRoot=releaseConfig['userRepoRoot'],
             )
 
             builders.append({
