@@ -978,6 +978,26 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'properties': {'slavebuilddir':
                 reallyShort(builderPrefix('%s_up_vrfy' % platform))}
         })
+        beta_update_verify_factory = UpdateVerifyFactory(
+            hgHost=branchConfig['hghost'],
+            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            verifyConfig=releaseConfig['verifyConfigs'][platform],
+            clobberURL=branchConfig['base_clobber_url'],
+            useOldUpdater=branchConfig.get('use_old_updater', False),
+            cmd_params=['-t', '-f', 'beta', '-n'],
+        )
+
+        builders.append({
+            'name': builderPrefix('%s_beta_update_verify' % platform),
+            'slavenames': all_slaves,
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('%s_beta_update_verify' % platform),
+            'slavebuilddir': reallyShort(builderPrefix('%s_beta_up_vrfy' % platform)),
+            'factory': beta_update_verify_factory,
+            'env': builder_env,
+            'properties': {'slavebuilddir':
+                reallyShort(builderPrefix('%s_beta_up_vrfy' % platform))}
+        })
 
     check_permissions_factory = ScriptFactory(
         scriptRepo=tools_repo,
@@ -1157,6 +1177,26 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'env': builder_env,
                 'properties': {'slavebuilddir':
                     reallyShort(builderPrefix('%s_mu_verify' % platform))}
+            })
+            major_beta_update_verify_factory = UpdateVerifyFactory(
+                hgHost=branchConfig['hghost'],
+                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                verifyConfig=releaseConfig['majorUpdateVerifyConfigs'][platform],
+                clobberURL=branchConfig['base_clobber_url'],
+                useOldUpdater=branchConfig.get('use_old_updater', False),
+                cmd_params=['-t', '-f', 'beta', '-n'],
+            )
+
+            builders.append({
+                'name': builderPrefix('%s_major_beta_update_verify' % platform),
+                'slavenames': all_slaves,
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('%s_major_beta_update_verify' % platform),
+                'slavebuilddir': reallyShort(builderPrefix('%s_mu_beta_verify' % platform)),
+                'factory': major_beta_update_verify_factory,
+                'env': builder_env,
+                'properties': {'slavebuilddir':
+                    reallyShort(builderPrefix('%s_mu_beta_verify' % platform))}
             })
 
     bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
