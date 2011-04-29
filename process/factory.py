@@ -4799,16 +4799,10 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
 
 class UpdateVerifyFactory(ReleaseFactory):
     def __init__(self, verifyConfig, buildSpace=.3, useOldUpdater=False,
-                 cmd_params=None, **kwargs):
+                 **kwargs):
         ReleaseFactory.__init__(self, repoPath='nothing',
                                 buildSpace=buildSpace, **kwargs)
-        command=['bash', 'verify.sh']
-        if not cmd_params:
-            cmd_params = ['-c']
-        elif isinstance(cmd_params, basestring):
-            cmd_params = [cmd_params]
-        command.extend(cmd_params)
-        command.append(verifyConfig)
+        command=['bash', 'verify.sh', '-c', verifyConfig]
         if useOldUpdater:
             command.append('--old-updater')
         self.addStep(UpdateVerify,
