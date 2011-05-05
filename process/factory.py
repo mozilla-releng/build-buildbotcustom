@@ -3647,8 +3647,10 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
+            timeout = 30*60
             command = ['python',
                        WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
+                       '--timeout', timeout,
                        'ssh', '-l', username, '-oIdentityFile=%s' % sshKey,
                        self.hgHost, 'clone', repoName, repoPath]
 
@@ -3656,7 +3658,7 @@ class StagingRepositorySetupFactory(ReleaseFactory):
              name='recreate_repo',
              command=command,
              description=['recreate', repoName],
-             timeout=30*60 # 30 minutes
+             timeout=timeout
             )
 
         # Wait for hg.m.o to catch up
