@@ -3,6 +3,7 @@ import os.path, re
 import posixpath
 from time import strftime
 import urllib
+import random
 
 from twisted.python import log
 
@@ -3613,7 +3614,10 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
-            userRepoURL = '%s/%s' % (self.getRepository(userRepoRoot), repoName)
+            # Don't use cache for user repos
+            rnd = random.randint(100000, 999999)
+            userRepoURL = '%s/%s?rnd=%s' % (self.getRepository(userRepoRoot),
+                                        repoName, rnd)
 
             # test for existence
             command = 'wget -O /dev/null %s' % repo
@@ -3643,12 +3647,14 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
-            command = 'ssh -l %s -i %s %s clone %s %s' % \
-              (username, sshKey, self.hgHost, repoName, repoPath)
+            command = ['python',
+                       WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
+                       'ssh', '-l', username, '-oIdentityFile=%s' % sshKey,
+                       self.hgHost, 'clone', repoName, repoPath]
 
             self.addStep(ShellCommand,
              name='recreate_repo',
-             command=['bash', '-c', command],
+             command=command,
              description=['recreate', repoName],
              timeout=30*60 # 30 minutes
             )
