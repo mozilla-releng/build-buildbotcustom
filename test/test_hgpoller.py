@@ -274,3 +274,73 @@ class RepoBranchHandling(unittest.TestCase):
         self.doTest('GECKO20b5pre_20100820_RELBRANCH')
 
         self.assertEquals(len(self.changes), 1)
+        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+
+class MaxChangesHandling(unittest.TestCase):
+    def setUp(self):
+        self.changes = []
+
+    def doTest(self, repo_branch, maxChanges):
+        changes = self.changes
+        class TestPoller(BaseHgPoller):
+            def __init__(self):
+                BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
+                        repo_branch=repo_branch, maxChanges=maxChanges)
+                self.emptyRepo = True
+
+        class parent:
+            def addChange(self, change):
+                changes.append(change)
+
+        p = TestPoller()
+        p.parent = parent()
+        p.processData(validPushlog)
+
+    def testNoRepoBigMax(self):
+        # Test that we get all of the changes when maxChanges is large enough
+        self.doTest(None, 10)
+
+        self.assertEquals(len(self.changes), 3)
+        # Check that we got the right changes
+        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[1].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[2].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+
+    def testNoRepoUnlimited(self):
+        # Test that we get all of the changes when maxChanges is large enough
+        self.doTest(None, None)
+
+        self.assertEquals(len(self.changes), 3)
+        # Check that we got the right changes
+        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[1].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[2].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+
+    def testNoRepoSmallMax(self):
+        # Test that we get only 2 changes if maxChanges is set to 2
+        self.doTest(None, 2)
+
+        self.assertEquals(len(self.changes), 2)
+        # Check that we got the right changes
+        self.assertEquals(self.changes[0].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[1].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+
+    def testDefaultRepoBigMax(self):
+        self.doTest('default', 10)
+
+        self.assertEquals(len(self.changes), 2)
+        # Check that we got the right changes
+        self.assertEquals(self.changes[0].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[1].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+
+    def testDefaultRepoSmallMax(self):
+        self.doTest('default', 1)
+
+        self.assertEquals(len(self.changes), 1)
+        # Check that we got the right changes
+        self.assertEquals(self.changes[0].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+
+    def testRelbranchSmallMax(self):
+        self.doTest('GECKO20b5pre_20100820_RELBRANCH', 0)
+
+        self.assertEquals(len(self.changes), 0)

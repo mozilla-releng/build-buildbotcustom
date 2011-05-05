@@ -126,6 +126,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             majorReleaseName = majorReleasePrefix()
         platform = platform[0] if len(platform) >= 1 else None
         message_tag = releaseConfig.get('messagePrefix', '[release] ')
+        buildbot_url = ''
+        if master_status.getURLForThing(build):
+            buildbot_url = "Full details are available at:\n %s\n" % master_status.getURLForThing(build)
         # Use a generic ftp URL non-specific to any locale
         ftpURL = genericFtpUrl()
         if platform:
@@ -488,6 +491,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 sshKey=releaseConfig['hgSshKey'],
                 repositories=clone_repositories,
                 clobberURL=branchConfig['base_clobber_url'],
+                userRepoRoot=releaseConfig['userRepoRoot'],
             )
 
             builders.append({
