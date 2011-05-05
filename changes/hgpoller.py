@@ -114,6 +114,9 @@ def _parse_changes(data):
             changes.append(change)
 
     # Sort by push date
+    # Changes in the same push have their order preserved because python list
+    # sorts are stable. The leaf of each push is sorted at the end of the list
+    # of changes for that push.
     changes.sort(key=lambda c:c['updated'])
     return changes
 
@@ -197,7 +200,7 @@ class BaseHgPoller(BasePoller):
     timeout = 30
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
-                 tipsOnly=False, tree=None, repo_branch=None):
+                 tipsOnly=False, tree=None, repo_branch=None, maxChanges=100):
         BasePoller.__init__(self)
         self.hgURL = hgURL
         self.branch = branch
@@ -210,11 +213,11 @@ class BaseHgPoller(BasePoller):
         self.baseURL = "/".join(fragments)
         self.pushlogUrlOverride = pushlogUrlOverride
         self.tipsOnly = tipsOnly
-        self.lastChange = time.time()
         self.lastChangeset = None
         self.startLoad = 0
         self.loadTime = None
         self.repo_branch = repo_branch
+        self.maxChanges = maxChanges
 
         self.emptyRepo = False
 
@@ -258,8 +261,8 @@ class BaseHgPoller(BasePoller):
         return BasePoller.dataFailed(self, res)
 
     def processData(self, query):
-        change_list = _parse_changes(query)
-        if len(change_list) == 0:
+        all_changes = _parse_changes(query)
+        if len(all_changes) == 0:
             if self.lastChangeset is None:
                 # We don't have a lastChangeset, and there are no changes.  Assume
                 # the repository is empty.
@@ -268,6 +271,21 @@ class BaseHgPoller(BasePoller):
                     log.msg("%s is empty" % self.baseURL)
             # Nothing else to do
             return
+
+        # We want to add at most self.maxChanges changes.
+        # Go through the list of changes backwards, since we want to keep the
+        # latest ones and possibly discard earlier ones.
+        change_list = []
+        for change in reversed(all_changes):
+            if self.maxChanges is not None and len(change_list) >= self.maxChanges:
+                break
+
+            # Ignore changes not on the specified in-repo branch.
+            if self.repo_branch is not None and self.repo_branch != change['branch']:
+                continue
+            change_list.append(change)
+        # Un-reverse the list of changes so they get added in the right order
+        change_list.reverse()
 
         # If we have a lastChangeset we're comparing against, we've been
         # running for a while and so any changes returned here are new.
@@ -280,9 +298,6 @@ class BaseHgPoller(BasePoller):
         # the latest changeset in the repository
         if self.lastChangeset is not None or self.emptyRepo:
             for change in change_list:
-                # Ignore changes off the specified in-repo branch.
-                if self.repo_branch is not None and self.repo_branch != change['branch']:
-                    continue
                 link = "%s/rev/%s" % (self.baseURL, change["changeset"])
                 c = changes.Change(who = change["author"],
                                    files = change["files"],
@@ -296,9 +311,10 @@ class BaseHgPoller(BasePoller):
 
         # The repository isn't empty any more!
         self.emptyRepo = False
-        self.lastChange = max(self.lastChange, *[c["updated"]
-                                                 for c in change_list])
-        self.lastChangeset = change_list[-1]["changeset"]
+        # Use the last change found by the poller, regardless of if it's on our
+        # branch or not. This is so we don't have to constantly ignore it in
+        # future polls.
+        self.lastChangeset = all_changes[-1]["changeset"]
         if self.verbose:
             log.msg("last changeset %s on %s" %
                     (self.lastChangeset, self.baseURL))
@@ -312,13 +328,15 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
     change master."""
 
     compare_attrs = ['hgURL', 'branch', 'pollInterval',
-                     'pushlogUrlOverride', 'tipsOnly', 'storeRev']
+                     'pushlogUrlOverride', 'tipsOnly', 'storeRev',
+                     'repo_branch']
     parent = None
     loop = None
     volatile = ['loop']
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
-                 tipsOnly=False, pollInterval=30, storeRev=None):
+                 tipsOnly=False, pollInterval=30, storeRev=None,
+                 repo_branch="default"):
         """
         @type   hgURL:          string
         @param  hgURL:          The base URL of the Hg repo
@@ -336,10 +354,13 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         @param  storeRev:       A name of a property to set on the resulting
                                 Change to help identify the specific repository
                                 if multiple HgPollers are used in one branch.
+        @type   repo_branch:    string or None
+        @param  repo_branch:    Name of the in-repo branch to pay attention to.
+                                If None, then pay attention to all branches.
         """
 
         BaseHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
-                              tipsOnly, repo_branch="default")
+                              tipsOnly, repo_branch=repo_branch)
         self.pollInterval = pollInterval
         self.storeRev = storeRev
 
