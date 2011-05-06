@@ -7298,6 +7298,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  timeout=2400
                 ))
             elif name == 'jsreftest':
+                totalChunks = suite.get('totalChunks', None)
+                thisChunk = suite.get('thisChunk', None)
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
                  testtype='jsreftest',
@@ -7306,6 +7308,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  ))
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
+                 totalChunks=totalChunks,
+                 thisChunk=thisChunk,
                  workdir='build/tests',
                  timeout=2400
                 ))
