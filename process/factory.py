@@ -8069,6 +8069,17 @@ class PartnerRepackFactory(ReleaseFactory):
 
         for platform in self.platformList:
             self.addStep(ShellCommand,
+             name='create_partner_build_directory',
+             description=['create', 'partner', 'directory'],
+             command=['bash', '-c',
+                'ssh -oIdentityFile=~/.ssh/%s %s@%s mkdir -p %s/%s/'
+                    % (self.stageSshKey, self.stageUsername,
+                       self.stagingServer, self.candidatesDir,
+                       self.partnerUploadDir),
+                 ],
+             workdir='.',
+            )
+            self.addStep(ShellCommand,
              name='upload_partner_build_status',
              command=['bash', '-c',
                 'ssh -oIdentityFile=~/.ssh/%s %s@%s touch %s/%s/%s'
