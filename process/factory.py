@@ -8327,6 +8327,17 @@ class AndroidBuildFactory(MobileBuildFactory):
             description=['getting', 'app', 'version'],
             descriptionDone=['got', 'app', 'version']
         ))
+        envJava = {}
+        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH', '/opt/local/bin:/tools/python/bin:/tools/buildbot/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/cltbld/bin')
+        self.addStep(ShellCommand,
+            name='verify_android_signature',
+            command= ['bash', '-c',
+                 WithProperties('%(toolsdir)s/release/signing/verify-android-signature.sh --apk=dist/%(completeMarFilename)s --tools-dir=%(toolsdir)s --nightly')],
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['verify', 'android', 'signature'],
+            env=envJava,
+            haltOnFailure=True,
+        )
         self._createSnippet()
         self.addStep(ShellCommand,
             name='cat_complete_snippet',
