@@ -874,5 +874,5 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
                         '--enable-privilege'
                        ]
-        self.command.extend(self.getSuiteOptions(suite))
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
+        self.command.extend(self.getSuiteOptions(suite))
