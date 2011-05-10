@@ -3,6 +3,7 @@ import os.path, re
 import posixpath
 from time import strftime
 import urllib
+import random
 
 from twisted.python import log
 
@@ -3613,7 +3614,10 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
-            userRepoURL = '%s/%s' % (self.getRepository(userRepoRoot), repoName)
+            # Don't use cache for user repos
+            rnd = random.randint(100000, 999999)
+            userRepoURL = '%s/%s?rnd=%s' % (self.getRepository(userRepoRoot),
+                                        repoName, rnd)
 
             # test for existence
             command = 'wget -O /dev/null %s' % repo
@@ -3643,14 +3647,18 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
-            command = 'ssh -l %s -i %s %s clone %s %s' % \
-              (username, sshKey, self.hgHost, repoName, repoPath)
+            timeout = 30*60
+            command = ['python',
+                       WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
+                       '--timeout', timeout,
+                       'ssh', '-l', username, '-oIdentityFile=%s' % sshKey,
+                       self.hgHost, 'clone', repoName, repoPath]
 
             self.addStep(ShellCommand,
              name='recreate_repo',
-             command=['bash', '-c', command],
+             command=command,
              description=['recreate', repoName],
-             timeout=30*60 # 30 minutes
+             timeout=timeout
             )
 
         # Wait for hg.m.o to catch up
@@ -7290,6 +7298,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  timeout=2400
                 ))
             elif name == 'jsreftest':
+                totalChunks = suite.get('totalChunks', None)
+                thisChunk = suite.get('thisChunk', None)
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
                  testtype='jsreftest',
@@ -7298,6 +7308,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  ))
                 self.addStep(unittest_steps.RemoteReftestStep(
                  suite=name,
+                 totalChunks=totalChunks,
+                 thisChunk=thisChunk,
                  workdir='build/tests',
                  timeout=2400
                 ))
@@ -8057,6 +8069,17 @@ class PartnerRepackFactory(ReleaseFactory):
 
         for platform in self.platformList:
             self.addStep(ShellCommand,
+             name='create_partner_build_directory',
+             description=['create', 'partner', 'directory'],
+             command=['bash', '-c',
+                'ssh -oIdentityFile=~/.ssh/%s %s@%s mkdir -p %s/%s/'
+                    % (self.stageSshKey, self.stageUsername,
+                       self.stagingServer, self.candidatesDir,
+                       self.partnerUploadDir),
+                 ],
+             workdir='.',
+            )
+            self.addStep(ShellCommand,
              name='upload_partner_build_status',
              command=['bash', '-c',
                 'ssh -oIdentityFile=~/.ssh/%s %s@%s touch %s/%s/%s'
@@ -8304,6 +8327,17 @@ class AndroidBuildFactory(MobileBuildFactory):
             description=['getting', 'app', 'version'],
             descriptionDone=['got', 'app', 'version']
         ))
+        envJava = {}
+        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH', '/opt/local/bin:/tools/python/bin:/tools/buildbot/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/cltbld/bin')
+        self.addStep(ShellCommand,
+            name='verify_android_signature',
+            command= ['bash', '-c',
+                 WithProperties('%(toolsdir)s/release/signing/verify-android-signature.sh --apk=dist/%(completeMarFilename)s --tools-dir=%(toolsdir)s --nightly')],
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            description=['verify', 'android', 'signature'],
+            env=envJava,
+            haltOnFailure=True,
+        )
         self._createSnippet()
         self.addStep(ShellCommand,
             name='cat_complete_snippet',
