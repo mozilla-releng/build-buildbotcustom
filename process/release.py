@@ -46,7 +46,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
-                           branchConfig['build_tools_repo_path'])
+                           releaseConfig.get('build_tools_repo_path',
+                               branchConfig['build_tools_repo_path']))
     config_repo = '%s%s' % (branchConfig['hgurl'],
                              branchConfig['config_repo_path'])
 
