@@ -297,6 +297,9 @@ class ReftestMixin(object):
             return ['--setpref=gfx.direct2d.disabled=true',
                     '--setpref=layers.accelerate-none=true',
                     'reftest/tests/layout/reftests/reftest.list']
+        elif suite == 'opengl-no-accel':
+            return ['--setpref=layers.acceleration.force-enabled=disabled',
+                    'reftest/tests/layout/reftests/reftest.list']
         elif suite == 'jsreftest':
             return ['--extra-profile-file=jsreftest/tests/user.js',
                     'jsreftest/tests/jstests.list']

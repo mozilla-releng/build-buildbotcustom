@@ -7194,7 +7194,8 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   maxTime=120*60, # Two Hours
                  ))
             elif suite in ('reftest', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
-                           'crashtest-ipc', 'direct3D', 'opengl', 'reftest-no-d2d-d3d'):
+                           'crashtest-ipc', 'direct3D', 'opengl', 'opengl-no-accel', \
+                           'reftest-no-d2d-d3d'):
                 if suite in ('direct3D', 'opengl'):
                     self.env.update({'MOZ_ACCELERATED':'11'})
                 if suite in ('reftest-ipc', 'crashtest-ipc'):
