@@ -3927,13 +3927,42 @@ class ReleaseTaggingFactory(ReleaseFactory):
 
 class SingleSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
-                 stageUsername, stageSshKey, buildNumber, autoconfDirs=['.'],
-                 buildSpace=1, **kwargs):
+                 stageUsername, stageSshKey, buildNumber, mozconfig,
+                 configRepoPath, configSubDir, env={}, objdir='',
+                 mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
+                 mozconfigBranch="production", **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
-        releaseTag = '%s_RELEASE' % (baseTag)
-        bundleFile = 'source/%s-%s.bundle' % (productName, version)
-        sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
-                                                         version)
+
+        self.mozconfig = mozconfig
+        self.configRepoPath=configRepoPath
+        self.configSubDir=configSubDir
+        self.env = env.copy()
+        self.mozconfigBranch = mozconfigBranch
+        self.releaseTag = '%s_RELEASE' % (baseTag)
+        self.bundleFile = 'source/%s-%s.bundle' % (productName, version)
+        self.sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName, version)
+
+        self.origSrcDir = self.branchName
+
+        # Mozilla subdir
+        if mozillaDir:
+            self.mozillaDir = '/%s' % mozillaDir
+            self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
+        else:
+            self.mozillaDir = ''
+            self.mozillaSrcDir = self.origSrcDir
+
+        # self.mozillaObjdir is used in SeaMonkey's and Thunderbird's case
+        self.objdir = objdir or self.origSrcDir
+        self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+        self.distDir = "%s/dist" % self.mozillaObjdir
+
+        # Make sure MOZ_PKG_PRETTYNAMES is set so that our source package is
+        # created in the expected place.
+        self.env['MOZ_OBJDIR'] = self.objdir
+        self.env['MOZ_PKG_PRETTYNAMES'] = '1'
+        self.env['MOZ_PKG_VERSION'] = version
+
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
           (productName, version, buildNumber)
@@ -3966,9 +3995,9 @@ class SingleSourceFactory(ReleaseFactory):
         # This will get us to the version we're building the release with
         self.addStep(ShellCommand,
          name='hg_update',
-         command=['hg', 'up', '-C', '-r', releaseTag],
-         workdir=self.branchName,
-         description=['update to', releaseTag],
+         command=['hg', 'up', '-C', '-r', self.releaseTag],
+         workdir=self.mozillaSrcDir,
+         description=['update to', self.releaseTag],
          haltOnFailure=True
         )
         # ...And this will get us the tags so people can do things like
@@ -3976,7 +4005,7 @@ class SingleSourceFactory(ReleaseFactory):
         self.addStep(ShellCommand,
          name='hg_update_incl_tags',
          command=['hg', 'up', '-C'],
-         workdir=self.branchName,
+         workdir=self.mozillaSrcDir,
          description=['update to', 'include tag revs'],
          haltOnFailure=True
         )
@@ -3984,14 +4013,14 @@ class SingleSourceFactory(ReleaseFactory):
          name='hg_ident_revision',
          command=['hg', 'identify', '-i'],
          property='revision',
-         workdir=self.branchName,
+         workdir=self.mozillaSrcDir,
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
          name='create_bundle',
          command=['hg', '-R', self.branchName, 'bundle', '--base', 'null',
                   '-r', WithProperties('%(revision)s'),
-                  bundleFile],
+                  self.bundleFile],
          workdir='.',
          description=['create bundle'],
          haltOnFailure=True
@@ -3999,33 +4028,93 @@ class SingleSourceFactory(ReleaseFactory):
         self.addStep(ShellCommand,
          name='delete_metadata',
          command=['rm', '-rf', '.hg'],
-         workdir=self.branchName,
+         workdir=self.mozillaSrcDir,
          description=['delete metadata'],
          haltOnFailure=True
         )
-        for dir in autoconfDirs:
-            self.addStep(ShellCommand,
-             name='autoconf',
-             command=['autoconf-2.13'],
-             workdir='%s/%s' % (self.branchName, dir),
-             haltOnFailure=True
-            )
+        self.addConfigSteps(workdir=self.mozillaSrcDir)
         self.addStep(ShellCommand,
-         name='create_tarball',
-         command=['tar', '-cjf', sourceTarball, self.branchName],
-         workdir='.',
-         description=['create tarball'],
+         name='configure',
+         command=['make', '-f' 'client.mk', 'configure'],
+         workdir=self.mozillaSrcDir,
+         env=self.env,
+         description=['configure'],
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='make_source-package',
+         command=['make','source-package'],
+         workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
+         env=self.env,
+         description=['make source-package'],
+         haltOnFailure=True
+        )
+        self.addStep(ShellCommand,
+         name='mv_source-package',
+         command=['mv','%s/%s/%s' % (self.branchName,
+                                     self.distDir,
+                                     self.sourceTarball),
+                  self.sourceTarball],
+         workdir=".",
+         env=self.env,
+         description=['mv source-package'],
          haltOnFailure=True
         )
         self.addStep(ShellCommand,
          name='upload_files',
          command=['python', '%s/build/upload.py' % self.branchName,
                   '--base-path', '.',
-                  bundleFile, sourceTarball],
+                  self.bundleFile, self.sourceTarball],
          workdir='.',
          env=uploadEnv,
          description=['upload files'],
         )
+
+    def addConfigSteps(self, workdir='build'):
+        assert self.configRepoPath is not None
+        assert self.configSubDir is not None
+        assert self.mozconfig is not None
+        configRepo = self.getRepository(self.configRepoPath)
+
+        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
+                                                      self.mozconfig)
+        self.addStep(ShellCommand,
+                     name='rm_configs',
+                     command=['rm', '-rf', 'configs'],
+                     description=['removing', 'configs'],
+                     descriptionDone=['remove', 'configs'],
+                     haltOnFailure=True,
+                     workdir=workdir
+        )
+        self.addStep(MercurialCloneCommand,
+                     name='hg_clone_configs',
+                     command=['hg', 'clone', configRepo, 'configs'],
+                     description=['checking', 'out', 'configs'],
+                     descriptionDone=['checkout', 'configs'],
+                     haltOnFailure=True,
+                     workdir=workdir
+        )
+        self.addStep(ShellCommand,
+                     name='hg_update',
+                     command=['hg', 'update', '-r', self.mozconfigBranch],
+                     description=['updating', 'mozconfigs'],
+                     haltOnFailure=True,
+                     workdir="%s/configs" % workdir
+        )
+        self.addStep(ShellCommand,
+                     # cp configs/mozilla2/$platform/$repo/$type/mozconfig .mozconfig
+                     name='cp_mozconfig',
+                     command=['cp', self.mozconfig, '.mozconfig'],
+                     description=['copying', 'mozconfig'],
+                     descriptionDone=['copy', 'mozconfig'],
+                     haltOnFailure=True,
+                     workdir=workdir
+        )
+        self.addStep(ShellCommand,
+                     name='cat_mozconfig',
+                     command=['cat', '.mozconfig'],
+                     workdir=workdir
+                    )
 
 class MultiSourceFactory(ReleaseFactory):
     """You need to pass in a repoConfig, which will be a list that
