@@ -6503,7 +6503,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 uploadArgs['to_tinderbox_dated'] = False
                 uploadArgs['revision'] = WithProperties('%(got_revision)s')
                 uploadArgs['who'] = WithProperties('%(who)s')
-                uploadArgs['builddir'] = WithProperties('%(builddir)s')
+                uploadArgs['builddir'] = tinderboxBuildsDir
             else:
                 uploadArgs['to_tinderbox_dated'] = True
         if subdir:
@@ -6535,6 +6535,9 @@ class MobileBuildFactory(MozillaBuildFactory):
             sendchangePlatform = 'android'
         if 'linux' in self.platform:
             sendchangePlatform = 'linux'
+        user = "sendchange"
+        if self.enable_try:
+            user = WithProperties("%(who)s")
         if len(self.talosMasters) > 0 and sendchange:
             talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
             for master, warn, retries in self.talosMasters:
@@ -6546,7 +6549,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  branch=talosBranch,
                  revision=WithProperties("%(got_revision)s"),
                  files=[WithProperties('%(packageUrl)s')],
-                 user="sendchange")
+                 user=user)
                 )
         if len(self.unittestMasters) > 0 and sendchange:
             unittestType = 'mobile' if 'linux' in self.platform else 'opt'
@@ -6563,7 +6566,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=[WithProperties('%(packageUrl)s'),
                         WithProperties('%(testsUrl)s')],
-                 user="sendchange",
+                 user=user,
                 ))
 
     def addMultiLocaleSteps(self, scriptName="mozharness/scripts/multil10n.py"):
@@ -7191,7 +7194,8 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   maxTime=120*60, # Two Hours
                  ))
             elif suite in ('reftest', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
-                           'crashtest-ipc', 'direct3D', 'opengl', 'reftest-no-d2d-d3d'):
+                           'crashtest-ipc', 'direct3D', 'opengl', 'opengl-no-accel', \
+                           'reftest-no-d2d-d3d'):
                 if suite in ('direct3D', 'opengl'):
                     self.env.update({'MOZ_ACCELERATED':'11'})
                 if suite in ('reftest-ipc', 'crashtest-ipc'):
