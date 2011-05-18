@@ -5769,6 +5769,14 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
 
     def addPackageSteps(self):
         self.addStep(ShellCommand,
+            name='rm_mobile_pkg',
+            command=['rm', '-rvf', 'dist/fennec*'],
+            workdir='%s/%s/%s' % (self.baseWorkDir,
+            self.branchName, self.objdir),
+            env=self.env,
+            haltOnFailure=True,
+        )
+        self.addStep(ShellCommand,
             name='make_mobile_pkg',
             command=['make', 'package'],
             workdir='%s/%s/%s' % (self.baseWorkDir,
@@ -5937,6 +5945,13 @@ class MaemoBuildFactory(MobileBuildFactory):
         if multiLocale:
             extraArgs='AB_CD=multi'
             env['MOZ_CHROME_MULTILOCALE'] = ' '.join(self.locales)
+        self.addStep(ShellCommand,
+            name='rm_pkg',
+            command=[self.scratchboxPath, '-p', '-d',
+                     '%s' % (self.objdirRelPath),
+                     'rm -rfv dist/fennec*'],
+            haltOnFailure=True
+        )
         self.addStep(ShellCommand,
             name='make_pkg',
             command=[self.scratchboxPath, '-p', '-k', '-d',
@@ -7518,6 +7533,13 @@ class AndroidBuildFactory(MobileBuildFactory):
             makePackageCommand += ['AB_CD=%s' % locale]
             makePackageTestsCommand += ['AB_CD=%s' % locale]
 
+        self.addStep(ShellCommand,
+            name='rm_android_pkg',
+            command=['rm', '-rfv', 'dist/fennec*'],
+            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
+            env=envJava,
+            haltOnFailure=True,
+        )
         self.addStep(ShellCommand,
             name='make_android_pkg',
             command=makePackageCommand,
