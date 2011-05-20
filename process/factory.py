@@ -7856,3 +7856,51 @@ class AndroidReleaseBuildFactory(AndroidBuildFactory):
         )
         if self.createSnippet and uploadSnippet:
             self._uploadSnippet()
+
+class ScriptFactory(BuildFactory):
+    def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
+         env=None, extra_data=None, extra_args=None,
+         script_timeout=1200, script_maxtime=None):
+
+         BuildFactory.__init__(self)
+         self.addStep(SetBuildProperty(
+             property_name='master',
+             value=lambda b: b.builder.botmaster.parent.buildbotURL
+         ))
+         self.addStep(ShellCommand(
+             name="clobber_scripts",
+             command=['rm', '-rf', 'scripts'],
+             workdir=".",
+         ))
+         self.addStep(ShellCommand(
+             name="clone_scripts",
+             command=['hg', 'clone', scriptRepo, 'scripts'],
+             workdir=".",
+             haltOnFailure=True))
+         self.addStep(ShellCommand(
+             name="update_scripts",
+             command=['hg', 'update', '-C', '-r',
+                      WithProperties('%(script_repo_revision:-default)s')],
+             haltOnFailure=True,
+             workdir='scripts'
+         ))
+         self.addStep(SetBuildProperty,
+              name='set_who',
+              property_name='who',
+              value=lambda build:str(build.source.changes[0].who),
+              haltOnFailure=True
+         )
+         self.addStep(SetBuildProperty,
+              name='set_locale',
+              property_name='locale',
+              value=lambda build:str(build.source.changes[0].who.split('/')[-2]),
+              haltOnFailure=True
+         )
+ 
+         self.addStep(ShellCommand(name="run_script",
+             command=[interpreter, WithProperties(scriptName)],
+             timeout=script_timeout, maxTime=script_maxtime,
+             workdir=".",
+             haltOnFailure=True,
+             env=env,
+             warnOnWarnings=True))
