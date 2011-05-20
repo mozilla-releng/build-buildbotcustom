@@ -7258,9 +7258,24 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
 class RemoteUnittestFactory(MozillaTestFactory):
     def __init__(self, platform, suites, hostUtils, productName='fennec',
                  downloadSymbols=False, downloadTests=True,
-                 posixBinarySuffix='', **kwargs):
+                 posixBinarySuffix='', remoteExtras=None,
+                 branchName=None, **kwargs):
         self.suites = suites
         self.hostUtils = hostUtils
+
+        if remoteExtras is not None:
+            self.remoteExtras = remoteExtras
+        else:
+            self.remoteExtras = {}
+
+        exePaths = self.remoteExtras.get('processName', {})
+        if branchName in exePaths:
+            self.remoteProcessName = exePaths[branchName]
+        else:
+            if 'default' in exePaths:
+                self.remoteProcessName = exePaths['default']
+            else:
+                self.remoteProcessName = 'org.mozilla.fennec'
 
         MozillaTestFactory.__init__(self, platform, productName=productName,
                                     downloadSymbols=downloadSymbols,
@@ -7304,6 +7319,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
             command=['python', '../../sut_tools/installApp.py',
                      WithProperties("%(sut_ip)s"),
                      WithProperties("build/%(build_filename)s"),
+                     self.remoteProcessName,
                     ],
             haltOnFailure=True)
         )
@@ -7363,12 +7379,14 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          testPath=tp,
                          workdir='build/tests',
                          timeout=2400,
+                         app=self.remoteProcessName,
                         ))
                 else:
                     self.addStep(unittest_steps.RemoteMochitestStep(
                      variant=variant,
                      workdir='build/tests',
-                     timeout=2400
+                     timeout=2400,
+                     app=self.remoteProcessName,
                     ))
             elif name.startswith('reftest') or name == 'crashtest':
                 totalChunks = suite.get('totalChunks', None)
@@ -7385,7 +7403,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  totalChunks=totalChunks,
                  thisChunk=thisChunk,
                  workdir='build/tests',
-                 timeout=2400
+                 timeout=2400,
+                 app=self.remoteProcessName,
                 ))
             elif name == 'jsreftest':
                 totalChunks = suite.get('totalChunks', None)
@@ -7401,7 +7420,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  totalChunks=totalChunks,
                  thisChunk=thisChunk,
                  workdir='build/tests',
-                 timeout=2400
+                 timeout=2400,
+                 app=self.remoteProcessName,
                 ))
 
     def addTearDownSteps(self):
@@ -7461,6 +7481,14 @@ class TalosFactory(RequestSortingBuildFactory):
         else:
             self.talosBranch = talosBranch
 
+        exePaths = self.remoteExtras.get('processName', {})
+        if branchName in exePaths:
+            self.remoteProcessName = exePaths[branchName]
+        else:
+            if 'default' in exePaths:
+                self.remoteProcessName = exePaths['default']
+            else:
+                self.remoteProcessName = 'org.mozilla.fennec'
 
         self.addInfoSteps()
         self.addCleanupSteps()
@@ -7892,6 +7920,7 @@ class TalosFactory(RequestSortingBuildFactory):
             command=['python', '../../sut_tools/installApp.py',
                      WithProperties("%(sut_ip)s"),
                      WithProperties(self.workdirBase + "/%(filename)s"),
+                     self.remoteProcessName,
                     ],
             env=self.env,
             haltOnFailure=True)

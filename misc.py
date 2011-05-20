@@ -423,6 +423,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             hgHost=config['hghost'],
             repoPath=config['repo_path'],
             buildToolsRepoPath=config['build_tools_repo_path'],
+            branchName=branch_name,
+            remoteExtras=pf.get('remote_extras'),
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
