@@ -3650,7 +3650,7 @@ class StagingRepositorySetupFactory(ReleaseFactory):
         for repoPath in sorted(repositories.keys()):
             repo = self.getRepository(repoPath)
             repoName = self.getRepoName(repoPath)
-            timeout = 30*60
+            timeout = 60*60
             command = ['python',
                        WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
                        '--timeout', timeout,
