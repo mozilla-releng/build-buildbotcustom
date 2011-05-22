@@ -7486,7 +7486,10 @@ class TalosFactory(RequestSortingBuildFactory):
         else:
             self.talosBranch = talosBranch
 
-        exePaths = self.remoteExtras.get('processName', {})
+        if self.remoteExtras is not None:
+            exePaths = self.remoteExtras.get('processName', {})
+        else:
+            exePaths = {}
         if branchName in exePaths:
             self.remoteProcessName = exePaths[branchName]
         else:
