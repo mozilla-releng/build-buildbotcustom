@@ -4040,7 +4040,7 @@ class SingleSourceFactory(ReleaseFactory):
         self.addConfigSteps(workdir=self.mozillaSrcDir)
         self.addStep(ShellCommand,
          name='configure',
-         command=['make', '-f' 'client.mk', 'configure'],
+         command=['make', '-f', 'client.mk', 'configure'],
          workdir=self.mozillaSrcDir,
          env=self.env,
          description=['configure'],
