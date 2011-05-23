@@ -4585,7 +4585,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          name='commit_verify_configs',
          command=['hg', 'commit', '-u', self.hgUsername, '-m',
                   'Automated configuration bump: update verify configs ' + \
-                  'for %s build %s' % (self.version, self.buildNumber)],
+                  'for %s %s build %s' % (self.brandName, self.version,
+                                          self.buildNumber)
+                 ],
          description=['commit verify configs'],
          workdir='tools',
          haltOnFailure=True
