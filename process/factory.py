@@ -6306,7 +6306,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                             changesetLink=self.mozChangesetLink,
                             revision=self.mozRevision,
                             propertyPrefix="mozilla",
-                            cloneTimeout=60*30)
+                            cloneTimeout=60*60)
             if self.mobileRepoPath:
                 self.addHgPullSteps(repository=self.mobileRepository,
                     workdir='%s/%s' % (self.baseWorkDir,
