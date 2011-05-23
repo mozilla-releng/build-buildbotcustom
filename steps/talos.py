@@ -22,8 +22,16 @@ class MozillaUpdateConfig(ShellCommand):
         else:
             self.remoteExtras = {}
 
+        exePaths = self.remoteExtras.get('processName', {})
+        if branch in exePaths:
+            self.remoteExePath = exePaths[branch]
+        else:
+            if 'default' in exePaths:
+                self.remoteExePath = exePaths['default']
+            else:
+                self.remoteExePath = 'org.mozilla.fennec'
+
         self.remoteOptions = self.remoteExtras.get('options', [])
-        self.remoteExePath = self.remoteExtras.get('exePath', 'org.mozilla.fennec')
 
         self.branch = branch
         self.branchName = branchName
