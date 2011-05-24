@@ -7305,6 +7305,15 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                     posixBinarySuffix=posixBinarySuffix,
                                     **kwargs)
 
+    def addCleanupSteps(self):
+        '''Clean up the relevant places before starting a build'''
+        #On windows, we should try using cmd's attrib and native rmdir
+        self.addStep(ShellCommand(
+            name='rm_builddir',
+            command=['rm', '-rfv', 'build'],
+            workdir='.'
+        ))
+
     def addSetupSteps(self):
         self.addStep(DownloadFile(
             url=self.hostUtils,
