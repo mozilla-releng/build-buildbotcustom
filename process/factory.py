@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from datetime import datetime
 import os.path, re
 import posixpath
@@ -29,6 +31,7 @@ import buildbotcustom.steps.unittest
 import buildbotcustom.env
 import buildbotcustom.misc_scheduler
 import build.paths
+import release.info
 reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
@@ -42,6 +45,7 @@ reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 reload(build.paths)
+reload(release.info)
 
 from buildbotcustom.status.errors import purge_error, global_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
@@ -4573,6 +4577,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         # Bump the update verify config
         pushRepo = self.getRepository(self.buildToolsRepoPath, push=True)
         sshKeyOption = self.getSshKeyOption(self.hgSshKey)
+        tags = [release.info.getRuntimeTag(t) for t in release.info.getTags(self.baseTag, self.buildNumber)]
 
         for platform in sorted(self.verifyConfigs.keys()):
             bumpCommand = self.getUpdateVerifyBumpCommand(platform)
@@ -4592,6 +4597,21 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          workdir='tools',
          haltOnFailure=True
         ))
+        self.addStep(SetProperty,
+            command=['hg', 'identify', '-i'],
+            property='configRevision',
+            workdir='tools',
+            haltOnFailure=True
+        )
+        for t in tags:
+            self.addStep(ShellCommand(
+             name='tag_verify_configs',
+             command=['hg', 'tag', '-u', self.hgUsername, '-f',
+                      '-r', WithProperties('%(configRevision)s'), t],
+             description=['tag verify configs'],
+             workdir='tools',
+             haltOnFailure=True
+            ))
         self.addStep(ShellCommand(
          name='push_verify_configs',
          command=['hg', 'push', '-e',
