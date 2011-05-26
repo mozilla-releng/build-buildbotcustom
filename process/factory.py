@@ -7500,7 +7500,7 @@ class TalosFactory(RequestSortingBuildFactory):
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             remoteTests=False, productName="firefox", remoteExtras=None,
             talosAddOns=[], addonTester=False, releaseTester=False,
-            talosBranch=None):
+            talosBranch=None, branch=None):
 
         BuildFactory.__init__(self)
 
@@ -7539,8 +7539,8 @@ class TalosFactory(RequestSortingBuildFactory):
             exePaths = self.remoteExtras.get('processName', {})
         else:
             exePaths = {}
-        if branchName in exePaths:
-            self.remoteProcessName = exePaths[branchName]
+        if branch in exePaths:
+            self.remoteProcessName = exePaths[branch]
         else:
             if 'default' in exePaths:
                 self.remoteProcessName = exePaths['default']
@@ -7996,7 +7996,8 @@ class TalosFactory(RequestSortingBuildFactory):
          extName=TalosFactory.extName,
          addonTester=self.addonTester,
          useSymbols=self.fetchSymbols,
-         remoteExtras=self.remoteExtras)
+         remoteExtras=self.remoteExtras,
+         remoteProcessName=self.remoteProcessName)
         )
 
     def addRunTestStep(self):
