@@ -4093,7 +4093,7 @@ class SingleSourceFactory(ReleaseFactory):
                      description=['removing', 'configs'],
                      descriptionDone=['remove', 'configs'],
                      haltOnFailure=True,
-                     workdir=workdir
+                     workdir='.'
         )
         self.addStep(MercurialCloneCommand,
                      name='hg_clone_configs',
@@ -4101,23 +4101,23 @@ class SingleSourceFactory(ReleaseFactory):
                      description=['checking', 'out', 'configs'],
                      descriptionDone=['checkout', 'configs'],
                      haltOnFailure=True,
-                     workdir=workdir
+                     workdir='.'
         )
         self.addStep(ShellCommand,
                      name='hg_update',
                      command=['hg', 'update', '-r', self.mozconfigBranch],
                      description=['updating', 'mozconfigs'],
                      haltOnFailure=True,
-                     workdir="%s/configs" % workdir
+                     workdir='./configs'
         )
         self.addStep(ShellCommand,
                      # cp configs/mozilla2/$platform/$repo/$type/mozconfig .mozconfig
                      name='cp_mozconfig',
-                     command=['cp', self.mozconfig, '.mozconfig'],
+                     command=['cp', self.mozconfig, '%s/.mozconfig' % workdir],
                      description=['copying', 'mozconfig'],
                      descriptionDone=['copy', 'mozconfig'],
                      haltOnFailure=True,
-                     workdir=workdir
+                     workdir='.'
         )
         self.addStep(ShellCommand,
                      name='cat_mozconfig',
@@ -7500,7 +7500,7 @@ class TalosFactory(RequestSortingBuildFactory):
             workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
             remoteTests=False, productName="firefox", remoteExtras=None,
             talosAddOns=[], addonTester=False, releaseTester=False,
-            talosBranch=None):
+            talosBranch=None, branch=None):
 
         BuildFactory.__init__(self)
 
@@ -7539,8 +7539,8 @@ class TalosFactory(RequestSortingBuildFactory):
             exePaths = self.remoteExtras.get('processName', {})
         else:
             exePaths = {}
-        if branchName in exePaths:
-            self.remoteProcessName = exePaths[branchName]
+        if branch in exePaths:
+            self.remoteProcessName = exePaths[branch]
         else:
             if 'default' in exePaths:
                 self.remoteProcessName = exePaths['default']
@@ -7996,7 +7996,8 @@ class TalosFactory(RequestSortingBuildFactory):
          extName=TalosFactory.extName,
          addonTester=self.addonTester,
          useSymbols=self.fetchSymbols,
-         remoteExtras=self.remoteExtras)
+         remoteExtras=self.remoteExtras,
+         remoteProcessName=self.remoteProcessName)
         )
 
     def addRunTestStep(self):
