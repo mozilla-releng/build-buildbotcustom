@@ -4093,7 +4093,7 @@ class SingleSourceFactory(ReleaseFactory):
                      description=['removing', 'configs'],
                      descriptionDone=['remove', 'configs'],
                      haltOnFailure=True,
-                     workdir=workdir
+                     workdir='.'
         )
         self.addStep(MercurialCloneCommand,
                      name='hg_clone_configs',
@@ -4101,23 +4101,23 @@ class SingleSourceFactory(ReleaseFactory):
                      description=['checking', 'out', 'configs'],
                      descriptionDone=['checkout', 'configs'],
                      haltOnFailure=True,
-                     workdir=workdir
+                     workdir='.'
         )
         self.addStep(ShellCommand,
                      name='hg_update',
                      command=['hg', 'update', '-r', self.mozconfigBranch],
                      description=['updating', 'mozconfigs'],
                      haltOnFailure=True,
-                     workdir="%s/configs" % workdir
+                     workdir='./configs'
         )
         self.addStep(ShellCommand,
                      # cp configs/mozilla2/$platform/$repo/$type/mozconfig .mozconfig
                      name='cp_mozconfig',
-                     command=['cp', self.mozconfig, '.mozconfig'],
+                     command=['cp', self.mozconfig, '%s/.mozconfig' % workdir],
                      description=['copying', 'mozconfig'],
                      descriptionDone=['copy', 'mozconfig'],
                      haltOnFailure=True,
-                     workdir=workdir
+                     workdir='.'
         )
         self.addStep(ShellCommand,
                      name='cat_mozconfig',
