@@ -7334,6 +7334,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='.'
         ))
 
+    def addInitialSteps(self):
+        self.addStep(SetProperty,
+             command=['bash', '-c', 'echo $SUT_IP'],
+             property='sut_ip'
+        )
+        MozillaTestFactory.addInitialSteps(self)
+
     def addSetupSteps(self):
         self.addStep(DownloadFile(
             url=self.hostUtils,
@@ -7350,10 +7357,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/hostutils',
             name='unpack_hostutils',
         ))
-        self.addStep(SetProperty,
-             command=['bash', '-c', 'echo $SUT_IP'],
-             property='sut_ip'
-        )
         self.addStep(ShellCommand(
             name='cleanup device',
             workdir='.',
