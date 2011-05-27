@@ -618,9 +618,19 @@ def generateBranchObjects(config, name):
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
     l10nPollInterval = config.get('l10nPollInterval', 5*60)
+
+    # This section is to make it easier to disable certain products.
+    # Ideally we could specify a shorter platforms key on the branch,
+    # but that doesn't work
+    enabled_platforms = []
+    for platform in sorted(config['platforms'].keys()):
+        pf = config['platforms'][platform]
+        if pf['stage_product'] in config['enabled_products']:
+            enabled_platforms.append(platform)
+
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
-    for platform in config['platforms'].keys():
+    for platform in enabled_platforms:
         pf = config['platforms'][platform]
         base_name = pf['base_name']
         pretty_name = PRETTY_NAME % base_name
@@ -968,9 +978,8 @@ def generateBranchObjects(config, name):
             )
     branchObjects['schedulers'].append(weekly_scheduler)
 
-    # This section is to make it easier to disable certain products.
-    # Ideally we could specify a shorter platforms key on the branch,
-    # but that doesn't work
+    # We iterate throught the platforms a second time, so we need
+    # to ensure that disabled platforms aren't configured the second time
     enabled_platforms = []
     for platform in sorted(config['platforms'].keys()):
         pf = config['platforms'][platform]
