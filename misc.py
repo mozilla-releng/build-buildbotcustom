@@ -1159,8 +1159,7 @@ def generateBranchObjects(config, name):
                     mobile_l10n_builders.append(builderName)
                     factory = ScriptFactory(
                         scriptRepo='%s%s' % (config['hgurl'],
-                                              'users/jford_mozilla.com/tools'),
-                                              #config['build_tools_repo_path']),
+                                              config['build_tools_repo_path']),
                         interpreter='bash',
                         scriptName='scripts/l10n/nightly_mobile_repacks.sh',
                         extra_args=[platform, stage_platform,
