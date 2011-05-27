@@ -3206,24 +3206,20 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 def generateJetpackObjects(config, SLAVES):
     builders = []
     for platform in config['platforms'].keys():
-        if platform in ('xp', 'win7', 'w764'):
-            slaves = SLAVES[platform]
-            interpreter = 'bash'
-        else:
-            slaves = SLAVES[platform]
-            interpreter = None
-
+        slaves = SLAVES[platform]
         jetpackTarball = "%s/%s/%s" % (config['hgurl'] , config['repo_path'], config['jetpack_tarball'])
         f = ScriptFactory(
                 config['scripts_repo'],
-                'buildfarm/utils/run_jetpack.sh',
-                interpreter=interpreter,
-                extra_args=(platform, jetpackTarball, config['ftp_url'], config['platforms'][platform]['ext']),
+                'buildfarm/utils/run_jetpack.py',
+                extra_args=("--platform", platform, "--tarball-url", jetpackTarball,
+                           "--ftp-url", config['ftp_url'], "--extension", config['platforms'][platform]['ext'],),
+                interpreter='python',
                 log_eval_func=rc_eval_func({1: WARNINGS}),
                 )
 
         builder = {'name': 'jetpack-%s' % platform,
                    'builddir': 'jetpack-%s' % platform,
+                   'slavebuilddir': 'test',
                    'slavenames': slaves,
                    'factory': f,
                    'category': 'jetpack',

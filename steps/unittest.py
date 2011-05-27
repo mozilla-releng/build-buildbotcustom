@@ -804,7 +804,7 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
 
         self.name = suite
 
-        self.command = ['bash', '-c', WithProperties("%(toolsdir)s/buildfarm/utils/run_jetpack.sh %(platform)s")]
+        self.command = ['python', WithProperties("%(toolsdir)s/buildfarm/utils/run_jetpack.py"), '-p', WithProperties("%(platform)s")]
 
         # TODO: When jetpack can handle symbols path and leak testing, add those
         # until then, we skip that.
