@@ -7569,6 +7569,11 @@ class TalosFactory(RequestSortingBuildFactory):
          name='tinderboxprint_slavename',
          data=WithProperties('TinderboxPrint: s: %(slavename)s'),
         ))
+        if self.remoteTests:
+            self.addStep(SetProperty,
+                 command=['bash', '-c', 'echo $SUT_IP'],
+                 property='sut_ip'
+            )
 
     def addCleanupSteps(self):
         if self.OS in ('xp', 'vista', 'win7', 'w764'):
@@ -7632,6 +7637,17 @@ class TalosFactory(RequestSortingBuildFactory):
          command='mkdir talos',
          env=self.env)
         )
+        if self.remoteTests:
+            self.addStep(ShellCommand(
+                name='cleanup device',
+                workdir=self.workdirBase,
+                description="Cleanup Device",
+                command=['python', '../../sut_tools/cleanup.py',
+                         WithProperties("%(sut_ip)s"),
+                        ],
+                env=self.env,
+                haltOnFailure=True)
+            )
 
     def addDmgInstaller(self):
         if self.OS in ('leopard', 'tiger', 'snowleopard'):
@@ -7956,20 +7972,6 @@ class TalosFactory(RequestSortingBuildFactory):
         ))
 
     def addPrepareDeviceStep(self):
-        self.addStep(SetProperty,
-             command=['bash', '-c', 'echo $SUT_IP'],
-             property='sut_ip'
-        )
-        self.addStep(ShellCommand(
-            name='cleanup device',
-            workdir=self.workdirBase,
-            description="Cleanup Device",
-            command=['python', '../../sut_tools/cleanup.py',
-                     WithProperties("%(sut_ip)s"),
-                    ],
-            env=self.env,
-            haltOnFailure=True)
-        )
         self.addStep(ShellCommand(
             name='install app on device',
             workdir=self.workdirBase,
