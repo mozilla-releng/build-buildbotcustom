@@ -275,7 +275,10 @@ if __name__ == "__main__":
                         # way of purging the logs out of the latest-<branch>
                         # directories
                         #uploadArgs['to_latest'] = True
-                        uploadArgs['branch'] = options.branch
+                        if 'mobile' in options.product:
+                            uploadArgs['branch'] = options.branch + '-' + platform
+                        else:
+                            uploadArgs['branch'] = options.branch
 
                     if options.shadowbuild:
                         uploadArgs['to_shadow'] = True
