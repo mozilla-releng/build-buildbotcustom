@@ -683,7 +683,7 @@ def generateBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-            if config['enable_shark'] and platform.startswith('macosx'):
+            if config['enable_shark'] and pf.get('enable_shark'):
                 nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
@@ -1186,6 +1186,8 @@ def generateBranchObjects(config, name):
                         'nextSlave': _nextL10nSlave(),
                         'properties': {'branch': '%s' % config['repo_path'],
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                                       'stage_platform': stage_platform,
+                                       'product': pf['stage_product'],
                                        'slavebuilddir': slavebuilddir},
                         'env': builder_env
                     })
@@ -1217,16 +1219,22 @@ def generateBranchObjects(config, name):
                     multiargs['multiLocaleScript'] = 'scripts/maemo_multi_locale_build.py'
                 multiargs['multiLocaleConfig'] = multi_config_name
 
-            if config['create_snippet'] and pf.get('create_android_snippet'):
+            create_snippet = config['create_snippet']
+            if 'android' in platform:
+                if config['create_mobile_snippet']:
                 # A better way to do this would be to use stage_product in the download_base_url
                 # string and create an ausProduct variable that controls whether to use
                 # Firefox/Fennec
                 # Patches accepted
-                ausargs = {
-                    'downloadBaseURL': config['mobile_download_base_url'],
-                    'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                    'ausBaseUploadDir': config['aus2_mobile_base_upload_dir'],
-                }
+                    create_snippet = config['create_mobile_snippet']
+                    ausargs = {
+                        'downloadBaseURL': config['mobile_download_base_url'],
+                        'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
+                        'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
+                    }
+                else:
+                    create_snippet = False
+                    ausargs = {}
             else:
                 ausargs = {
                     'downloadBaseURL': config['download_base_url'],
@@ -1263,7 +1271,7 @@ def generateBranchObjects(config, name):
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
                 nightly=True,
-                createSnippet=pf.get('create_snippet', config['create_snippet']),
+                createSnippet=create_snippet,
                 createPartial=pf.get('create_partial', config['create_partial']),
                 updatePlatform=pf['update_platform'],
                 ausUser=config['aus2_user'],
@@ -1303,7 +1311,7 @@ def generateBranchObjects(config, name):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'nightly_build': True, 
+                               'nightly_build': True,
                                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
@@ -1364,11 +1372,15 @@ def generateBranchObjects(config, name):
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
-                        'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform))},
+                        'properties': {'branch': name,
+                                       'platform': platform,
+                                       'product': pf['stage_product'],
+                                       'stage_platform': stage_platform,
+                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
-            if config['enable_shark'] and platform.startswith('macosx'):
+            if config['enable_shark'] and pf.get('enable_shark'):
                 if name in ('mozilla-1.9.1','mozilla-1.9.2'):
                     shark_objdir = config['objdir']
                 else:
