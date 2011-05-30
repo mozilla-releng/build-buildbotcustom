@@ -1000,7 +1000,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 scriptRepo=tools_repo,
                 interpreter='bash',
                 scriptName='scripts/release/updates/chunked-verify.sh',
-                extra_args=[platform, releaseConfig['verifyConfigs'][platform],
+                extra_args=[platform, 'verifyConfigs',
                             str(updateVerifyChunks), str(n)],
                 log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
             )
@@ -1190,7 +1190,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptRepo=tools_repo,
                     interpreter='bash',
                     scriptName='scripts/release/updates/chunked-verify.sh',
-                    extra_args=[platform, releaseConfig['majorUpdateVerifyConfigs'][platform],
+                    extra_args=[platform, 'majorUpdateVerifyConfigs',
                                 str(updateVerifyChunks), str(n)],
                     log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
                 )
