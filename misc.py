@@ -1462,7 +1462,11 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
-                'properties': {'branch': name, 'platform': platform,'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
+                'properties': {'branch': name,
+                               'platform': platform,
+                               'stage_platform': stage_platform,
+                               'product': pf['stage_product'],
+                               'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
