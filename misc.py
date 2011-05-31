@@ -1220,27 +1220,23 @@ def generateBranchObjects(config, name):
                 multiargs['multiLocaleConfig'] = multi_config_name
 
             create_snippet = config['create_snippet']
-            if 'android' in platform:
-                if config['create_mobile_snippet']:
-                # A better way to do this would be to use stage_product in the download_base_url
-                # string and create an ausProduct variable that controls whether to use
-                # Firefox/Fennec
-                # Patches accepted
-                    create_snippet = config['create_mobile_snippet']
-                    ausargs = {
-                        'downloadBaseURL': config['mobile_download_base_url'],
-                        'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                        'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
-                    }
-                else:
-                    create_snippet = False
-                    ausargs = {}
+            if pf.has_key('create_snippet') and config['create_snippet']:
+                create_snippet = pf.get('create_snippet')
+            if create_snippet and 'android' in platform:
+                # Ideally, this woud use some combination of product name and
+                # stage_platform, but that can be done in a follow up.
+                ausargs = {
+                    'downloadBaseURL': config['mobile_download_base_url'],
+                    'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
+                    'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
+                }
             else:
                 ausargs = {
                     'downloadBaseURL': config['download_base_url'],
                     'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
                     'ausBaseUploadDir': config['aus2_base_upload_dir'],
                 }
+
 
             nightly_kwargs = {}
             nightly_kwargs.update(multiargs)
