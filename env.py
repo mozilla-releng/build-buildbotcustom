@@ -79,6 +79,8 @@ MozillaEnvironments['linux-unittest'] = {
 }
 
 MozillaEnvironments['linux64-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
+# Not sure if I need this environment or not :(
+MozillaEnvironments['linux-mobile-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
 
 MozillaEnvironments['macosx-unittest'] = {
     "MOZ_NO_REMOTE": '1',

@@ -618,9 +618,19 @@ def generateBranchObjects(config, name):
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
     l10nPollInterval = config.get('l10nPollInterval', 5*60)
+
+    # This section is to make it easier to disable certain products.
+    # Ideally we could specify a shorter platforms key on the branch,
+    # but that doesn't work
+    enabled_platforms = []
+    for platform in sorted(config['platforms'].keys()):
+        pf = config['platforms'][platform]
+        if pf['stage_product'] in config['enabled_products']:
+            enabled_platforms.append(platform)
+
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
-    for platform in config['platforms'].keys():
+    for platform in enabled_platforms:
         pf = config['platforms'][platform]
         base_name = pf['base_name']
         pretty_name = PRETTY_NAME % base_name
@@ -673,7 +683,7 @@ def generateBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-            if config['enable_shark'] and platform.startswith('macosx'):
+            if config['enable_shark'] and pf.get('enable_shark'):
                 nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
@@ -700,7 +710,7 @@ def generateBranchObjects(config, name):
         weeklyBuilders.append('%s hg bundle' % name)
 
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'))
+            is_shadow=bool(name=='shadow-central'), platform_prop='stage_platform',product_prop='product')
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
@@ -968,12 +978,24 @@ def generateBranchObjects(config, name):
             )
     branchObjects['schedulers'].append(weekly_scheduler)
 
+    # We iterate throught the platforms a second time, so we need
+    # to ensure that disabled platforms aren't configured the second time
+    enabled_platforms = []
     for platform in sorted(config['platforms'].keys()):
+        pf = config['platforms'][platform]
+        if pf['stage_product'] in config['enabled_products']:
+            enabled_platforms.append(platform)
+
+    for platform in enabled_platforms:
         # shorthand
         pf = config['platforms'][platform]
 
-        leakTest = False
-        codesighs = config.get('enable_codesighs',True)
+        # The stage platform needs to be used by the factory __init__ methods
+        # as well as the log handler status target.  Instead of repurposing the
+        # platform property on each builder, we will create a new property
+        # on the needed builders
+        stage_platform = pf.get('stage_platform', platform)
+
         uploadPackages = True
         uploadSymbols = False
         packageTests = False
@@ -981,7 +1003,8 @@ def generateBranchObjects(config, name):
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
-            leakTest = True
+            # Some platforms can't run on the build host
+            leakTest = pf.get('enable_leaktests', True)
             codesighs = False
             if not pf.get('enable_unittests'):
                 uploadPackages = pf.get('packageTests', False)
@@ -991,8 +1014,11 @@ def generateBranchObjects(config, name):
             # Platform already has the -debug suffix
             unittestBranch = "%s-%s-unittest" % (name, platform)
             tinderboxBuildsDir = "%s-%s" % (name, platform)
-        elif pf.get('enable_opt_unittests'):
-            packageTests = True
+        else:
+            if pf.get('enable_opt_unittests'):
+                packageTests=True
+            codesighs = pf.get('enable_codesighs', True)
+            leakTest = False
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
@@ -1000,6 +1026,8 @@ def generateBranchObjects(config, name):
 
         if platform.find('win') > -1:
             codesighs = False
+
+        doBuildAnalysis = pf.get('enable_build_analysis', False)
 
         buildSpace = pf.get('build_space', config['default_build_space'])
         l10nSpace = config['default_l10n_space']
@@ -1020,6 +1048,10 @@ def generateBranchObjects(config, name):
             factory_class = NightlyBuildFactory
             uploadSymbols = False
 
+        stageBasePath = '%s/%s' % (config['stage_base_path'],
+                                       pf['stage_product'])
+
+
         # Some platforms shouldn't do dep builds (i.e. RPM)
         if pf.get('enable_dep', True):
             mozilla2_dep_factory = factory_class(env=pf['env'],
@@ -1033,15 +1065,18 @@ def generateBranchObjects(config, name):
                 profiledBuild=pf['profiled_build'],
                 productName=config['product_name'],
                 mozconfig=pf['mozconfig'],
+                use_scratchbox=pf.get('use_scratchbox'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
                 stageSshKey=config['stage_ssh_key'],
-                stageBasePath=config['stage_base_path'],
+                stageBasePath=stageBasePath,
                 stageLogBaseUrl=config.get('stage_log_base_url', None),
+                stageProduct=pf['stage_product'],
                 graphServer=config['graph_server'],
                 graphSelector=config['graph_selector'],
                 graphBranch=config.get('graph_branch', config['tinderbox_tree']),
+                doBuildAnalysis=doBuildAnalysis,
                 baseName=pf['base_name'],
                 leakTest=leakTest,
                 checkTest=checkTest,
@@ -1063,6 +1098,8 @@ def generateBranchObjects(config, name):
                 testPrettyNames=pf.get('test_pretty_names', False),
                 stagePlatform=pf.get('stage_platform'),
                 l10nCheckTest=pf.get('l10n_check_test', False),
+                android_signing=pf.get('android_signing', False),
+                post_upload_include_platform=pf.get('post_upload_include_platform', False),
                 **extra_args
             )
             mozilla2_dep_builder = {
@@ -1075,7 +1112,11 @@ def generateBranchObjects(config, name):
                 'nextSlave': _nextFastSlave,
                 # Uncomment to enable only fast slaves for dep builds.
                 #'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
-                'properties': {'branch': name, 'platform': platform, 'slavebuilddir' : reallyShort('%s-%s' % (name, platform))},
+                'properties': {'branch': name,
+                               'platform': platform,
+                               'stage_platform': stage_platform,
+                               'product': pf['stage_product'],
+                               'slavebuilddir' : reallyShort('%s-%s' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -1111,9 +1152,99 @@ def generateBranchObjects(config, name):
             nightly_builder = '%s nightly' % pf['base_name']
 
             triggeredSchedulers=None
-            if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-               nightly_builder in l10nNightlyBuilders:
-                triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
+            if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
+                mobile_l10n_scheduler_name = '%s-%s-l10n' % (name, platform)
+                builder_env = pf['env'].copy()
+                builder_env.update({
+                    'BUILDBOT_CONFIGS': '%s%s' % (config['hgurl'],
+                                                  config['config_repo_path']),
+                    'CLOBBERER_URL': config['base_clobber_url'],
+                })
+                mobile_l10n_builders = []
+                for n in range(1, int(pf['l10n_chunks']) + 1):
+                    builddir='%s-%s-l10n_%s' % (name, platform, str(n))
+                    builderName = "%s l10n nightly %s/%s" % \
+                        (pf['base_name'], n, pf['l10n_chunks'])
+                    mobile_l10n_builders.append(builderName)
+                    factory = ScriptFactory(
+                        scriptRepo='%s%s' % (config['hgurl'],
+                                              config['build_tools_repo_path']),
+                        interpreter='bash',
+                        scriptName='scripts/l10n/nightly_mobile_repacks.sh',
+                        extra_args=[platform, stage_platform,
+                                    getRealpath('localconfig.py'),
+                                    str(pf['l10n_chunks']), str(n)]
+                    )
+                    slavebuilddir = reallyShort(builddir)
+                    branchObjects['builders'].append({
+                        'name': builderName,
+                        'slavenames': pf.get('slaves'),
+                        'builddir': builddir,
+                        'slavebuilddir': slavebuilddir,
+                        'factory': factory,
+                        'category': name,
+                        'nextSlave': _nextL10nSlave(),
+                        'properties': {'branch': '%s' % config['repo_path'],
+                                       'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                                       'stage_platform': stage_platform,
+                                       'product': pf['stage_product'],
+                                       'slavebuilddir': slavebuilddir},
+                        'env': builder_env
+                    })
+
+                branchObjects["schedulers"].append(Triggerable(
+                    name=mobile_l10n_scheduler_name,
+                    builderNames=mobile_l10n_builders
+                ))
+                triggeredSchedulers=[mobile_l10n_scheduler_name]
+
+            else:  # Non-mobile l10n is done differently at this time
+                if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+                   nightly_builder in l10nNightlyBuilders:
+                    triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
+
+
+            multiargs = {}
+            if config.get('enable_l10n') and pf.get('multi_locale'):
+                multiargs['multiLocale'] = True
+                multiargs['multiLocaleMerge'] = config['multi_locale_merge']
+                multiargs['compareLocalesRepoPath'] = config['compare_locales_repo_path']
+                multiargs['compareLocalesTag'] = config['compare_locales_tag']
+                multiargs['mozharnessRepoPath'] = config['mozharness_repo_path']
+                multiargs['mozharnessTag'] = config['mozharness_tag']
+                multi_config_name = 'multi_locale/%s_%s.json' % (name, platform)
+                if 'android' in platform:
+                    multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
+                elif 'maemo' in platform:
+                    multiargs['multiLocaleScript'] = 'scripts/maemo_multi_locale_build.py'
+                multiargs['multiLocaleConfig'] = multi_config_name
+
+            create_snippet = config['create_snippet']
+            if 'android' in platform:
+                if config['create_mobile_snippet']:
+                # A better way to do this would be to use stage_product in the download_base_url
+                # string and create an ausProduct variable that controls whether to use
+                # Firefox/Fennec
+                # Patches accepted
+                    create_snippet = config['create_mobile_snippet']
+                    ausargs = {
+                        'downloadBaseURL': config['mobile_download_base_url'],
+                        'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
+                        'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
+                    }
+                else:
+                    create_snippet = False
+                    ausargs = {}
+            else:
+                ausargs = {
+                    'downloadBaseURL': config['download_base_url'],
+                    'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
+                    'ausBaseUploadDir': config['aus2_base_upload_dir'],
+                }
+
+            nightly_kwargs = {}
+            nightly_kwargs.update(multiargs)
+            nightly_kwargs.update(ausargs)
 
             mozilla2_nightly_factory = NightlyBuildFactory(
                 env=pf['env'],
@@ -1127,21 +1258,22 @@ def generateBranchObjects(config, name):
                 profiledBuild=pf['profiled_build'],
                 productName=config['product_name'],
                 mozconfig=pf['mozconfig'],
+                use_scratchbox=pf.get('use_scratchbox'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
                 stageSshKey=config['stage_ssh_key'],
-                stageBasePath=config['stage_base_path'],
+                stageBasePath=stageBasePath,
                 stageLogBaseUrl=config.get('stage_log_base_url', None),
+                stageProduct=pf['stage_product'],
                 codesighs=False,
+                doBuildAnalysis=doBuildAnalysis,
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
                 nightly=True,
-                createSnippet=pf.get('create_snippet', config['create_snippet']),
+                createSnippet=create_snippet,
                 createPartial=pf.get('create_partial', config['create_partial']),
-                ausBaseUploadDir=config['aus2_base_upload_dir'],
                 updatePlatform=pf['update_platform'],
-                downloadBaseURL=config['download_base_url'],
                 ausUser=config['aus2_user'],
                 ausSshKey=config['aus2_ssh_key'],
                 ausHost=config['aus2_host'],
@@ -1154,7 +1286,6 @@ def generateBranchObjects(config, name):
                 packageTests=packageTests,
                 unittestMasters=pf.get('unittest_masters', config['unittest_masters']),
                 unittestBranch=unittestBranch,
-                geriatricMasters=config['geriatric_masters'],
                 triggerBuilds=config['enable_l10n'],
                 triggeredSchedulers=triggeredSchedulers,
                 tinderboxBuildsDir=tinderboxBuildsDir,
@@ -1163,6 +1294,9 @@ def generateBranchObjects(config, name):
                 testPrettyNames=pf.get('test_pretty_names', False),
                 l10nCheckTest=pf.get('l10n_check_test', False),
                 stagePlatform=pf.get('stage_platform'),
+                android_signing=pf.get('android_signing', False),
+                post_upload_include_platform=pf.get('post_upload_include_platform', False),
+                **nightly_kwargs
             )
 
             mozilla2_nightly_builder = {
@@ -1173,8 +1307,12 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
-                'properties': {'branch': name, 'platform': platform,
-                    'nightly_build': True, 'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
+                'properties': {'branch': name,
+                               'platform': platform,
+                               'stage_platform': stage_platform,
+                               'product': pf['stage_product'],
+                               'nightly_build': True,
+                               'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -1234,11 +1372,15 @@ def generateBranchObjects(config, name):
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
-                        'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform))},
+                        'properties': {'branch': name,
+                                       'platform': platform,
+                                       'product': pf['stage_product'],
+                                       'stage_platform': stage_platform,
+                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
-            if config['enable_shark'] and platform.startswith('macosx'):
+            if config['enable_shark'] and pf.get('enable_shark'):
                 if name in ('mozilla-1.9.1','mozilla-1.9.2'):
                     shark_objdir = config['objdir']
                 else:
@@ -1259,8 +1401,9 @@ def generateBranchObjects(config, name):
                     stageUsername=config['stage_username'],
                     stageGroup=config['stage_group'],
                     stageSshKey=config['stage_ssh_key'],
-                    stageBasePath=config['stage_base_path'],
+                    stageBasePath=stageBasePath,
                     stageLogBaseUrl=config.get('stage_log_base_url', None),
+                    stageProduct=pf.get('stage_product'),
                     codesighs=False,
                     uploadPackages=uploadPackages,
                     uploadSymbols=False,
@@ -1279,7 +1422,11 @@ def generateBranchObjects(config, name):
                     'factory': mozilla2_shark_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
+                    'properties': {'branch': name,
+                                   'platform': platform,
+                                   'stage_platform': stage_platform,
+                                   'product': pf['stage_product'],
+                                   'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
 
@@ -1364,7 +1511,11 @@ def generateBranchObjects(config, name):
                 'factory': unittest_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
-                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform))},
+                'properties': {'branch': name,
+                               'platform': platform,
+                               'stage_platform': stage_platform,
+                               'product': pf['stage_product'],
+                               'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform))},
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -1449,6 +1600,7 @@ def generateBranchObjects(config, name):
                  mozconfig = pf['xr_mozconfig']
              else:
                  mozconfig = '%s/%s/xulrunner' % (platform, name)
+             xulrunnerStageBasePath = '%s/xulrunner' % config['stage_base_path']
              mozilla2_xulrunner_factory = NightlyBuildFactory(
                  env=xr_env,
                  objdir=pf['platform_objdir'],
@@ -1465,7 +1617,7 @@ def generateBranchObjects(config, name):
                  stageUsername=config['stage_username_xulrunner'],
                  stageGroup=config['stage_group'],
                  stageSshKey=config['stage_ssh_xulrunner_key'],
-                 stageBasePath=config['stage_base_path_xulrunner'],
+                 stageBasePath=xulrunnerStageBasePath,
                  codesighs=False,
                  uploadPackages=uploadPackages,
                  uploadSymbols=True,
@@ -2089,7 +2241,6 @@ def generateCCBranchObjects(config, name):
                 packageTests=packageTests,
                 unittestMasters=config['unittest_masters'],
                 unittestBranch=unittestBranch,
-                geriatricMasters=config['geriatric_masters'],
                 triggerBuilds=config['enable_l10n'],
                 triggeredSchedulers=triggeredSchedulers,
                 tinderboxBuildsDir=tinderboxBuildsDir,
@@ -2838,7 +2989,9 @@ def generateMobileBranchObjects(config, name):
             }
             mobile_objects['builders'].append(builder)
 
-        if pf.get('l10n_chunks', None):
+        # The following code is disabled because it has been moved to the
+        # regular generateBranchObjects function and is breaking for jhford
+        if False: #pf.get('l10n_chunks', None):
             builder_env = pf['env'].copy()
             builder_env.update({
                 'BUILDBOT_CONFIGS': '%s%s' % (config['hgurl'],
@@ -3206,24 +3359,20 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 def generateJetpackObjects(config, SLAVES):
     builders = []
     for platform in config['platforms'].keys():
-        if platform in ('xp', 'win7', 'w764'):
-            slaves = SLAVES[platform]
-            interpreter = 'bash'
-        else:
-            slaves = SLAVES[platform]
-            interpreter = None
-
+        slaves = SLAVES[platform]
         jetpackTarball = "%s/%s/%s" % (config['hgurl'] , config['repo_path'], config['jetpack_tarball'])
         f = ScriptFactory(
                 config['scripts_repo'],
-                'buildfarm/utils/run_jetpack.sh',
-                interpreter=interpreter,
-                extra_args=(platform, jetpackTarball, config['ftp_url'], config['platforms'][platform]['ext']),
+                'buildfarm/utils/run_jetpack.py',
+                extra_args=("--platform", platform, "--tarball-url", jetpackTarball,
+                           "--ftp-url", config['ftp_url'], "--extension", config['platforms'][platform]['ext'],),
+                interpreter='python',
                 log_eval_func=rc_eval_func({1: WARNINGS}),
                 )
 
         builder = {'name': 'jetpack-%s' % platform,
                    'builddir': 'jetpack-%s' % platform,
+                   'slavebuilddir': 'test',
                    'slavenames': slaves,
                    'factory': f,
                    'category': 'jetpack',
@@ -3304,7 +3453,7 @@ def generateProjectObjects(project, config, SLAVES):
     return buildObjects
 
 def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
-        platform_prop="platform", product=None):
+        platform_prop="platform", product_prop=None, product=None):
     extra_args = []
     if config.get('enable_mail_notifier'):
         if config.get('notify_real_author'):
@@ -3335,7 +3484,10 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
         logUploadCmd += ['-p', WithProperties("%%(%s)s" % platform_prop)]
     logUploadCmd += extra_args
 
-    if product:
+    if product_prop:
+        logUploadCmd += ['--product', WithProperties("%%(%s)s" % product_prop)]
+        assert not product, 'dont specify static value when using property'
+    elif product:
         logUploadCmd.extend(['--product', product])
 
     if is_try:
