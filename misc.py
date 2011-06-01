@@ -397,7 +397,8 @@ def mergeBuildObjects(d1, d2):
 def generateTestBuilder(config, branch_name, platform, name_prefix,
                         build_dir_prefix, suites_name, suites,
                         mochitestLeakThreshold, crashtestLeakThreshold,
-                        slaves=None, resetHwClock=False, category=None):
+                        slaves=None, resetHwClock=False, category=None,
+                        stagePlatform=None, stageProduct=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -410,9 +411,10 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     if 'mobile' in name_prefix or 'Android' in name_prefix:
         productName = 'fennec'
     branchProperty = branch_name
-    if pf.get('branch_extra', None):
-        branchProperty += '-%s' % pf['branch_extra']
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
+    properties = {'branch': branchProperty, 'platform': platform,
+                  'slavebuilddir': 'test', 'stage_platform': stagePlatform,
+                  'stage_product': stageProduct}
     if pf.get('is_remote', False):
         hostUtils = pf['host_utils_url']
         factory = RemoteUnittestFactory(
@@ -433,8 +435,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'slavebuilddir': 'test',
             'factory': factory,
             'category': category,
-            'properties': {'branch': branchProperty, 'platform': platform,
-                           'build_platform': platform, 'slavebuilddir': 'test'},
+            'properties': properties,
         }
         builders.append(builder)
     else:
@@ -468,8 +469,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     'factory': factory,
                     'category': category,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': branchProperty, 'platform': platform,
-                        'build_platform': platform, 'slavebuilddir' : 'test'},
+                    'properties': properties,
                     'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
                 }
                 builders.append(builder)
@@ -497,7 +497,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'properties': {'branch': branchProperty, 'platform': platform, 'build_platform': platform, 'slavebuilddir' : 'test'},
+                'properties': properties,
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
@@ -1137,7 +1137,8 @@ def generateBranchObjects(config, name):
                         config, name, platform, "%s debug test" % base_name,
                         "%s-%s-unittest" % (name, platform),
                         suites_name, suites, mochitestLeakThreshold,
-                        crashtestLeakThreshold))
+                        crashtestLeakThreshold, stagePlatform=stage_platform,
+                        stageProduct=pf['stage_product']))
             continue
 
         if config['enable_nightly']:
@@ -1534,7 +1535,8 @@ def generateBranchObjects(config, name):
                     config, name, platform, "%s test" % pf['base_name'],
                     "%s-%s-unittest" % (name, platform),
                     suites_name, suites, mochitestLeakThreshold,
-                    crashtestLeakThreshold))
+                    crashtestLeakThreshold, stagePlatform=stage_platform,
+                    stageProduct=pf['stage_product']))
 
             # Remove mochitest-a11y from other types of builds, since they're not
             # built with a11y enabled
@@ -1548,7 +1550,8 @@ def generateBranchObjects(config, name):
                     config, name, platform, "%s opt test" % pf['base_name'],
                     "%s-%s-opt-unittest" % (name, platform),
                     suites_name, suites, mochitestLeakThreshold,
-                    crashtestLeakThreshold))
+                    crashtestLeakThreshold, stagePlatform=stage_platform,
+                    stageProduct=pf['stage_product']))
 
         if config['enable_codecoverage']:
             # We only do code coverage builds on linux right now
@@ -2592,6 +2595,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if platform_config.get('branch_extra', None):
             branchProperty += '-%s' % platform_config['branch_extra']
 
+        stage_platform = platform_config.get('stage_platform', platform)
+        stage_product = platform_config['stage_product']
+
         # if platform is in the branch config check for overriding slave_platforms at the branch level
         # before creating the builders & schedulers
         if branch_config['platforms'].get(platform):
@@ -2638,10 +2644,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         'properties': {
                             'branch': branchProperty,
                             'platform': slave_platform,
-                            'build_platform': platform,
+                            'stage_platform': stage_platform,
+                            'stage_product': stage_product,
                             'builddir': builddir,
                             'slavebuilddir': slavebuilddir,
-                            },
+                        },
                     }
                     if not merge:
                         nomergeBuilders.append(builder['name'])
@@ -2693,7 +2700,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                     suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
                                     branch_config.get('crashtest_leak_threshold', None),
                                     platform_config[slave_platform]['slaves'],
-                                    resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False)))
+                                    resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
+                                    stagePlatform=stage_platform,
+                                    stageProduct=stage_product))
 
                         for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
                             for test in test_builders:
@@ -2771,7 +2780,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     logUploadCmd = makeLogUploadCommand(branch, branch_config,
             is_try=bool(branch=='try'),
             is_shadow=bool(branch=='shadow-central'),
-            platform_prop='build_platform')
+            platform_prop='stage_platform',
+            product_prop='stage_product')
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
@@ -2984,7 +2994,9 @@ def generateMobileBranchObjects(config, name):
                 'category': long_repo_name,
                 'nextSlave': _nextFastSlave,
                 'properties': {'branch': long_repo_name,
-                               'platform': platform, 'slavebuilddir': reallyShort(builddir)}
+                               'platform': platform,
+                               'product': 'mobile',
+                               'slavebuilddir': reallyShort(builddir)}
             }
             mobile_objects['builders'].append(builder)
 
@@ -3021,7 +3033,8 @@ def generateMobileBranchObjects(config, name):
                     'nextSlave': _nextL10nSlave(),
                     'properties': {'branch': '%s' % config['repo_path'],
                                    'builddir': '%s-l10n_%s' % (builddir, str(n)),
-                                   'slavebuilddir': slavebuilddir},
+                                   'slavebuilddir': slavebuilddir,
+                                   'product': 'mobile'},
                     'env': builder_env
                 })
 
@@ -3042,7 +3055,8 @@ def generateMobileBranchObjects(config, name):
 
     logUploadCmd = makeLogUploadCommand(name, config,
             is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'))
+            is_shadow=bool(name=='shadow-central'),
+            product_prop='product')
 
     mobile_objects['status'].append(SubprocessLogHandler(
         logUploadCmd,
