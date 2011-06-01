@@ -80,11 +80,15 @@ class L10nMixin(object):
 
     def __init__(self, platform, repo='http://hg.mozilla.org/', branch=None,
             baseTag='default', localesFile="browser/locales/all-locales",
-            locales=None):
+            locales=None, localesURL=None):
+        """
+        You can call this class with either a defined list of locales or
+        a URL that contains the list of locales
+        """
         self.branch = branch
         self.baseTag = baseTag
-        self.repo = repo
-        self.localesFile = localesFile
+        self.localesURL = localesURL if localesURL else "%s%s/raw-file/%s/%s" \
+                          % (repo, branch, revision or self.baseTag, localesFile)
 
         # if the user wants to use something different than all locales
         # check ParseLocalesFile function to note that we now need a dictionary
@@ -146,15 +150,12 @@ class L10nMixin(object):
             log.msg('L10nMixin.getLocales():: The user has set a list of locales')
             return self.locales
         else:
-            revision = revision or self.baseTag
-            localesURL = "%s%s/raw-file/%s/%s" \
-                                            % (self.repo, self.branch, revision, self.localesFile)
-            log.msg("L10nMixin:: Getting locales from: "+localesURL)
+            log.msg("L10nMixin:: Getting locales from: "+self.localesURL)
             # we expect that getPage will return the output of "all-locales"
             # or "shipped-locales" or any file that contains a locale per line
             # in the begining of the line e.g. "en-GB" or "ja linux win32"
             # getPage returns a defered that will return a string
-            d = getPage(localesURL, timeout = 5 * 60)
+            d = getPage(self.localesURL, timeout = 5 * 60)
             d.addCallback(lambda data: ParseLocalesFile(data))
             return d
 
@@ -179,11 +180,8 @@ class TriggerableL10n(Triggerable, L10nMixin):
 
     compare_attrs = ('name', 'builderNames', 'branch')
 
-    def __init__(self, name,  builderNames, platform,
-            repo='http://hg.mozilla.org/', branch=None, baseTag='default',
-            localesFile=None, locales=None):
-        L10nMixin.__init__(self, platform=platform, repo=repo, branch=branch,
-                baseTag=baseTag, localesFile=localesFile, locales=locales)
+    def __init__(self, name,  builderNames, branch=None, **kwargs):
+        L10nMixin.__init__(self, **kwargs)
         Triggerable.__init__(self, name, builderNames)
 
     def trigger(self, ss, set_props=None):
@@ -199,13 +197,9 @@ class DependentL10n(Dependent, L10nMixin):
 
     compare_attrs = ('name', 'upstream', 'builders')
 
-    def __init__(self, name, upstream, builderNames, platform,
-            repo='http://hg.mozilla.org/', branch=None, baseTag='default',
-            localesFile=None, locales=None):
+    def __init__(self, name, upstream, builderNames, **kwargs):
         Dependent.__init__(self, name, upstream, builderNames)
-        L10nMixin.__init__(self, platform=platform, branch=branch,
-                baseTag=baseTag, localesFile=localesFile,
-                locales=locales)
+        L10nMixin.__init__(self, **kwargs)
 
     def run(self):
         d = self.parent.db.runInteraction(self._run)

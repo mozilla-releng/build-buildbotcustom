@@ -966,7 +966,7 @@ def generateBranchObjects(config, name):
                                    builderNames=[l10n_builder],
                                    branch=config['repo_path'],
                                    baseTag='default',
-                                   localesFile=config['allLocalesFile']
+                                   localesURL=config.get('localesURL', None)
                                   ))
 
     weekly_scheduler = Nightly(
