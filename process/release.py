@@ -973,6 +973,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             binaryName=releaseConfig['binaryName'],
             oldBinaryName=releaseConfig['oldBinaryName'],
             testOlderPartials=releaseConfig['testOlderPartials'],
+            longVersion=releaseConfig.get('longVersion', None),
+            oldLongVersion=releaseConfig.get('oldLongVersion', None)
         )
 
         builders.append({
