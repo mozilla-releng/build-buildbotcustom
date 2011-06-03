@@ -679,7 +679,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             talosMasters = None
 
-        if platform in releaseConfig['unittestPlatforms']:
+        if releaseConfig['enableUnittests']:
             packageTests = True
             unittestMasters = branchConfig['unittest_masters']
             unittestBranch = builderPrefix('%s-opt-unittest' % platform)
