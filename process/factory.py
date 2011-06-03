@@ -46,7 +46,8 @@ reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
 
-from buildbotcustom.status.errors import purge_error, global_errors
+from buildbotcustom.status.errors import purge_error, global_errors, \
+  upload_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -1896,6 +1897,7 @@ class TryBuildFactory(MercurialBuildFactory):
              haltOnFailure=True,
              description=["upload"],
              timeout=40*60, # 40 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2446,7 +2448,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=["upload"],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
         else:
             objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
@@ -2461,7 +2464,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 haltOnFailure=True,
                 description=['make', 'upload'],
                 sb=self.use_scratchbox,
-                timeout=40*60 # 40 minutes
+                timeout=40*60, # 40 minutes
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2601,7 +2605,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          extract_fn = parse_make_upload,
          haltOnFailure=True,
          description=['upload'],
-         timeout=60*60 # 60 minutes
+         timeout=60*60, # 60 minutes
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         )
 
         # Send to the "release" branch on talos, it will do
@@ -2667,7 +2672,8 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
          workdir='build',
          extract_fn = get_url,
          haltOnFailure=True,
-         description=['upload']
+         description=['upload'],
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         )
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
@@ -2956,7 +2962,8 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
                                        self.appName),
          haltOnFailure=True,
-         flunkOnFailure=True
+         flunkOnFailure=True,
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         )
 
     def getSources(self):
@@ -5337,7 +5344,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             sendchange_props = {
@@ -5455,7 +5463,8 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
-             description=['upload']
+             description=['upload'],
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             for master, warn, retries in self.unittestMasters:
@@ -5694,7 +5703,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             sendchange_props = {
@@ -6690,7 +6700,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             extract_fn = parse_make_upload,
             haltOnFailure=True,
             description=['make', 'upload'],
-            timeout=40*60 # 40 minutes
+            timeout=40*60, # 40 minutes
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         ))
         sendchangePlatform = None
         if self.platform == 'android-r7':
