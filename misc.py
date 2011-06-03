@@ -1316,14 +1316,9 @@ def generateBranchObjects(config, name):
                 if platform in config['l10n_platforms']:
                     # TODO Linux and mac are not working with mozconfig at this point
                     # and this will disable it for now. We will fix this in bug 518359.
-                    if platform is 'wince':
-                        env = pf['env']
-                        objdir = pf['platform_objdir']
-                        mozconfig = pf['mozconfig']
-                    else:
-                        env = {}
-                        objdir = ''
-                        mozconfig = None
+                    env = {}
+                    objdir = ''
+                    mozconfig = None
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=env,
@@ -2266,14 +2261,9 @@ def generateCCBranchObjects(config, name):
                 if platform in config['l10n_platforms']:
                     # TODO Linux and mac are not working with mozconfig at this point
                     # and this will disable it for now. We will fix this in bug 518359.
-                    if platform is 'wince':
-                        env = pf['env']
-                        objdir = pf['platform_objdir']
-                        mozconfig = pf['mozconfig']
-                    else:
-                        env = {}
-                        objdir = ''
-                        mozconfig = None
+                    env = {}
+                    objdir = ''
+                    mozconfig = None
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
                         env=env,

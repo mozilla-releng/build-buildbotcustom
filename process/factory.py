@@ -514,8 +514,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             packageFilename = '*.win32.zip'
         elif platform.startswith("win64"):
             packageFilename = '*.win64-x86_64.zip'
-        elif platform.startswith("wince"):
-            packageFilename = '*.wince-arm.zip'
         else:
             return False
         return packageFilename
@@ -1399,19 +1397,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addFilePropertiesSteps(filename='*.installer.exe', 
                                         directory='build/%s/dist/install/sea' % self.mozillaObjdir,
                                         fileType='installer',
-                                        haltOnFailure=True)
-        elif self.platform.startswith("wince"):
-            self.addStep(ShellCommand,
-                name='make_cab',
-                command=['make', 'package', 'MOZ_PKG_FORMAT=CAB'] + pkgArgs,
-                env=pkg_env,
-                workdir='build/%s' % self.objdir,
-                haltOnFailure=True
-            )
-            self.addFilePropertiesSteps(filename='*.wince-arm.cab', 
-                                        directory='build/%s' % self.objdir,
-                                        fileType='installer',
-                                        maxDepth=3,
                                         haltOnFailure=True)
 
         if self.productName == 'xulrunner':
@@ -2928,29 +2913,18 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
-        if self.platform.startswith('wince'):
-            self.addStep(ShellCommand,
-             name='configure',
-             command=['make -f client.mk configure'], 
-             description='configure',
-             descriptionDone='configure done',
-             haltOnFailure=True,
-             env = self.configure_env,
-             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            )
-        else:
-            # For backward compatibility where there is no mozconfig
-            self.addStep(ShellCommand, **self.processCommand(
-             name='configure',
-             command=['sh', '--',
-                      './configure', '--enable-application=%s' % self.appName,
-                      '--with-l10n-base=../%s' % self.l10nRepoPath ] +
-                      self.extraConfigureArgs,
-             description='configure',
-             descriptionDone='configure done',
-             haltOnFailure=True,
-             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            ))
+        # For backward compatibility where there is no mozconfig
+        self.addStep(ShellCommand, **self.processCommand(
+         name='configure',
+         command=['sh', '--',
+                  './configure', '--enable-application=%s' % self.appName,
+                  '--with-l10n-base=../%s' % self.l10nRepoPath ] +
+                  self.extraConfigureArgs,
+         description='configure',
+         descriptionDone='configure done',
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+        ))
         self.addStep(ShellCommand, **self.processCommand(
          name='make_config',
          command=['make'],
@@ -3420,15 +3394,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         return '.%(locale)s.' + NightlyBuildFactory.getCompleteMarPatternMatch(self)
 
     def doRepack(self):
-        # wince needs this step for nsprpub to succeed
-        if self.platform is 'wince':
-            self.addStep(ShellCommand,
-             name='make_build',
-             command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
-             description=['make build'],
-             haltOnFailure=True
-            )
         self.addStep(ShellCommand,
          name='make_nsprpub',
          command=['make'],
@@ -3678,10 +3643,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
-        elif self.platform.startswith('wince'):
-            filename = '%s.zip' % self.project
-            builds[filename] = '%s-%s.zip' % (self.project, self.version)
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         else:
             raise "Unsupported platform"
 
@@ -3705,15 +3666,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              description=['make memory/jemalloc'],
              haltOnFailure=True
             )
-        # wince needs this step for nsprpub to succeed
-        if self.platform.startswith('wince'):
-            self.addStep(ShellCommand(
-             name='make_build',
-             command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
-             description=['make build'],
-             haltOnFailure=True
-            ))
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'modules/libmar'):
             self.addStep(ShellCommand,
