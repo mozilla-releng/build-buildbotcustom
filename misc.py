@@ -414,7 +414,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     properties = {'branch': branchProperty, 'platform': platform,
                   'slavebuilddir': 'test', 'stage_platform': stagePlatform,
-                  'stage_product': stageProduct}
+                  'product': stageProduct}
     if pf.get('is_remote', False):
         hostUtils = pf['host_utils_url']
         factory = RemoteUnittestFactory(
@@ -2646,7 +2646,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'branch': branchProperty,
                             'platform': slave_platform,
                             'stage_platform': stage_platform,
-                            'stage_product': stage_product,
+                            'product': stage_product,
                             'builddir': builddir,
                             'slavebuilddir': slavebuilddir,
                         },
@@ -2782,7 +2782,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             is_try=bool(branch=='try'),
             is_shadow=bool(branch=='shadow-central'),
             platform_prop='stage_platform',
-            product_prop='stage_product')
+            product_prop='product')
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,

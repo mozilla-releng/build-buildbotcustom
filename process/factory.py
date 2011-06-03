@@ -4529,7 +4529,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
-                 fakeMacInfoTxt=False, **kwargs):
+                 fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
+                 **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4590,6 +4591,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.oldBinaryName = oldBinaryName
         self.testOlderPartials = testOlderPartials
         self.fakeMacInfoTxt = fakeMacInfoTxt
+        self.longVersion = longVersion or self.version
+        self.oldLongVersion = oldLongVersion or self.oldVersion
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4968,8 +4971,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             ))
 
     def getUpdateVerifyBumpCommand(self, platform):
-        oldLongVersion = self.makeLongVersion(self.oldVersion)
-        longVersion = self.makeLongVersion(self.version)
         oldCandidatesDir = self.getCandidatesDir(self.productName,
                                                  self.oldVersion,
                                                  self.oldBuildNumber)
@@ -4981,9 +4982,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 '-r', self.brandName,
                 '--old-version=%s' % self.oldVersion,
                 '--old-app-version=%s' % self.oldAppVersion,
-                '--old-long-version=%s' % oldLongVersion,
+                '--old-long-version=%s' % self.oldLongVersion,
                 '-v', self.version, '--app-version=%s' % self.appVersion,
-                '--long-version=%s' % longVersion,
+                '--long-version=%s' % self.longVersion,
                 '-n', str(self.buildNumber), '-a', self.ausServerUrl,
                 '-s', self.stagingServer, '-c', verifyConfigPath,
                 '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
