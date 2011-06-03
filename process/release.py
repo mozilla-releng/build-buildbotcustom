@@ -1360,7 +1360,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     builders.extend(test_builders)
 
     logUploadCmd = makeLogUploadCommand(sourceRepoInfo['name'], branchConfig,
-            platform_prop=None)
+            platform_prop=None, product=releaseConfig['productName'])
 
     status.append(SubprocessLogHandler(
         logUploadCmd + [
