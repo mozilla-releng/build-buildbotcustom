@@ -99,7 +99,7 @@ class L10nMixin(object):
         # sure to convert them to the form the locales files ues.
         assert platform in ('linux', 'linux64', 'win32', 'win64',
                 'macosx', 'macosx64', 'osx', 'osx64',
-                'maemo', 'wince', 'android-r7')
+                'maemo', 'android-r7')
 
         self.platform = platform
         if self.platform.startswith('macosx'):

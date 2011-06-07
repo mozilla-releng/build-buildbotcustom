@@ -46,7 +46,8 @@ reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
 
-from buildbotcustom.status.errors import purge_error, global_errors
+from buildbotcustom.status.errors import purge_error, global_errors, \
+  upload_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -514,8 +515,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             packageFilename = '*.win32.zip'
         elif platform.startswith("win64"):
             packageFilename = '*.win64-x86_64.zip'
-        elif platform.startswith("wince"):
-            packageFilename = '*.wince-arm.zip'
         else:
             return False
         return packageFilename
@@ -1332,21 +1331,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.android_signing:
             pkg_env['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
 
-        #Moved |make package| before |make package-tests| to work around bug629194
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = "build/%s" % self.objdir
         workdir = WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir = "build/"
-        self.addStep(ScratchboxCommand(
-            name='make_pkg',
-            command=['make', 'package'] + pkgArgs,
-            env=pkg_env,
-            workdir=objdir,
-            sb=self.use_scratchbox,
-            haltOnFailure=True
-        ))
         if 'rpm' in self.platform_variation:
             pkgArgs.append("MOZ_PKG_FORMAT=RPM")
         if self.packageSDK:
@@ -1367,6 +1357,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
              sb=self.use_scratchbox,
              haltOnFailure=True,
             ))
+        self.addStep(ScratchboxCommand(
+            name='make_pkg',
+            command=['make', 'package'] + pkgArgs,
+            env=pkg_env,
+            workdir=objdir,
+            sb=self.use_scratchbox,
+            haltOnFailure=True
+        ))
         # Get package details
         packageFilename = self.getPackageFilename(self.platform,
                                                   self.platform_variation)
@@ -1399,19 +1397,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addFilePropertiesSteps(filename='*.installer.exe', 
                                         directory='build/%s/dist/install/sea' % self.mozillaObjdir,
                                         fileType='installer',
-                                        haltOnFailure=True)
-        elif self.platform.startswith("wince"):
-            self.addStep(ShellCommand,
-                name='make_cab',
-                command=['make', 'package', 'MOZ_PKG_FORMAT=CAB'] + pkgArgs,
-                env=pkg_env,
-                workdir='build/%s' % self.objdir,
-                haltOnFailure=True
-            )
-            self.addFilePropertiesSteps(filename='*.wince-arm.cab', 
-                                        directory='build/%s' % self.objdir,
-                                        fileType='installer',
-                                        maxDepth=3,
                                         haltOnFailure=True)
 
         if self.productName == 'xulrunner':
@@ -1911,6 +1896,7 @@ class TryBuildFactory(MercurialBuildFactory):
              haltOnFailure=True,
              description=["upload"],
              timeout=40*60, # 40 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2461,7 +2447,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=["upload"],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
         else:
             objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
@@ -2476,7 +2463,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 haltOnFailure=True,
                 description=['make', 'upload'],
                 sb=self.use_scratchbox,
-                timeout=40*60 # 40 minutes
+                timeout=40*60, # 40 minutes
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2616,7 +2604,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          extract_fn = parse_make_upload,
          haltOnFailure=True,
          description=['upload'],
-         timeout=60*60 # 60 minutes
+         timeout=60*60, # 60 minutes
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         )
 
         # Send to the "release" branch on talos, it will do
@@ -2682,7 +2671,8 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
          workdir='build',
          extract_fn = get_url,
          haltOnFailure=True,
-         description=['upload']
+         description=['upload'],
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         )
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
@@ -2928,29 +2918,18 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
-        if self.platform.startswith('wince'):
-            self.addStep(ShellCommand,
-             name='configure',
-             command=['make -f client.mk configure'], 
-             description='configure',
-             descriptionDone='configure done',
-             haltOnFailure=True,
-             env = self.configure_env,
-             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            )
-        else:
-            # For backward compatibility where there is no mozconfig
-            self.addStep(ShellCommand, **self.processCommand(
-             name='configure',
-             command=['sh', '--',
-                      './configure', '--enable-application=%s' % self.appName,
-                      '--with-l10n-base=../%s' % self.l10nRepoPath ] +
-                      self.extraConfigureArgs,
-             description='configure',
-             descriptionDone='configure done',
-             haltOnFailure=True,
-             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            ))
+        # For backward compatibility where there is no mozconfig
+        self.addStep(ShellCommand, **self.processCommand(
+         name='configure',
+         command=['sh', '--',
+                  './configure', '--enable-application=%s' % self.appName,
+                  '--with-l10n-base=../%s' % self.l10nRepoPath ] +
+                  self.extraConfigureArgs,
+         description='configure',
+         descriptionDone='configure done',
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+        ))
         self.addStep(ShellCommand, **self.processCommand(
          name='make_config',
          command=['make'],
@@ -2982,7 +2961,8 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
                                        self.appName),
          haltOnFailure=True,
-         flunkOnFailure=True
+         flunkOnFailure=True,
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         )
 
     def getSources(self):
@@ -3420,15 +3400,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         return '.%(locale)s.' + NightlyBuildFactory.getCompleteMarPatternMatch(self)
 
     def doRepack(self):
-        # wince needs this step for nsprpub to succeed
-        if self.platform is 'wince':
-            self.addStep(ShellCommand,
-             name='make_build',
-             command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
-             description=['make build'],
-             haltOnFailure=True
-            )
         self.addStep(ShellCommand,
          name='make_nsprpub',
          command=['make'],
@@ -3678,10 +3649,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
-        elif self.platform.startswith('wince'):
-            filename = '%s.zip' % self.project
-            builds[filename] = '%s-%s.zip' % (self.project, self.version)
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         else:
             raise "Unsupported platform"
 
@@ -3705,15 +3672,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              description=['make memory/jemalloc'],
              haltOnFailure=True
             )
-        # wince needs this step for nsprpub to succeed
-        if self.platform.startswith('wince'):
-            self.addStep(ShellCommand(
-             name='make_build',
-             command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
-             description=['make build'],
-             haltOnFailure=True
-            ))
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'modules/libmar'):
             self.addStep(ShellCommand,
@@ -5385,7 +5343,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             sendchange_props = {
@@ -5503,7 +5462,8 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
-             description=['upload']
+             description=['upload'],
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             for master, warn, retries in self.unittestMasters:
@@ -5742,7 +5702,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             sendchange_props = {
@@ -6738,7 +6699,8 @@ class MobileBuildFactory(MozillaBuildFactory):
             extract_fn = parse_make_upload,
             haltOnFailure=True,
             description=['make', 'upload'],
-            timeout=40*60 # 40 minutes
+            timeout=40*60, # 40 minutes
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         ))
         sendchangePlatform = None
         if self.platform == 'android-r7':
@@ -7477,7 +7439,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     workdir='build/mozmill',
                     timeout=5*60,
                     flunkOnFailure=True
-                    ))                    
+                    ))
 
 
 class RemoteUnittestFactory(MozillaTestFactory):
@@ -7609,9 +7571,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  haltOnFailure=True,
                 ))
                 variant = name.split('-', 1)[1]
+                if 'browser-chrome' in name:
+                    stepProc = unittest_steps.RemoteMochitestBrowserChromeStep
+                else:
+                    stepProc = unittest_steps.RemoteMochitestStep
                 if suite.get('testPaths', None):
                     for tp in suite.get('testPaths', []):
-                        self.addStep(unittest_steps.RemoteMochitestStep(
+                        self.addStep(stepProc(
                          variant=variant,
                          testPath=tp,
                          workdir='build/tests',
@@ -7619,7 +7585,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          app=self.remoteProcessName,
                         ))
                 else:
-                    self.addStep(unittest_steps.RemoteMochitestStep(
+                    self.addStep(stepProc(
                      variant=variant,
                      workdir='build/tests',
                      timeout=2400,

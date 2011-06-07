@@ -13,3 +13,8 @@ hg_errors = ((re.compile("abort: HTTP Error 5\d{2}"), RETRY),
 purge_error = ((re.compile("Error: unable to free"), RETRY),)
 
 update_verify_error = ((re.compile("FAIL"), FAILURE),)
+
+upload_errors = ((re.compile("Connection timed out"), RETRY),
+                 (re.compile("Connection refused"), RETRY),
+                 (re.compile("Connection reset by peer"), RETRY),
+                )

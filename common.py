@@ -7,7 +7,7 @@ def getCodesighsPlatforms():
 def getSupportedPlatforms():
     return ('linux', 'linuxqt','linux64',
             'win32', 'macosx', 'macosx64',
-            'wince', 'win64', 'android')
+            'win64', 'android')
 
 def getPlatformFtpDir(platform):
     platform_ftp_map = {
@@ -17,7 +17,6 @@ def getPlatformFtpDir(platform):
         'macosx64': 'mac',
         'win32': 'win32',
         'win64': 'win64-x86_64',
-        'wince': 'wince-arm',
         'android': 'android-r7',
     }
     return platform_ftp_map.get(platform)
