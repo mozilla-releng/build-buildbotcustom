@@ -901,7 +901,7 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
             self.command.extend(['--test-path', testPath])
 
 
-class RemoteMochitestBrowserChromeStep(MochitestBrowserChromeMixin, RemoteMochitestStep):
+class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
     def __init__(self, **kwargs):
         self.super_class = RemoteMochitestStep
         RemoteMochitestStep.__init__(self, **kwargs)
