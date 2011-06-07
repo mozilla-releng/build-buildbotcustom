@@ -1331,21 +1331,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.android_signing:
             pkg_env['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
 
-        #Moved |make package| before |make package-tests| to work around bug629194
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = "build/%s" % self.objdir
         workdir = WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir = "build/"
-        self.addStep(ScratchboxCommand(
-            name='make_pkg',
-            command=['make', 'package'] + pkgArgs,
-            env=pkg_env,
-            workdir=objdir,
-            sb=self.use_scratchbox,
-            haltOnFailure=True
-        ))
         if 'rpm' in self.platform_variation:
             pkgArgs.append("MOZ_PKG_FORMAT=RPM")
         if self.packageSDK:
@@ -1366,6 +1357,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
              sb=self.use_scratchbox,
              haltOnFailure=True,
             ))
+        self.addStep(ScratchboxCommand(
+            name='make_pkg',
+            command=['make', 'package'] + pkgArgs,
+            env=pkg_env,
+            workdir=objdir,
+            sb=self.use_scratchbox,
+            haltOnFailure=True
+        ))
         # Get package details
         packageFilename = self.getPackageFilename(self.platform,
                                                   self.platform_variation)
