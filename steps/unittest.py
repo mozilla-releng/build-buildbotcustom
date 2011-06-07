@@ -120,9 +120,6 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
 
 def summarizeLogMochitest(name, log):
     infoRe = r"\d+ INFO (Passed|Failed|Todo):\ +(\d+)"
-    # Support browser-chrome result summary format which differs from MozillaMochitest's.
-    if name == 'mochitest-browser-chrome':
-        infoRe = r"\t(Passed|Failed|Todo): (\d+)"
 
     return summarizeLog(
         name, log, "Passed", "Failed", "Todo",
@@ -140,7 +137,7 @@ def summarizeLogRemoteMochitest(name, log):
         if found:
             s = line.strip()
             l = s.split(': ')
-            if len(l) = 2 and l[0] in keys:
+            if len(l) == 2 and l[0] in keys:
                 if l[0] in d:
                     d[l[0]] = l[1]
         else:
@@ -269,10 +266,8 @@ def evaluateRemoteMochitest(name, log, superResult):
     if superResult != SUCCESS:
         return superResult
 
-    failIdent = r"^\d+ INFO Failed: 0"
-    # Support browser-chrome result summary format which differs from MozillaMochitest's.
-    if 'browser-chrome' in name:
-        failIdent = r"^\tFailed: 0"
+    failIdent = r"^\tFailed: 0"
+
     # Assume that having the 'failIdent' line
     # means the tests run completed (successfully).
     # Also check for "^TEST-UNEXPECTED-" for harness errors.
