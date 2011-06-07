@@ -7439,7 +7439,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     workdir='build/mozmill',
                     timeout=5*60,
                     flunkOnFailure=True
-                    ))                    
+                    ))
 
 
 class RemoteUnittestFactory(MozillaTestFactory):
@@ -7571,9 +7571,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  haltOnFailure=True,
                 ))
                 variant = name.split('-', 1)[1]
+                if 'browser-chrome' in name:
+                    stepProc = unittest_steps.RemoteMochitestBrowserChromeStep
+                else:
+                    stepProc = unittest_steps.RemoteMochitestStep
                 if suite.get('testPaths', None):
                     for tp in suite.get('testPaths', []):
-                        self.addStep(unittest_steps.RemoteMochitestStep(
+                        self.addStep(stepProc(
                          variant=variant,
                          testPath=tp,
                          workdir='build/tests',
@@ -7581,7 +7585,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          app=self.remoteProcessName,
                         ))
                 else:
-                    self.addStep(unittest_steps.RemoteMochitestStep(
+                    self.addStep(stepProc(
                      variant=variant,
                      workdir='build/tests',
                      timeout=2400,
