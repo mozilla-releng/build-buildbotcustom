@@ -109,10 +109,6 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
                                      and tryParse populates the list with the builderNames\
                                      that need schedulers.')
 
-    parser.add_argument('--do-everything', '-a',
-                        action='store_true',
-                        dest='do_everything',
-                        help='m-c override to do all builds, tests, talos just like a trunk push')
     parser.add_argument('--build', '-b',
                         default='do',
                         dest='build',
@@ -131,12 +127,6 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
                         help='provide a list of talos tests, or specify all (default is None)')
 
     (options, unknown_args) = parser.parse_known_args(processMessage(message))
-
-    if options.do_everything:
-        options.build = ['opt', 'debug']
-        options.user_platforms = 'all'
-        options.test = 'all'
-        options.talos = 'all'
 
     # Build options include a possible override of 'all' to get a buildset that matches m-c
     if options.build == 'do' or options.build == 'od':
