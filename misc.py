@@ -1238,6 +1238,7 @@ def generateBranchObjects(config, name):
                     'ausBaseUploadDir': config['aus2_base_upload_dir'],
                 }
 
+
             nightly_kwargs = {}
             nightly_kwargs.update(multiargs)
             nightly_kwargs.update(ausargs)
