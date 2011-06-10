@@ -162,21 +162,48 @@ if __name__ == '__main__':
     log_url, exit_code = uploadLog(args)
     print
 
-    builder_path, build_number = sys.argv[-2:]
+    tm_parser = ArgumentParser()
+    tm_parser.add_argument("-e", "--all-emails", dest="all_emails", help="request all emails", action="store_true")
+    tm_parser.add_argument("-n", "--no-emails", dest="silence", help="request no emails at all", action="store_true")
+    tm_parser.set_defaults(
+        all_emails=False,
+        silence=False,
+        )
+
+    builder_path, build_number = args[-2:]
     build = getBuild(builder_path, build_number)
 
+    # check the commit message for syntax regarding email prefs
+    match = re.search("try: ", build.source.changes[-1].comments)
+    comment_args = ""
+    if match:
+        comment_args = build.source.changes[-1].comments.split("try: ")[1].split()
+    tm_options, args = tm_parser.parse_known_args(comment_args)
+
+    # Let's check the results to see if we need the message
+    result = build.getResults()
+    # if silence, never make the message
+    # if all emails, alway make the message
+    # else default is failures only
+    msgdict = None
     # Generate the message
-    msgdict = makeTryMessage(build, log_url)
+    if not tm_options.silence:
+        if tm_options.all_emails:
+            msgdict = makeTryMessage(build, log_url)
+        else:
+            if result != SUCCESS:
+                msgdict = makeTryMessage(build, log_url)
 
     if options.to_author:
         options.to.append(msgdict['author'])
 
     # Send it!
-    msg = formatMessage(msgdict, options.from_, options.to)
-    print msg
+    if msgdict != None:
+        msg = formatMessage(msgdict, options.from_, options.to)
+        print msg
 
-    s = SMTP()
-    s.connect()
-    s.sendmail(options.from_, options.to, msg.as_string())
+        s = SMTP()
+        s.connect()
+        s.sendmail(options.from_, options.to, msg.as_string())
 
     sys.exit(exit_code)
