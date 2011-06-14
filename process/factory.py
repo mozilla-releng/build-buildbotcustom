@@ -7655,7 +7655,7 @@ class TalosFactory(RequestSortingBuildFactory):
     """Create working talos build factory"""
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
-            workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
+            workdirBase=None, fetchSymbols=False, plugins=None, pagesets=[],
             remoteTests=False, productName="firefox", remoteExtras=None,
             talosAddOns=[], addonTester=False, releaseTester=False,
             talosBranch=None, branch=None):
@@ -7680,7 +7680,7 @@ class TalosFactory(RequestSortingBuildFactory):
         self.customTalos = customTalos
         self.fetchSymbols = fetchSymbols
         self.plugins = plugins
-        self.pageset = pageset
+        self.pagesets = pagesets[:]
         self.talosAddOns = talosAddOns[:]
         self.exepath = None
         self.env = MozillaEnvironments[envName]
@@ -7743,6 +7743,16 @@ class TalosFactory(RequestSortingBuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
+             env=self.env)
+            )
+            #required step due to long filename length in tp5
+            self.addStep(ShellCommand(
+             name='mv tp5',
+             workdir=os.path.join(self.workdirBase),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="move tp5 out of talos dir to tp5-%random%",
+             command=["if", "exist", "talos\\page_load_test\\tp5", "mv", "talos\\page_load_test\\tp5", "tp5-%random%"],
              env=self.env)
             )
             self.addStep(ShellCommand(
@@ -8067,13 +8077,13 @@ class TalosFactory(RequestSortingBuildFactory):
              workdir=os.path.join(self.workdirBase, "talos/base_profile"),
             ))
 
-        if self.pageset:
+        for pageset in self.pagesets:
             self.addStep(DownloadFile(
-             url="%s/%s" % (self.supportUrlBase, self.pageset),
+             url="%s/%s" % (self.supportUrlBase, pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
             ))
             self.addStep(UnpackFile(
-             filename=os.path.basename(self.pageset),
+             filename=os.path.basename(pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
             ))
 
