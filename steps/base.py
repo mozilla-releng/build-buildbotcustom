@@ -41,7 +41,7 @@ def addRetryEvaluateCommand(obj):
             self.super_class = obj
             if retry:
                 wrappedCommand = self.retryCommand + \
-                               ['-t', kwargs.get('timeout', 1200)] + \
+                               ['-t', str(kwargs.get('timeout', 1200))] + \
                                command
             else:
                 wrappedCommand = command
