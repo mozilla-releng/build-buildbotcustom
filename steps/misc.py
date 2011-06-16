@@ -137,7 +137,7 @@ class ScratchboxCommand(ShellCommand):
                     string_list.append(arg.fmtstring)
                 else:
                     string_list.append(arg)
-            string_command = ' '.join(string_list)
+            string_command = ' '.join([str(x) for x in string_list])
         elif issubclass(self.command.__class__, WithProperties):
             use_with_properties = True
             string_command = self.command.fmtstring
