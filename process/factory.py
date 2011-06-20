@@ -3337,7 +3337,9 @@ class ReleaseFactory(MozillaBuildFactory):
             return '-i %s' % hgSshKey
         return hgSshKey
 
-    def makeLongVersion(self, version):
+    def makeLongVersion(self, version, usePretty=True):
+        if not usePretty:
+           return version
         version = re.sub('a([0-9]+)$', ' Alpha \\1', version)
         version = re.sub('b([0-9]+)$', ' Beta \\1', version)
         version = re.sub('rc([0-9]+)$', ' RC \\1', version)
@@ -3346,10 +3348,11 @@ class ReleaseFactory(MozillaBuildFactory):
 
 class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
     def __init__(self, platform, buildRevision, version, buildNumber,
-                 env={}, brandName=None, mergeLocales=False, **kwargs):
+                 env={}, brandName=None, mergeLocales=False, usePrettyLongVer=True, **kwargs):
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
+        self.usePrettyLongVer = usePrettyLongVer
         if brandName:
             self.brandName = brandName
         else:
@@ -3407,7 +3410,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
                         '/pub/mozilla.org/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
                                                     self.buildNumber)
-        longVersion = self.makeLongVersion(self.version)
+        longVersion = self.makeLongVersion(self.version, self.usePrettyLongVer)
 
         # This block sets platform specific data that our wget command needs.
         #  build is mapping between the local and remote filenames
