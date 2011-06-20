@@ -4188,7 +4188,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  mozRepoPath=None, oldRepoPath=None, brandName=None,
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
-                 fakeMacInfoTxt=False, fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
+                 fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
                  **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
