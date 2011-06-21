@@ -8028,7 +8028,7 @@ class TalosFactory(RequestSortingBuildFactory):
         elif self.remoteTests:
             self.addStep(ShellCommand(
              name='copy_talos',
-             command=["cp", "-r", "../../talos-data/talos", "."],
+             command=["cp", "-rv", "/builds/talos-data/talos", "."],
              workdir=self.workdirBase,
              description="copying talos",
              haltOnFailure=True,
@@ -8037,7 +8037,7 @@ class TalosFactory(RequestSortingBuildFactory):
             )
             self.addStep(ShellCommand(
              name='copy_fennecmark',
-             command=["cp", "-r", "../../talos-data/bench@taras.glek",
+             command=["cp", "-rv", "/builds/talos-data/bench@taras.glek",
                       "talos/mobile_profile/extensions/"],
              workdir=self.workdirBase,
              description="copying fennecmark",
@@ -8047,7 +8047,7 @@ class TalosFactory(RequestSortingBuildFactory):
             )
             self.addStep(ShellCommand(
              name='copy_pageloader',
-             command=["cp", "-r", "../../talos-data/pageloader@mozilla.org",
+             command=["cp", "-rv", "/builds/talos-data/pageloader@mozilla.org",
                       "talos/mobile_profile/extensions/"],
              workdir=self.workdirBase,
              description="copying pageloader",
