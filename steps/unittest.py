@@ -888,8 +888,6 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
                                  consoleLevel=consoleLevel)
 
         self.name = 'mochitest-%s' % variant
-        if testPath:
-            self.name += " (%s)" % testPath
         self.command = ['python', 'mochitest/runtestsremote.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
