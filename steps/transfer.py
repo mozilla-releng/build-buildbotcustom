@@ -186,7 +186,7 @@ class MozillaStageUpload(ShellCommand):
         # the build id is extracted in a previous step and set as a build
         # property
         buildid = self.getProperty("buildid")
-        if (len(buildid) == 14:
+        if len(buildid) == 14:
             return strftime("%Y-%m-%d-%H-%M-%S", strptime(buildid[0:14], "%Y%m%d%H%M%S"))
         else:
             return strftime("%Y-%m-%d-%H", strptime(buildid[0:10], "%Y%m%d%H"))
