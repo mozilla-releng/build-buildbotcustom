@@ -2996,7 +2996,7 @@ class CCBaseRepackFactory(BaseRepackFactory):
          descriptionDone=['client.py', 'checkout'],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
-         timeout=60*60 # 1 hour
+         timeout=60*60*3 # 3 hours (crazy, but necessary for now)
         )
 
 class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
