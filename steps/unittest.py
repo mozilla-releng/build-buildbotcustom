@@ -310,6 +310,7 @@ class MochitestMixin(object):
     def getVariantOptions(self, variant):
         if variant == 'ipcplugins':
             return ['--setpref=dom.ipc.plugins.enabled=false',
+                    '--setpref=dom.ipc.plugins.enabled.x86_64=false',
                     '--%s' % variant]
         elif variant != 'plain':
             return ['--%s' % variant]
