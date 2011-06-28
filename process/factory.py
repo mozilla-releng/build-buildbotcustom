@@ -2430,7 +2430,10 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         if self.nightly:
             uploadArgs['to_dated'] = True
-            uploadArgs['to_latest'] = True
+            if 'rpm' in self.complete_platform:
+                uploadArgs['to_latest'] = False
+            else:
+                uploadArgs['to_latest'] = True
             if self.post_upload_include_platform:
                 # This was added for bug 557260 because of a requirement for
                 # mobile builds to upload in a slightly different location
