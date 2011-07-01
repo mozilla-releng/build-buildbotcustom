@@ -40,14 +40,18 @@ class CreateUpdateSnippet(BuildStep):
 
     def _getDatedDirPath(self):
         buildid = self.getProperty('buildid')
-        year  = buildid[0:4]
-        month = buildid[4:6]
-        day   = buildid[6:8]
-        hour  = buildid[8:10]
+        year   = buildid[0:4]
+        month  = buildid[4:6]
+        day    = buildid[6:8]
+        hour   = buildid[8:10]
+        minute = buildid[10:12]
+        second = buildid[12:14]
         datedDir = "%s-%s-%s-%s-%s" % (year,
                                        month,
                                        day,
                                        hour,
+                                       minute,
+                                       second,
                                        self.milestone)
         return "%s/%s/%s" % (year, month, datedDir)
 
