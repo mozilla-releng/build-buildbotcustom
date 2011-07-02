@@ -46,13 +46,13 @@ class CreateUpdateSnippet(BuildStep):
         hour   = buildid[8:10]
         minute = buildid[10:12]
         second = buildid[12:14]
-        datedDir = "%s-%s-%s-%s-%s" % (year,
-                                       month,
-                                       day,
-                                       hour,
-                                       minute,
-                                       second,
-                                       self.milestone)
+        datedDir = "%s-%s-%s-%s-%s-%s-%s" % (year,
+                                             month,
+                                             day,
+                                             hour,
+                                             minute,
+                                             second,
+                                             self.milestone)
         return "%s/%s/%s" % (year, month, datedDir)
 
     def generateSnippet(self):
