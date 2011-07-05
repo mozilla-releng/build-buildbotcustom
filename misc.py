@@ -2956,7 +2956,7 @@ def generateValgrindObjects(config, slaves):
         builder = {'name': 'valgrind-%s' % platform,
                    'builddir': 'valgrind-%s' % platform,
                    'slavenames': slaves[platform],
-                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                   'nextSlave': _nextSlowSlave,
                    'factory': f,
                    'category': 'idle',
                    'env': env,

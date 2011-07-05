@@ -203,17 +203,14 @@ def updateFromFiles(session, master_url, master_name, builders, last_time, updat
             if not build:
                 continue
             starttime = None
-            endtime = None
             if build.started:
                 starttime = datetime.utcfromtimestamp(build.started)
-            if build.finished:
-                endtime = datetime.utcfromtimestamp(build.finished)
 
             q = session.query(model.Build).filter_by(
+                    master_id=master.id,
                     builder=db_builder,
                     buildnumber=build.number,
                     starttime=starttime,
-                    endtime=endtime,
                     )
             db_build = q.first()
             if not db_build:
