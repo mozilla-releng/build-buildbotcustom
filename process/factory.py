@@ -6012,7 +6012,7 @@ class CodeCoverageFactory(UnittestBuildFactory):
 
         for name, command, timeout in commands:
             real_command = " ".join(command)
-            real_command += " 2>&1 | bzip2 > ../logs/%s.log.bz2" % name
+            real_command += " 2>&1 | tee >(bzip2 -c > ../logs/%s.log.bz2)" % name
             self.addStep(ShellCommand,
              name=name,
              command=['bash', '-c', real_command],
