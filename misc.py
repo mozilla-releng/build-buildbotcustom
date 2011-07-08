@@ -1649,6 +1649,8 @@ def generateBranchObjects(config, name):
         # -- end of per-platform loop --
 
     if config['enable_weekly_bundle']:
+        stageBasePath = '%s/%s' % (config['stage_base_path'],
+                                   pf['stage_product'])
         bundle_factory = ScriptFactory(
             config['hgurl'] + config['build_tools_repo_path'],
             'scripts/bundle/hg-bundle.sh',
@@ -1660,7 +1662,7 @@ def generateBranchObjects(config, name):
                 config['repo_path'],
                 config['stage_server'],
                 config['stage_username'],
-                config['stage_base_path'],
+                stageBasePath,
                 config['stage_ssh_key'],
                 ],
         )
