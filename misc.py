@@ -1945,7 +1945,7 @@ def generateCCBranchObjects(config, name):
             uploadSymbols = pf.get('upload_symbols', False)
         else:
             factory_class = CCNightlyBuildFactory
-            uploadSymbols = pf.get('upload_symbols', False)
+            uploadSymbols = False
 
         mozilla2_dep_factory = factory_class(env=pf['env'],
             objdir=pf['platform_objdir'],
@@ -1987,6 +1987,8 @@ def generateCCBranchObjects(config, name):
             tinderboxBuildsDir=tinderboxBuildsDir,
             enable_ccache=pf.get('enable_ccache', False),
             useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+            testPrettyNames=pf.get('test_pretty_names', False),
+            l10nCheckTest=pf.get('l10n_check_test', False),
             **extra_args
         )
         mozilla2_dep_builder = {
@@ -2083,6 +2085,8 @@ def generateCCBranchObjects(config, name):
                 tinderboxBuildsDir=tinderboxBuildsDir,
                 enable_ccache=pf.get('enable_ccache', False),
                 useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+                testPrettyNames=pf.get('test_pretty_names', False),
+                l10nCheckTest=pf.get('l10n_check_test', False),
             )
 
             mozilla2_nightly_builder = {
