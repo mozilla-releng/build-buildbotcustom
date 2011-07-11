@@ -64,7 +64,8 @@ from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.env import MozillaEnvironments
-from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, genBuildID
+from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
+  genBuildID, reallyShort
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -2725,7 +2726,7 @@ def identToProperties(default_prop=None):
 class BaseRepackFactory(MozillaBuildFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs + ['*-nightly']
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + [reallyShort('*-nightly')]
 
     extraConfigureArgs = []
 
