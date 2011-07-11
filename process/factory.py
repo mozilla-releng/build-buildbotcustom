@@ -1,5 +1,6 @@
 from datetime import datetime
 import os.path, re
+import posixpath
 from time import strftime
 import urllib
 
@@ -67,6 +68,8 @@ from buildbot.status.builder import SUCCESS, FAILURE
 # limit the number of clones of the try repository so that we don't kill
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
 hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
+
+hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
 
 class DummyFactory(BuildFactory):
     def __init__(self):
@@ -139,7 +142,7 @@ def postUploadCmdPrefix(upload_dir=None,
     if to_tinderbox_builds:
         cmd.append('--release-to-tinderbox-builds')
     if to_try:
-        cmd.append('--release-to-tryserver-builds')
+        cmd.append('--release-to-try-builds')
     if to_latest:
         cmd.append("--release-to-latest")
     if to_dated:
@@ -163,9 +166,15 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk))",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm))",
                         "\n".join([stdout, stderr]), re.M):
-        if m.endswith("crashreporter-symbols.zip"):
+        if 'devel' in m and m.endswith('.rpm'):
+            retval['develRpmUrl'] = m
+        elif 'tests' in m and m.endswith('.rpm'):
+            retval['testsRpmUrl'] = m
+        elif m.endswith('.rpm'):
+            retval['packageRpmUrl'] = m
+        elif m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
             retval['testsUrl'] = m
@@ -353,7 +362,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
          name='tinderboxsummarymessage_buildername',
          data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
         ))
-        if self.branchName in ('tryserver',):
+        if self.branchName in ('try',):
             self.addStep(OutputStep(
              name='tinderboxprint_revision',
              data=WithProperties('TinderboxPrint: s: %(revision)s'),
@@ -589,7 +598,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
                  mozconfigBranch="production", useSharedCheckouts=False,
-                 testPrettyNames=False, l10nCheckTest=False, **kwargs):
+                 stagePlatform=None, testPrettyNames=False, l10nCheckTest=False, 
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -667,8 +677,30 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                           (self.ausBaseUploadDir, 
                                            self.updatePlatform)
 
+        self.complete_platform = self.platform
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
+        # We need to know what the platform that we should use on
+        # stage should be.  It would be great to be able to do this
+        # programatically, but some variations work differently to others.
+        # Instead of changing the world. lets keep the modification to platforms
+        # that opt in
+        if stagePlatform:
+            self.stagePlatform = stagePlatform
+        else:
+            self.stagePlatform = self.platform
+        # it turns out that the cruft is useful for dealing with multiple types
+        # of builds that are all done using the same self.platform.
+        # Examples of what happens:
+        #   platform = 'linux' sets self.platform_variation to []
+        #   platform = 'linux-opt' sets self.platform_variation to ['opt']
+        #   platform = 'linux-opt-rpm' sets self.platform_variation to ['opt','rpm']
+        platform_chunks = self.complete_platform.split('-', 1)
+        if len(platform_chunks) > 1:
+                self.platform_variation = platform_chunks[1].split('-')
+        else:
+                self.platform_variation = []
+
         assert self.platform in getSupportedPlatforms()
 
         if self.graphServer is not None:
@@ -700,10 +732,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.stageLogBaseUrl = stageLogBaseUrl
         if self.stageLogBaseUrl:
             # yes, the branchName is needed twice here so that log uploads work for all
-            self.logUploadDir = '%s/%s-%s/' % (self.branchName, self.branchName, self.platform)
+            self.logUploadDir = '%s/%s-%s/' % (self.branchName, self.branchName,
+                                               self.stagePlatform)
             self.logBaseUrl = '%s/%s' % (self.stageLogBaseUrl, self.logUploadDir)
         else:
-            self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName, self.platform)
+            self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
+                                                             self.stagePlatform)
             self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
                         ( self.stageServer, self.productName, self.logUploadDir)
 
@@ -894,9 +928,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
          description=['compile'],
          env=self.env,
          haltOnFailure=True,
-         timeout=7200 # 120 minutes, because windows PGO builds take a long time,
-                      # and because 10.6 builds on minis with 1 GB RAM take a REALLY
-                      # long time.
+         timeout=10800,
+         # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose
+         # the root cause of the linker time out.  
         )
 
     def addBuildInfoSteps(self):
@@ -1193,6 +1227,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
     def addUploadSteps(self, pkgArgs=None):
         pkgArgs = pkgArgs or []
+        if 'rpm' in self.platform_variation:
+            pkgArgs.append("MOZ_PKG_FORMAT=RPM")
         if self.packageSDK:
             self.addStep(ShellCommand,
              name='make_sdk',
@@ -1218,7 +1254,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
         # Get package details
         packageFilename = self.getPackageFilename(self.platform)
-        if packageFilename:
+        if packageFilename and 'rpm' not in self.platform_variation:
             self.addFilePropertiesSteps(filename=packageFilename, 
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
@@ -1668,7 +1704,7 @@ class TryBuildFactory(MercurialBuildFactory):
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
-        # Set up the post upload to the custom tryserver tinderboxBuildsDir
+        # Set up the post upload to the custom try tinderboxBuildsDir
         tinderboxBuildsDir = self.packageDir
 
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
@@ -2197,7 +2233,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         # Always upload builds to the dated tinderbox builds directories
         if self.tinderboxBuildsDir is None:
-            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
+            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.stagePlatform)
         else:
             tinderboxBuildsDir = self.tinderboxBuildsDir
 
@@ -2232,9 +2268,15 @@ class NightlyBuildFactory(MercurialBuildFactory):
              timeout=60*60 # 60 minutes
             )
         else:
+            # Because of how the RPM packaging works,
+            # we need to tell make upload to look for RPMS
+            if 'rpm' in self.complete_platform:
+                upload_vars = ["MOZ_PKG_FORMAT=RPM"]
+            else:
+                upload_vars = []
             self.addStep(SetProperty(
                 name='make_upload',
-                command=['make', 'upload'],
+                command=['make', 'upload'] + upload_vars,
                 env=uploadEnv,
                 workdir='%s/%s' % (self.baseWorkDir, self.objdir),
                 extract_fn = parse_make_upload,
@@ -2601,6 +2643,15 @@ class BaseRepackFactory(MozillaBuildFactory):
 
         self.preClean()
 
+        # Need to override toolsdir as set by MozillaBuildFactory because
+        # we need Windows-style paths.
+        if self.platform.startswith('win'):
+            self.addStep(SetProperty,
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
+            )
+
         self.addStep(ShellCommand,
          name='mkdir_l10nrepopath',
          command=['sh', '-c', 'mkdir -p %s' % self.l10nRepoPath],
@@ -2751,39 +2802,40 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
 
     def getSources(self):
-        self.addStep(MercurialCloneCommand,
+        self.addStep(ShellCommand(
          name='get_enUS_src',
-         command=['sh', '-c',
-          WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
-                         'hg -R '+self.origSrcDir+' pull ;'+
-                         'hg -R '+self.origSrcDir+' up -C ;'+
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.repoPath+' ' +
-                         self.origSrcDir+' ; ' +
-                         'fi ' +
-                         '&& hg -R '+self.origSrcDir+' update -C -r %(en_revision)s')],
+         command=[
+                  'python',
+                  WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                  WithProperties("--rev=%(en_revision)s"),
+                  'http://%s/%s' % (self.hgHost, self.repoPath),
+                  self.origSrcDir,
+                 ],
+         env=self.env,
          descriptionDone="en-US source",
          workdir=self.baseWorkDir,
+         locks=[hg_l10n_lock.access('counting')],
          haltOnFailure=True,
+         flunkOnFailure=True,
          timeout=30*60 # 30 minutes
-        )
-        self.addStep(MercurialCloneCommand,
+        ))
+        self.addStep(ShellCommand(
          name='get_locale_src',
-         command=['sh', '-c',
-          WithProperties('if [ -d %(locale)s ]; then ' +
-                         'hg -R %(locale)s pull -r default ; ' +
-                         'else ' +
-                         'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.l10nRepoPath+ 
-                           '/%(locale)s/ ; ' +
-                         'fi ' +
-                         '&& hg -R %(locale)s update -C -r %(l10n_revision)s')],
+         command=[
+                  'python',
+                  WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                  WithProperties("--rev=%(l10n_revision)s"),
+                  WithProperties("http://" + self.hgHost + "/" + \
+                                 self.l10nRepoPath + "/%(locale)s")
+                 ],
+         env=self.env,
          descriptionDone="locale source",
-         timeout=5*60, # 5 minutes
+         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
+         locks=[hg_l10n_lock.access('counting')],
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
-        )
+         flunkOnFailure=True,
+         timeout=5*60, # 5 minutes
+        ))
 
     def updateEnUS(self):
         '''Update the en-US source files to the revision used by
@@ -6215,7 +6267,7 @@ class MobileBuildFactory(MozillaBuildFactory):
                 property_name='who',
                 value=lambda x: str(x.source.changes[0].who),
             ))
-            remote_location = '%s/%s/tryserver-%s' % (self.stageBasePath,
+            remote_location = '%s/%s/try-%s' % (self.stageBasePath,
                             self.try_subdir, self.platform)
             ssh_string = 'ssh -i ~/.ssh/%s %s@%s mkdir -p %s' % \
                     (self.stageSshKey, self.stageUsername,
@@ -6382,14 +6434,12 @@ class MobileBuildFactory(MozillaBuildFactory):
             timeout=40*60 # 40 minutes
         ))
         sendchangePlatform = None
-        if self.talosMasters:
-            if self.platform == 'android-r7':
-                sendchangePlatform = 'android'
-            if 'linux' in self.platform:
-                sendchangePlatform = 'linux'
-        if sendchangePlatform and sendchange:
+        if self.platform == 'android-r7':
+            sendchangePlatform = 'android'
+        if 'linux' in self.platform:
+            sendchangePlatform = 'linux'
+        if len(self.talosMasters) > 0 and sendchange:
             talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
-            unittestBranch = "%s-%s-opt-unittest" % (self.branchName, sendchangePlatform)
             for master, warn, retries in self.talosMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6401,6 +6451,11 @@ class MobileBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange")
                 )
+        if len(self.unittestMasters) > 0 and sendchange:
+            unittestType = 'mobile' if 'linux' in self.platform else 'opt'
+            unittestBranch = "%s-%s-%s-unittest" % (self.branchName,
+                                                    sendchangePlatform,
+                                                    unittestType)
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6448,7 +6503,8 @@ class MobileDesktopBuildFactory(MobileBuildFactory):
         self.addBuildSteps()
         self.addPackageSteps()
         self.addSymbolSteps()
-        self.addMakeUploadSteps()
+        do_sendchange = True if 'linux' in self.platform else False
+        self.addMakeUploadSteps(sendchange=do_sendchange)
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
