@@ -385,11 +385,13 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             property='builddir',
             workdir='.',
         ))
+        # XX remove flunkOnFailure after bug 558430 is fixed
         self.addStep(ShellCommand,
          name='rm_buildtools',
          command=['rm', '-rf', 'tools'],
          description=['clobber', 'build tools'],
-         workdir='.'
+         workdir='.',
+         flunkOnFailure=False,
         )
         self.addStep(MercurialCloneCommand,
          name='clone_buildtools',
@@ -6953,7 +6955,8 @@ class MozillaTestFactory(MozillaBuildFactory):
         self.addStep(ShellCommand(
             name='rm_builddir',
             command=['rm', '-rf', 'build'],
-            workdir='.'
+            workdir='.',
+            flunkOnFailure=False, # XXX until bug 558430 is fixed
         ))
 
     def addPrepareBuildSteps(self):
