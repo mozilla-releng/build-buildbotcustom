@@ -181,6 +181,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['testsUrl'] = m
         elif m.endswith("apk") and 'unsigned' in m:
             retval['unsignedApkUrl'] = m
+        elif 'jsshell-' in m and m.endswith('.zip'):
+            retval['jsshellUrl'] = m
         else:
             retval['packageUrl'] = m
     return retval
