@@ -16,6 +16,7 @@ from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import WARNINGS
 
+import buildbotcustom.common
 import buildbotcustom.changes.hgpoller
 import buildbotcustom.process.factory
 import buildbotcustom.log
@@ -37,6 +38,7 @@ reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
 reload(build.paths)
 
+from buildbotcustom.common import reallyShort
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
@@ -58,68 +60,6 @@ from build.paths import getRealpath
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
-
-def reallyShort(name):
-    mappings = {
-        'mozilla': 'm',
-        'central': 'cen',
-        '1.9.1': '191',
-        '1.9.2': '192',
-        'tracemonkey': 'tm',
-        'places': 'plc',
-        'electrolysis': 'e10s',
-        'jaegermonkey': 'jm',
-        'shadow': 'sh',
-        'mobile': 'mb',
-        'desktop': None,
-        'debug': 'dbg',
-        'xulrunner': 'xr',
-        'build': 'bld',
-        'linux': 'lnx',
-        'win32': 'w32',
-        'win64': 'w64',
-        'macosx': 'osx',
-        'macosx64': 'osx64',
-        'linux64': 'lnx64',
-        'android': 'andrd',
-        'release': 'rel',
-        'mochitests': 'mochi',
-        'mochitest': 'm',
-        'other': 'oth',
-        'browser': 'br',
-        'nightly': 'ntly',
-        'tryserver': 'try',
-        'cedar': 'ced',
-        'birch': 'bir',
-        'maple': 'map',
-        'leopard': 'leo',
-        'snowleopard': 'snow',
-        'fedora': 'fed',
-        'fedora64': 'fed64',
-        'repack': 'rpk',
-        'alder': 'a',
-        'holly': 'h',
-        'larch': 'l',
-        'accessibility': 'a11y',
-        'inbound': 'in',
-        'devtools': 'dev',
-        'services': 'srv',
-        'private-browsing': 'pb',
-    }
-    hyphen_seperated_words = name.split('-')
-    words = []
-    for word in hyphen_seperated_words:
-        space_seperated_words = word.split('_')
-        for word in space_seperated_words:
-            words.extend(word.split(' '))
-    new_words = []
-    for word in words:
-        if word in mappings.keys():
-            if mappings[word]:
-                new_words.append(mappings[word])
-        else:
-            new_words.append(word)
-    return '-'.join(new_words)
 
 def get_l10n_repositories(file, l10nRepoPath, relbranch):
     """Reads in a list of locale names and revisions for their associated

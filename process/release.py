@@ -12,6 +12,7 @@ from buildbot.steps.trigger import Trigger
 import release.platforms
 import release.paths
 import buildbotcustom.changes.ftppoller
+import buildbotcustom.common
 import build.paths
 import release.info
 reload(release.platforms)
@@ -23,7 +24,8 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  reallyShort, makeLogUploadCommand
+  makeLogUploadCommand
+from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, ReleaseFinalVerification, L10nVerifyFactory, \
