@@ -1779,7 +1779,7 @@ def generateCCBranchObjects(config, name):
             pushlogUrlOverride='%s/%s/json-pushes?full=1' % (config['hgurl'],
                                                   config['mozilla_repo_path']),
             tipsOnly=tipsOnly,
-            repo_branch=repo_branch
+            repo_branch=repo_branch,
             pollInterval=pollInterval,
             storeRev="polled_moz_revision",
         ))
