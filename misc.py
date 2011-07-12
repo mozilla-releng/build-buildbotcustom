@@ -1751,16 +1751,24 @@ def generateCCBranchObjects(config, name):
             builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
-    # change sources - if try is enabled, tipsOnly will be true which  makes 
-    # every push only show up as one changeset
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
     if config['hgurl'].startswith('https:'):
         pass
     else:
+        if config.get('enable_try', False):
+            tipsOnly = True
+            # Pay attention to all branches for pushes to try
+            repo_branch = None
+        else:
+            tipsOnly = True
+            # Other branches should only pay attention to the default branch
+            repo_branch = "default"
+
         branchObjects['change_source'].append(HgPoller(
             hgURL=config['hgurl'],
             branch=config['repo_path'],
-            tipsOnly=config.get('enable_try', False),
+            tipsOnly=tipsOnly,
+            repo_branch=repo_branch,
             pollInterval=pollInterval,
             storeRev="polled_comm_revision",
         ))
@@ -1770,7 +1778,8 @@ def generateCCBranchObjects(config, name):
             branch=config['repo_path'],
             pushlogUrlOverride='%s/%s/json-pushes?full=1' % (config['hgurl'],
                                                   config['mozilla_repo_path']),
-            tipsOnly=config.get('enable_try', False),
+            tipsOnly=tipsOnly,
+            repo_branch=repo_branch
             pollInterval=pollInterval,
             storeRev="polled_moz_revision",
         ))

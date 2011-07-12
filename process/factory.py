@@ -1845,7 +1845,13 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          command=['hg', 'identify', '-i'],
          property='got_revision'
         )
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
+        #Fix for bug 612319 to correct http://ssh:// changeset links
+        if self.hgHost[0:5] == "ssh://":
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
+                                                           self.repoPath)
+        else: 
+            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+                                                          self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
@@ -1891,7 +1897,13 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          workdir='build%s' % self.mozillaDir,
          property='hg_revision'
         )
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
+        #Fix for bug 612319 to correct http://ssh:// changeset links
+        if self.hgHost[0:5] == "ssh://":
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
+                                                           self.repoPath)
+        else: 
+            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+                                                          self.repoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
