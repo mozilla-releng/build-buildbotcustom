@@ -1822,7 +1822,6 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             self.addStep(ShellCommand(
                 name='moz_hg_update',
                 command=moz_cmd,
-                timeout=60*60,
                 env=env,
                 workdir='.',
                 haltOnFailure=True,
