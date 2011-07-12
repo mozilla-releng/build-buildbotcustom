@@ -259,7 +259,7 @@ class MochitestMixin(object):
     def getVariantOptions(self, variant):
         if variant == 'ipcplugins':
             return ['--setpref=dom.ipc.plugins.enabled=false',
-                    '--test-path=modules/plugin/test']
+                    '--%s' % variant]
         elif variant != 'plain':
             return ['--%s' % variant]
         else:
@@ -296,6 +296,9 @@ class ReftestMixin(object):
         elif suite == 'reftest-no-d2d-d3d':
             return ['--setpref=gfx.direct2d.disabled=true',
                     '--setpref=layers.accelerate-none=true',
+                    'reftest/tests/layout/reftests/reftest.list']
+        elif suite == 'opengl-no-accel':
+            return ['--setpref=layers.acceleration.force-enabled=disabled',
                     'reftest/tests/layout/reftests/reftest.list']
         elif suite == 'jsreftest':
             return ['--extra-profile-file=jsreftest/tests/user.js',
@@ -874,5 +877,5 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
                         '--enable-privilege'
                        ]
-        self.command.extend(self.getSuiteOptions(suite))
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
+        self.command.extend(self.getSuiteOptions(suite))

@@ -3,14 +3,14 @@ import subprocess
 import tempfile
 
 from twisted.python import log as twlog
-from twisted.python import failure, threadpool
+from twisted.python import failure
 from twisted.internet import defer, reactor
 
 from buildbot.status import base
 
 class ThreadedLogHandler(base.StatusReceiverMultiService):
-    compare_attrs = ['categories', 'builders', "size"]
-    def __init__(self, categories=None, builders=None, size=5):
+    compare_attrs = ['categories', 'builders']
+    def __init__(self, categories=None, builders=None):
         base.StatusReceiverMultiService.__init__(self)
 
         self.categories = categories
@@ -23,9 +23,6 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
 
         self.watched = []
 
-        self.size = size
-        self.pool = threadpool.ThreadPool(maxthreads=size)
-
     def setServiceParent(self, parent):
         base.StatusReceiverMultiService.setServiceParent(self, parent)
         self.setup()
@@ -33,8 +30,6 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
     def setup(self):
         self.master_status = self.parent.getStatus()
         self.master_status.subscribe(self)
-        twlog.msg("Starting thread pool %s" % self.pool)
-        self.pool.start()
 
     def disownServiceParent(self):
         self.master_status.unsubscribe(self)
@@ -43,8 +38,6 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
         return base.StatusReceiverMultiService.disownServiceParent(self)
 
     def stopService(self):
-        twlog.msg("Stopping thread pool %s" % self.pool)
-        self.pool.stop()
         base.StatusReceiverMultiService.stopService(self)
 
     def builderAdded(self, name, builder):
@@ -66,15 +59,15 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
                builder.category not in self.categories:
             return # ignore this build
 
-        self.pool.callInThread(self.handleLogs, builder, build, results)
+        reactor.callInThread(self.handleLogs, builder, build, results)
 
     def handleLogs(self, builder, build, results):
         pass
 
 class SubprocessLogHandler(ThreadedLogHandler):
-    compare_attrs = ['command', 'categories', 'builders', 'size']
-    def __init__(self, command, categories=None, builders=None, size=5):
-        ThreadedLogHandler.__init__(self, categories, builders, size)
+    compare_attrs = ['command', 'categories', 'builders']
+    def __init__(self, command, categories=None, builders=None):
+        ThreadedLogHandler.__init__(self, categories, builders)
         self.command = command
 
     def handleLogs(self, builder, build, results):

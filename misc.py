@@ -425,6 +425,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             hgHost=config['hghost'],
             repoPath=config['repo_path'],
             buildToolsRepoPath=config['build_tools_repo_path'],
+            branchName=branch_name,
+            remoteExtras=pf.get('remote_extras'),
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
@@ -816,16 +818,24 @@ def generateBranchObjects(config, name):
             builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
-    # change sources - if try is enabled, tipsOnly will be true which  makes 
-    # every push only show up as one changeset
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
     if config['hgurl'].startswith('https:'):
         pass
     else:
+        if config.get('enable_try', False):
+            tipsOnly = True
+            # Pay attention to all branches for pushes to try
+            repo_branch = None
+        else:
+            tipsOnly = True
+            # Other branches should only pay attention to the default branch
+            repo_branch = "default"
+
         branchObjects['change_source'].append(HgPoller(
             hgURL=config['hgurl'],
             branch=config['repo_path'],
-            tipsOnly=config.get('enable_try', False),
+            tipsOnly=tipsOnly,
+            repo_branch=repo_branch,
             pollInterval=pollInterval,
         ))
 
@@ -2446,6 +2456,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         # before creating the builders & schedulers
         if branch_config['platforms'].get(platform):
             slave_platforms = branch_config['platforms'][platform].get('slave_platforms', platform_config.get('slave_platforms', []))
+
+            # Map of # of test runs to builder names
+            talos_builders = {}
             for slave_platform in slave_platforms:
                 platform_name = platform_config[slave_platform]['name']
                 # this is to handle how a platform has more than one slave platform
@@ -2491,23 +2504,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     }
                     if not merge:
                         nomergeBuilders.append(builder['name'])
-                    extra_args = {}
-                    if branch == "try":
-                        scheduler_class = BuilderChooserScheduler
-                        extra_args['chooserFunc'] = tryChooser
-                        extra_args['prettyNames'] = prettyNames
-                        extra_args['talosSuites'] = SUITES.keys()
-                    else:
-                        scheduler_class = MultiScheduler
-                    s = scheduler_class(
-                            name='tests-%s-%s-%s-talos' % (branch, slave_platform, suite),
-                            branch='%s-%s-talos' % (branch, platform),
-                            treeStableTimer=None,
-                            builderNames=[builder['name']],
-                            numberOfBuildsToTrigger=tests,
-                            **extra_args
-                            )
-                    branchObjects['schedulers'].append(s)
+
+                    talos_builders.setdefault(tests, []).append(builder['name'])
                     branchObjects['builders'].append(builder)
                     branch_builders[tinderboxTree].append(builder['name'])
                     all_builders.append(builder['name'])
@@ -2578,6 +2576,34 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 treeStableTimer=None,
                                 **extra_args
                             ))
+
+            # Create one scheduler per # of tests to run
+            for tests, builder_names in talos_builders.items():
+                extra_args = {}
+                if tests == 1:
+                    scheduler_class = Scheduler
+                    name='tests-%s-%s-talos' % (branch, platform)
+                else:
+                    scheduler_class = MultiScheduler
+                    name='tests-%s-%s-talos-x%s' % (branch, platform, tests)
+                    extra_args['numberOfBuildsToTrigger'] = tests
+
+                if branch == "try":
+                    scheduler_class = BuilderChooserScheduler
+                    extra_args['chooserFunc'] = tryChooser
+                    extra_args['prettyNames'] = prettyNames
+                    extra_args['talosSuites'] = SUITES.keys()
+                    extra_args['numberOfBuildsToTrigger'] = tests
+
+                s = scheduler_class(
+                        name=name,
+                        branch='%s-%s-talos' % (branch, platform),
+                        treeStableTimer=None,
+                        builderNames=builder_names,
+                        **extra_args
+                        )
+                branchObjects['schedulers'].append(s)
+
     for tinderboxTree in branch_builders.keys():
         if len(branch_builders[tinderboxTree]):
             branchObjects['status'].append(TinderboxMailNotifier(
@@ -2897,7 +2923,7 @@ def generateMobileBranchObjects(config, name):
         mobile_objects['change_source'].append(HgPoller(
             hgURL=config.get('hgurl'),
             branch=config.get('mobile_repo_path'),
-            tipsOnly=config.get('enable_mobile_try', False),
+            tipsOnly=True,
             pollInterval=pollInterval,
         ))
 

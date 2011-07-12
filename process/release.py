@@ -46,7 +46,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
-                           branchConfig['build_tools_repo_path'])
+                           releaseConfig.get('build_tools_repo_path',
+                               branchConfig['build_tools_repo_path']))
     config_repo = '%s%s' % (branchConfig['hgurl'],
                              branchConfig['config_repo_path'])
 
@@ -126,6 +127,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             majorReleaseName = majorReleasePrefix()
         platform = platform[0] if len(platform) >= 1 else None
         message_tag = releaseConfig.get('messagePrefix', '[release] ')
+        buildbot_url = ''
+        if master_status.getURLForThing(build):
+            buildbot_url = "Full details are available at:\n %s\n" % master_status.getURLForThing(build)
         # Use a generic ftp URL non-specific to any locale
         ftpURL = genericFtpUrl()
         if platform:
@@ -488,6 +492,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 sshKey=releaseConfig['hgSshKey'],
                 repositories=clone_repositories,
                 clobberURL=branchConfig['base_clobber_url'],
+                userRepoRoot=releaseConfig['userRepoRoot'],
             )
 
             builders.append({
@@ -564,7 +569,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ))
 
     if not releaseConfig.get('skip_source'):
+        pf = branchConfig['platforms']['linux']
+        mozconfig = 'linux/%s/release' % sourceRepoInfo['name']
         source_factory = SingleSourceFactory(
+            env=pf['env'],
+            objdir=pf['platform_objdir'],
             hgHost=branchConfig['hghost'],
             buildToolsRepoPath=branchConfig['build_tools_repo_path'],
             repoPath=sourceRepoInfo['path'],
@@ -577,6 +586,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             buildNumber=releaseConfig['buildNumber'],
             autoconfDirs=['.', 'js/src'],
             clobberURL=branchConfig['base_clobber_url'],
+            mozconfig=mozconfig,
+            configRepoPath=branchConfig['config_repo_path'],
+            configSubDir=branchConfig['config_subdir'],
         )
 
         builders.append({
@@ -593,7 +605,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         })
 
         if releaseConfig['xulrunnerPlatforms']:
+            mozconfig = 'linux/%s/xulrunner' % sourceRepoInfo['name']
             xulrunner_source_factory = SingleSourceFactory(
+                env=pf['env'],
+                objdir=pf['platform_objdir'],
                 hgHost=branchConfig['hghost'],
                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
                 repoPath=sourceRepoInfo['path'],
@@ -606,6 +621,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildNumber=releaseConfig['buildNumber'],
                 autoconfDirs=['.', 'js/src'],
                 clobberURL=branchConfig['base_clobber_url'],
+                mozconfig=mozconfig,
+                configRepoPath=branchConfig['config_repo_path'],
+                configSubDir=branchConfig['config_subdir'],
             )
 
             builders.append({
