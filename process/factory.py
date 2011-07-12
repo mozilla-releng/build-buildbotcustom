@@ -1827,6 +1827,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 workdir='.',
                 haltOnFailure=True,
                 flunkOnFailure=True,
+                timeout=60*60*2, # 2 hours
             ))
         else:
             self.addStep(Mercurial,
