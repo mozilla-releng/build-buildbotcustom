@@ -76,6 +76,7 @@ MozillaEnvironments['linux-unittest'] = {
     "NO_FAIL_ON_TEST_ERRORS": '1',
     "CCACHE_DIR": '/builds/ccache',
     "CCACHE_UMASK": '002',
+    "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
 MozillaEnvironments['linux64-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
@@ -87,7 +88,8 @@ MozillaEnvironments['macosx-unittest'] = {
     "NO_EM_RESTART": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
     "CVS_RSH": 'ssh',
-    "NO_FAIL_ON_TEST_ERRORS": '1'  
+    "NO_FAIL_ON_TEST_ERRORS": '1',
+    "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
 MozillaEnvironments['macosx64-unittest'] = MozillaEnvironments['macosx-unittest'].copy() 
@@ -114,7 +116,8 @@ MozillaEnvironments['win32-unittest'] = {
     "MSVCDir": 'D:\\msvs8\\VC',
     "DevEnvDir": "D:\\msvs8\\Common7\\IDE",
     "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
-               'D:\\msvs8\\VC\\ATLMFC\\LIB'
+               'D:\\msvs8\\VC\\ATLMFC\\LIB',
+    "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
 MozillaEnvironments['win64-unittest'] = {
@@ -124,6 +127,7 @@ MozillaEnvironments['win64-unittest'] = {
     "XPCOM_DEBUG_BREAK": 'warn',
     "CVS_RSH": 'ssh',
     "NO_FAIL_ON_TEST_ERRORS": '1',
+    "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
 ### Talos environments
@@ -187,6 +191,7 @@ MozillaEnvironments['mac-perf'] = {
 }
 
 MozillaEnvironments['android-unittest'] = {
+    "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
 MozillaEnvironments['android-perf'] = {

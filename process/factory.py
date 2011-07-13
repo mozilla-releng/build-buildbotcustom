@@ -110,6 +110,8 @@ def postUploadCmdPrefix(upload_dir=None,
         to_try=False,
         to_shadow=False,
         to_candidates=False,
+        to_mobile_candidates=False,
+        nightly_dir=None,
         as_list=True,
         ):
     """Returns a post_upload.py command line for the given arguments.
@@ -158,6 +160,10 @@ def postUploadCmdPrefix(upload_dir=None,
         cmd.append("--release-to-shadow-central-builds")
     if to_candidates:
         cmd.append("--release-to-candidates-dir")
+    if to_mobile_candidates:
+        cmd.append("--release-to-mobile-candidates-dir")
+    if nightly_dir:
+        cmd.append("--nightly-dir=%s" % nightly_dir)
 
     if as_list:
         return cmd
@@ -185,7 +191,7 @@ def parse_make_upload(rc, stdout, stderr):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
             retval['testsUrl'] = m
-        elif m.endswith("apk") and 'unsigned' in m:
+        elif m.endswith('apk') and 'unsigned-unaligned' in m:
             retval['unsignedApkUrl'] = m
         elif 'jsshell-' in m and m.endswith('.zip'):
             retval['jsshellUrl'] = m
@@ -1445,6 +1451,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 command=cmd,
                 env=pkg_env,
                 workdir='.',
+                haltOnFailure=True,
             ))
             # We need to set packageFilename to the multi apk
             self.addFilePropertiesSteps(filename=packageFilename,
@@ -2544,13 +2551,14 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
 class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
-            **kwargs):
+            usePrettyNames=True, enableUpdatePackaging=True, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
         self.talosMasters = talosMasters or []
         self.unittestMasters = unittestMasters or []
         self.unittestBranch = unittestBranch
+        self.enableUpdatePackaging = enableUpdatePackaging
         if self.unittestMasters:
             assert self.unittestBranch
 
@@ -2563,7 +2571,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         env = env.copy()
         # Make sure MOZ_PKG_PRETTYNAMES is on and override MOZ_PKG_VERSION
         # The latter is only strictly necessary for RCs.
-        env['MOZ_PKG_PRETTYNAMES'] = '1'
+        if usePrettyNames:
+            env['MOZ_PKG_PRETTYNAMES'] = '1'
         env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
@@ -2574,13 +2583,14 @@ class ReleaseBuildFactory(MercurialBuildFactory):
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         # Make sure the complete MAR has been generated
-        self.addStep(ShellCommand,
-            name='make_update_pkg',
-            command=['make', '-C',
-                     '%s/tools/update-packaging' % self.mozillaObjdir],
-            env=self.env,
-            haltOnFailure=True
-        )
+        if self.enableUpdatePackaging:
+            self.addStep(ShellCommand,
+                name='make_update_pkg',
+                command=['make', '-C',
+                         '%s/tools/update-packaging' % self.mozillaObjdir],
+                env=self.env,
+                haltOnFailure=True
+            )
         self.addStep(ShellCommand,
          name='echo_buildID',
          command=['bash', '-c',
@@ -2597,23 +2607,43 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
-        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
-                product=self.productName,
-                version=self.version,
-                buildNumber=str(self.buildNumber),
-                to_candidates=True,
-                as_list=False)
+        uploadArgs = dict(
+            product=self.productName,
+            version=self.version,
+            buildNumber=str(self.buildNumber),
+            as_list=False)
+        upload_vars = []
 
-        self.addStep(RetryingSetProperty(
+        if self.productName == 'fennec':
+            builddir = '%s/en-US' % self.stagePlatform
+            if uploadMulti:
+                builddir = '%s/multi' % self.stagePlatform
+                upload_vars = ['AB_CD=multi']
+            if postUploadBuildDir:
+                builddir = '%s/%s' % (self.stagePlatform, postUploadBuildDir)
+            uploadArgs['builddir'] = builddir
+            uploadArgs['to_mobile_candidates'] = True
+            uploadArgs['nightly_dir'] = 'candidates'
+            uploadArgs['product'] = 'mobile'
+        else:
+            uploadArgs['to_candidates'] = True
+
+        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
+
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        if self.platform.startswith('win'):
+            objdir = 'build/%s' % self.objdir
+        self.addStep(RetryingScratchboxProperty(
          name='make_upload',
-         command=['make', 'upload'],
+         command=['make', 'upload'] + upload_vars,
          env=uploadEnv,
-         workdir='build/%s' % self.objdir,
-         extract_fn = parse_make_upload,
+         workdir=objdir,
+         extract_fn=parse_make_upload,
          haltOnFailure=True,
          description=['upload'],
          timeout=60*60, # 60 minutes
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+         sb=self.use_scratchbox,
         ))
 
         # Send to the "release" branch on talos, it will do
@@ -4119,10 +4149,14 @@ class SingleSourceFactory(ReleaseFactory):
         self.env['MOZ_OBJDIR'] = self.objdir
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
         self.env['MOZ_PKG_VERSION'] = version
+        self.env['MOZ_PKG_APPNAME'] = productName
 
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
           (productName, version, buildNumber)
+        if productName == 'fennec':
+            postUploadCmd = 'post_upload.py -p mobile --nightly-dir candidates -v %s -n %s -c' % \
+                          (version, buildNumber)
         uploadEnv = {'UPLOAD_HOST': stagingServer,
                      'UPLOAD_USER': stageUsername,
                      'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
