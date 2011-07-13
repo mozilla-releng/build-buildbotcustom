@@ -247,6 +247,8 @@ if __name__ == "__main__":
                 buildid = getBuildId(build)
 
                 if options.release:
+                    if 'mobile' in options.product:
+                        uploadArgs['nightly_dir'] = 'candidates'
                     uploadArgs['to_candidates'] = True
                     version, buildNumber = options.release.split('/')
                     uploadArgs['version'] = version
@@ -291,7 +293,6 @@ if __name__ == "__main__":
                     to_try=False,
                     who=None,
                     revision=None,
-                    builddir=None,
                     buildid=buildid,
                     ))
             post_upload_cmd = postUploadCmdPrefix(**uploadArgs)

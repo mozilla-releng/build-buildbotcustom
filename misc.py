@@ -128,6 +128,13 @@ def isImportantL10nFile(change, l10nModules):
                 return True
     return False
 
+def changeContainsProduct(change, productName):
+    products = change.properties.getProperty("products")
+    if products:
+        if productName in products.split(','):
+            return True
+    return False
+
 def generateTestBuilderNames(name_prefix, suites_name, suites):
     test_builders = []
     if isinstance(suites, dict) and "totalChunks" in suites:

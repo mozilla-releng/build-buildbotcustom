@@ -75,6 +75,7 @@ class FtpPollerBase(base.ChangeSource):
             c = changes.Change(who = url,
                            comments = "success",
                            files = [],
+                           properties={'who': url},
                            branch = self.branch)
             self.parent.addChange(c)
 
