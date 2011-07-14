@@ -130,8 +130,8 @@ def isImportantL10nFile(change, l10nModules):
 
 def changeContainsProduct(change, productName):
     products = change.properties.getProperty("products")
-    if products:
-        if productName in products.split(','):
+    if isinstance(products, basestring) and \
+        productName in products.split(','):
             return True
     return False
 
