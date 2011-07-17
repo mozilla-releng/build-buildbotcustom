@@ -89,7 +89,7 @@ class L10nMixin(object):
         self.baseTag = baseTag
         if localesURL:
             self.localesURL = localesURL
-        else 
+        else:
             # revision will be expanded later
             self.localesURL = "%s%s/raw-file/%%(revision)s/%s" % \
                                       (repo, branch, localesFile)
