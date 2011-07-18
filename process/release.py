@@ -25,7 +25,7 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  makeLogUploadCommand, changeContainsProduct
+  makeLogUploadCommand, changeContainsProduct, nomergeBuilders
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -1554,6 +1554,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ],
         builders=[b['name'] for b in builders + test_builders],
     ))
+
+    # Don't merge release builder requests
+    nomergeBuilders.extend([b['name'] for b in builders + test_builders])
 
     return {
             "builders": builders,
