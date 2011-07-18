@@ -895,11 +895,17 @@ def generateBranchObjects(config, name):
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
     if nightlyBuilders or xulrunnerNightlyBuilders:
+        goodFunc = lastGoodFunc(
+                branch=config['repo_path'],
+                builderNames=builders,
+                triggerBuildIfNoChanges=False,
+                l10nBranch=config.get('l10n_repo_path')
+                )
+
         nightly_scheduler = makePropertiesScheduler(
                 SpecificNightly,
                 [buildIDSchedFunc, buildUIDSchedFunc])(
-                    ssFunc=lastGoodFunc(config['repo_path'],
-                        builderNames=builders),
+                    ssFunc=goodFunc,
                     name="%s nightly" % name,
                     branch=config['repo_path'],
                     # bug 482123 - keep the minute to avoid problems with DST

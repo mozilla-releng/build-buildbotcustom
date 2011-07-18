@@ -132,7 +132,7 @@ def changeEventGeneratorInTransaction(dbconn, t, branches=[],
     for (changeid,) in t.fetchall():
         yield dbconn._txn_getChangeNumberedNow(t, changeid)
 
-def lastChangeset(db, t, branch):
+def lastChange(db, t, branch):
     """Returns the revision for the last changeset on the given branch"""
     #### NOTE: called in a thread!
     for c in changeEventGeneratorInTransaction(db, t, branches=[branch]):
@@ -142,7 +142,7 @@ def lastChangeset(db, t, branch):
         # Ignore changes which didn't come from the poller
         if not c.revlink:
             continue
-        return c.revision
+        return c
     return None
 
 def lastGoodRev(db, t, branch, builderNames, starttime, endtime):
@@ -249,7 +249,7 @@ def getLastBuiltRevision(db, t, branch, builderNames):
         return result[0]
     return None
 
-def lastGoodFunc(branch, builderNames):
+def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=None):
     """Returns a function that returns the latest revision on branch that was
     green for all builders in builderNames.
 
@@ -272,10 +272,32 @@ def lastGoodFunc(branch, builderNames):
                 (end-start, rev))
 
         if rev is None:
+            # Check if there are any recent l10n changes
+            if l10nBranch:
+                lastL10nChange = lastChange(db, t, l10nBranch)
+                if lastL10nChange:
+                    lastL10nChange = lastL10nChange.when
+                else:
+                    lastL10nChange = 0
+            else:
+                lastL10nChange = 0
+
+            # If there are no recent l10n changes, and we don't want to trigger
+            # builds if nothing has changed in the past 24 hours, then return
+            # None, indicating that no build should be scheduled
+            if not triggerBuildIfNoChanges:
+                if l10nBranch:
+                    if (start-lastL10nChange) > (24*3600):
+                        return None
+                else:
+                    return None
+
             # Couldn't find a good revision.  Fall back to using the latest
             # revision on this branch
-            rev = lastChangeset(db, t, branch)
-            log.msg("lastChangeset returned %s" % (rev))
+            c = lastChange(db, t, branch)
+            if c:
+                rev = c.revision
+            log.msg("lastChange returned %s" % (rev))
 
         # Find the last revision our scheduler's builders have built.  This can
         # include forced builds.
