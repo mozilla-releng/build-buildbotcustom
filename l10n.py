@@ -87,8 +87,12 @@ class L10nMixin(object):
         """
         self.branch = branch
         self.baseTag = baseTag
-        self.localesURL = localesURL if localesURL else "%s%s/raw-file/%s/%s" \
-                          % (repo, branch, revision or self.baseTag, localesFile)
+        if localesURL:
+            self.localesURL = localesURL
+        else:
+            # revision will be expanded later
+            self.localesURL = "%s%s/raw-file/%%(revision)s/%s" % \
+                                      (repo, branch, localesFile)
 
         # if the user wants to use something different than all locales
         # check ParseLocalesFile function to note that we now need a dictionary
@@ -150,12 +154,13 @@ class L10nMixin(object):
             log.msg('L10nMixin.getLocales():: The user has set a list of locales')
             return self.locales
         else:
-            log.msg("L10nMixin:: Getting locales from: "+self.localesURL)
+            localePage = self.localesURL % {'revision': revision or self.baseTag}
+            log.msg("L10nMixin:: Getting locales from: "+localePage)
             # we expect that getPage will return the output of "all-locales"
             # or "shipped-locales" or any file that contains a locale per line
             # in the begining of the line e.g. "en-GB" or "ja linux win32"
             # getPage returns a defered that will return a string
-            d = getPage(self.localesURL, timeout = 5 * 60)
+            d = getPage(localePage, timeout = 5 * 60)
             d.addCallback(lambda data: ParseLocalesFile(data))
             return d
 

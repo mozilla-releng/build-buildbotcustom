@@ -25,7 +25,7 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  makeLogUploadCommand, changeContainsProduct
+  makeLogUploadCommand, changeContainsProduct, nomergeBuilders
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -714,7 +714,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildToolsRepoPath=tools_repo_path,
                 repoPath=sourceRepoInfo['path'],
                 productName='xulrunner',
-                version=releaseConfig['milestone'],
+                version=releaseConfig['version'],
                 baseTag=releaseConfig['baseTag'],
                 stagingServer=branchConfig['stage_server'],
                 stageUsername=branchConfig['stage_username_xulrunner'],
@@ -962,7 +962,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                 # the entire thing
                 buildSpace=pf.get('build_space', branchConfig['default_build_space']),
                 productName='xulrunner',
-                version=releaseConfig['milestone'],
+                version=releaseConfig['version'],
                 buildNumber=releaseConfig['buildNumber'],
                 clobberURL=branchConfig['base_clobber_url'],
                 packageSDK=True,
@@ -1554,6 +1554,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ],
         builders=[b['name'] for b in builders + test_builders],
     ))
+
+    # Don't merge release builder requests
+    nomergeBuilders.extend([b['name'] for b in builders + test_builders])
 
     return {
             "builders": builders,
