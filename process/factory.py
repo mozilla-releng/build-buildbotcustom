@@ -529,16 +529,16 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         else:
             return False
         return packageFilename
-    
+
     def parseFileSize(self, propertyName):
         def getSize(rv, stdout, stderr):
-            stdout = stdout.strip()        
+            stdout = stdout.strip()
             return {propertyName: stdout.split()[4]}
         return getSize
 
     def parseFileHash(self, propertyName):
         def getHash(rv, stdout, stderr):
-            stdout = stdout.strip()        
+            stdout = stdout.strip()
             return {propertyName: stdout.split(' ',2)[1]}
         return getHash
 

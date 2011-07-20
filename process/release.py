@@ -311,7 +311,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             releaseConfig['buildNumber'],
             protocol='http',
             server=releaseConfig['ftpServer'])
-        signed_apk_url = '%s%s/%s/%s-%s.%s.eabi-arm.apk' % \
+        signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
             (candidatesDir,
              branchConfig['platforms']['linux-android']['stage_platform'],
              locale, releaseConfig['productName'], releaseConfig['version'],
@@ -323,7 +323,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         ))
         if branchConfig['platforms']['linux-android'].get('multi_locale'):
             locale = 'multi'
-            signed_apk_url = '%s%s/%s/%s-%s.%s.eabi-arm.apk' % \
+            signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
                            (candidatesDir,
                             branchConfig['platforms']['linux-android'].get(
                                 'stage_platform'),
