@@ -1904,10 +1904,10 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         #Fix for bug 612319 to correct http://ssh:// changeset links
         if self.hgHost[0:5] == "ssh://":
             changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
-                                                           self.repoPath)
+                                                           self.mozRepoPath)
         else: 
             changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
-                                                          self.repoPath)
+                                                          self.mozRepoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
