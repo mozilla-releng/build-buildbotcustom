@@ -5244,27 +5244,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.env.update(env)
 
         if self.platform == 'win32':
-            self.addStep(TinderboxShellCommand,
-             name='kill_sh',
-             description='kill sh',
-             descriptionDone="killed sh",
-             command="pskill -t sh.exe",
-             workdir="D:\\Utilities"
-            )
-            self.addStep(TinderboxShellCommand,
-             name='kill_make',
-             description='kill make',
-             descriptionDone="killed make",
-             command="pskill -t make.exe",
-             workdir="D:\\Utilities"
-            )
-            self.addStep(TinderboxShellCommand,
-             name='kill_firefox',
-             description='kill firefox',
-             descriptionDone="killed firefox",
-             command="pskill -t firefox.exe",
-             workdir="D:\\Utilities"
-            )
             self.addStep(SetProperty,
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',
