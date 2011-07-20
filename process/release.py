@@ -40,7 +40,7 @@ from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from buildbotcustom.status.errors import update_verify_error
 from build.paths import getRealpath
-from release.info import getRuntimeTag
+from release.info import getRuntimeTag, getReleaseTag
 import BuildSlaves
 
 DEFAULT_PARALLELIZATION = 10
@@ -50,7 +50,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     # This variable is one thing that forces us into reconfiging prior to a
     # release. It should be removed as soon as nothing depends on it.
     sourceRepoInfo = releaseConfig['sourceRepositories'][sourceRepoKey]
-    releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
+    releaseTag = getReleaseTag(releaseConfig['baseTag'])
     # This tag is created post-signing, when we do some additional
     # config file bumps
     runtimeTag = getRuntimeTag(releaseTag)
@@ -1343,6 +1343,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                         '_' + str(n)
                 env = builder_env.copy()
                 env.update(branchConfig['platforms'][platform]['env'])
+                mu_runtimeTag = getRuntimeTag(getReleaseTag(
+                    releaseConfig['majorUpdateBaseTag']))
 
                 builders.append({
                     'name': builderName,
@@ -1355,7 +1357,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'env': env,
                     'properties': {'builddir': builddir,
                                    'slavebuilddir': reallyShort(builddir),
-                                   'script_repo_revision': runtimeTag,
+                                   'script_repo_revision': mu_runtimeTag,
                                    'release_tag': releaseTag,
                                    'release_config': releaseConfigFile},
                 })
