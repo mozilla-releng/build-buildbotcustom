@@ -3456,7 +3456,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         self.addStep(MercurialCloneCommand,
          name='get_enUS_src',
          command=['sh', '-c',
-          WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
+          WithProperties('if [ -d '+self.origSrcDir+'/.hg ]; then ' +
                          'hg -R '+self.origSrcDir+' pull ;'+
                          'hg -R '+self.origSrcDir+' up -C ;'+
                          'else ' +
@@ -3473,7 +3473,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         self.addStep(MercurialCloneCommand,
          name='get_locale_src',
          command=['sh', '-c',
-          WithProperties('if [ -d %(locale)s ]; then ' +
+          WithProperties('if [ -d %(locale)s/.hg ]; then ' +
                          'hg -R %(locale)s pull -r default ; ' +
                          'else ' +
                          'hg clone ' +
