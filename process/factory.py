@@ -3450,6 +3450,77 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                                    mergeLocales=mergeLocales, mozillaDir='mozilla',
                                    mozconfigBranch='default', **kwargs)
 
+    # Repeated here since the Parent classes fail hgtool/checkouts due to
+    # relbranch issues, and not actually having the tag after clone
+    def getSources(self):
+        self.addStep(MercurialCloneCommand,
+         name='get_enUS_src',
+         command=['sh', '-c',
+          WithProperties('if [ -d '+self.origSrcDir+' ]; then ' +
+                         'hg -R '+self.origSrcDir+' pull ;'+
+                         'hg -R '+self.origSrcDir+' up -C ;'+
+                         'else ' +
+                         'hg clone ' +
+                         'http://'+self.hgHost+'/'+self.repoPath+' ' +
+                         self.origSrcDir+' ; ' +
+                         'fi ' +
+                         '&& hg -R '+self.origSrcDir+' update -C -r %(en_revision)s')],
+         descriptionDone="en-US source",
+         workdir=self.baseWorkDir,
+         haltOnFailure=True,
+         timeout=30*60 # 30 minutes
+        )
+        self.addStep(MercurialCloneCommand,
+         name='get_locale_src',
+         command=['sh', '-c',
+          WithProperties('if [ -d %(locale)s ]; then ' +
+                         'hg -R %(locale)s pull -r default ; ' +
+                         'else ' +
+                         'hg clone ' +
+                         'http://'+self.hgHost+'/'+self.l10nRepoPath+ 
+                           '/%(locale)s/ ; ' +
+                         'fi ' +
+                         '&& hg -R %(locale)s update -C -r %(l10n_revision)s')],
+         descriptionDone="locale source",
+         timeout=10*60, # 10 minutes
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
+        )
+        # build up the checkout command with all options
+        co_command = ['python', 'client.py', 'checkout',
+                      WithProperties('--comm-rev=%(en_revision)s')]
+        if self.mozRepoPath:
+            co_command.append('--mozilla-repo=%s' % self.getRepository(self.mozRepoPath))
+        if self.inspectorRepoPath:
+            co_command.append('--inspector-repo=%s' % self.getRepository(self.inspectorRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-inspector')
+        if self.venkmanRepoPath:
+            co_command.append('--venkman-repo=%s' % self.getRepository(self.venkmanRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-venkman')
+        if self.chatzillaRepoPath:
+            co_command.append('--chatzilla-repo=%s' % self.getRepository(self.chatzillaRepoPath))
+        elif self.skipBlankRepos:
+            co_command.append('--skip-chatzilla')
+        if self.cvsroot:
+            co_command.append('--cvsroot=%s' % self.cvsroot)
+        if self.buildRevision:
+            co_command.append('--comm-rev=%s' % self.buildRevision)
+            co_command.append('--mozilla-rev=%s' % self.buildRevision)
+            co_command.append('--inspector-rev=%s' % self.buildRevision)
+            co_command.append('--venkman-rev=%s' % self.buildRevision)
+            co_command.append('--chatzilla-rev=%s' % self.buildRevision)
+        # execute the checkout
+        self.addStep(ShellCommand,
+         command=co_command,
+         description=['running', 'client.py', 'checkout'],
+         descriptionDone=['client.py', 'checkout'],
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
+         timeout=60*60*3 # 3 hours (crazy, but necessary for now)
+        )
+
     def updateSources(self):
         self.addStep(ShellCommand,
          name='update_sources',
