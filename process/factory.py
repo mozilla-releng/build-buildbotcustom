@@ -2646,10 +2646,6 @@ class BaseRepackFactory(MozillaBuildFactory):
             # use "mac" instead of "mac64" for macosx64
             self.env.update({'MOZ_PKG_PLATFORM': 'mac'})
 
-        # Configure step gets executed before the downloadBuilds and we can't
-        # render at that point of execution the environment variable 'srcdir'
-        self.configure_env = self.env.copy()
-
         self.uploadEnv = self.env.copy() # pick up any env variables in our subclass
         self.uploadEnv.update({
             'AB_CD': WithProperties('%(locale)s'),
@@ -2771,7 +2767,7 @@ class BaseRepackFactory(MozillaBuildFactory):
              description='configure',
              descriptionDone='configure done',
              haltOnFailure=True,
-             env = self.configure_env,
+             env = self.env,
              workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
             )
         else:
@@ -3417,10 +3413,17 @@ class ReleaseFactory(MozillaBuildFactory):
         version = re.sub('rc([0-9]+)$', ' RC \\1', version)
         return version
 
-
-class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
+class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
     def __init__(self, platform, buildRevision, version, buildNumber,
-                 env={}, brandName=None, mergeLocales=False, usePrettyLongVer=True, **kwargs):
+                 env={}, brandName=None, mergeLocales=False, usePrettyLongVer=True,
+                 mozRepoPath='', inspectorRepoPath='', venkmanRepoPath='',
+                 chatzillaRepoPath='', cvsroot='', **kwargs):
+        self.skipBlankRepos = True
+        self.mozRepoPath = mozRepoPath
+        self.inspectorRepoPath = inspectorRepoPath
+        self.venkmanRepoPath = venkmanRepoPath
+        self.chatzillaRepoPath = chatzillaRepoPath
+        self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
@@ -3444,7 +3447,8 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
                              '-n %s ' % self.buildNumber + \
                              '--release-to-candidates-dir'
         BaseRepackFactory.__init__(self, env=env, platform=platform,
-                                   mergeLocales=mergeLocales, **kwargs)
+                                   mergeLocales=mergeLocales, mozillaDir='mozilla',
+                                   mozconfigBranch='default', **kwargs)
 
     def updateSources(self):
         self.addStep(ShellCommand,
@@ -3468,8 +3472,39 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
                      workdir=WithProperties('build/' + self.l10nRepoPath + 
                                             '/%(locale)s')
                      )
+        self.addStep(ShellCommand,
+         command=['hg', 'up', '-C', '-r', self.buildRevision],
+         workdir='build/'+self.mozillaSrcDir,
+         description=['update mozilla',
+                      'to %s' % self.buildRevision],
+         haltOnFailure=True
+        )
+        if self.venkmanRepoPath:
+            self.addStep(ShellCommand,
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             workdir='build/'+self.mozillaSrcDir+'/extensions/venkman',
+             description=['update venkman',
+                          'to %s' % self.buildRevision],
+             haltOnFailure=True
+            )
+        if self.inspectorRepoPath:
+            self.addStep(ShellCommand,
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             workdir='build/'+self.mozillaSrcDir+'/extensions/inspector',
+             description=['update inspector',
+                          'to %s' % self.buildRevision],
+             haltOnFailure=True
+            )
+        if self.chatzillaRepoPath:
+            self.addStep(ShellCommand,
+             command=['hg', 'up', '-C', '-r', self.buildRevision],
+             workdir='build/'+self.mozillaSrcDir+'/extensions/irc',
+             description=['update chatzilla',
+                          'to %s' % self.buildRevision],
+             haltOnFailure=True
+            )
 
-    def downloadBuilds(self):
+    def preClean(self):
         # We need to know the absolute path to the input builds when we repack,
         # so we need retrieve at run-time as a build property
         self.addStep(SetProperty,
@@ -3478,6 +3513,7 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          workdir='build/'+self.origSrcDir
         )
 
+    def downloadBuilds(self):
         candidatesDir = 'http://%s' % self.stageServer + \
                         '/pub/mozilla.org/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
@@ -3566,62 +3602,6 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
          haltOnFailure=True,
          workdir='build/'+self.objdir+'/'+self.appName+'/locales'
         )
-
-class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseRepackFactory):
-    def __init__(self, mozRepoPath='', inspectorRepoPath='',
-                 venkmanRepoPath='', chatzillaRepoPath='', cvsroot='',
-                 **kwargs):
-        self.skipBlankRepos = True
-        self.mozRepoPath = mozRepoPath
-        self.inspectorRepoPath = inspectorRepoPath
-        self.venkmanRepoPath = venkmanRepoPath
-        self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
-        ReleaseRepackFactory.__init__(self, mozillaDir='mozilla',
-            mozconfigBranch='default', **kwargs)
-
-    def updateSources(self):
-        ReleaseRepackFactory.updateSources(self)
-        self.addStep(ShellCommand,
-         command=['hg', 'up', '-C', '-r', self.buildRevision],
-         workdir='build/'+self.mozillaSrcDir,
-         description=['update mozilla',
-                      'to %s' % self.buildRevision],
-         haltOnFailure=True
-        )
-        if self.venkmanRepoPath:
-            self.addStep(ShellCommand,
-             command=['hg', 'up', '-C', '-r', self.buildRevision],
-             workdir='build/'+self.mozillaSrcDir+'/extensions/venkman',
-             description=['update venkman',
-                          'to %s' % self.buildRevision],
-             haltOnFailure=True
-            )
-        if self.inspectorRepoPath:
-            self.addStep(ShellCommand,
-             command=['hg', 'up', '-C', '-r', self.buildRevision],
-             workdir='build/'+self.mozillaSrcDir+'/extensions/inspector',
-             description=['update inspector',
-                          'to %s' % self.buildRevision],
-             haltOnFailure=True
-            )
-        if self.chatzillaRepoPath:
-            self.addStep(ShellCommand,
-             command=['hg', 'up', '-C', '-r', self.buildRevision],
-             workdir='build/'+self.mozillaSrcDir+'/extensions/irc',
-             description=['update chatzilla',
-                          'to %s' % self.buildRevision],
-             haltOnFailure=True
-            )
-
-    def downloadBuilds(self):
-        ReleaseRepackFactory.downloadBuilds(self)
-
-    # unsure why we need to explicitely do this but after bug 478436 we stopped
-    # executing the actual repackaging without this def here
-    def doRepack(self):
-        ReleaseRepackFactory.doRepack(self)
-
 
 class StagingRepositorySetupFactory(ReleaseFactory):
     """This Factory should be run at the start of a staging release run. It
