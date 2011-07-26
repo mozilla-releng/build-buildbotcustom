@@ -425,7 +425,7 @@ class MobileUnittestFactory(MobileTalosFactory):
             haltOnFailure=True,
             timeout=self.timeout,
         ))
-        self.addStep(MobileParseTestLog,
+        self.addStep(MobileParseTestLog(
             name=self.test_type,
             command=['cat', log_name],
             knownFailCount=self.known_fail_count,
@@ -434,4 +434,4 @@ class MobileUnittestFactory(MobileTalosFactory):
             timeout=120,
             flunkOnFailure=False,
             haltOnFailure=False,
-       )
+       ))
