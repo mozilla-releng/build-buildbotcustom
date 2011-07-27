@@ -6817,7 +6817,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.branchName.lower().startswith('shadow'):
             self.ignoreCerts = True
         self.remoteTests = remoteTests
-        self.configOptions = configOptions[:]
+        self.configOptions = configOptions['suites'][:]
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
