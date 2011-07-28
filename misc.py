@@ -2541,8 +2541,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             all_test_builders[tinderboxTree] = []
 
         branchProperty = branch
-        if platform_config.get('branch_extra', None):
-            branchProperty += '-%s' % platform_config['branch_extra']
 
         stage_platform = platform_config.get('stage_platform', platform)
         stage_product = platform_config['stage_product']
