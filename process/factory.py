@@ -602,7 +602,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
 class MercurialBuildFactory(MozillaBuildFactory):
     def __init__(self, env, objdir, platform, configRepoPath, configSubDir,
                  profiledBuild, mozconfig, use_scratchbox=False, productName=None,
-                 scratchbox_target=None, android_signing=False,
+                 scratchbox_target='FREMANTLE_ARMEL', android_signing=False,
                  buildRevision=None, stageServer=None, stageUsername=None,
                  stageGroup=None, stageSshKey=None, stageBasePath=None,
                  stageProduct=None, post_upload_include_platform=False,
@@ -686,9 +686,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
         self.use_scratchbox = use_scratchbox
-        self.scratchbox_target = scratchbox_target # unimplemented because we only use one
-                                                   # target for now (unlikely to change)
-        assert scratchbox_target is None, 'unimplemented'
+        self.scratchbox_target = scratchbox_target
         self.android_signing = android_signing
         self.post_upload_include_platform = post_upload_include_platform
         self.useSharedCheckouts = useSharedCheckouts
@@ -793,6 +791,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',
                 workdir='tools'
+            ))
+        if self.use_scratchbox:
+            self.addStep(ScratchboxCommand(
+                command=["sb-conf", "select", self.scratchbox_target],
+                name='set_target',
+                env=self.env,
+                sb=True,
+                workdir='/',
             ))
 
         if self.enable_ccache:
@@ -6817,7 +6823,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.branchName.lower().startswith('shadow'):
             self.ignoreCerts = True
         self.remoteTests = remoteTests
-        self.configOptions = configOptions[:]
+        self.configOptions = configOptions['suites'][:]
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
