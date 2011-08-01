@@ -201,7 +201,8 @@ class BaseHgPoller(BasePoller):
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
                  tipsOnly=False, tree=None, repo_branch=None, maxChanges=100):
-        BasePoller.__init__(self)
+        self.super_class = BasePoller
+        self.super_class.__init__(self)
         self.hgURL = hgURL
         self.branch = branch
         self.tree = tree
@@ -258,7 +259,7 @@ class BaseHgPoller(BasePoller):
                 log.msg("%s has been reset" % self.baseURL)
             self.lastChangeset = None
             self.emptyRepo = True
-        return BasePoller.dataFailed(self, res)
+        return self.super_class.dataFailed(self, res)
 
     def processData(self, query):
         all_changes = _parse_changes(query)
