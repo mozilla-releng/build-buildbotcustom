@@ -30,10 +30,11 @@ class L10nVerifyMetaDiff(TinderboxShellCommand):
                  previousProduct=None,
                  **kwargs):
         self.super_class = TinderboxShellCommand
-        self.super_class.__init__(self, ignoreCodes=[0,1], **kwargs)
+        kwargs['ignoreCodes'] = [0,1]
+        self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(currentProduct=currentProduct,
                                  previousProduct=previousProduct)
-        if not 'command' in kwargs:
+        if not kwargs.get('command'):
             if currentProduct is None:
                 return FAILURE
             if previousProduct is None:
