@@ -31,6 +31,7 @@ class L10nVerifyMetaDiff(TinderboxShellCommand):
                  **kwargs):
         self.super_class = TinderboxShellCommand
         kwargs['ignoreCodes'] = [0,1]
+        kwargs['log_eval_func'] = lambda x,y: SUCCESS
         self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(currentProduct=currentProduct,
                                  previousProduct=previousProduct)
