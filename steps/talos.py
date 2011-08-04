@@ -51,7 +51,9 @@ class MozillaUpdateConfig(ShellCommand):
         #if we are an addonTester then the addonName/addonUrl build property should be set
         #  if it's not set this will throw a key error and the run will go red - which should be the expected result
         if self.addonTester:
-            addon_id = os.path.basename(self.build.getProperty('addonUrl'))
+            addon_id = os.path.basename(self.build.getProperty('addonUrl')) #eg /en-US/firefox/downloads/latest/10900
+            if not addon_id.isdigit(): #eg http://ftp.mozilla.org/pub/mozilla.org/addons/92382/ie_tab_2__ff_3.6+_-2.12.21.1-fx.xpi
+                addon_id = (self.getProperty('addonUrl')).split('/')[-2]
             self.addOptions += ['--addonID', addon_id, '--extension', self.extName]
 
         if self.useSymbols:
