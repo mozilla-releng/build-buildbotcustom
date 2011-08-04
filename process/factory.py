@@ -7278,7 +7278,11 @@ class TalosFactory(RequestSortingBuildFactory):
             import urlparse
             base_url = 'https://addons.mozilla.org/'
             addon_url = build.getProperty('addonUrl')
-            return urlparse.urljoin(base_url, addon_url)
+            parsed_url = urlparse.urlsplit(addon_url)
+            if parsed_url[1]: #there is a netloc, this is already a full path to a given addon
+              return addon_url
+            else:
+              return urlparse.urljoin(base_url, addon_url)
 
         self.addStep(DownloadFile(
          url_fn=get_addon_url,
