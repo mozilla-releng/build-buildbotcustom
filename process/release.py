@@ -25,7 +25,8 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  makeLogUploadCommand, changeContainsProduct, nomergeBuilders
+  makeLogUploadCommand, changeContainsProduct, nomergeBuilders, \
+  changeContainsProperties
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -311,14 +312,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             releaseConfig['buildNumber'],
             protocol='http',
             server=releaseConfig['ftpServer'])
-        signed_apk_url = '%s%s/%s/%s-%s.%s.eabi-arm.apk' % \
+        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.eabi-arm.apk' % \
             (candidatesDir,
              branchConfig['platforms']['linux-android']['stage_platform'],
              locale, releaseConfig['productName'], releaseConfig['version'],
              locale)
         change_source.append(UrlPoller(
             branch=builderPrefix('android_post_signing'),
-            url=signed_apk_url,
+            url=enUS_signed_apk_url,
             pollInterval=60*10
         ))
         if branchConfig['platforms']['linux-android'].get('multi_locale'):
@@ -1487,6 +1488,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     extraRecipients=[recipient],
                     branches=[builderPrefix('post_signing')],
                     messageFormatter=createReleaseChangeMessage,
+                ))
+        if releaseConfig['productName'] == 'fennec':
+            #send a message when android signing is complete
+            status.append(ChangeNotifier(
+                    fromaddr="release@mozilla.com",
+                    relayhost="mail.build.mozilla.org",
+                    sendToInterestedUsers=False,
+                    extraRecipients=[recipient],
+                    branches=[builderPrefix('android_post_signing')],
+                    messageFormatter=createReleaseChangeMessage,
+                    changeIsImportant=lambda c: \
+                    changeContainsProperties(c, dict(who=enUS_signed_apk_url))
                 ))
 
     #send the nice(passing) release messages

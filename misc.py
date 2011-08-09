@@ -135,6 +135,12 @@ def changeContainsProduct(change, productName):
             return True
     return False
 
+def changeContainsProperties(change, props={}):
+    for prop, value in props.iteritems():
+        if change.properties.getProperty(prop) != value:
+            return False
+    return True
+
 def generateTestBuilderNames(name_prefix, suites_name, suites):
     test_builders = []
     if isinstance(suites, dict) and "totalChunks" in suites:
