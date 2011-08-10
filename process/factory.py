@@ -6192,7 +6192,8 @@ def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
 class MozillaTestFactory(MozillaBuildFactory):
     def __init__(self, platform, productName='firefox',
                  downloadSymbols=True, downloadTests=False,
-                 posixBinarySuffix='-bin', resetHwClock=False, **kwargs):
+                 posixBinarySuffix='-bin', resetHwClock=False, stackwalk_cgi=None,
+                 **kwargs):
         #Note: the posixBinarySuffix is needed because some products (firefox)
         #use 'firefox-bin' and some (fennec) use 'fennec' for the name of the
         #actual application binary.  This is only applicable to posix-like
@@ -6208,6 +6209,7 @@ class MozillaTestFactory(MozillaBuildFactory):
         self.downloadSymbols = downloadSymbols
         self.downloadTests = downloadTests
         self.resetHwClock = resetHwClock
+        self.stackwalk_cgi = stackwalk_cgi
 
         assert self.platform in getSupportedPlatforms()
 
@@ -6338,19 +6340,26 @@ class MozillaTestFactory(MozillaBuildFactory):
                         return build_url[:-len(suffix)] + '.crashreporter-symbols.zip'
             else:
                 return parse_sendchange_files(build, include_substr='.crashreporter-symbols.')
-        self.addStep(DownloadFile(
-            url_fn=get_symbols_url,
-            filename_property='symbols_filename',
-            url_property='symbols_url',
-            name='download_symbols',
-            ignore_certs=self.ignoreCerts,
-            workdir='build/symbols'
-        ))
-        self.addStep(UnpackFile(
-            filename=WithProperties('%(symbols_filename)s'),
-            name='unpack_symbols',
-            workdir='build/symbols'
-        ))
+
+        if not self.stackwalk_cgi:
+            self.addStep(DownloadFile(
+                url_fn=get_symbols_url,
+                filename_property='symbols_filename',
+                url_property='symbols_url',
+                name='download_symbols',
+                ignore_certs=self.ignoreCerts,
+                workdir='build/symbols'
+            ))
+            self.addStep(UnpackFile(
+                filename=WithProperties('%(symbols_filename)s'),
+                name='unpack_symbols',
+                workdir='build/symbols'
+            ))
+        else:
+            self.addStep(SetBuildProperty(
+                property_name='symbols_url',
+                value=get_symbols_url,
+            ))
 
     def addPrepareTestsSteps(self):
         def get_tests_url(build):
@@ -6420,19 +6429,27 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
     def __init__(self, platform, test_suites, env, productName='firefox',
                  mochitest_leak_threshold=None,
                  crashtest_leak_threshold=None, totalChunks=None,
-                 thisChunk=None, chunkByDir=None, **kwargs):
+                 thisChunk=None, chunkByDir=None, stackwalk_cgi=None,
+                 **kwargs):
         platform = platform.split('-')[0]
         self.test_suites = test_suites
         self.totalChunks = totalChunks
         self.thisChunk = thisChunk
         self.chunkByDir = chunkByDir
+
         self.env = MozillaEnvironments['%s-unittest' % platform].copy()
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        if stackwalk_cgi:
+            self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
+        else:
+            self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
         self.env.update(env)
+
         self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
                                 'crashtest': crashtest_leak_threshold,}
+
         MozillaTestFactory.__init__(self, platform, productName,
-                                    downloadTests=True, **kwargs)
+                                    downloadTests=True, stackwalk_cgi=stackwalk_cgi,
+                                    **kwargs)
 
     def addSetupSteps(self):
         if 'linux' in self.platform:
@@ -6444,6 +6461,10 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
 
     def addRunTestSteps(self):
         # Run them!
+        if self.stackwalk_cgi:
+            symbols_path = '%(symbols_url)s'
+        else:
+            symbols_path = 'symbols'
         for suite in self.test_suites:
             leak_threshold = self.leak_thresholds.get(suite, None)
             if suite.startswith('mobile-mochitest'):
@@ -6462,7 +6483,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
                  env=self.env,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  testPath='mobile',
                  leakThreshold=leak_threshold,
                  chunkByDir=self.chunkByDir,
@@ -6483,7 +6504,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
                  env=self.env,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  leakThreshold=leak_threshold,
                  chunkByDir=self.chunkByDir,
                  totalChunks=self.totalChunks,
@@ -6502,7 +6523,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
                  platform=self.platform,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  maxTime=120*60, # Two Hours
                 ))
             elif suite in ('jsreftest', ):
@@ -6514,12 +6535,12 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  haltOnFailure=True,
                  name='unpack jsreftest tests',
                  ))
- 
+
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
                  env=self.env,
                  leakThreshold=leak_threshold,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  maxTime=2*60*60, # Two Hours
                 ))
             elif suite == 'jetpack':
@@ -6535,7 +6556,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   suite=suite,
                   env=self.env,
                   leakThreshold=leak_threshold,
-                  symbols_path='symbols',
+                  symbols_path=symbols_path,
                   maxTime=120*60, # Two Hours
                  ))
             elif suite in ('reftest', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
@@ -6556,7 +6577,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  suite=suite,
                  env=self.env,
                  leakThreshold=leak_threshold,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  maxTime=2*60*60, # Two Hours
                 ))
             elif suite == 'mozmill':

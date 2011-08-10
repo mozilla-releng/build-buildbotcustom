@@ -1,13 +1,13 @@
 from urlparse import urljoin
 try:
     import json
+    assert json
 except:
     import simplejson as json
 import collections
 import random
 import re
 import sys, os, time
-from copy import deepcopy
 
 from twisted.python import log
 
@@ -50,7 +50,6 @@ from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup, ChangeNotifier
-from buildbot.status.mail import MailNotifier
 from buildbotcustom.status.generators import buildTryChangeMessage
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
@@ -420,6 +419,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     env=pf.get('unittest-env', {}),
                     downloadSymbols=pf.get('download_symbols', True),
                     resetHwClock=resetHwClock,
+                    stackwalk_cgi=config.get('stackwalk_cgi'),
                 )
                 builder = {
                     'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
@@ -449,6 +449,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 downloadSymbols=pf.get('download_symbols', True),
                 env=pf.get('unittest-env', {}),
                 resetHwClock=resetHwClock,
+                stackwalk_cgi=config.get('stackwalk_cgi'),
             )
             builder = {
                 'name': '%s %s' % (name_prefix, suites_name),
