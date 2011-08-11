@@ -6438,7 +6438,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         self.chunkByDir = chunkByDir
 
         self.env = MozillaEnvironments['%s-unittest' % platform].copy()
-        if stackwalk_cgi:
+        if stackwalk_cgi and kwargs.get('downloadSymbols'):
             self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
         else:
             self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
@@ -6461,7 +6461,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
 
     def addRunTestSteps(self):
         # Run them!
-        if self.stackwalk_cgi:
+        if self.stackwalk_cgi and self.downloadSymbols:
             symbols_path = '%(symbols_url)s'
         else:
             symbols_path = 'symbols'
