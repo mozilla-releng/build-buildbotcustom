@@ -812,7 +812,7 @@ class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandRepor
             self.command.append("--test-path=%s" % testPath)
 
         if symbols_path:
-            self.command.append("--symbols-path=%s" % symbols_path)
+            self.command.append(WithProperties("--symbols-path=%s" % symbols_path))
 
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
@@ -837,7 +837,7 @@ class MozillaPackagedReftests(ReftestMixin, ShellCommandReportTimeout):
                 '--extra-profile-file=bin/plugins',
                 ]
         if symbols_path:
-            self.command.append("--symbols-path=%s" % symbols_path)
+            self.command.append(WithProperties("--symbols-path=%s" % symbols_path))
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
         self.command.extend(self.getSuiteOptions(suite))
