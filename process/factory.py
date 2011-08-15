@@ -31,6 +31,7 @@ import buildbotcustom.env
 import buildbotcustom.misc_scheduler
 import build.paths
 import release.info
+import release.paths
 reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
@@ -45,6 +46,7 @@ reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
+reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
   upload_errors
@@ -71,6 +73,8 @@ import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
 from buildbot.status.builder import SUCCESS, FAILURE
+
+from release.paths import makeCandidatesDir
 
 # limit the number of clones of the try repository so that we don't kill
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
@@ -2588,6 +2592,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         pass
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
+        info_txt = '%s_info.txt' % self.complete_platform
         # Make sure the complete MAR has been generated
         if self.enableUpdatePackaging:
             self.addStep(ShellCommand(
@@ -2600,8 +2605,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         self.addStep(ShellCommand(
          name='echo_buildID',
          command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                '%s_info.txt' % self.platform)],
+                  WithProperties('echo buildID=%(buildid)s > ' + info_txt)],
          workdir='build/%s/dist' % self.mozillaObjdir
         ))
 
@@ -2609,7 +2613,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
                           'UPLOAD_USER': self.stageUsername,
                           'UPLOAD_TO_TEMP': '1',
-                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
+                          'UPLOAD_EXTRA_FILES': info_txt})
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
@@ -2651,6 +2655,21 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
          sb=self.use_scratchbox,
         ))
+
+        if self.productName == 'fennec' and not uploadMulti:
+            cmd = ['scp']
+            if self.stageSshKey:
+                cmd.append('-oIdentityFile=~/.ssh/%s' % self.stageSshKey)
+            cmd.append(info_txt)
+            candidates_dir = makeCandidatesDir(self.productName, self.version,
+                                               self.buildNumber)
+            cmd.append('%s@%s:%s' % (self.stageUsername, self.stageServer,
+                                     candidates_dir))
+            self.addStep(RetryingShellCommand(
+                name='upload_buildID',
+                command=cmd,
+                workdir='build/%s/dist' % self.mozillaObjdir
+            ))
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
