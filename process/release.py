@@ -1117,7 +1117,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('updates'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates')),
