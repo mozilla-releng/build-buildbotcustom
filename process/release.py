@@ -71,6 +71,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         all_slaves.extend(platform_slaves)
         if 'win' not in p:
             unix_slaves.extend(platform_slaves)
+    unix_slaves = [x for x in set(unix_slaves)]
+    all_slaves = [x for x in set(all_slaves)]
 
     signedPlatforms = releaseConfig.get('signedPlatforms', ('win32',))
 
@@ -1115,7 +1117,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('updates'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates')),

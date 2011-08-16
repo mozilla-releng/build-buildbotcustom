@@ -687,34 +687,35 @@ def generateBranchObjects(config, name):
     # Currently, each branch goes to a different tree
     # If this changes in the future this may have to be
     # moved out of the loop
-    branchObjects['status'].append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
-        logCompression="gzip",
-        errorparser="unittest"
-    ))
-    # XULRunner builds
-    branchObjects['status'].append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['xulrunner_tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=xulrunnerNightlyBuilders,
-        logCompression="gzip"
-    ))
-    # Code coverage builds go to a different tree
-    branchObjects['status'].append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['weekly_tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=coverageBuilders,
-        logCompression="gzip",
-        errorparser="unittest"
-    ))
+    if not config.get('disable_tinderbox_mail'):
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
+            logCompression="gzip",
+            errorparser="unittest"
+        ))
+        # XULRunner builds
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['xulrunner_tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=xulrunnerNightlyBuilders,
+            logCompression="gzip"
+        ))
+        # Code coverage builds go to a different tree
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['weekly_tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=coverageBuilders,
+            logCompression="gzip",
+            errorparser="unittest"
+        ))
 
     # Try Server notifier
     if config.get('enable_mail_notifier'):
@@ -754,27 +755,28 @@ def generateBranchObjects(config, name):
         nomergeBuilders.extend(l10n_builders)
 
         # This notifies all l10n related build objects to Mozilla-l10n
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="bootstrap@mozilla.com",
-            tree=config['l10n_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
+        if not config.get('disable_tinderbox_mail'):
+            branchObjects['status'].append(TinderboxMailNotifier(
+                fromaddr="bootstrap@mozilla.com",
+                tree=config['l10n_tinderbox_tree'],
+                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+                relayhost="mail.build.mozilla.org",
+                logCompression="gzip",
+                builders=l10n_builders,
+                binaryURL=l10n_binaryURL
+            ))
 
-        # We only want the builds from the specified builders
-        # since their builds have a build property called "locale"
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="bootstrap@mozilla.com",
-            tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
+            # We only want the builds from the specified builders
+            # since their builds have a build property called "locale"
+            branchObjects['status'].append(TinderboxMailNotifier(
+                fromaddr="bootstrap@mozilla.com",
+                tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
+                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+                relayhost="mail.build.mozilla.org",
+                logCompression="gzip",
+                builders=l10n_builders,
+                binaryURL=l10n_binaryURL
+            ))
 
         # Log uploads for dep l10n repacks
         branchObjects['status'].append(SubprocessLogHandler(
@@ -884,15 +886,16 @@ def generateBranchObjects(config, name):
             **extra_args
         ))
 
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['packaged_unittest_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=test_builders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
+        if not config.get('disable_tinderbox_mail'):
+            branchObjects['status'].append(TinderboxMailNotifier(
+                fromaddr="mozilla2.buildbot@build.mozilla.org",
+                tree=config['packaged_unittest_tinderbox_tree'],
+                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+                relayhost="mail.build.mozilla.org",
+                builders=test_builders,
+                logCompression="gzip",
+                errorparser="unittest"
+            ))
 
         branchObjects['status'].append(SubprocessLogHandler(
             logUploadCmd,
@@ -1864,7 +1867,7 @@ def generateCCBranchObjects(config, name):
             builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
-    # change sources - if try is enabled, tipsOnly will be true which  makes 
+    # change sources - if try is enabled, tipsOnly will be true which makes
     # every push only show up as one changeset
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
     if config['hgurl'].startswith('https:'):
@@ -2708,28 +2711,29 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         )
                 branchObjects['schedulers'].append(s)
 
-    for tinderboxTree in branch_builders.keys():
-        if len(branch_builders[tinderboxTree]):
-            branchObjects['status'].append(TinderboxMailNotifier(
-                           fromaddr="talos.buildbot@build.mozilla.org",
-                           tree=tinderboxTree,
-                           extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                           relayhost="mail.build.mozilla.org",
-                           builders=branch_builders[tinderboxTree],
-                           useChangeTime=False,
-                           logCompression="gzip"))
-    ###  Unittests need specific errorparser
-    for tinderboxTree in all_test_builders.keys():
-        if len(all_test_builders[tinderboxTree]):
-            branchObjects['status'].append(TinderboxMailNotifier(
-                           fromaddr="talos.buildbot@build.mozilla.org",
-                           tree=tinderboxTree,
-                           extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                           relayhost="mail.build.mozilla.org",
-                           builders=all_test_builders[tinderboxTree],
-                           useChangeTime=False,
-                           errorparser="unittest",
-                           logCompression="gzip"))
+    if not branch_config.get('disable_tinderbox_mail'):
+        for tinderboxTree in branch_builders.keys():
+            if len(branch_builders[tinderboxTree]):
+                branchObjects['status'].append(TinderboxMailNotifier(
+                               fromaddr="talos.buildbot@build.mozilla.org",
+                               tree=tinderboxTree,
+                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+                               relayhost="mail.build.mozilla.org",
+                               builders=branch_builders[tinderboxTree],
+                               useChangeTime=False,
+                               logCompression="gzip"))
+        ###  Unittests need specific errorparser
+        for tinderboxTree in all_test_builders.keys():
+            if len(all_test_builders[tinderboxTree]):
+                branchObjects['status'].append(TinderboxMailNotifier(
+                               fromaddr="talos.buildbot@build.mozilla.org",
+                               tree=tinderboxTree,
+                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+                               relayhost="mail.build.mozilla.org",
+                               builders=all_test_builders[tinderboxTree],
+                               useChangeTime=False,
+                               errorparser="unittest",
+                               logCompression="gzip"))
 
     logUploadCmd = makeLogUploadCommand(branch, branch_config,
             is_try=bool(branch=='try'),
@@ -2772,7 +2776,7 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     # Don't fetch symbols
     branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
-    return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, 
+    return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         ACTIVE_UNITTEST_PLATFORMS, factory_class)
 
 
