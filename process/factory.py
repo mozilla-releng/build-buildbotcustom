@@ -5012,7 +5012,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 '--long-version=%s' % self.longVersion,
                 '-n', str(self.buildNumber), '-a', self.ausServerUrl,
                 '-s', self.stagingServer, '-c', verifyConfigPath,
-                '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
+                '-d', oldCandidatesDir, '-l', 'shipped-locales',
+                '--old-shipped-locales', 'old-shipped-locales',
                 '--pretty-candidates-dir']
         if self.binaryName:
             bcmd.extend(['--binary-name', self.binaryName])
