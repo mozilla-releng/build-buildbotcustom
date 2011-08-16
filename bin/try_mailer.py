@@ -112,7 +112,7 @@ Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n
         log_url = log_url.replace('://stage', '://ftp')
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n" % locals()
     else:
-        text += "Please check <a href=\"http://tbpl.mozilla.org/?tree=Try&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
+        text += "Please check <a href=\"http://tbpl.allizom.org/?tree=Try&usebuildbot=1&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
 
     text = re.sub("\n", "<br>\n", text)
 
