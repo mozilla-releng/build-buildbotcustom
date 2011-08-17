@@ -39,9 +39,13 @@ def addRetryEvaluateCommand(obj):
                         '-s', '1', '-r', '5']
         def __init__(self, command, retry=True, **kwargs):
             self.super_class = obj
+            timeout = kwargs.get('timeout', 1200)
+            # Add a minute to the timeout to give retry.py a chance to retry
+            # the command
+            kwargs['timeout'] = timeout + 60
             if retry:
                 wrappedCommand = self.retryCommand + \
-                               ['-t', str(kwargs.get('timeout', 1200))] + \
+                               ['-t', str(timeout)] + \
                                command
             else:
                 wrappedCommand = command

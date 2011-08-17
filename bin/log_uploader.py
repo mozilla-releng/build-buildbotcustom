@@ -10,13 +10,14 @@ from buildbot.status.builder import Results
 
 from buildbotcustom.process.factory import postUploadCmdPrefix
 
-def ssh(user, identity, host, remote_cmd, port=22):
-    devnull = open(os.devnull)
-    cmd = ['ssh', '-l', user]
-    if identity:
-        cmd.extend(['-i', identity])
-    cmd.extend(['-p', str(port), host, remote_cmd])
+from util.retry import retry
 
+retries = 5
+retry_sleep = 30
+
+def do_cmd(cmd):
+    "Runs the command, and returns output"
+    devnull = open(os.devnull)
     proc = subprocess.Popen(cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -24,13 +25,20 @@ def ssh(user, identity, host, remote_cmd, port=22):
 
     retcode = proc.wait()
     output = proc.stdout.read().strip()
-    if retcode != 0:
-        raise Exception("Command %s returned non-zero exit code %i:\n%s" % (
-            cmd, retcode, output))
-    return output
+    if retcode == 0:
+        return output
+    raise Exception("Command %s returned non-zero exit code %i:\n%s" % (
+        cmd, retcode, output))
+
+def ssh(user, identity, host, remote_cmd, port=22):
+    cmd = ['ssh', '-l', user]
+    if identity:
+        cmd.extend(['-i', identity])
+    cmd.extend(['-p', str(port), host, remote_cmd])
+
+    return retry(do_cmd, attempts=retries, sleeptime=retry_sleep, args=(cmd,))
 
 def scp(user, identity, host, files, remote_dir, port=22):
-    devnull = open(os.devnull)
     cmd = ['scp']
     if identity:
         cmd.extend(['-i', identity])
@@ -38,17 +46,7 @@ def scp(user, identity, host, files, remote_dir, port=22):
     cmd.extend(files)
     cmd.append("%s@%s:%s" % (user, host, remote_dir))
 
-    proc = subprocess.Popen(cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=devnull,)
-
-    retcode = proc.wait()
-    output = proc.stdout.read().strip()
-    if retcode != 0:
-        raise Exception("Command %s returned non-zero exit code %i:\n%s" % (
-            cmd, retcode, output))
-    return output
+    return retry(do_cmd, attempts=retries, sleeptime=retry_sleep, args=(cmd,))
 
 def getBuild(builder_path, build_number):
     build_path = os.path.join(builder_path, build_number)
@@ -163,11 +161,15 @@ if __name__ == "__main__":
             l10n=False,
             user=os.environ.get("USER"),
             product="firefox",
+            retries=retries,
+            retry_sleep=retry_sleep,
             )
     parser.add_option("-u", "--user", dest="user", help="upload user name")
     parser.add_option("-i", "--identity", dest="identity", help="ssh identity")
     parser.add_option("-b", "--branch", dest="branch", help="branch")
     parser.add_option("-p", "--platform", dest="platform", help="platform")
+    parser.add_option("-r", "--retries", dest="retries", help="number of times to try", type="int")
+    parser.add_option("-t", "--retrytime", dest="retry_sleep", help="time to sleep between tries", type="int")
     parser.add_option("--product", dest="product", help="product directory")
     parser.add_option("--nightly", dest="nightly", action="store_true",
             help="upload to nightly dir")
@@ -187,6 +189,9 @@ if __name__ == "__main__":
 
     if not options.platform and not options.release:
         parser.error("platform required")
+
+    retries = options.retries
+    retry_sleep = options.retry_sleep
 
     if len(args) != 3:
         parser.error("Need to specify host, builder_path and build number")
@@ -212,7 +217,7 @@ if __name__ == "__main__":
             if options.release:
                 # Create the logs directory
                 ssh(user=options.user, identity=options.identity, host=host,
-                        remote_cmd="mkdir %s/logs" % remote_tmpdir)
+                        remote_cmd="mkdir -p %s/logs" % remote_tmpdir)
                 scp(user=options.user, identity=options.identity, host=host,
                         files=[logfile], remote_dir='%s/logs' % remote_tmpdir)
                 remote_files = [os.path.join(remote_tmpdir, 'logs', os.path.basename(f)) for f in [logfile]]
