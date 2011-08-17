@@ -1537,24 +1537,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 messageFormatter=createReleaseAVVendorsMessage,
             ))
 
-    status.append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=branchConfig["tinderbox_tree"] + "-Release",
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in builders],
-        logCompression="gzip")
-    )
+    if not releaseConfig.get('disable_tinderbox_mail'):
+        status.append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=branchConfig["tinderbox_tree"] + "-Release",
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in builders],
+            logCompression="gzip")
+        )
 
-    status.append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=branchConfig["tinderbox_tree"] + "-Release",
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in test_builders],
-        logCompression="gzip",
-        errorparser="unittest")
-    )
+        status.append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=branchConfig["tinderbox_tree"] + "-Release",
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in test_builders],
+            logCompression="gzip",
+            errorparser="unittest")
+        )
 
     builders.extend(test_builders)
 
