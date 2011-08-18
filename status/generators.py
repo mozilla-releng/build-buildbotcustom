@@ -13,7 +13,7 @@ def buildTryChangeMessage(change, packageDir):
     msgdict["body"] = """\
 Thanks for your try submission (http://hg.mozilla.org/try/pushloghtml?changeset=%(revision)s).  It's the best!
 
-Watch http://tbpl.mozilla.org/?tree=Try&rev=%(revision)s for your results to come in.
+Watch http://tbpl.allizom.org/?tree=Try&usebuildbot=1&rev=%(revision)s for your results to come in.
 
 Builds and logs will be available at %(packageDir)s.
 
@@ -113,7 +113,7 @@ successfully created and could be available for download at %(url)s\n\n" % local
                     text += "%s\n" % (test.group(0))
         text += '\n'
 
-    text += """Visit http://tbpl.mozilla.org/?tree=%(tinderboxTree)s&rev=%(revision)s to view the full logs.""" % locals()
+    text += """Visit http://tbpl.allizom.org/?tree=%(tinderboxTree)s&usebuildbot=1&rev=%(revision)s to view the full logs.""" % locals()
 
     return (text, 'plain')
 
