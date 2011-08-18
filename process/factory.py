@@ -7317,11 +7317,13 @@ class TalosFactory(RequestSortingBuildFactory):
     def addDownloadExtensionStep(self):
         def get_addon_url(build):
             import urlparse
+            import urllib
             base_url = 'https://addons.mozilla.org/'
             addon_url = build.getProperty('addonUrl')
-            parsed_url = urlparse.urlsplit(addon_url)
+            #addon_url may be encoded, also we want to ensure that http%3A// becomes http://
+            parsed_url = urlparse.urlsplit(urllib.unquote_plus(addon_url).replace('%3A', ':'))
             if parsed_url[1]: #there is a netloc, this is already a full path to a given addon
-              return addon_url
+              return urlparse.urlunsplit(parsed_url)
             else:
               return urlparse.urljoin(base_url, addon_url)
 
