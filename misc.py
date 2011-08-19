@@ -2892,20 +2892,23 @@ def generateNanojitObjects(config, SLAVES):
             )
 
     # Tinderbox notifier
-    tbox_mailer = TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in builders],
-        logCompression="gzip",
-    )
+    status = []
+    if not config.get("disable_tinderbox_mail"):
+        tbox_mailer = TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in builders],
+            logCompression="gzip",
+        )
+        status = [tbox_mailer]
 
     return {
             'builders': builders,
             'change_source': [poller],
             'schedulers': [scheduler],
-            'status': [tbox_mailer],
+            'status': status,
             }
 
 def generateValgrindObjects(config, slaves):
@@ -2936,19 +2939,22 @@ def generateValgrindObjects(config, slaves):
             )
 
     # Tinderbox notifier
-    tbox_mailer = TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in builders],
-        logCompression="gzip",
-    )
+    status = []
+    if not config.get("disable_tinderbox_mail"):
+        tbox_mailer = TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in builders],
+            logCompression="gzip",
+        )
+        status = [tbox_mailer]
 
     return {
             'builders': builders,
             'schedulers': [scheduler],
-            'status': [tbox_mailer],
+            'status': status,
             }
 
 def generateSpiderMonkeyObjects(config, SLAVES):
@@ -3005,20 +3011,23 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             )
 
     # Tinderbox notifier
-    tbox_mailer = TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in builders],
-        logCompression="gzip",
-        errorparser="unittest"
-    )
+    status = []
+    if not config.get("disable_tinderbox_mail"):
+        tbox_mailer = TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in builders],
+            logCompression="gzip",
+            errorparser="unittest"
+        )
+        status = [tbox_mailer]
 
     return {
             'builders': builders,
             'schedulers': [scheduler],
-            'status': [tbox_mailer],
+            'status': status,
             }
 
 def generateJetpackObjects(config, SLAVES):
@@ -3062,20 +3071,23 @@ def generateJetpackObjects(config, SLAVES):
             )
 
     # Tinderbox notifier
-    tbox_mailer = TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=config['tinderbox_tree'],
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in builders],
-        logCompression="gzip",
-    )
+    status = []
+    if not config.get("disable_tinderbox_mail"):
+        tbox_mailer = TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=config['tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in builders],
+            logCompression="gzip",
+        )
+        status = [tbox_mailer]
 
     return {
             'builders': builders,
             'change_source': [poller],
             'schedulers': [scheduler],
-            'status': [tbox_mailer],
+            'status': status,
             }
 
 def generateProjectObjects(project, config, SLAVES):
