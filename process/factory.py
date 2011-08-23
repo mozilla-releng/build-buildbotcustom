@@ -6830,6 +6830,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addCleanupSteps()
         self.addStep(DisconnectStep(
             name='reboot device',
+            workdir='.',
             alwaysRun=True,
             force_disconnect=True,
             warnOnFailure=False,
