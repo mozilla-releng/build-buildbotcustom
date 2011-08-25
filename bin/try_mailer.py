@@ -194,15 +194,15 @@ if __name__ == '__main__':
             if result != SUCCESS:
                 msgdict = makeTryMessage(build, log_url)
 
-    # Send it!
-    if msgdict != None:
-        if options.to_author:
-            options.to.append(msgdict['author'])
-        msg = formatMessage(msgdict, options.from_, options.to)
-        print msg
-
-        s = SMTP()
-        s.connect()
-        s.sendmail(options.from_, options.to, msg.as_string())
+        # Send it!
+        if msgdict != None:
+            if options.to_author:
+                options.to.append(msgdict['author'])
+            msg = formatMessage(msgdict, options.from_, options.to)
+            print msg
+    
+            s = SMTP()
+            s.connect()
+            s.sendmail(options.from_, options.to, msg.as_string())
 
     sys.exit(exit_code)
