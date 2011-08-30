@@ -545,7 +545,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
 
 def generateBranchObjects(config, name):
     """name is the name of branch which is usually the last part of the path
-       to the repository. For example, 'mozilla-central', 'tracemonkey', or
+       to the repository. For example, 'mozilla-central', 'mozilla-aurora', or
        'mozilla-1.9.1'.
        config is a dictionary containing all of the necessary configuration
        information for a branch. The required keys depends greatly on what's
