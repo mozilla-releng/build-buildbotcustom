@@ -2845,6 +2845,8 @@ def generateFuzzingObjects(config, SLAVES):
 
 def generateNanojitObjects(config, SLAVES):
     builders = []
+    branch = os.path.basename(config['repo_path'])
+
     for platform in config['platforms']:
         if 'win' in platform:
             slaves = SLAVES[platform]
@@ -2872,6 +2874,7 @@ def generateNanojitObjects(config, SLAVES):
                    'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                    'factory': f,
                    'category': 'idle',
+                   'properties': {'branch': branch},
                   }
         builders.append(builder)
         nomergeBuilders.append(builder)
@@ -2913,6 +2916,8 @@ def generateNanojitObjects(config, SLAVES):
 
 def generateValgrindObjects(config, slaves):
     builders = []
+    branch = os.path.basename(config['repo_path'])
+
     for platform in config['platforms']:
         f = ScriptFactory(
                 config['scripts_repo'],
@@ -2927,6 +2932,7 @@ def generateValgrindObjects(config, slaves):
                    'factory': f,
                    'category': 'idle',
                    'env': env,
+                   'properties': {'branch': branch},
                   }
         builders.append(builder)
 
@@ -2992,6 +2998,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     'factory': f,
                     'category': 'idle',
                     'env': config['env'][platform],
+                    'properties': {'branch': branch},
                     }
             builders.append(builder)
 
