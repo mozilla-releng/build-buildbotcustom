@@ -955,6 +955,35 @@ class MercurialBuildFactory(MozillaBuildFactory):
              defaultBranch=self.repoPath,
              timeout=60*60, # 1 hour
             ))
+        elif self.useSharedCheckouts:
+            self.addStep(JSONPropertiesDownload(
+                name="download_props",
+                slavedest="buildprops.json",
+                workdir='.'
+            ))
+
+            env = self.env.copy()
+            env['PROPERTIES_FILE'] = 'buildprops.json'
+            cmd = [
+                    'python',
+                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                    'http://%s/%s' % (self.hgHost, self.repoPath),
+                    'build',
+                  ]
+            self.addStep(ShellCommand(
+                name='hg_update',
+                command=cmd,
+                timeout=60*60,
+                env=env,
+                workdir='.',
+                haltOnFailure=True,
+                flunkOnFailure=True,
+            ))
+            self.addStep(SetProperty(
+                name = 'set_got_revision',
+                command=['hg', 'parent', '--template={node}'],
+                extract_fn = short_hash
+            ))
         else:
             self.addStep(Mercurial(
              name='hg_update',
@@ -963,6 +992,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              defaultBranch=self.repoPath,
              timeout=60*60, # 1 hour
             ))
+
         if self.buildRevision:
             self.addStep(ShellCommand(
              name='hg_update',
