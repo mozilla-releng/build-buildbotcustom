@@ -112,7 +112,7 @@ Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n
         log_url = log_url.replace('://stage', '://ftp')
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n" % locals()
     else:
-        text += "Please check <a href=\"http://tbpl.allizom.org/?tree=Try&usebuildbot=1&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
+        text += "Please check <a href=\"https://tbpl.mozilla.org/?tree=Try&usebuildbot=1&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
 
     text = re.sub("\n", "<br>\n", text)
 
@@ -187,7 +187,9 @@ if __name__ == '__main__':
     # else default is failures only
     msgdict = None
     # Generate the message
-    if not tm_options.silence:
+    if tm_options.silence:
+        print "No email going out for this result: %s (silence=%s)" % (result, tm_options.silence)
+    else:
         if tm_options.all_emails:
             msgdict = makeTryMessage(build, log_url)
         else:

@@ -37,7 +37,6 @@ def reallyShort(name):
         'central': 'cen',
         '1.9.1': '191',
         '1.9.2': '192',
-        'tracemonkey': 'tm',
         'places': 'plc',
         'electrolysis': 'e10s',
         'jaegermonkey': 'jm',
