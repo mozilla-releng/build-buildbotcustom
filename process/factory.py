@@ -2193,8 +2193,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                      WithProperties('ssh -l %s -i ~/.ssh/%s %s ' % (self.stageUsername,
                                                                     self.stageSshKey,
                                                                     self.stageServer) +
-                                    'ls -1t %s | grep %s' % (self.latestDir,
-                                                             marPattern))
+                                    'ls -1t %s | grep %s | head -n 1' % (self.latestDir,
+                                                                        marPattern))
                      ],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
             flunkOnFailure=False,
