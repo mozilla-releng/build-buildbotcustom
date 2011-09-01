@@ -187,9 +187,7 @@ if __name__ == '__main__':
     # else default is failures only
     msgdict = None
     # Generate the message
-    if tm_options.silence:
-        print "No email going out for this result: %s (silence=%s)" % (result, tm_options.silence)
-    else:
+    if not tm_options.silence:
         if tm_options.all_emails:
             msgdict = makeTryMessage(build, log_url)
         else:

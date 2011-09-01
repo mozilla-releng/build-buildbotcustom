@@ -1072,11 +1072,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 description=['getting', 'sourcestamp'],
                 descriptionDone=['got', 'sourcestamp']
             ))
-            self.addStep(SetBuildProperty(
-                name='set_comments',
-                property_name="comments",
-                value=lambda build:(build.source.changes[-1].comments),
-            ))
             self._gotBuildInfo = True
 
     def addBuildAnalysisSteps(self):
@@ -1942,7 +1937,6 @@ class TryBuildFactory(MercurialBuildFactory):
              revision=WithProperties('%(got_revision)s'),
              files=[WithProperties('%(packageUrl)s')],
              user=WithProperties('%(who)s'),
-             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
         for master, warn, retries in self.unittestMasters:
@@ -1956,7 +1950,6 @@ class TryBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s'),
                      WithProperties('%(testsUrl)s')],
              user=WithProperties('%(who)s'),
-             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -2518,7 +2511,6 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange",
-                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -2536,7 +2528,6 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=files,
                  user="sendchange-unittest",
-                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -2697,7 +2688,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange",
-             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -2712,7 +2702,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s'),
                     WithProperties('%(testsUrl)s')],
              user="sendchange-unittest",
-             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -5538,7 +5527,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
                  revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
-                 user=WithProperties('%(who)s')),
+                 user=WithProperties('%(who)s'))
                 )
 
 class CCUnittestBuildFactory(MozillaBuildFactory):
