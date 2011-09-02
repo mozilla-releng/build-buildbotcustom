@@ -1111,6 +1111,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addLeakTestSteps(self):
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(AliveTest(
           env=leakEnv,
           workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -1250,6 +1251,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addCheckTestSteps(self):
         env = self.env.copy()
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
          warnOnWarnings=True,
@@ -1272,6 +1274,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addValgrindCheckSteps(self):
         env = self.env.copy()
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check-valgrind",
          warnOnWarnings=True,
@@ -1723,6 +1726,7 @@ class TryBuildFactory(MercurialBuildFactory):
         # extraArgs
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         for args in [['-register'], ['-CreateProfile', 'default'],
                      ['-P', 'default']]:
             self.addStep(AliveTest(
@@ -5341,6 +5345,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.doUpload()
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         self.addPreTestSteps()
 
@@ -5697,6 +5702,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.doUpload()
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         self.addPreTestSteps()
 
@@ -6462,6 +6468,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
             self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
         else:
             self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.env.update(env)
 
         self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
