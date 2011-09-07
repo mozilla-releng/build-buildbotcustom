@@ -9,6 +9,7 @@ from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
 from buildbot.steps.shell import WithProperties
+from buildbot.status.builder import Results
 
 import release.platforms
 import release.paths
@@ -124,6 +125,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         msgdict = {}
         releaseName = releasePrefix()
         job_status = "failed" if results else "success"
+        job_status_repr = Results[results]
         allplatforms = list(releaseConfig['enUSPlatforms'])
         xrplatforms = list(releaseConfig.get('xulrunnerPlatforms', []))
         stage = name.replace(builderPrefix(""), "")
