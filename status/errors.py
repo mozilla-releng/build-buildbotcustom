@@ -1,11 +1,10 @@
 import re
 
-from buildbot.status.builder import EXCEPTION, FAILURE, RETRY, WARNINGS
+from buildbot.status.builder import EXCEPTION, FAILURE, RETRY
 
 global_errors = ((re.compile("No space left on device"), RETRY),
                  (re.compile("Remote Device Error"), EXCEPTION),
                  (re.compile("Connection to the other side was lost in a non-clean fashion"), RETRY),
-                 (re.compile("WARN(ING)?:"), WARNINGS),
                 )
 hg_errors = ((re.compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re.compile("abort: .*: no match found!"), RETRY),
