@@ -832,9 +832,7 @@ def generateBranchObjects(config, name):
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
-        extra_args['treeStableTimer'] = None
-    else:
-        extra_args['treeStableTimer'] = 3*60
+    extra_args['treeStableTimer'] = None
 
     branchObjects['schedulers'].append(scheduler_class(
         name=name,
