@@ -762,7 +762,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         pf = branchConfig['platforms'][platform]
         mozconfig = '%s/%s/release' % (platform, sourceRepoInfo['name'])
         if platform in releaseConfig['talosTestPlatforms']:
-            talosMasters = branchConfig['talos_masters']
+            talosMasters = pf['talos_masters']
         else:
             talosMasters = None
 
