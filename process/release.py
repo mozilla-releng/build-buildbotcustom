@@ -776,6 +776,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             unittestBranch = None
 
         if not releaseConfig.get('skip_build'):
+            platform_env = pf['env'].copy()
+            if 'update_channel' in branchConfig:
+                platform_env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
             if platform in releaseConfig['l10nPlatforms']:
                 triggeredSchedulers = [builderPrefix('%s_repack' % platform)]
             else:
@@ -785,7 +788,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             enableUpdatePackaging = bool(releaseConfig.get('verifyConfigs',
                                                       {}).get(platform))
             build_factory = ReleaseBuildFactory(
-                env=pf['env'],
+                env=platform_env,
                 objdir=pf['platform_objdir'],
                 platform=platform,
                 hgHost=branchConfig['hghost'],
@@ -853,6 +856,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 ))
 
         if platform in releaseConfig['l10nPlatforms']:
+            env = builder_env.copy()
+            env.update(pf['env'])
+            if 'update_channel' in branchConfig:
+                env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
+
             if not releaseConfig.get('disableStandaloneRepacks'):
                 standalone_factory = ScriptFactory(
                     scriptRepo=tools_repo,
@@ -860,8 +868,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptName='scripts/l10n/standalone_repacks.sh',
                     extra_args=[platform, branchConfigFile]
                 )
-                env = builder_env.copy()
-                env.update(pf['env'])
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
                     'slavenames': branchConfig['l10n_slaves'][platform],
@@ -894,8 +900,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
                 builddir = builderPrefix('%s_repack' % platform) + \
                                          '_' + str(n)
-                env = builder_env.copy()
-                env.update(pf['env'])
                 builders.append({
                     'name': builderName,
                     'slavenames': branchConfig['l10n_slaves'][platform],
