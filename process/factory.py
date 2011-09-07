@@ -4929,6 +4929,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                       '%s builds' % self.version],
          env={'PYTHONPATH': WithProperties('%(toolsdir)s/lib/python')},
          haltOnFailure=False,
+         flunkOnFailure=False,
          workdir=self.updateDir
         ))
 
