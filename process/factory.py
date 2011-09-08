@@ -633,6 +633,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  mozharnessTag='default',
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
+                 mozharnessMultiOptions=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -822,6 +823,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.multiLocaleScript = multiLocaleScript
             self.multiLocaleConfig = multiLocaleConfig
             self.multiLocaleMerge = multiLocaleMerge
+            if mozharnessMultiOptions:
+                self.mozharnessMultiOptions = mozharnessMultiOptions
+            else:
+                self.mozharnessMultiOptions = ['--only-pull-locale-source',
+                                               '--only-add-locales',
+                                               '--only-package-multi']
 
             self.addMultiLocaleRepoSteps()
 
@@ -1478,9 +1485,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                    '--config-file', self.multiLocaleConfig]
             if self.multiLocaleMerge:
                 cmd.append('--merge-locales')
-            cmd.extend(['--only-pull-locale-source',
-                        '--only-add-locales',
-                        '--only-package-multi'])
+            cmd.extend(self.mozharnessMultiOptions)
             self.addStep(ShellCommand(
                 name='mozharness_multilocale',
                 command=cmd,
@@ -2610,6 +2615,10 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if usePrettyNames:
             env['MOZ_PKG_PRETTYNAMES'] = '1'
         env['MOZ_PKG_VERSION'] = version
+        kwargs['mozharnessMultiOptions'] = ['--only-pull-build-source',
+                                            '--only-pull-locale-source',
+                                            '--only-add-locales',
+                                            '--only-package-multi']
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
