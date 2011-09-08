@@ -1,10 +1,6 @@
 """
 pulse status plugin for buildbot
-
-see http://hg.mozilla.org/users/clegnitto_mozilla.com/mozillapulse/ for pulse
-code
 """
-from datetime import tzinfo, timedelta, datetime
 import re
 import os.path
 import time
@@ -16,50 +12,8 @@ from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 from twisted.python import log
 
-from mozillapulse.messages.build import BuildMessage
-
 from buildbot.status.status_push import StatusPush
-
-ZERO = timedelta(0)
-HOUR = timedelta(hours=1)
-
-# A UTC class.
-
-class UTC(tzinfo):
-    """UTC"""
-
-    def utcoffset(self, dt):
-        return ZERO
-
-    def tzname(self, dt):
-        return "UTC"
-
-    def dst(self, dt):
-        return ZERO
-
-def transform_time(t):
-    """Transform an epoch time to a string representation of the form
-    YYYY-mm-ddTHH:MM:SS+0000"""
-    if t is None:
-        return None
-    elif isinstance(t, basestring):
-        return t
-
-    dt = datetime.fromtimestamp(t, UTC())
-    return dt.strftime('%Y-%m-%dT%H:%M:%S%z')
-
-def transform_times(event):
-    """Replace epoch times in event with string representations of the time"""
-    if isinstance(event, dict):
-        retval = {}
-        for key, value in event.items():
-            if key == 'times' and len(value) == 2:
-                retval[key] = [transform_time(t) for t in value]
-            else:
-                retval[key] = transform_times(value)
-    else:
-        retval = event
-    return retval
+from buildbot.util import json
 
 def escape(name):
     return name.replace(".", "_").replace(" ", "_")
@@ -71,29 +25,23 @@ class PulseStatus(StatusPush):
     """
     Status pusher for Mozilla Pulse (an AMQP broker).
 
-    Sends all events regarding activity on this master to the given publisher,
-    which should be a mozillapulse.publishers.GenericPublisher instance.
+    Sends all events regarding activity on this master to the given queue,
+    which should be a buildbotcustom.status.queue.QueueDir instance.
 
     `ignoreBuilders`, if set, should be a list of strings or compiled regular
     expressions of builders that should *NOT* be watched.
 
     `send_logs`, if set, will enable sending log chunks to the message broker.
 
-    `max_connect_time` (default 600) is the maximum length of time we'll hold a
-    connection to the broker open.
-
-    `max_idle_time` (default 300) is the maximum length of idle time we'll hold
-    a connection to the broker open.
-
     `heartbeat_time` (default 900) is how often we generate heartbeat events.
     """
 
-    compare_attrs = StatusPush.compare_attrs + ['publisher', 'ignoreBuilders',
+    compare_attrs = StatusPush.compare_attrs + ['queuedir', 'ignoreBuilders',
             'send_logs']
 
-    def __init__(self, publisher, ignoreBuilders=None, send_logs=False,
-            max_connect_time=600, max_idle_time=300, heartbeat_time=900):
-        self.publisher = publisher
+    def __init__(self, queuedir, ignoreBuilders=None, send_logs=False,
+            heartbeat_time=900):
+        self.queuedir = queuedir
         self.send_logs = send_logs
 
         self.ignoreBuilders = []
@@ -106,18 +54,13 @@ class PulseStatus(StatusPush):
                     self.ignoreBuilders.append(i)
         self.watched = []
 
-        self.max_connect_time = max_connect_time
-        self.max_idle_time = max_idle_time
-        self.heartbeat_time = heartbeat_time
-
-        self._disconnect_timer = None
-        self._idle_timer = None
-
-        # Lock to make sure only one thread is active at a time
-        self._thread_lock = DeferredLock()
-
         # Set up heartbeat
+        self.heartbeat_time = heartbeat_time
         self._heartbeat_loop = LoopingCall(self.heartbeat)
+
+        # Wait 10 seconds before sending our stuff
+        self.push_delay = 10
+        self.delayed_push = None
 
         StatusPush.__init__(self, PulseStatus.pushEvents, filter=False)
 
@@ -143,143 +86,62 @@ class PulseStatus(StatusPush):
         self.status.unsubscribe(self)
         for w in self.watched:
             w.unsubscribe(self)
+
+        # Write out any pending events
+        if self.delayed_push:
+            self.delayed_push.cancel()
+            self.delayed_push = None
+
+        while self.queue.nbItems() > 0:
+            self._do_push()
         return StatusPush.stopService(self)
 
-    def _disconnect(self, message):
-        """Disconnect ourselves from the broker.
-
-        We need to do this in a thread since disconnecting can require network
-        access, which can block.
-        """
-        d = self._thread_lock.acquire()
-
-        d.addCallback(lambda ign: log.msg(message))
-
-        def clear_timers(ign):
-            # Cancel and get rid of timers
-            if self._disconnect_timer and self._disconnect_timer.active():
-                self._disconnect_timer.cancel()
-            self._disconnect_timer = None
-
-            if self._idle_timer and self._idle_timer.active():
-                self._idle_timer.cancel()
-            self._idle_timer = None
-        d.addCallback(clear_timers)
-
-        d.addCallback(lambda ign: deferToThread(self.publisher.disconnect))
-
-        def done(ign):
-            self._thread_lock.release()
-            return ign
-        d.addBoth(done)
-        return d
-
     def pushEvents(self):
+        """Trigger a push"""
+        if not self.delayed_push:
+            self.delayed_push = reactor.callLater(self.push_delay, self._do_push)
+
+    def _do_push(self):
         """Push some events to pulse"""
-        d = self._thread_lock.acquire()
-
-        # Set the idle/disconnect timers
-        def set_timers(ign):
-            # Set timer to disconnect
-            if not self._disconnect_timer:
-                self._disconnect_timer = reactor.callLater(
-                        self.max_connect_time, self._disconnect,
-                        "Pulse %s: Disconnecting after %s seconds" %
-                            (hexid(self), self.max_connect_time))
-
-            if self.max_idle_time:
-                # Set timer for idle time
-                if self._idle_timer and self._idle_timer.active():
-                    self._idle_timer.cancel()
-                self._idle_timer = reactor.callLater(
-                        self.max_idle_time, self._disconnect,
-                        "Pulse %s: Disconnecting after %s seconds idle" %
-                            (hexid(self), self.max_idle_time))
-        d.addCallback(set_timers)
+        self.delayed_push = None
 
         # Get the events
-        def get_events(ign):
-            events = self.queue.popChunk()
-            if events:
-                log.msg("Pulse %s: Initiating push of %i events" %
-                        (hexid(self), len(events)))
-            return events
-        d.addCallback(get_events)
+        events = self.queue.popChunk()
 
-        # pushEvents is called synchronously from the base class, so we need to
-        # do the publisher.publish calls in a thread, since they block
-        def threadedPush(events):
-            # Nothing to do!
-            if not events:
-                return []
+        # Nothing to do!
+        if not events:
+            return
 
-            # Remove all but the last heartbeat
-            last_heartbeat = None
-            removed = 0
-            for e in events[:]:
-                if e['event'] == 'heartbeat':
-                    if last_heartbeat is None:
-                        last_heartbeat = e
-                        continue
-                    removed += 1
-                    if e['id'] > last_heartbeat['id']:
-                        events.remove(last_heartbeat)
-                        last_heartbeat = e
-                    else:
-                        events.remove(e)
-            if removed:
-                log.msg("Pulse %s: Pruned %i old heartbeats" %
-                        (hexid(self), removed))
+        # List of json-encodable messages to write to queuedir
+        to_write = []
+        start = time.time()
+        count = 0
+        heartbeats = 0
+        for e in events:
+            count += 1
+            if e['event'] == 'heartbeat':
+                heartbeats += 1
 
-            start = time.time()
-            count = 0
-            sent = 0
-            heartbeats = 0
-            while events:
-                event = events.pop(0)
-                count += 1
-                if event['event'] == 'heartbeat':
-                    heartbeats += 1
+            e['master_name'] = self.status.botmaster.master_name
+            e['master_incarnation'] = \
+                    self.status.botmaster.master_incarnation
 
-                try:
-                    event['master_name'] = self.status.botmaster.master_name
-                    event['master_incarnation'] = \
-                            self.status.botmaster.master_incarnation
-                    # Transform time tuples to standard pulse time format
-                    msg = BuildMessage(transform_times(event))
-                    self.publisher.publish(msg)
-                    sent += 1
-                except:
-                    # put at the end, in case it's a problematic message
-                    # somehow preventing us from moving on
-                    events.append(event)
-                    log.msg("Pulse %s: Error handling message %s: %s" %
-                            (hexid(self), event['event'],
-                                traceback.format_exc()))
-                    self.publisher.disconnect()
-                    break
-            end = time.time()
-            log.msg("Pulse %s: Processed %i, sent %i events (%i heartbeats) "
-                        "in %.2f seconds" %
-                        (hexid(self), count, sent, heartbeats, (end-start)))
-            # Anything left in here should be retried
-            return events
-        d.addCallback(lambda events: deferToThread(threadedPush, events))
+            # Transform time tuples to standard pulse time format
+            to_write.append(e)
+        end = time.time()
+        log.msg("Pulse %s: Processed %i events (%i heartbeats) "
+                    "in %.2f seconds" %
+                    (hexid(self), count, heartbeats, (end-start)))
+        try:
+            self.queuedir.add(json.dumps(to_write))
+        except:
+            # Try again later?
+            self.queue.insertBackChunk(events)
+            log.err()
 
-        def donePush(retry):
-            if retry:
-                log.msg("Pulse %s: retrying %s events" %
-                        (hexid(self), len(retry)))
-                self.queue.insertBackChunk(retry)
-        d.addCallback(donePush)
-
-        def _finished(ign):
-            self._thread_lock.release()
-            return ign
-        d.addBoth(_finished)
-
-        d.addErrback(log.err)
-        return d
+        # If we still have more stuff, send it in a bit
+        if self.queue.nbItems() > 0:
+            self.pushEvents()
 
     def builderAdded(self, builderName, builder):
         if self.stopped:
