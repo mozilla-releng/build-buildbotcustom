@@ -2609,9 +2609,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     )
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                     slavebuilddir= 'test'
+                    slave_key = branch_config.get('slave_key', 'slaves')
                     builder = {
                         'name': "%s %s talos %s" % (platform_name, branch, suite),
-                        'slavenames': platform_config[slave_platform]['slaves'],
+                        'slavenames': platform_config[slave_platform][slave_key],
                         'builddir': builddir,
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
@@ -2669,12 +2670,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             # create the builders
+                            slave_key = branch_config.get('slave_key', 'slaves')
+                            slavenames = platform_config[slave_platform][slave_key]
                             branchObjects['builders'].extend(generateTestBuilder(
                                     branch_config, branch, platform, "%s %s %s test" % (platform_name, branch, test_type),
                                     "%s_%s_test" % (branch, slave_platform_name),
                                     suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
                                     branch_config.get('crashtest_leak_threshold', None),
-                                    platform_config[slave_platform]['slaves'],
+                                    slavenames,
                                     resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
                                     stagePlatform=stage_platform,
                                     stageProduct=stage_product))
