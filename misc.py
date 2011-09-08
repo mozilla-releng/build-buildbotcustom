@@ -2937,7 +2937,7 @@ def generateValgrindObjects(config, slaves):
                    'slavenames': slaves[platform],
                    'nextSlave': _nextSlowSlave,
                    'factory': f,
-                   'category': 'idle',
+                   'category': branch,
                    'env': env,
                    'properties': {'branch': branch},
                   }
@@ -3003,7 +3003,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     'slavenames': slaves,
                     'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                     'factory': f,
-                    'category': 'idle',
+                    'category': branch,
                     'env': config['env'][platform],
                     'properties': {'branch': branch},
                     }
