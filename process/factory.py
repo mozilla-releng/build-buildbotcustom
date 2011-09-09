@@ -1025,6 +1025,11 @@ class MercurialBuildFactory(MozillaBuildFactory):
          name='tinderboxprint_changeset',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
+        self.addStep(SetBuildProperty(
+            name='set_comments',
+            property_name="comments",
+            value=lambda build:build.source.changes[-1].comments if len(build.source.changes) > 0 else "",
+        ))
 
     def addConfigSteps(self):
         assert self.configRepoPath is not None
@@ -1747,6 +1752,11 @@ class TryBuildFactory(MercurialBuildFactory):
          name='tinderboxprint_changeset_link',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
+        self.addStep(SetBuildProperty(
+            name='set_comments',
+            property_name="comments",
+            value=lambda build:build.source.changes[-1].comments if len(build.source.changes) > 0 else "",
+        ))
 
     def addLeakTestSteps(self):
         # we want the same thing run a few times here, with different
@@ -1908,7 +1918,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(SetBuildProperty(
              name='set_who',
              property_name='who',
-             value=lambda build:str(build.source.changes[0].who),
+             value=lambda build:str(build.source.changes[0].who) if len(build.source.changes) > 0 else "",
              haltOnFailure=True
         ))
 
@@ -1968,6 +1978,7 @@ class TryBuildFactory(MercurialBuildFactory):
              revision=WithProperties('%(got_revision)s'),
              files=[WithProperties('%(packageUrl)s')],
              user=WithProperties('%(who)s'),
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
         for master, warn, retries in self.unittestMasters:
@@ -1981,6 +1992,7 @@ class TryBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s'),
                      WithProperties('%(testsUrl)s')],
              user=WithProperties('%(who)s'),
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -2542,6 +2554,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -2559,6 +2572,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=files,
                  user="sendchange-unittest",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -2723,6 +2737,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange",
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -2737,6 +2752,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s'),
                     WithProperties('%(testsUrl)s')],
              user="sendchange-unittest",
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -5451,6 +5467,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s'),
                         WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -5523,7 +5540,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
             ))
             self.addStep(SetBuildProperty(
              property_name="who",
-             value=lambda build:build.source.changes[0].who,
+             value=lambda build:build.source.changes[0].who if len(build.source.changes) > 0 else "",
              haltOnFailure=True
             ))
 
@@ -5564,7 +5581,8 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
                  revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
-                 user=WithProperties('%(who)s'))
+                 user=WithProperties('%(who)s')),
+                 comments=WithProperties('%(comments:-)s'),
                 )
 
 class CCUnittestBuildFactory(MozillaBuildFactory):
@@ -5812,6 +5830,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s'),
                         WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 

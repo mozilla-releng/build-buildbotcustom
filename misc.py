@@ -1,7 +1,7 @@
 from urlparse import urljoin
 try:
     import json
-    assert json
+    assert json # pyflakes
 except:
     import simplejson as json
 import collections
@@ -24,9 +24,11 @@ import buildbotcustom.l10n
 import buildbotcustom.scheduler
 import buildbotcustom.status.mail
 import buildbotcustom.status.generators
+import buildbotcustom.status.queued_command
 import buildbotcustom.status.log_handlers
 import buildbotcustom.misc_scheduler
 import build.paths
+import buildtools.queuedir
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -34,9 +36,11 @@ reload(buildbotcustom.l10n)
 reload(buildbotcustom.scheduler)
 reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
+reload(buildbotcustom.status.queued_command)
 reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
 reload(build.paths)
+reload(buildtools.queuedir)
 
 from buildbotcustom.common import reallyShort
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
@@ -54,8 +58,10 @@ from buildbotcustom.status.generators import buildTryChangeMessage
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
     buildUIDSchedFunc, lastGoodFunc
+from buildbotcustom.status.queued_command import QueuedCommandHandler
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from build.paths import getRealpath
+from buildtools.queuedir import QueueDir
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -673,14 +679,16 @@ def generateBranchObjects(config, name):
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
             is_shadow=bool(name=='shadow-central'), platform_prop='stage_platform',product_prop='product')
 
-    branchObjects['status'].append(SubprocessLogHandler(
+    branchObjects['status'].append(QueuedCommandHandler(
         logUploadCmd,
+        QueueDir.getQueue('commands'),
         builders=builders + unittestBuilders + debugBuilders,
     ))
 
     if nightlyBuilders:
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd + ['--nightly'],
+            QueueDir.getQueue('commands'),
             builders=nightlyBuilders,
         ))
 
@@ -779,13 +787,15 @@ def generateBranchObjects(config, name):
             ))
 
         # Log uploads for dep l10n repacks
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd + ['--l10n'],
+            QueueDir.getQueue('commands'),
             builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
         ))
         # and for nightly repacks
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd + ['--l10n', '--nightly'],
+            QueueDir.getQueue('commands'),
             builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
@@ -832,9 +842,7 @@ def generateBranchObjects(config, name):
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
-        extra_args['treeStableTimer'] = None
-    else:
-        extra_args['treeStableTimer'] = 3*60
+    extra_args['treeStableTimer'] = None
 
     branchObjects['schedulers'].append(scheduler_class(
         name=name,
@@ -897,8 +905,9 @@ def generateBranchObjects(config, name):
                 errorparser="unittest"
             ))
 
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd,
+            QueueDir.getQueue('commands'),
             builders=test_builders,
         ))
 
@@ -2600,9 +2609,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     )
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                     slavebuilddir= 'test'
+                    slave_key = branch_config.get('slave_key', 'slaves')
                     builder = {
                         'name': "%s %s talos %s" % (platform_name, branch, suite),
-                        'slavenames': platform_config[slave_platform]['slaves'],
+                        'slavenames': platform_config[slave_platform][slave_key],
                         'builddir': builddir,
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
@@ -2660,12 +2670,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             # create the builders
+                            slave_key = branch_config.get('slave_key', 'slaves')
+                            slavenames = platform_config[slave_platform][slave_key]
                             branchObjects['builders'].extend(generateTestBuilder(
                                     branch_config, branch, platform, "%s %s %s test" % (platform_name, branch, test_type),
                                     "%s_%s_test" % (branch, slave_platform_name),
                                     suites_name, suites, branch_config.get('mochitest_leak_threshold', None),
                                     branch_config.get('crashtest_leak_threshold', None),
-                                    platform_config[slave_platform]['slaves'],
+                                    slavenames,
                                     resetHwClock=branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
                                     stagePlatform=stage_platform,
                                     stageProduct=stage_product))
@@ -2750,8 +2762,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             platform_prop='stage_platform',
             product_prop='product')
 
-    branchObjects['status'].append(SubprocessLogHandler(
+    branchObjects['status'].append(QueuedCommandHandler(
         logUploadCmd,
+        QueueDir.getQueue('commands'),
         builders=all_builders,
     ))
 
@@ -2939,7 +2952,7 @@ def generateValgrindObjects(config, slaves):
                    'slavenames': slaves[platform],
                    'nextSlave': _nextSlowSlave,
                    'factory': f,
-                   'category': 'idle',
+                   'category': branch,
                    'env': env,
                    'properties': {'branch': branch},
                   }
@@ -3005,7 +3018,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     'slavenames': slaves,
                     'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                     'factory': f,
-                    'category': 'idle',
+                    'category': branch,
                     'env': config['env'][platform],
                     'properties': {'branch': branch},
                     }

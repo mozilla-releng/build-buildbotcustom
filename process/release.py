@@ -39,10 +39,11 @@ from release.platforms import buildbot2ftp, sl_platform_map
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
-from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from buildbotcustom.status.errors import update_verify_error
+from buildbotcustom.status.queued_command import QueuedCommandHandler
 from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
+from buildtools.queuedir import QueueDir
 import BuildSlaves
 
 DEFAULT_PARALLELIZATION = 10
@@ -1571,11 +1572,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     logUploadCmd = makeLogUploadCommand(sourceRepoInfo['name'], branchConfig,
             platform_prop=None, product=product)
 
-    status.append(SubprocessLogHandler(
+    status.append(QueuedCommandHandler(
         logUploadCmd + [
             '--release', '%s/%s' % (
                 releaseConfig['version'], releaseConfig['buildNumber'])
             ],
+        QueueDir.getQueue('commands'),
         builders=[b['name'] for b in builders + test_builders],
     ))
 
