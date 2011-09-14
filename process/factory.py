@@ -2629,10 +2629,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if usePrettyNames:
             env['MOZ_PKG_PRETTYNAMES'] = '1'
         env['MOZ_PKG_VERSION'] = version
-        kwargs['mozharnessMultiOptions'] = ['--only-pull-build-source',
-                                            '--only-pull-locale-source',
-                                            '--only-add-locales',
-                                            '--only-package-multi']
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,

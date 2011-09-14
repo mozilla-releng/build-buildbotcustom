@@ -785,7 +785,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             else:
                 triggeredSchedulers = None
             multiLocaleConfig = releaseConfig.get(
-                'mozharness_config', {}).get(platform)
+                'mozharness_config', {}).get('platforms', {}).get(platform)
+            mozharnessMultiOptions = releaseConfig.get(
+                'mozharness_config', {}).get('multilocaleOptions')
             enableUpdatePackaging = bool(releaseConfig.get('verifyConfigs',
                                                       {}).get(platform))
             build_factory = ReleaseBuildFactory(
@@ -832,6 +834,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mozharnessTag=branchConfig['mozharness_tag'],
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
+                mozharnessMultiOptions=mozharnessMultiOptions,
                 usePrettyNames=releaseConfig.get('usePrettyNames', True),
                 enableUpdatePackaging=enableUpdatePackaging,
                 mozconfigBranch=releaseTag,
