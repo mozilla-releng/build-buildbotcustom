@@ -6882,13 +6882,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
 
     def addTearDownSteps(self):
         self.addCleanupSteps()
-        self.addStep(DisconnectStep(
+        self.addStep(ShellCommand(
             name='reboot device',
             workdir='.',
             alwaysRun=True,
-            force_disconnect=True,
             warnOnFailure=False,
             flunkOnFailure=False,
+            timeout=60*30,
             description='Reboot Device',
             command=['python', '/builds/sut_tools/reboot.py',
                       WithProperties("%(sut_ip)s"),
@@ -7440,17 +7440,17 @@ class TalosFactory(RequestSortingBuildFactory):
                 pass
             return False
         if self.remoteTests:
-            self.addStep(DisconnectStep(
+            self.addStep(ShellCommand(
                          name='reboot device',
-                         flunkOnFailure=True,
+                         flunkOnFailure=False,
                          warnOnFailure=False,
                          alwaysRun=True,
                          workdir=self.workdirBase,
                          description="Reboot Device",
+                         timeout=60*30,
                          command=['python', '/builds/sut_tools/reboot.py',
                                   WithProperties("%(sut_ip)s"),
                                  ],
-                         force_disconnect=do_disconnect,
                          env=self.env)
             )
         else:
