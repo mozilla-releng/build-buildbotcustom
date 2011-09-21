@@ -7313,14 +7313,26 @@ class TalosFactory(RequestSortingBuildFactory):
             ))
 
         if self.plugins:
-            self.addStep(DownloadFile(
-             url="%s/%s" % (self.supportUrlBase, self.plugins),
-             workdir=os.path.join(self.workdirBase, "talos/base_profile"),
-            ))
-            self.addStep(UnpackFile(
-             filename=os.path.basename(self.plugins),
-             workdir=os.path.join(self.workdirBase, "talos/base_profile"),
-            ))
+            #32 bit (includes mac browsers)
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android', 'leopard', 'snowleopard', 'leopard-o'):
+                self.addStep(DownloadFile(
+                 url="%s/%s" % (self.supportUrlBase, self.plugins['32']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
+                self.addStep(UnpackFile(
+                 filename=os.path.basename(self.plugins['32']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
+            #64 bit
+            if self.OS in ('w764', 'fedora64'):
+                self.addStep(DownloadFile(
+                 url="%s/%s" % (self.supportUrlBase, self.plugins['64']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
+                self.addStep(UnpackFile(
+                 filename=os.path.basename(self.plugins['64']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
 
         for pageset in self.pagesets:
             self.addStep(DownloadFile(
