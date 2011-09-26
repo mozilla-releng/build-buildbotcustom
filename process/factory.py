@@ -4088,11 +4088,29 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  description=['update', repoName],
                  haltOnFailure=True
                 ))
+
+                self.addStep(SetProperty(
+                 command=['sh', '-c', 'hg branches | grep %s | wc -l' % repoRelbranchName],
+                 property='branch_match_count',
+                 workdir=repoName,
+                 haltOnFailure=True,
+                ))
+
                 self.addStep(ShellCommand(
                  name='hg_branch',
                  command=['hg', 'branch', repoRelbranchName],
                  workdir=repoName,
                  description=['branch %s' % repoName],
+                 doStepIf=lambda step: int(step.getProperty('branch_match_count')) == 0,
+                 haltOnFailure=True
+                ))
+
+                self.addStep(ShellCommand(
+                 name='switch_branch',
+                 command=['hg', 'up', '-C', repoRelbranchName],
+                 workdir=repoName,
+                 description=['switch to', repoRelbranchName],
+                 doStepIf=lambda step: int(step.getProperty('branch_match_count')) > 0,
                  haltOnFailure=True
                 ))
             # if buildNumber > 1 we need to switch to it with 'hg up -C'
