@@ -762,29 +762,27 @@ def generateBranchObjects(config, name):
         l10n_binaryURL += "-l10n"
         nomergeBuilders.extend(l10n_builders)
 
-        # This notifies all l10n related build objects to Mozilla-l10n
-        if not config.get('disable_tinderbox_mail'):
-            branchObjects['status'].append(TinderboxMailNotifier(
-                fromaddr="bootstrap@mozilla.com",
-                tree=config['l10n_tinderbox_tree'],
-                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-                relayhost="mail.build.mozilla.org",
-                logCompression="gzip",
-                builders=l10n_builders,
-                binaryURL=l10n_binaryURL
-            ))
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="bootstrap@mozilla.com",
+            tree=config['l10n_tinderbox_tree'],
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            logCompression="gzip",
+            builders=l10n_builders,
+            binaryURL=l10n_binaryURL
+        ))
 
-            # We only want the builds from the specified builders
-            # since their builds have a build property called "locale"
-            branchObjects['status'].append(TinderboxMailNotifier(
-                fromaddr="bootstrap@mozilla.com",
-                tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
-                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-                relayhost="mail.build.mozilla.org",
-                logCompression="gzip",
-                builders=l10n_builders,
-                binaryURL=l10n_binaryURL
-            ))
+        # We only want the builds from the specified builders
+        # since their builds have a build property called "locale"
+        branchObjects['status'].append(TinderboxMailNotifier(
+            fromaddr="bootstrap@mozilla.com",
+            tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
+            relayhost="mail.build.mozilla.org",
+            logCompression="gzip",
+            builders=l10n_builders,
+            binaryURL=l10n_binaryURL
+        ))
 
         # Log uploads for dep l10n repacks
         branchObjects['status'].append(QueuedCommandHandler(
