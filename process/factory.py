@@ -1127,11 +1127,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 extract_fn=get_ctors,
                 ))
 
-            self.addStep(OutputStep(
-                name='tinderboxprint_ctors',
-                data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
-                ))
-
             if self.graphServer:
                 self.addBuildInfoSteps()
                 self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
@@ -1141,6 +1136,11 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                              resultsname=self.baseName,
                                              env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
                                              propertiesFile="properties.json"))
+            else:
+                self.addStep(OutputStep(
+                    name='tinderboxprint_ctors',
+                    data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
+                    ))
 
     def addLeakTestSteps(self):
         leakEnv = self.env.copy()
