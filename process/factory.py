@@ -381,11 +381,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
          name='tinderboxsummarymessage_buildername',
          data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
         ))
-        if self.branchName in ('try',):
-            self.addStep(OutputStep(
-             name='tinderboxprint_revision',
-             data=WithProperties('TinderboxPrint: s: %(revision)s'),
-            ))
         self.addInitialSteps()
 
     def addInitialSteps(self):
