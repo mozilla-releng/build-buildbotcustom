@@ -192,8 +192,7 @@ class MozillaStageUpload(ShellCommand):
             return strftime("%Y-%m-%d-%H", strptime(buildid[0:10], "%Y%m%d%H"))
 
     def getBuildStartTime(self):
-        return strftime("%Y-%m-%d-%H-%M-%S", 
-                        gmtime(self.step_status.build.getTimes()[0]))
+        return int(self.step_status.build.getTimes()[0])
 
     def getPackageDirectory(self):
         return '%s-%s' % (self.getBuildID(), self.milestone)
