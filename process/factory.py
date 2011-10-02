@@ -908,7 +908,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=60*60 # 1 hour
             )
         pkg_patterns = []
-        for product in ('firefox-', 'fennec'):
+        for product in ('firefox-', 'fennec', 'seamonkey'):
             pkg_patterns.append('%s/dist/%s*' % (self.mozillaObjdir,
                                                   product))
 
@@ -2956,7 +2956,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tinderboxPrint('tree',self.tree)
         self.tinderboxPrint('buildnumber',WithProperties('%(buildnumber)s'))
 
-    def doUpload(self):
+    def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         self.addStep(ShellCommand,
          name='make_upload',
          command=['make', 'upload', WithProperties('AB_CD=%(locale)s')],
@@ -5381,7 +5381,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
-    def doUpload(self):
+    def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         if self.uploadPackages:
             self.addStep(ShellCommand,
              name='make_pkg',
@@ -5493,7 +5493,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
 
         UnittestBuildFactory.__init__(self, **kwargs)
 
-    def doUpload(self):
+    def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         if self.uploadPackages:
             self.addStep(ShellCommand,
              name='make_pkg',
@@ -5734,7 +5734,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
-    def doUpload(self):
+    def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         if self.uploadPackages:
             self.addStep(ShellCommand,
              name='make_pkg',
