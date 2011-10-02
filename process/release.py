@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 
 import os
+from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
@@ -12,10 +13,12 @@ import release.platforms
 import release.paths
 import buildbotcustom.changes.ftppoller
 import build.paths
+import release.info
 reload(release.platforms)
 reload(release.paths)
 reload(buildbotcustom.changes.ftppoller)
 reload(build.paths)
+reload(release.info)
 
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
@@ -23,8 +26,7 @@ from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   reallyShort, makeLogUploadCommand
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
-  ReleaseUpdatesFactory, UpdateVerifyFactory, ReleaseFinalVerification, \
-  L10nVerifyFactory, \
+  ReleaseUpdatesFactory, ReleaseFinalVerification, L10nVerifyFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder
 from buildbotcustom.changes.ftppoller import UrlPoller, LocalesFtpPoller
@@ -33,10 +35,12 @@ from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
+from buildbotcustom.status.errors import update_verify_error
 from build.paths import getRealpath
+from release.info import getRuntimeTag
 import BuildSlaves
 
-DEFAULT_L10N_CHUNKS = 15
+DEFAULT_PARALLELIZATION = 10
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                  releaseConfigFile, sourceRepoKey="mozilla"):
@@ -44,7 +48,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     # release. It should be removed as soon as nothing depends on it.
     sourceRepoInfo = releaseConfig['sourceRepositories'][sourceRepoKey]
     releaseTag = '%s_RELEASE' % releaseConfig['baseTag']
-    l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_L10N_CHUNKS)
+    # This tag is created post-signing, when we do some additional
+    # config file bumps
+    runtimeTag = getRuntimeTag(releaseTag)
+    l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_PARALLELIZATION)
+    updateVerifyChunks = releaseConfig.get('updateVerifyChunks', DEFAULT_PARALLELIZATION)
     tools_repo = '%s%s' % (branchConfig['hgurl'],
                            releaseConfig.get('build_tools_repo_path',
                                branchConfig['build_tools_repo_path']))
@@ -221,12 +229,24 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         msgdict['type'] = 'plain'
         return msgdict
 
-    def l10nBuilders(platform):
+    def parallelizeBuilders(base_name, platform, chunks):
         builders = {}
-        for n in range(1, l10nChunks+1):
-            builders[n] = builderPrefix("repack_%s/%s" % (n, str(l10nChunks)),
+        for n in range(1, chunks+1):
+            builders[n] = builderPrefix("%s_%s/%s" % (base_name, n,
+                                                      str(chunks)),
                                         platform)
         return builders
+
+    def l10nBuilders(platform):
+        return parallelizeBuilders("repack", platform, l10nChunks)
+
+    def updateVerifyBuilders(platform):
+        return parallelizeBuilders("update_verify", platform,
+                                   updateVerifyChunks)
+
+    def majorUpdateVerifyBuilders(platform):
+        return parallelizeBuilders("major_update_verify", platform,
+                                   updateVerifyChunks)
 
     builders = []
     test_builders = []
@@ -385,7 +405,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     updateBuilderNames = []
     for platform in sorted(releaseConfig['verifyConfigs'].keys()):
-        updateBuilderNames.append(builderPrefix('%s_update_verify' % platform))
+        updateBuilderNames.extend(updateVerifyBuilders(platform).values())
     update_verify_scheduler = Dependent(
         name=builderPrefix('update_verify'),
         upstream=updates_scheduler,
@@ -410,8 +430,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if releaseConfig['majorUpdateRepoPath']:
         majorUpdateBuilderNames = []
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
-            majorUpdateBuilderNames.append(
-                    builderPrefix('%s_major_update_verify' % platform))
+            majorUpdateBuilderNames.extend(
+                majorUpdateVerifyBuilders(platform).values())
         major_update_verify_scheduler = Triggerable(
             name=builderPrefix('major_update_verify'),
             builderNames=majorUpdateBuilderNames
@@ -815,7 +835,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageUsername=branchConfig['stage_username_xulrunner'],
                 stageGroup=branchConfig['stage_group'],
                 stageSshKey=branchConfig['stage_ssh_xulrunner_key'],
-                stageBasePath=branchConfig['stage_base_path_xulrunner'],
+                stageBasePath=branchConfig['stage_base_path'] + '/xulrunner',
                 codesighs=False,
                 uploadPackages=True,
                 uploadSymbols=True,
@@ -975,26 +995,36 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
 
     for platform in sorted(releaseConfig['verifyConfigs'].keys()):
-        update_verify_factory = UpdateVerifyFactory(
-            hgHost=branchConfig['hghost'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-            verifyConfig=releaseConfig['verifyConfigs'][platform],
-            clobberURL=branchConfig['base_clobber_url'],
-            useOldUpdater=branchConfig.get('use_old_updater', False),
-        )
+        for n, builderName in updateVerifyBuilders(platform).iteritems():
+            uv_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                interpreter='bash',
+                scriptName='scripts/release/updates/chunked-verify.sh',
+                extra_args=[platform, releaseConfig['verifyConfigs'][platform],
+                            str(updateVerifyChunks), str(n)],
+                log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
+            )
 
-        builders.append({
-            'name': builderPrefix('%s_update_verify' % platform),
-            'slavenames': branchConfig['platforms'][platform]['slaves'],
-            'category': builderPrefix(''),
-            'builddir': builderPrefix('%s_update_verify' % platform),
-            'slavebuilddir': reallyShort(builderPrefix('%s_up_vrfy' % platform)),
-            'factory': update_verify_factory,
-            'nextSlave': _nextFastReservedSlave,
-            'env': builder_env,
-            'properties': {'slavebuilddir':
-                reallyShort(builderPrefix('%s_up_vrfy' % platform))}
-        })
+            builddir = builderPrefix('%s_update_verify' % platform) + \
+                                     '_' + str(n)
+            env = builder_env.copy()
+            env.update(branchConfig['platforms'][platform]['env'])
+
+            builders.append({
+                'name': builderName,
+                'slavenames': branchConfig['platforms'][platform]['slaves'],
+                'category': builderPrefix(''),
+                'builddir': builddir,
+                'slavebuilddir': reallyShort(builddir),
+                'factory': uv_factory,
+                'nextSlave': _nextFastReservedSlave,
+                'env': env,
+                'properties': {'builddir': builddir,
+                               'slavebuilddir': reallyShort(builddir),
+                               'script_repo_revision': runtimeTag,
+                               'release_tag': releaseTag,
+                               'release_config': releaseConfigFile},
+            })
 
     check_permissions_factory = ScriptFactory(
         scriptRepo=tools_repo,
@@ -1155,26 +1185,36 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         notify_builders.append(builderPrefix('major_update'))
 
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
-            major_update_verify_factory = UpdateVerifyFactory(
-                hgHost=branchConfig['hghost'],
-                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
-                verifyConfig=releaseConfig['majorUpdateVerifyConfigs'][platform],
-                clobberURL=branchConfig['base_clobber_url'],
-                useOldUpdater=branchConfig.get('use_old_updater', False),
-            )
+            for n, builderName in majorUpdateVerifyBuilders(platform).iteritems():
+                muv_factory = ScriptFactory(
+                    scriptRepo=tools_repo,
+                    interpreter='bash',
+                    scriptName='scripts/release/updates/chunked-verify.sh',
+                    extra_args=[platform, releaseConfig['majorUpdateVerifyConfigs'][platform],
+                                str(updateVerifyChunks), str(n)],
+                    log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
+                )
 
-            builders.append({
-                'name': builderPrefix('%s_major_update_verify' % platform),
-                'slavenames': branchConfig['platforms'][platform]['slaves'],
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('%s_major_update_verify' % platform),
-                'slavebuilddir': reallyShort(builderPrefix('%s_mu_verify' % platform)),
-                'factory': major_update_verify_factory,
-                'nextSlave': _nextFastReservedSlave,
-                'env': builder_env,
-                'properties': {'slavebuilddir':
-                    reallyShort(builderPrefix('%s_mu_verify' % platform))}
-            })
+                builddir = builderPrefix('%s_major_update_verify' % platform) + \
+                                        '_' + str(n)
+                env = builder_env.copy()
+                env.update(branchConfig['platforms'][platform]['env'])
+
+                builders.append({
+                    'name': builderName,
+                    'slavenames': branchConfig['platforms'][platform]['slaves'],
+                    'category': builderPrefix(''),
+                    'builddir': builddir,
+                    'slavebuilddir': reallyShort(builddir),
+                    'factory': muv_factory,
+                    'nextSlave': _nextFastReservedSlave,
+                    'env': env,
+                    'properties': {'builddir': builddir,
+                                   'slavebuilddir': reallyShort(builddir),
+                                   'script_repo_revision': runtimeTag,
+                                   'release_tag': releaseTag,
+                                   'release_config': releaseConfigFile},
+                })
 
     bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
         baseTag=releaseConfig['baseTag'],

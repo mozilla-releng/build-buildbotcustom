@@ -36,6 +36,7 @@ import re
 from buildbot.process.buildstep import LoggedRemoteCommand, BuildStep
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS, worst_status
+from buildbot.status.builder import STDOUT, STDERR #ScratchboxProperty
 
 from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand
 from buildbotcustom.common import genBuildID, genBuildUID
@@ -91,6 +92,131 @@ class InterruptableDeferred(Deferred):
         if not self.already_fired:
             self.already_fired = True
             self.errback(DefaultException(reason))
+
+
+class ScratchboxCommand(ShellCommand):
+    #Note: this class doesn't deal with all WithProperties invocations.
+    #in particular, it only deals with the WithProperties('format string')
+    #case
+    # Things to address:
+    #   -what happens if the workdir doesn't exist?
+    #     -only issue if this is the first command called in a build
+    #   -should add reconfig/checkconfig time check for valid workdir (no spaces!)
+    #   -doesn't currently set properties
+    #   -magic function should be implemented as a mixin or something
+
+    def __init__(self, sb=False, sb_login='/scratchbox/moz_scratchbox',
+                 sb_workdir_mutator=lambda x: x, sb_args=['-p', '-k'],
+                 **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self,**kwargs)
+        self.sb = sb
+        self.sb_login = sb_login
+        self.sb_workdir_mutator = sb_workdir_mutator
+        self.sb_args = sb_args
+        assert 'workdir' in kwargs.keys(), "You *must* specify workdir"
+        self.addFactoryArguments(sb=sb,
+                                 sb_login=sb_login,
+                                 sb_workdir_mutator=sb_workdir_mutator,
+                                 sb_args=sb_args,
+                                )
+
+    def magic(self):
+        #This variable is used to decide whether to wrap the 
+        #command in a WithProperties instance
+        use_with_properties = False
+
+        #We need to have all commands as a string.  We'll
+        #convert argv commands into string commands
+        if isinstance(self.command, list):
+            string_list = []
+            for arg in self.command:
+                if issubclass(arg.__class__, WithProperties):
+                    use_with_properties = True
+                    string_list.append(arg.fmtstring)
+                else:
+                    string_list.append(arg)
+            string_command = ' '.join(string_list)
+        elif issubclass(self.command.__class__, WithProperties):
+            use_with_properties = True
+            string_command = self.command.fmtstring
+        else:
+            string_command = self.command
+        sb_workdir = self.sb_workdir_mutator(self.remote_kwargs['workdir'])
+
+        #If the workdir is a WithProperties instance, we need to get the format
+        #string and wrap it in another WithProperties
+        if issubclass(sb_workdir.__class__, WithProperties):
+            use_with_properties = True
+            sb_workdir = sb_workdir.fmtstring
+
+        assert ' ' not in sb_workdir, 'scratchbox cannot deal with spaces in workdir'
+
+        full_command = r'%s %s -d %s %s' % (self.sb_login,
+                                                ' '.join(self.sb_args),
+                                                sb_workdir,
+                                                string_command)
+
+        if use_with_properties:
+            self.command = WithProperties(full_command)
+        else:
+            self.command = full_command
+
+
+    def start(self):
+        if self.sb:
+            self.magic()
+        self.super_class.start(self)
+
+class ScratchboxProperty(ScratchboxCommand):
+    # This class could be implemented cleaner by implementing
+    # the scratchbox logic differently.  Patches accepted
+    name = "scratchbox-setproperty"
+
+    def __init__(self, property=None, extract_fn=None, strip=True, **kwargs):
+        self.property = property
+        self.extract_fn = extract_fn
+        self.strip = strip
+
+        assert (property is not None) ^ (extract_fn is not None), \
+                "Exactly one of property and extract_fn must be set"
+
+        self.super_class = ScratchboxCommand
+        self.super_class.__init__(self, **kwargs)
+
+        self.addFactoryArguments(property=self.property)
+        self.addFactoryArguments(extract_fn=self.extract_fn)
+        self.addFactoryArguments(strip=self.strip)
+
+        self.property_changes = {}
+
+    def commandComplete(self, cmd):
+        if self.property:
+            result = cmd.logs['stdio'].getText()
+            if self.strip: result = result.strip()
+            propname = self.build.getProperties().render(self.property)
+            self.setProperty(propname, result, "ScratchboxProperty Step")
+            self.property_changes[propname] = result
+        else:
+            log = cmd.logs['stdio']
+            new_props = self.extract_fn(cmd.rc,
+                    ''.join(log.getChunks([STDOUT], onlyText=True)),
+                    ''.join(log.getChunks([STDERR], onlyText=True)))
+            for k,v in new_props.items():
+                self.setProperty(k, v, "ScratchboxProperty Step")
+            self.property_changes = new_props
+
+    def createSummary(self, log):
+        props_set = [ "%s: %r" % (k,v) for k,v in self.property_changes.items() ]
+        self.addCompleteLog('property changes', "\n".join(props_set))
+
+    def getText(self, cmd, results):
+        if self.property_changes:
+            return [ "set props:" ] + self.property_changes.keys()
+        else:
+            return [ "no change" ]
+
+
 
 class CreateDir(ShellCommand):
     name = "create dir"
