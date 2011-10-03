@@ -620,9 +620,19 @@ def generateBranchObjects(config, name):
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
     l10nPollInterval = config.get('l10nPollInterval', 5*60)
+
+    # This section is to make it easier to disable certain products.
+    # Ideally we could specify a shorter platforms key on the branch,
+    # but that doesn't work
+    enabled_platforms = []
+    for platform in sorted(config['platforms'].keys()):
+        pf = config['platforms'][platform]
+        if pf['stage_product'] in config['enabled_products']:
+            enabled_platforms.append(platform)
+
     # generate a list of builders, nightly builders (names must be different)
     # for easy access
-    for platform in config['platforms'].keys():
+    for platform in enabled_platforms:
         pf = config['platforms'][platform]
         base_name = pf['base_name']
         pretty_name = PRETTY_NAME % base_name
@@ -675,7 +685,7 @@ def generateBranchObjects(config, name):
                     '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-            if config['enable_shark'] and platform.startswith('macosx'):
+            if config['enable_shark'] and pf.get('enable_shark'):
                 nightlyBuilders.append('%s shark' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
@@ -958,7 +968,7 @@ def generateBranchObjects(config, name):
                                    builderNames=[l10n_builder],
                                    branch=config['repo_path'],
                                    baseTag='default',
-                                   localesFile=config['allLocalesFile']
+                                   localesURL=config.get('localesURL', None)
                                   ))
 
     weekly_scheduler = Nightly(
@@ -970,9 +980,8 @@ def generateBranchObjects(config, name):
             )
     branchObjects['schedulers'].append(weekly_scheduler)
 
-    # This section is to make it easier to disable certain products.
-    # Ideally we could specify a shorter platforms key on the branch,
-    # but that doesn't work
+    # We iterate throught the platforms a second time, so we need
+    # to ensure that disabled platforms aren't configured the second time
     enabled_platforms = []
     for platform in sorted(config['platforms'].keys()):
         pf = config['platforms'][platform]
@@ -1161,8 +1170,7 @@ def generateBranchObjects(config, name):
                     mobile_l10n_builders.append(builderName)
                     factory = ScriptFactory(
                         scriptRepo='%s%s' % (config['hgurl'],
-                                              'users/jford_mozilla.com/tools'),
-                                              #config['build_tools_repo_path']),
+                                              config['build_tools_repo_path']),
                         interpreter='bash',
                         scriptName='scripts/l10n/nightly_mobile_repacks.sh',
                         extra_args=[platform, stage_platform,
@@ -1180,6 +1188,8 @@ def generateBranchObjects(config, name):
                         'nextSlave': _nextL10nSlave(),
                         'properties': {'branch': '%s' % config['repo_path'],
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                                       'stage_platform': stage_platform,
+                                       'product': pf['stage_product'],
                                        'slavebuilddir': slavebuilddir},
                         'env': builder_env
                     })
@@ -1211,15 +1221,16 @@ def generateBranchObjects(config, name):
                     multiargs['multiLocaleScript'] = 'scripts/maemo_multi_locale_build.py'
                 multiargs['multiLocaleConfig'] = multi_config_name
 
-            if config['create_snippet'] and pf.get('create_android_snippet'):
-                # A better way to do this would be to use stage_product in the download_base_url
-                # string and create an ausProduct variable that controls whether to use
-                # Firefox/Fennec
-                # Patches accepted
+            create_snippet = config['create_snippet']
+            if pf.has_key('create_snippet') and config['create_snippet']:
+                create_snippet = pf.get('create_snippet')
+            if create_snippet and 'android' in platform:
+                # Ideally, this woud use some combination of product name and
+                # stage_platform, but that can be done in a follow up.
                 ausargs = {
                     'downloadBaseURL': config['mobile_download_base_url'],
                     'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                    'ausBaseUploadDir': config['aus2_mobile_base_upload_dir'],
+                    'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
                 }
             else:
                 ausargs = {
@@ -1257,7 +1268,7 @@ def generateBranchObjects(config, name):
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
                 nightly=True,
-                createSnippet=pf.get('create_snippet', config['create_snippet']),
+                createSnippet=create_snippet,
                 createPartial=pf.get('create_partial', config['create_partial']),
                 updatePlatform=pf['update_platform'],
                 ausUser=config['aus2_user'],
@@ -1297,7 +1308,7 @@ def generateBranchObjects(config, name):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'nightly_build': True, 
+                               'nightly_build': True,
                                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
@@ -1358,11 +1369,15 @@ def generateBranchObjects(config, name):
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
-                        'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform))},
+                        'properties': {'branch': name,
+                                       'platform': platform,
+                                       'product': pf['stage_product'],
+                                       'stage_platform': stage_platform,
+                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
-            if config['enable_shark'] and platform.startswith('macosx'):
+            if config['enable_shark'] and pf.get('enable_shark'):
                 if name in ('mozilla-1.9.1','mozilla-1.9.2'):
                     shark_objdir = config['objdir']
                 else:
@@ -1444,7 +1459,11 @@ def generateBranchObjects(config, name):
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
-                'properties': {'branch': name, 'platform': platform,'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
+                'properties': {'branch': name,
+                               'platform': platform,
+                               'stage_platform': stage_platform,
+                               'product': pf['stage_product'],
+                               'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 

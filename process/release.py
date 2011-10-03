@@ -571,7 +571,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('tag'),
-            'slavenames': pf['slaves'],
+            'slavenames': pf['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('tag'),
             'slavebuilddir': reallyShort(builderPrefix('tag')),
@@ -613,7 +613,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
            'name': builderPrefix('source'),
-           'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
            'category': builderPrefix(''),
            'builddir': builderPrefix('source'),
            'slavebuilddir': reallyShort(builderPrefix('source')),
@@ -648,7 +648,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                'name': builderPrefix('xulrunner_source'),
-               'slavenames': branchConfig['platforms']['linux']['slaves'],
+               'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
                'category': builderPrefix(''),
                'builddir': builderPrefix('xulrunner_source'),
                'slavebuilddir': reallyShort(builderPrefix('xulrunner_source')),
@@ -977,7 +977,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('updates'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates')),
@@ -1000,7 +1000,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 scriptRepo=tools_repo,
                 interpreter='bash',
                 scriptName='scripts/release/updates/chunked-verify.sh',
-                extra_args=[platform, releaseConfig['verifyConfigs'][platform],
+                extra_args=[platform, 'verifyConfigs',
                             str(updateVerifyChunks), str(n)],
                 log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
             )
@@ -1104,7 +1104,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('final_verification', platform),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('final_verification', platform),
             'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform)),
@@ -1173,7 +1173,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('major_update'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('major_update'),
             'slavebuilddir': reallyShort(builderPrefix('mu')),
@@ -1190,7 +1190,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptRepo=tools_repo,
                     interpreter='bash',
                     scriptName='scripts/release/updates/chunked-verify.sh',
-                    extra_args=[platform, releaseConfig['majorUpdateVerifyConfigs'][platform],
+                    extra_args=[platform, 'majorUpdateVerifyConfigs',
                                 str(updateVerifyChunks), str(n)],
                     log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
                 )
@@ -1236,7 +1236,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     builders.append({
         'name': builderPrefix('bouncer_submitter'),
-        'slavenames': branchConfig['platforms']['linux']['slaves'],
+        'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
         'category': builderPrefix(''),
         'builddir': builderPrefix('bouncer_submitter'),
         'slavebuilddir': reallyShort(builderPrefix('bncr_sub')),
@@ -1267,7 +1267,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('euballot_bouncer_submitter'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('euballot_bouncer_submitter'),
             'slavebuilddir': reallyShort(builderPrefix('eu_bncr_sub')),

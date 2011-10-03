@@ -1017,6 +1017,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
         buildcmd = 'build'
         if self.profiledBuild:
             buildcmd = 'profiledbuild'
+        workdir=WithProperties('%(basedir)s/build')
+        if self.platform.startswith('win'):
+            workdir="build"
         self.addStep(ScratchboxCommand(
          name='compile',
          command=['make', '-f', 'client.mk', buildcmd, WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')],
@@ -1027,7 +1030,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose
          # the root cause of the linker time out.
          sb=self.use_scratchbox,
-         workdir=WithProperties('%(basedir)s/build'),
+         workdir=workdir,
         ))
 
     def addBuildInfoSteps(self):
@@ -1334,11 +1337,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
             pkg_env['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
 
         #Moved |make package| before |make package-tests| to work around bug629194
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        if self.platform.startswith('win'):
+            objdir = "build/%s" % self.objdir
+        workdir = WithProperties('%(basedir)s/build')
+        if self.platform.startswith('win'):
+            workdir = "build/"
         self.addStep(ScratchboxCommand(
             name='make_pkg',
             command=['make', 'package'] + pkgArgs,
             env=pkg_env,
-            workdir=WithProperties('%(basedir)s/build/' + self.objdir),
+            workdir=objdir,
             sb=self.use_scratchbox,
             haltOnFailure=True
         ))
@@ -1349,7 +1358,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              name='make_sdk',
              command=['make', '-f', 'client.mk', 'sdk'],
              env=pkg_env,
-             workdir=WithProperties('%(basedir)s/build/'),
+             workdir=workdir,
              sb=self.use_scratchbox,
              haltOnFailure=True,
             ))
@@ -1358,7 +1367,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              name='make_pkg_tests',
              command=['make', 'package-tests'] + pkgTestArgs,
              env=pkg_env,
-             workdir=WithProperties('%(basedir)s/build/' + self.objdir),
+             workdir=objdir,
              sb=self.use_scratchbox,
              haltOnFailure=True,
             ))
@@ -1382,6 +1391,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             ))
         # Windows special cases
         if self.platform.startswith("win") and \
+           'mobile' not in self.complete_platform and \
            self.productName != 'xulrunner':
             self.addStep(ShellCommand,
                 name='make_installer',
@@ -1450,19 +1460,27 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 env=pkg_env,
                 workdir='.',
             ))
+            # We need to set packageFilename to the multi apk
+            self.addFilePropertiesSteps(filename=packageFilename,
+                                        directory='build/%s/dist' % self.mozillaObjdir,
+                                        fileType='package',
+                                        haltOnFailure=True)
 
-        if self.createSnippet:
+        if self.createSnippet and 'android' not in self.complete_platform:
             self.addCreateUpdateSteps();
 
         # Call out to a subclass to do the actual uploading
         self.doUpload(uploadMulti=self.multiLocale)
 
     def addCodesighsSteps(self):
+        codesighs_dir = WithProperties('%(basedir)s/build/' + self.mozillaObjdir +
+                                       '/tools/codesighs')
+        if self.platform.startswith('win'):
+            codesighs_dir = 'build/%s/tools/codesighs' % self.mozillaObjdir
         self.addStep(ScratchboxCommand(
          name='make_codesighs',
          command=['make'],
-         workdir=WithProperties('%(basedir)s/build/' + self.mozillaObjdir +
-                                '/tools/codesighs'),
+         workdir=codesighs_dir,
          sb=self.use_scratchbox,
         ))
         self.addStep(ShellCommand,
@@ -1571,22 +1589,28 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addUploadSnippetsSteps()
 
     def addBuildSymbolsStep(self):
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        if self.platform.startswith('win'):
+            objdir = 'build/%s' % self.objdir
         self.addStep(ScratchboxCommand(
          name='make_buildsymbols',
          command=['make', 'buildsymbols'],
          env=self.env,
-         workdir=WithProperties('%(basedir)s/build/' + self.objdir),
+         workdir=objdir,
          sb=self.use_scratchbox,
          haltOnFailure=True,
          timeout=60*60,
         ))
 
     def addUploadSymbolsStep(self):
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        if self.platform.startswith('win'):
+            objdir = 'build/%s' % self.objdir
         self.addStep(ScratchboxCommand(
          name='make_uploadsymbols',
          command=['make', 'uploadsymbols'],
          env=self.env,
-         workdir=WithProperties('%(basedir)s/build/' + self.objdir),
+         workdir=objdir,
          sb=self.use_scratchbox,
          haltOnFailure=True,
          timeout=2400, # 40 minutes
@@ -1879,10 +1903,13 @@ class TryBuildFactory(MercurialBuildFactory):
                 as_list=False,
                 )
 
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        if self.platform.startswith('win'):
+            objdir = 'build/%s' % self.objdir
         self.addStep(ScratchboxProperty(
              command=['make', 'upload'],
              env=uploadEnv,
-             workdir=WithProperties('%(basedir)s/build/' + self.objdir),
+             workdir=objdir,
              sb=self.use_scratchbox,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
@@ -1890,7 +1917,7 @@ class TryBuildFactory(MercurialBuildFactory):
              timeout=40*60, # 40 minutes
         ))
 
-        talosBranch = "%s-%s-talos" % (self.branchName, self.platform)
+        talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
         sendchange_props = {
                 'buildid': WithProperties('%(buildid:-)s'),
                 'builduid': WithProperties('%(builduid:-)s'),
@@ -2453,11 +2480,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
              timeout=60*60 # 60 minutes
             )
         else:
+            objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
+            if self.platform.startswith('win'):
+                objdir = '%s/%s' % (self.baseWorkDir, self.objdir)
             self.addStep(ScratchboxProperty(
                 name='make_upload',
                 command=['make', 'upload'] + upload_vars,
                 env=uploadEnv,
-                workdir=WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir),
+                workdir=objdir,
                 extract_fn = parse_make_upload,
                 haltOnFailure=True,
                 description=['make', 'upload'],
@@ -2465,7 +2495,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 timeout=40*60 # 40 minutes
             ))
 
-        talosBranch = "%s-%s-talos" % (self.branchName, self.platform)
+        talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
         sendchange_props = {
                 'buildid': WithProperties('%(buildid:-)s'),
                 'builduid': WithProperties('%(builduid:-)s'),
@@ -2607,7 +2637,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
-        talosBranch = "release-%s-%s-talos" % (self.branchName, self.platform)
+        talosBranch = "release-%s-%s-talos" % (self.branchName, self.complete_platform)
         sendchange_props = {
                 'buildid': WithProperties('%(buildid:-)s'),
                 'builduid': WithProperties('%(builduid:-)s'),
