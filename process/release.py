@@ -53,9 +53,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     runtimeTag = getRuntimeTag(releaseTag)
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_PARALLELIZATION)
     updateVerifyChunks = releaseConfig.get('updateVerifyChunks', DEFAULT_PARALLELIZATION)
-    tools_repo = '%s%s' % (branchConfig['hgurl'],
-                           releaseConfig.get('build_tools_repo_path',
-                               branchConfig['build_tools_repo_path']))
+    tools_repo_path = releaseConfig.get('build_tools_repo_path',
+                                        branchConfig['build_tools_repo_path'])
+    tools_repo = '%s%s' % (branchConfig['hgurl'], tools_repo_path)
     config_repo = '%s%s' % (branchConfig['hgurl'],
                              branchConfig['config_repo_path'])
 
@@ -507,7 +507,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             repository_setup_factory = StagingRepositorySetupFactory(
                 hgHost=branchConfig['hghost'],
-                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                buildToolsRepoPath=tools_repo_path,
                 username=releaseConfig['hgUsername'],
                 sshKey=releaseConfig['hgSshKey'],
                 repositories=clone_repositories,
@@ -595,7 +595,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             env=pf['env'],
             objdir=pf['platform_objdir'],
             hgHost=branchConfig['hghost'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            buildToolsRepoPath=tools_repo_path,
             repoPath=sourceRepoInfo['path'],
             productName=releaseConfig['productName'],
             version=releaseConfig['version'],
@@ -630,7 +630,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 env=pf['env'],
                 objdir=pf['platform_objdir'],
                 hgHost=branchConfig['hghost'],
-                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                buildToolsRepoPath=tools_repo_path,
                 repoPath=sourceRepoInfo['path'],
                 productName='xulrunner',
                 version=releaseConfig['milestone'],
@@ -679,7 +679,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             talosMasters = None
 
-        if platform in releaseConfig['unittestPlatforms']:
+        if releaseConfig['enableUnittests']:
             packageTests = True
             unittestMasters = branchConfig['unittest_masters']
             unittestBranch = builderPrefix('%s-opt-unittest' % platform)
@@ -695,7 +695,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 platform=platform,
                 hgHost=branchConfig['hghost'],
                 repoPath=sourceRepoInfo['path'],
-                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                buildToolsRepoPath=tools_repo_path,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
                 profiledBuild=pf['profiled_build'],
@@ -825,7 +825,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 platform=platform,
                 hgHost=branchConfig['hghost'],
                 repoPath=sourceRepoInfo['path'],
-                buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                buildToolsRepoPath=tools_repo_path,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
                 profiledBuild=None,
@@ -872,7 +872,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
              partner_repack_factory = PartnerRepackFactory(
                  hgHost=branchConfig['hghost'],
                  repoPath=sourceRepoInfo['path'],
-                 buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+                 buildToolsRepoPath=tools_repo_path,
                  productName=releaseConfig['productName'],
                  version=releaseConfig['version'],
                  buildNumber=releaseConfig['buildNumber'],
@@ -904,7 +904,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     for platform in releaseConfig['l10nPlatforms']:
         l10n_verification_factory = L10nVerifyFactory(
             hgHost=branchConfig['hghost'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            buildToolsRepoPath=tools_repo_path,
             cvsroot=releaseConfig['cvsroot'],
             stagingServer=releaseConfig['stagingServer'],
             productName=releaseConfig['productName'],
@@ -937,7 +937,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            buildToolsRepoPath=tools_repo_path,
             cvsroot=releaseConfig['cvsroot'],
             patcherToolsTag=releaseConfig['patcherToolsTag'],
             patcherConfig=releaseConfig['patcherConfig'],
@@ -973,6 +973,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             binaryName=releaseConfig['binaryName'],
             oldBinaryName=releaseConfig['oldBinaryName'],
             testOlderPartials=releaseConfig['testOlderPartials'],
+            longVersion=releaseConfig.get('longVersion', None),
+            oldLongVersion=releaseConfig.get('oldLongVersion', None)
         )
 
         builders.append({
@@ -1097,7 +1099,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         final_verification_factory = ReleaseFinalVerification(
             hgHost=branchConfig['hghost'],
             platforms=[platform],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            buildToolsRepoPath=tools_repo_path,
             verifyConfigs=releaseConfig['verifyConfigs'],
             clobberURL=branchConfig['base_clobber_url'],
         )
@@ -1134,7 +1136,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         major_update_factory = MajorUpdateFactory(
             hgHost=branchConfig['hghost'],
             repoPath=releaseConfig['majorUpdateRepoPath'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            buildToolsRepoPath=tools_repo_path,
             cvsroot=releaseConfig['cvsroot'],
             patcherToolsTag=releaseConfig['majorPatcherToolsTag'],
             patcherConfig=releaseConfig['majorUpdatePatcherConfig'],
@@ -1230,7 +1232,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         oldVersion=releaseConfig['oldVersion'],
         hgHost=branchConfig['hghost'],
         repoPath=sourceRepoInfo['path'],
-        buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+        buildToolsRepoPath=tools_repo_path,
         credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py")
     )
 
@@ -1261,7 +1263,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             oldVersion=None, # no updates
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
-            buildToolsRepoPath=branchConfig['build_tools_repo_path'],
+            buildToolsRepoPath=tools_repo_path,
             credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py"),
         )
 
@@ -1358,7 +1360,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     builders.extend(test_builders)
 
     logUploadCmd = makeLogUploadCommand(sourceRepoInfo['name'], branchConfig,
-            platform_prop=None)
+            platform_prop=None, product=releaseConfig['productName'])
 
     status.append(SubprocessLogHandler(
         logUploadCmd + [
