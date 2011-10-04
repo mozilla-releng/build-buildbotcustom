@@ -43,8 +43,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
   CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
   TryUnittestBuildFactory, ScriptFactory, rc_eval_func
-from buildbotcustom.process.factory import MaemoBuildFactory, \
-    MobileDesktopBuildFactory, AndroidBuildFactory, RemoteUnittestFactory
+from buildbotcustom.process.factory import RemoteUnittestFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly
 from buildbotcustom.l10n import TriggerableL10n
@@ -1240,6 +1239,7 @@ def generateBranchObjects(config, name):
                     'ausBaseUploadDir': config['aus2_base_upload_dir'],
                 }
 
+
             nightly_kwargs = {}
             nightly_kwargs.update(multiargs)
             nightly_kwargs.update(ausargs)
@@ -1318,14 +1318,9 @@ def generateBranchObjects(config, name):
                 if platform in config['l10n_platforms']:
                     # TODO Linux and mac are not working with mozconfig at this point
                     # and this will disable it for now. We will fix this in bug 518359.
-                    if platform is 'wince':
-                        env = pf['env']
-                        objdir = pf['platform_objdir']
-                        mozconfig = pf['mozconfig']
-                    else:
-                        env = {}
-                        objdir = ''
-                        mozconfig = None
+                    env = {}
+                    objdir = ''
+                    mozconfig = None
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=env,
@@ -1678,10 +1673,6 @@ def generateBranchObjects(config, name):
         }
         branchObjects['builders'].append(bundle_builder)
 
-    #Call out for mobile objects
-    mobile_objects = generateMobileBranchObjects(config, name)
-    for key in mobile_objects.keys():
-        branchObjects[key].extend(mobile_objects[key])
     return branchObjects
 
 def generateCCBranchObjects(config, name):
@@ -2285,14 +2276,9 @@ def generateCCBranchObjects(config, name):
                 if platform in config['l10n_platforms']:
                     # TODO Linux and mac are not working with mozconfig at this point
                     # and this will disable it for now. We will fix this in bug 518359.
-                    if platform is 'wince':
-                        env = pf['env']
-                        objdir = pf['platform_objdir']
-                        mozconfig = pf['mozconfig']
-                    else:
-                        env = {}
-                        objdir = ''
-                        mozconfig = None
+                    env = {}
+                    objdir = ''
+                    mozconfig = None
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
                         env=env,
@@ -2840,312 +2826,6 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES, 
         ACTIVE_UNITTEST_PLATFORMS, factory_class)
 
-
-def generateMobileBranchObjects(config, name):
-    '''Call the same way as generateBranchObjects'''
-    mobile_objects = {'builders': [], 'schedulers': [],
-                      'change_source': [], 'status': []
-    }
-    #If there are no mobile platforms, don't create 
-    #status plugins, changesources and schedulers that would do nothing
-    if config.get('mobile_platforms'):
-        if len(config['mobile_platforms']) < 1:
-            return mobile_objects
-    else:
-        return mobile_objects
-    builders = []
-    nightlyBuilders = []
-    debugBuilders = []
-    # prettyNames is a mapping to pass to the try_parser for validation
-    PRETTY_NAME = '%s build'
-    prettyNames = {}
-    long_repo_name = name[:]
-    if 'mobile_repo_path' in config:
-        mobile_repo_name = config['mobile_repo_path'].split('/')[-1]
-        long_repo_name = '%s-%s' % (name, mobile_repo_name)
-
-    pollInterval = config.get('pollInterval', 60)
-    build_tools_repo = '%s%s' % (config['hgurl'],
-                                 config['build_tools_repo_path'])
-    branch_config_file = getRealpath('localconfig.py')
-
-    #We could also make mobile_repo_path a list and iterate over that lise
-    #here to allow for more than one mobile repository to be built against
-    #one mozilla repository.  As there is currently a n:1 mapping between
-    #mozilla repository and mobile repository I (jhford) choose not to 
-    #implement this.
-    for platform in config.get('mobile_platforms', {}).keys():
-        render = {'branch': name,
-                  'platform': platform,
-        }
-        pf=config['mobile_platforms'][platform]
-        base_name = pf.get('base_name') % render
-        pretty_name = PRETTY_NAME % base_name
-        l10nSchedulerName = "%s-%s-mobile-l10n" % (long_repo_name,
-                                                      platform)
-
-        createSnippet = False
-        if config.get('create_mobile_snippet', None) and pf.get('update_platform', None):
-            createSnippet = True
-
-        factory_kwargs={
-            'hgHost': pf.get('hghost', config.get('hghost')),
-            'repoPath': pf.get('repo_path', config.get('repo_path')),
-            'configRepoPath': pf.get('config_repo_path', config.get('config_repo_path')),
-            'configSubDir': pf.get('config_subdir', config.get('config_subdir')),
-            'mozconfig':pf.get('mozconfig'),
-            'env': pf.get('env'),
-            'stageUsername':pf.get('stage_username', config.get('stage_username_mobile')),
-            'stageGroup': pf.get('stage_group', config.get('stage_group')),
-            'stageSshKey': pf.get('stage_ssh_key', config.get('stage_ssh_mobile_key')),
-            'stageServer': pf.get('stage_server', config.get('stage_server')),
-            'stageBasePath': pf.get('stage_base_path', config.get('stage_base_path_mobile')),
-            'mobileRepoPath': config.get('mobile_repo_path', None),
-            'compareLocalesRepoPath': pf.get('compare_locales_repo_path', config.get('compare_locales_repo_path')),
-            'compareLocalesRevision': pf.get('compare_locales_tag', config.get('compare_locales_tag')),
-            'mozharnessRepoPath': pf.get('mozharness_repo_path', config.get('mozharness_repo_path')),
-            'mozharnessRevision': pf.get('mozharness_tag', config.get('mozharness_tag')),
-            'uploadSymbols': False,
-            'generateSymbols': pf.get('generate_symbols', False),
-            'platform': platform,
-            'baseWorkDir': 'build', #Defaults to being under a slave builddir, which has tree info
-            'baseUploadDir': '%s-%s' % (name, platform),
-            'buildToolsRepoPath': pf.get('build_tools_repo_path', config.get('build_tools_repo_path')),
-            'clobberURL': pf.get('base_clobber_url', config.get('base_clobber_url')),
-            'clobberTime': pf.get('clobber_time', config.get('default_clobber_time')),
-            'buildSpace': pf.get('build_space', config.get('default_build_space')),
-            'buildsBeforeReboot': pf.get('builds_before_reboot'),
-            'nightly': False,
-            'clobber': config.get('enable_try', False),
-            'enable_try': config.get('enable_try', False),
-            'try_subdir': config.get('package_dir', None),
-            'packageGlobList': pf.get('package_globlist'),
-            'mozRevision': pf.get('mozilla_revision'),
-            'mobileRevision': pf.get('mobile_revision', None),
-            'ausUser': config.get('aus2_user', None),
-            'ausSshKey': config.get('aus2_ssh_key', None),
-            'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', None),
-            'ausHost': config['aus2_host'],
-            'downloadBaseURL': config['mobile_download_base_url'],
-            'updatePlatform': pf.get('update_platform', None),
-            'talosMasters': pf.get('talos_masters', []),
-            'unittestMasters': pf.get('unittest_masters', []),
-            # It would be great to have:
-            # 'packageTests': pf.get('package_tests', False),
-            # These are disabled until l10n comes up
-            #'triggerBuilds': True,
-            #'triggeredSchedulers': triggeredSchedulers,
-        }
-
-        builddir_base = '%s-mob-%s' % (name, platform)
-        multi_locale = pf.get('multi_locale', False) and \
-                       pf.get('mozharness_config', False) and\
-                       config.get('enable_multi_locale', False)
-
-        if 'maemo' in platform:
-            factory_class = MaemoBuildFactory
-            sb_home=pf.get('scratchbox_home', config.get('scratchbox_home'))
-            factory_kwargs.update({
-                'baseBuildDir': builddir_base,
-                'baseWorkDir': '%s/build/%s' % (sb_home, builddir_base),
-                'scratchboxPath': pf.get('scratchbox_path', config.get('scratchbox_path')),
-                'scratchboxPath': pf.get('scratchbox_path', config.get('scratchbox_path')),
-                'debs': pf.get('debs', config.get('debs', True)),
-                'mergeLocales': pf.get('merge_locales', config.get('merge_locales')),
-                'objdirRelPath': pf.get('objdirRelPath'),
-                'objdirAbsPath': pf.get('objdirAbsPath'),
-                'sb_target': pf.get('scratchbox_target'),
-            })
-        elif 'android' in platform:
-            factory_class = AndroidBuildFactory
-        else:
-            factory_class = MobileDesktopBuildFactory
-
-        if pf.get('enable_mobile_nightly', config.get('enable_mobile_nightly', True)):
-            builddir= '%s-nightly' % builddir_base
-            builder_name = '%s nightly' % base_name
-            nightly_kwargs = deepcopy(factory_kwargs)
-            nightly_kwargs['nightly'] = True
-            nightly_kwargs['uploadSymbols'] = config.get('upload_mobile_symbols', False) and pf.get('generate_symbols', False)
-            nightly_kwargs['createSnippet'] = createSnippet
-            if multi_locale:
-                nightly_kwargs['multiLocale'] = multi_locale
-                nightly_kwargs['mozharnessConfig'] = pf['mozharness_config']
-            if pf.get('l10n_chunks', None):
-                nightly_kwargs['triggerBuilds'] = True
-                nightly_kwargs['triggeredSchedulers'] = [l10nSchedulerName]
-
-            factory = factory_class(**nightly_kwargs)
-
-            builder ={
-                'name': builder_name,
-                'slavenames': pf.get('slaves'),
-                'builddir': builddir,
-                'slavebuilddir': reallyShort(builddir),
-                'factory': factory,
-                'category': long_repo_name,
-                'nextSlave': _nextFastSlave,
-                'properties': {'branch': long_repo_name,
-                               'platform': platform, 'slavebuilddir': reallyShort(builddir)}
-            }
-            nightlyBuilders.append(builder_name)
-            mobile_objects['builders'].append(builder)
-
-        factory = None
-        if pf.get('enable_mobile_dep', config.get('enable_mobile_dep', True)):
-            if platform.endswith("-debug"):
-                builddir = '%s-dbg' % builddir_base
-                debugBuilders.append(pretty_name)
-            else:
-
-                builddir = '%s-build' % builddir_base
-                builders.append(pretty_name)
-            prettyNames[platform] = pretty_name
-            dep_kwargs = deepcopy(factory_kwargs)
-            factory = factory_class(**dep_kwargs)
-
-            builder = {
-                'name': pretty_name,
-                'slavenames': pf.get('slaves'),
-                'builddir': builddir,
-                'slavebuilddir': reallyShort(builddir),
-                'factory': factory,
-                'category': long_repo_name,
-                'nextSlave': _nextFastSlave,
-                'properties': {'branch': long_repo_name,
-                               'platform': platform,
-                               'product': 'mobile',
-                               'slavebuilddir': reallyShort(builddir)}
-            }
-            mobile_objects['builders'].append(builder)
-
-        # The following code is disabled because it has been moved to the
-        # regular generateBranchObjects function and is breaking for jhford
-        if False: #pf.get('l10n_chunks', None):
-            builder_env = pf['env'].copy()
-            builder_env.update({
-                'BUILDBOT_CONFIGS': '%s%s' % (config['hgurl'],
-                                              config['config_repo_path']),
-                'CLOBBERER_URL': config['base_clobber_url'],
-            })
-            l10nBuilders = []
-            for n in range(1, int(pf['l10n_chunks']) + 1):
-                builderName = "%s l10n nightly %s/%s" % \
-                    (base_name, n, pf['l10n_chunks'])
-                l10nBuilders.append(builderName)
-                factory = ScriptFactory(
-                    scriptRepo=build_tools_repo,
-                    interpreter='bash',
-                    scriptName='scripts/l10n/nightly_mobile_repacks.sh',
-                    extra_args=[platform, branch_config_file,
-                                config.get('mobile_repo_path', ''),
-                                str(pf['l10n_chunks']), str(n)]
-                )
-                slavebuilddir = reallyShort('%s-l10n_%s' % (builddir, str(n)))
-                mobile_objects['builders'].append({
-                    'name': builderName,
-                    'slavenames': pf.get('slaves'),
-                    'builddir': '%s-l10n_%s' % (builddir, str(n)),
-                    'slavebuilddir': slavebuilddir,
-                    'factory': factory,
-                    'category': long_repo_name,
-                    'nextSlave': _nextL10nSlave(),
-                    'properties': {'branch': '%s' % config['repo_path'],
-                                   'builddir': '%s-l10n_%s' % (builddir, str(n)),
-                                   'slavebuilddir': slavebuilddir,
-                                   'product': 'mobile'},
-                    'env': builder_env
-                })
-
-            mobile_objects["schedulers"].append(Triggerable(
-                name=l10nSchedulerName,
-                builderNames=l10nBuilders
-            ))
-
-    #For now at least, mobile results go to a different tinderbox
-    mobile_objects['status'].append(TinderboxMailNotifier(
-        fromaddr='mozilla2.buildbot@build.mozilla.org',
-        tree=config.get('mobile_tinderbox_tree'),
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-        relayhost='mail.build.mozilla.org',
-        builders=builders + nightlyBuilders + debugBuilders,
-        logCompression='gzip',
-    ))
-
-    logUploadCmd = makeLogUploadCommand(name, config,
-            is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'),
-            product_prop='product')
-
-    mobile_objects['status'].append(SubprocessLogHandler(
-        logUploadCmd,
-        builders=builders + debugBuilders,
-    ))
-
-    if config.get('mobile_build_failure_emails'):
-        mobile_objects['status'].append(MailNotifier(
-            fromaddr='mobile-build-failures@mozilla.org',
-            sendToInterestedUsers=False,
-            extraRecipients=config['mobile_build_failure_emails'],
-            mode='failing',
-            builders=builders+nightlyBuilders+debugBuilders,
-            relayhost='mail.build.mozilla.org',
-        ))
-
-
-    if not config.get('enable_try', False) and 'mobile_repo_path' in config:
-        #This change source is for the mobile_repo.  There is an assumption
-        #that there will be a change source created for the main repository
-        mobile_objects['change_source'].append(HgPoller(
-            hgURL=config.get('hgurl'),
-            branch=config.get('mobile_repo_path'),
-            tipsOnly=True,
-            pollInterval=pollInterval,
-        ))
-
-    #this scheduler is to trigger mobile builds on a mozilla change
-    extra_args = {}
-    if config.get('enable_try'):
-        scheduler_class = BuilderChooserScheduler
-        extra_args['chooserFunc'] = tryChooser
-        extra_args['numberOfBuildsToTrigger'] = 1
-        extra_args['prettyNames'] = prettyNames
-    else:
-        scheduler_class = Scheduler
-
-    mobile_objects['schedulers'].append(scheduler_class(
-        name='%s-build-mozilla' % long_repo_name,
-        branch=config.get('repo_path'),
-        treeStableTimer=None if config.get('enable_try') else 3*60,
-        builderNames=builders + debugBuilders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')) and shouldBuild(c),
-        **extra_args
-    ))
-
-    if not config.get('enable_try', False):
-        #this scheduler is to trigger mobile builds on a mobile change
-        mobile_objects['schedulers'].append(Scheduler(
-            name='%s-build-mobile' % long_repo_name,
-            branch=config.get('mobile_repo_path', config['repo_path']),
-            treeStableTimer=3*60,
-            builderNames=builders,
-            fileIsImportant=lambda c: isHgPollerTriggered(c, config.get('hgurl')) and shouldBuild(c),
-        ))
-
-    if config.get('enable_mobile_nightly'):
-        #Mobile nightlies on this branch
-        mobile_objects['schedulers'].append(Nightly(
-            name='%s-nightly' % long_repo_name,
-            branch=config.get('mobile_repo_path', config['repo_path']),
-            hour=config.get('start_hour'),
-            minute=config.get('start_minute'),
-            builderNames=nightlyBuilders
-        ))
-
-    if not config.get('enable_merging', True):
-        nomergeBuilders.extend(builders + nightlyBuilders + debugBuilders)
-
-    return mobile_objects
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
     extra_args = ['-b', config['repo_path']]

@@ -128,6 +128,29 @@ def summarizeLogMochitest(name, log):
         name, log, "Passed", "Failed", "Todo",
         infoRe)
 
+def summarizeLogRemoteMochitest(name, log):
+    keys    = ('Passed', 'Failed', 'Todo')
+    d       = {}
+    summary = ""
+    found   = False
+
+    for s in keys:
+        d[s] = '0'
+    for line in log.readlines():
+        if found:
+            s = line.strip()
+            l = s.split(': ')
+            if len(l) == 2 and l[0] in keys:
+                if l[0] in d:
+                    d[l[0]] = l[1]
+        else:
+            if line.startswith('Browser Chrome Test Summary'):
+                found = True
+    if found:
+        summary = "%(Passed)s/%(Failed)s/%(Todo)s" % d
+    # Return the summary.
+    return "TinderboxPrint: %s<br/>%s\n" % (name, summary)
+
 def summarizeLogReftest(name, log):
     return summarizeLog(
         name, log, "Successful", "Unexpected", "Known problems",
@@ -235,6 +258,30 @@ def evaluateMochitest(name, log, superResult):
 
     return worst_status(superResult, SUCCESS)
 
+def evaluateRemoteMochitest(name, log, superResult):
+    # When a unittest fails we mark it orange, indicating with the
+    # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+    # However, we don't want to override EXCEPTION or RETRY, so we still
+    # need to use worst_status in further status decisions.
+    if superResult == FAILURE:
+        superResult = WARNINGS
+
+    if superResult != SUCCESS:
+        return superResult
+
+    failIdent = r"^\d+ INFO Failed: 0"
+    # Support browser-chrome result summary format which differs from MozillaMochitest's.
+    if 'browser-chrome' in name:
+        failIdent = r"^\tFailed: 0"
+    # Assume that having the 'failIdent' line
+    # means the tests run completed (successfully).
+    # Also check for "^TEST-UNEXPECTED-" for harness errors.
+    if not re.search(failIdent, log, re.MULTILINE) or \
+       re.search("^TEST-UNEXPECTED-", log, re.MULTILINE):
+        return worst_status(superResult, WARNINGS)
+
+    return worst_status(superResult, SUCCESS)
+
 def evaluateReftest(log, superResult):
     # When a unittest fails we mark it orange, indicating with the
     # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
@@ -276,6 +323,7 @@ class MochitestMixin(object):
         superResult = self.super_class.evaluateCommand(self, cmd)
         return evaluateMochitest(self.name, cmd.logs['stdio'].getText(),
                                  superResult)
+
 
 class ReftestMixin(object):
     warnOnFailure = True
@@ -560,7 +608,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(test_name=test_name)
-   
+
     def createSummary(self, log):
         if 'xpcshell' in self.name:
             self.addCompleteLog('summary', summarizeLogXpcshelltests(self.name, log))
@@ -592,7 +640,6 @@ class MozillaCheck(ShellCommandReportTimeout):
 
         return worst_status(superResult, SUCCESS)
 
-    
 class MozillaReftest(ShellCommandReportTimeout):
     warnOnFailure = True
 
@@ -841,8 +888,6 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
                                  consoleLevel=consoleLevel)
 
         self.name = 'mochitest-%s' % variant
-        if testPath:
-            self.name += " (%s)" % testPath
         self.command = ['python', 'mochitest/runtestsremote.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
@@ -857,6 +902,21 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
         self.command.extend(self.getVariantOptions(variant))
         if testPath:
             self.command.extend(['--test-path', testPath])
+
+
+class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
+    def __init__(self, **kwargs):
+        self.super_class = RemoteMochitestStep
+        RemoteMochitestStep.__init__(self, **kwargs)
+
+    def createSummary(self, log):
+        self.addCompleteLog('summary', summarizeLogRemoteMochitest(self.name, log))
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        return evaluateRemoteMochitest(self.name, cmd.logs['stdio'].getText(),
+                                       superResult)
+
 
 class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, suite, xrePath='../hostutils/xre',

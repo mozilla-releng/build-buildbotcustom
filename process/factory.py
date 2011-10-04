@@ -46,13 +46,15 @@ reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
 
-from buildbotcustom.status.errors import purge_error, global_errors
+from buildbotcustom.status.errors import purge_error, global_errors, \
+  upload_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
-  Trigger
+  Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, DisconnectStep, OutputStep, ScratchboxCommand, \
-  RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps, ScratchboxProperty
+  RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps, \
+  RetryingScratchboxProperty
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
   SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
@@ -226,14 +228,14 @@ class BootstrapFactory(BuildFactory):
          workdir='.',
          command=['rm', '-rf', 'build'],
          haltOnFailure=1)
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='checkout',
          description='checkout',
          workdir='.',
          command=['cvs', '-d', cvsroot, 'co', '-r', automation_tag,
                   '-d', 'build', cvsmodule],
          haltOnFailure=1,
-        )
+        ))
         self.addStep(ShellCommand,
          name='copy_bootstrap',
          description='copy bootstrap.cfg',
@@ -398,12 +400,13 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
          workdir='.',
          flunkOnFailure=False,
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='clone_buildtools',
          command=['hg', 'clone', self.buildToolsRepo, 'tools'],
          description=['clone', 'build tools'],
-         workdir='.'
-        )
+         workdir='.',
+         retry=False
+        ))
         self.addStep(SetProperty(
             name='set_toolsdir',
             command=['bash', '-c', 'pwd'],
@@ -412,13 +415,13 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         ))
 
         if self.clobberURL is not None:
-            self.addStep(MozillaClobberer,
+            self.addStep(MozillaClobberer(
              name='checking_clobber_times',
              branch=self.branchName,
              clobber_url=self.clobberURL,
              clobberer_path=WithProperties('%(builddir)s/tools/clobberer/clobberer.py'),
              clobberTime=self.clobberTime
-            )
+            ))
 
         if self.buildSpace > 0:
             command = ['python', 'tools/buildfarm/maintenance/purge_builds.py',
@@ -518,8 +521,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             packageFilename = '*.win32.zip'
         elif platform.startswith("win64"):
             packageFilename = '*.win64-x86_64.zip'
-        elif platform.startswith("wince"):
-            packageFilename = '*.wince-arm.zip'
         else:
             return False
         return packageFilename
@@ -853,14 +854,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 haltOnFailure=True,
                 workdir='.',
             )
-            self.addStep(MercurialCloneCommand,
+            self.addStep(MercurialCloneCommand(
                 name='hg_clone_%s' % name,
                 command=['hg', 'clone', self.getRepository(repo), name],
                 description=['checking', 'out', name],
                 descriptionDone=['checkout', name],
                 haltOnFailure=True,
                 workdir='.',
-            )
+            ))
             self.addStep(ShellCommand,
                 name='hg_update_%s'% name,
                 command=['hg', 'update', '-r', tag],
@@ -986,13 +987,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
          descriptionDone=['remove', 'configs'],
          haltOnFailure=True
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='hg_clone_configs',
          command=['hg', 'clone', configRepo, 'configs'],
          description=['checking', 'out', 'configs'],
          descriptionDone=['checkout', 'configs'],
          haltOnFailure=True
-        )
+        ))
         self.addStep(ShellCommand,
          name='hg_update',
          command=['hg', 'update', '-r', self.mozconfigBranch],
@@ -1119,20 +1120,20 @@ class MercurialBuildFactory(MozillaBuildFactory):
              warnOnFailure=True,
              haltOnFailure=True
             )
-            self.addStep(ShellCommand,
+            self.addStep(RetryingShellCommand(
              name='get_malloc_log',
              env=self.env,
              workdir='.',
              command=['wget', '-O', 'malloc.log.old',
                       '%s/malloc.log' % self.logBaseUrl]
-            )
-            self.addStep(ShellCommand,
+            ))
+            self.addStep(RetryingShellCommand(
              name='get_sdleak_log',
              env=self.env,
              workdir='.',
              command=['wget', '-O', 'sdleak.tree.old',
                       '%s/sdleak.tree' % self.logBaseUrl]
-            )
+            ))
             self.addStep(ShellCommand,
              name='mv_malloc_log',
              env=self.env,
@@ -1214,7 +1215,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                      warnOnFailure=True,
                      haltOnFailure=True
                     )
-            self.addStep(ShellCommand,
+            self.addStep(RetryingShellCommand(
              name='upload_logs',
              env=self.env,
              command=['scp', '-o', 'User=%s' % self.stageUsername,
@@ -1222,7 +1223,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                       '../malloc.log', '../sdleak.tree',
                       '%s:%s/%s' % (self.stageServer, self.stageBasePath,
                                     self.logUploadDir)]
-            )
+            ))
             self.addStep(ShellCommand,
              name='compare_sdleak_tree',
              env=self.env,
@@ -1336,21 +1337,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.android_signing:
             pkg_env['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
 
-        #Moved |make package| before |make package-tests| to work around bug629194
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = "build/%s" % self.objdir
         workdir = WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir = "build/"
-        self.addStep(ScratchboxCommand(
-            name='make_pkg',
-            command=['make', 'package'] + pkgArgs,
-            env=pkg_env,
-            workdir=objdir,
-            sb=self.use_scratchbox,
-            haltOnFailure=True
-        ))
         if 'rpm' in self.platform_variation:
             pkgArgs.append("MOZ_PKG_FORMAT=RPM")
         if self.packageSDK:
@@ -1371,6 +1363,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
              sb=self.use_scratchbox,
              haltOnFailure=True,
             ))
+        self.addStep(ScratchboxCommand(
+            name='make_pkg',
+            command=['make', 'package'] + pkgArgs,
+            env=pkg_env,
+            workdir=objdir,
+            sb=self.use_scratchbox,
+            haltOnFailure=True
+        ))
         # Get package details
         packageFilename = self.getPackageFilename(self.platform,
                                                   self.platform_variation)
@@ -1403,19 +1403,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addFilePropertiesSteps(filename='*.installer.exe', 
                                         directory='build/%s/dist/install/sea' % self.mozillaObjdir,
                                         fileType='installer',
-                                        haltOnFailure=True)
-        elif self.platform.startswith("wince"):
-            self.addStep(ShellCommand,
-                name='make_cab',
-                command=['make', 'package', 'MOZ_PKG_FORMAT=CAB'] + pkgArgs,
-                env=pkg_env,
-                workdir='build/%s' % self.objdir,
-                haltOnFailure=True
-            )
-            self.addFilePropertiesSteps(filename='*.wince-arm.cab', 
-                                        directory='build/%s' % self.objdir,
-                                        fileType='installer',
-                                        maxDepth=3,
                                         haltOnFailure=True)
 
         if self.productName == 'xulrunner':
@@ -1483,12 +1470,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir=codesighs_dir,
          sb=self.use_scratchbox,
         ))
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='get_codesize_log',
          command=['wget', '-O', 'codesize-auto-old.log', '%s/codesize-auto.log' % self.logBaseUrl],
          workdir='.',
          env=self.env
-        )
+        ))
         if self.mozillaDir == '':
             codesighsObjdir = self.objdir
         else:
@@ -1517,7 +1504,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['cat', '../codesize-auto-diff.log'],
          workdir='build%s' % self.mozillaDir
         )
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='upload_codesize_log',
          command=['scp', '-o', 'User=%s' % self.stageUsername,
           '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
@@ -1525,7 +1512,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
           '%s:%s/%s' % (self.stageServer, self.stageBasePath,
                         self.logUploadDir)],
          workdir='build%s' % self.mozillaDir
-        )
+        ))
 
     def addCreateSnippetsSteps(self, milestone_extra=''):
         if 'android' in self.complete_platform:
@@ -1563,7 +1550,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             ))
 
     def addUploadSnippetsSteps(self):
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
             name='create_aus_updir',
             command=['bash', '-c',
                      WithProperties('ssh -l %s ' % self.ausUser +
@@ -1572,7 +1559,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             description=['create', 'aus', 'upload', 'dir'],
             haltOnFailure=True,
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
             name='upload_complete_snippet',
             command=['scp', '-o', 'User=%s' % self.ausUser,
                      '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
@@ -1740,22 +1727,22 @@ class TryBuildFactory(MercurialBuildFactory):
              warnOnFailure=True,
              haltOnFailure=True
             )
-            self.addStep(ShellCommand,
+            self.addStep(RetryingShellCommand(
              name='get_malloc_log',
              env=self.env,
              workdir='.',
              command=['wget', '-O', 'malloc.log.old',
                       'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/malloc.log' % \
                          (self.stageServer, self.productName, self.platform)],
-            )
-            self.addStep(ShellCommand,
+            ))
+            self.addStep(RetryingShellCommand(
              name='get_sdleak_log',
              env=self.env,
              workdir='.',
              command=['wget', '-O', 'sdleak.tree.old',
                       'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/sdleak.tree' % \
                          (self.stageServer, self.productName, self.platform)],
-            )
+            ))
             self.addStep(ShellCommand,
              name='mv_malloc_log',
              env=self.env,
@@ -1842,14 +1829,14 @@ class TryBuildFactory(MercurialBuildFactory):
          command=['make'],
          workdir='build/%s/tools/codesighs' % self.mozillaObjdir
         )
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='get_codesize_log',
          command=['wget', '-O', 'codesize-auto-old.log',
          'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/codesize-auto.log' % \
            (self.stageServer, self.productName, self.platform)],
          workdir='.',
          env=self.env
-        )
+        ))
         if self.mozillaDir == '':
             codesighsObjdir = self.objdir
         else:
@@ -1906,7 +1893,7 @@ class TryBuildFactory(MercurialBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(ScratchboxProperty(
+        self.addStep(RetryingScratchboxProperty(
              command=['make', 'upload'],
              env=uploadEnv,
              workdir=objdir,
@@ -1915,6 +1902,7 @@ class TryBuildFactory(MercurialBuildFactory):
              haltOnFailure=True,
              description=["upload"],
              timeout=40*60, # 40 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
         ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2002,11 +1990,11 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             self.addStep(ShellCommand(
                 name='moz_hg_update',
                 command=moz_cmd,
+                timeout=60*60*2, # 2 hours
                 env=env,
                 workdir='.',
                 haltOnFailure=True,
                 flunkOnFailure=True,
-                timeout=60*60*2, # 2 hours
             ))
         else:
             self.addStep(Mercurial,
@@ -2212,7 +2200,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         previousMarURL = WithProperties('http://%s' % self.stageServer + \
                           '%s' % self.latestDir + \
                           '/%(previousMarFilename)s')
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
             name='get_previous_mar',
             description=['get', 'previous', 'mar'],
             doStepIf = self.previousMarExists,
@@ -2356,7 +2344,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
     def addUploadSnippetsSteps(self):
         ausPreviousBuildUploadDir = self.getPreviousBuildUploadDir()
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
             name='create_aus_previous_updir',
             doStepIf = self.previousMarExists,
             command=['bash', '-c',
@@ -2366,7 +2354,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             description=['create', 'aus', 'previous', 'upload', 'dir'],
             haltOnFailure=True,
             ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
             name='upload_complete_snippet',
             description=['upload', 'complete', 'snippet'],
             doStepIf = self.previousMarExists,
@@ -2382,7 +2370,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # We only need to worry about empty snippets (and partials obviously)
         # if we are creating partial patches on the slaves.
         if self.createPartial:
-            self.addStep(ShellCommand(
+            self.addStep(RetryingShellCommand(
                 name='upload_partial_snippet',
                 doStepIf = self.previousMarExists,
                 command=['scp', '-o', 'User=%s' % self.ausUser,
@@ -2395,7 +2383,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 haltOnFailure=True,
             ))
             ausCurrentBuildUploadDir = self.getCurrentBuildUploadDir()
-            self.addStep(ShellCommand(
+            self.addStep(RetryingShellCommand(
                 name='create_aus_current_updir',
                 doStepIf = self.previousMarExists,
                 command=['bash', '-c',
@@ -2408,7 +2396,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             # Create remote empty complete/partial snippets for current build.
             # Also touch the remote platform dir to defeat NFS caching on the
             # AUS webheads.
-            self.addStep(ShellCommand(
+            self.addStep(RetryingShellCommand(
                 name='create_empty_snippets',
                 doStepIf = self.previousMarExists,
                 command=['bash', '-c',
@@ -2470,20 +2458,21 @@ class NightlyBuildFactory(MercurialBuildFactory):
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
 
         if self.productName == 'xulrunner':
-            self.addStep(SetProperty,
+            self.addStep(RetryingSetProperty(
              command=['make', '-f', 'client.mk', 'upload'],
              env=uploadEnv,
              workdir='build',
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=["upload"],
-             timeout=60*60 # 60 minutes
-            )
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+            ))
         else:
             objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
             if self.platform.startswith('win'):
                 objdir = '%s/%s' % (self.baseWorkDir, self.objdir)
-            self.addStep(ScratchboxProperty(
+            self.addStep(RetryingScratchboxProperty(
                 name='make_upload',
                 command=['make', 'upload'] + upload_vars,
                 env=uploadEnv,
@@ -2492,7 +2481,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 haltOnFailure=True,
                 description=['make', 'upload'],
                 sb=self.use_scratchbox,
-                timeout=40*60 # 40 minutes
+                timeout=40*60, # 40 minutes
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2624,7 +2614,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 to_candidates=True,
                 as_list=False)
 
-        self.addStep(SetProperty,
+        self.addStep(RetryingSetProperty(
          name='make_upload',
          command=['make', 'upload'],
          env=uploadEnv,
@@ -2632,8 +2622,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          extract_fn = parse_make_upload,
          haltOnFailure=True,
          description=['upload'],
-         timeout=60*60 # 60 minutes
-        )
+         timeout=60*60, # 60 minutes
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+        ))
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
@@ -2692,14 +2683,15 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
                 return {'packageUrl': m}
             return {'packageUrl': ''}
 
-        self.addStep(SetProperty,
+        self.addStep(RetryingSetProperty(
          command=['make', '-f', 'client.mk', 'upload'],
          env=uploadEnv,
          workdir='build',
          extract_fn = get_url,
          haltOnFailure=True,
-         description=['upload']
-        )
+         description=['upload'],
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+        ))
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
@@ -2940,29 +2932,18 @@ class BaseRepackFactory(MozillaBuildFactory):
         )
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
-        if self.platform.startswith('wince'):
-            self.addStep(ShellCommand,
-             name='configure',
-             command=['make -f client.mk configure'], 
-             description='configure',
-             descriptionDone='configure done',
-             haltOnFailure=True,
-             env = self.env,
-             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            )
-        else:
-            # For backward compatibility where there is no mozconfig
-            self.addStep(ShellCommand, **self.processCommand(
-             name='configure',
-             command=['sh', '--',
-                      './configure', '--enable-application=%s' % self.appName,
-                      '--with-l10n-base=../%s' % self.l10nRepoPath ] +
-                      self.extraConfigureArgs,
-             description='configure',
-             descriptionDone='configure done',
-             haltOnFailure=True,
-             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-            ))
+        # For backward compatibility where there is no mozconfig
+        self.addStep(ShellCommand, **self.processCommand(
+         name='configure',
+         command=['sh', '--',
+                  './configure', '--enable-application=%s' % self.appName,
+                  '--with-l10n-base=../%s' % self.l10nRepoPath ] +
+                  self.extraConfigureArgs,
+         description='configure',
+         descriptionDone='configure done',
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+        ))
         self.addStep(ShellCommand, **self.processCommand(
          name='make_config',
          command=['make'],
@@ -2987,15 +2968,16 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tinderboxPrint('buildnumber',WithProperties('%(buildnumber)s'))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='make_upload',
          command=['make', 'upload', WithProperties('AB_CD=%(locale)s')],
          env=self.uploadEnv,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
                                        self.appName),
          haltOnFailure=True,
-         flunkOnFailure=True
-        )
+         flunkOnFailure=True,
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+        ))
 
     def getSources(self):
         self.addStep(ShellCommand(
@@ -3057,13 +3039,13 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir=self.baseWorkDir,
          haltOnFailure=True
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='clone_compare_locales',
          command=['hg', 'clone', compareLocalesRepo, 'compare-locales'],
          description=['checkout', 'compare-locales'],
          workdir=self.baseWorkDir,
          haltOnFailure=True
-        )
+        ))
         self.addStep(ShellCommand,
          name='update_compare_locales',
          command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
@@ -3371,14 +3353,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      )
 
     def downloadBuilds(self):
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='wget_enUS',
          command=['make', 'wget-en-US'],
          descriptionDone='wget en-US',
          env=self.env,
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName)
-        )
+        ))
 
     def updateEnUS(self):
         '''Update en-US to the source stamp we get from make ident.
@@ -3432,15 +3414,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         return '.%(locale)s.' + NightlyBuildFactory.getCompleteMarPatternMatch(self)
 
     def doRepack(self):
-        # wince needs this step for nsprpub to succeed
-        if self.platform is 'wince':
-            self.addStep(ShellCommand,
-             name='make_build',
-             command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
-             description=['make build'],
-             haltOnFailure=True
-            )
         self.addStep(ShellCommand,
          name='make_nsprpub',
          command=['make'],
@@ -3804,10 +3777,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
-        elif self.platform.startswith('wince'):
-            filename = '%s.zip' % self.project
-            builds[filename] = '%s-%s.zip' % (self.project, self.version)
-            self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         else:
             raise "Unsupported platform"
 
@@ -3831,15 +3800,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
              description=['make memory/jemalloc'],
              haltOnFailure=True
             )
-        # wince needs this step for nsprpub to succeed
-        if self.platform.startswith('wince'):
-            self.addStep(ShellCommand(
-             name='make_build',
-             command=['make'],
-             workdir='%s/%s/build' % (self.baseWorkDir, self.mozillaObjdir),
-             description=['make build'],
-             haltOnFailure=True
-            ))
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'modules/libmar'):
             self.addStep(ShellCommand,
@@ -4064,14 +4024,14 @@ class ReleaseTaggingFactory(ReleaseFactory):
             # 'hg clone -r' breaks in the respin case because the cloned
             # repository will not have ANY changesets from the release branch
             # and 'hg up -C' will fail
-            self.addStep(MercurialCloneCommand,
+            self.addStep(MercurialCloneCommand(
              name='hg_clone',
              command=['hg', 'clone', repo, repoName],
              workdir='.',
              description=['clone %s' % repoName],
              haltOnFailure=True,
              timeout=30*60 # 30 minutes
-            )
+            ))
             # for build1 we need to create a branch
             if buildNumber == 1 and not relbranchOverride:
                 # remember:
@@ -4245,14 +4205,14 @@ class SingleSourceFactory(ReleaseFactory):
          workdir='.',
          haltOnFailure=True
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='hg_clone',
          command=['hg', 'clone', self.repository, self.branchName],
          workdir='.',
          description=['clone %s' % self.branchName],
          haltOnFailure=True,
          timeout=30*60 # 30 minutes
-        )
+        ))
         # This will get us to the version we're building the release with
         self.addStep(ShellCommand,
          name='hg_update',
@@ -4321,7 +4281,7 @@ class SingleSourceFactory(ReleaseFactory):
          description=['mv source-package'],
          haltOnFailure=True
         )
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='upload_files',
          command=['python', '%s/build/upload.py' % self.branchName,
                   '--base-path', '.',
@@ -4329,7 +4289,7 @@ class SingleSourceFactory(ReleaseFactory):
          workdir='.',
          env=uploadEnv,
          description=['upload files'],
-        )
+        ))
 
     def addConfigSteps(self, workdir='build'):
         assert self.configRepoPath is not None
@@ -4347,14 +4307,14 @@ class SingleSourceFactory(ReleaseFactory):
                      haltOnFailure=True,
                      workdir='.'
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
                      name='hg_clone_configs',
                      command=['hg', 'clone', configRepo, 'configs'],
                      description=['checking', 'out', 'configs'],
                      descriptionDone=['checkout', 'configs'],
                      haltOnFailure=True,
                      workdir='.'
-        )
+        ))
         self.addStep(ShellCommand,
                      name='hg_update',
                      command=['hg', 'update', '-r', self.mozconfigBranch],
@@ -4424,14 +4384,14 @@ class MultiSourceFactory(ReleaseFactory):
             location = repo['location']
             bundleFiles.append('source/%s' % repo['bundleName'])
 
-            self.addStep(MercurialCloneCommand,
+            self.addStep(MercurialCloneCommand(
              name='hg_clone',
              command=['hg', 'clone', repository, location],
              workdir='.',
              description=['clone %s' % location],
              haltOnFailure=True,
              timeout=30*60 # 30 minutes
-            )
+            ))
             # This will get us to the version we're building the release with
             self.addStep(ShellCommand,
              name='hg_update',
@@ -4524,13 +4484,13 @@ class CCSourceFactory(ReleaseFactory):
          workdir='.',
          haltOnFailure=True
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          command=['hg', 'clone', self.repository, self.branchName],
          workdir='.',
          description=['clone %s' % self.branchName],
          haltOnFailure=True,
          timeout=30*60 # 30 minutes
-        )
+        ))
         # build up the checkout command that will bring us up to the release version
         co_command = ['python', 'client.py', 'checkout',
                       '--comm-rev=%s' % releaseTag,
@@ -4731,7 +4691,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
     def setup(self):
         # General setup
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='checkout_patcher',
          command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
                   '-d', 'build', 'mozilla/tools/patcher'],
@@ -4739,7 +4699,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          workdir='.',
          haltOnFailure=True
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='checkout_mozbuild',
          command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
                   '-d', 'MozBuild',
@@ -4747,7 +4707,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['checkout', 'MozBuild'],
          haltOnFailure=True
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='checkout_bootstrap_util',
          command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
                   '-d' 'Bootstrap',
@@ -4755,7 +4715,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['checkout', 'Bootstrap/Util.pm'],
          haltOnFailure=True
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='checkout_patcher_configs',
          command=['cvs', '-d', self.cvsroot, 'co', '-d' 'patcher-configs',
                   'mozilla/tools/patcher-configs'],
@@ -4763,13 +4723,13 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          haltOnFailure=True
         ))
         # Bump the patcher config
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='get_shipped_locales',
          command=['wget', '-O', 'shipped-locales', self.shippedLocales],
          description=['get', 'shipped-locales'],
          haltOnFailure=True
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='get_old_shipped_locales',
          command=['wget', '-O', 'old-shipped-locales', self.oldShippedLocales],
          description=['get', 'old-shipped-locales'],
@@ -4867,7 +4827,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              workdir='tools',
              haltOnFailure=True
             ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='push_verify_configs',
          command=['hg', 'push', '-e',
                   'ssh -l %s %s' % (self.hgUsername, sshKeyOption),
@@ -4966,7 +4926,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          workdir='.',
          description=['chmod 755', 'partial mar dirs']
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='upload_partial_mars',
          command=['rsync', '-av',
                   '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
@@ -4982,7 +4942,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
     def uploadSnippets(self):
         for localDir,remoteDir in self.dirMap.iteritems():
             snippetDir = self.snippetStagingDir + '/' + remoteDir
-            self.addStep(ShellCommand,
+            self.addStep(RetryingShellCommand(
              name='upload_snippets',
              command=['rsync', '-av',
                       '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.ausSshKey,
@@ -4991,10 +4951,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              workdir=self.updateDir,
              description=['upload', '%s snippets' % localDir],
              haltOnFailure=True
-            )
+            ))
             # We only push test channel snippets from automation.
             if localDir.endswith('test'):
-                self.addStep(ShellCommand(
+                self.addStep(RetryingShellCommand(
                  name='backupsnip',
                  command=['bash', '-c',
                           'ssh -l %s ' %  self.ausUser +
@@ -5004,7 +4964,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  description=['backupsnip'],
                  haltOnFailure=True
                 ))
-                self.addStep(ShellCommand(
+                self.addStep(RetryingShellCommand(
                  name='pushsnip',
                  command=['bash', '-c',
                           'ssh -l %s ' %  self.ausUser +
@@ -5086,7 +5046,7 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
              description=['add patcher config'],
             ))
         if self.fakeMacInfoTxt:
-            self.addStep(ShellCommand(
+            self.addStep(RetryingShellCommand(
                 name='symlink_mac_info_txt',
                 command=['ssh', '-oIdentityFile=~/.ssh/%s' % self.stageSshKey,
                          '%s@%s' % (self.stageUsername, self.stagingServer),
@@ -5260,7 +5220,7 @@ class TuxedoEntrySubmitterFactory(ReleaseFactory):
              workdir='tools/release',
             ))
 
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
          name='tuxedo_add',
          command=cmd,
          description=['tuxedo-add.py'],
@@ -5335,6 +5295,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
              command="pskill -t firefox.exe",
              workdir="D:\\Utilities"
             )
+            self.addStep(SetProperty,
+                command=['bash', '-c', 'pwd -W'],
+                property='toolsdir',
+                workdir='tools'
+            )
 
         self.addStep(Mercurial,
          name='hg_update',
@@ -5352,11 +5317,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
          workdir='.'
         )
 
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='buildbot_configs',
          command=['hg', 'clone', self.config_repo_url, 'mozconfigs'],
          workdir='.'
-        )
+        ))
 
         self.addCopyMozconfigStep()
 
@@ -5455,7 +5420,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             sendchange_props = {
@@ -5573,7 +5539,8 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
-             description=['upload']
+             description=['upload'],
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             for master, warn, retries in self.unittestMasters:
@@ -5713,11 +5680,11 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir='.'
         )
 
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='buildbot_configs',
          command=['hg', 'clone', self.config_repo_url, 'mozconfigs'],
          workdir='.'
-        )
+        ))
 
         self.addCopyMozconfigStep()
 
@@ -5812,7 +5779,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
-             timeout=60*60 # 60 minutes
+             timeout=60*60, # 60 minutes
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             )
 
             sendchange_props = {
@@ -6149,7 +6117,7 @@ class L10nVerifyFactory(ReleaseFactory):
         )
 
         # Download current release
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='download_current_release',
          description=['download', 'current', 'release'],
          descriptionDone=['downloaded', 'current', 'release'],
@@ -6177,10 +6145,10 @@ class L10nVerifyFactory(ReleaseFactory):
          workdir=verifyDirVersion,
          haltOnFailure=True,
          timeout=60*60
-        )
+        ))
 
         # Download previous release
-        self.addStep(ShellCommand,
+        self.addStep(RetryingShellCommand(
          name='download_previous_release',
          description=['download', 'previous', 'release'],
          descriptionDone =['downloaded', 'previous', 'release'],
@@ -6211,7 +6179,7 @@ class L10nVerifyFactory(ReleaseFactory):
          workdir=verifyDirVersion,
          haltOnFailure=True,
          timeout=60*60
-        )
+        ))
 
         currentProduct = '%s-%s-build%s' % (productName,
                                             version,
@@ -6246,880 +6214,6 @@ class L10nVerifyFactory(ReleaseFactory):
                      workdir=verifyDirVersion,
                      )
 
-
-
-class MobileBuildFactory(MozillaBuildFactory):
-    def __init__(self, configRepoPath, platform,
-                 configSubDir, mozconfig, objdir="objdir",
-                 stageUsername=None, stageSshKey=None, stageServer=None,
-                 stageBasePath=None, stageGroup=None,
-                 baseUploadDir=None, baseWorkDir='build', nightly=False,
-                 generateSymbols=False, uploadSymbols=False,
-                 productName='mobile',
-                 clobber=False, env=None,
-                 tinderboxBuildsDir=None,
-                 mobileRepoPath=None,
-                 mobileRevision='default',
-                 mozRevision='default', enable_try=False,
-                 createSnippet=False, ausUser=None,
-                 ausSshKey=None, ausBaseUploadDir=None,
-                 updatePlatform=None, ausHost=None,
-                 downloadBaseURL=None,
-                 talosMasters=None,
-                 unittestMasters=None,
-                 multiLocale=False,
-                 compareLocalesRepoPath='build/compare-locales',
-                 compareLocalesRevision='RELEASE_AUTOMATION',
-                 mozharnessRepoPath="build/mozharness",
-                 mozharnessRevision="default",
-                 mozharnessConfig=None,
-                 mergeLocales=True,
-                 try_subdir=None,
-                 triggeredSchedulers=None, triggerBuilds=False,
-                 mozconfigBranch="production",
-                 **kwargs):
-        """
-    mobileRepoPath: the path to the mobileRepo (mobile-browser)
-    platform: the mobile platform (linux-arm)
-    baseWorkDir: the path to the default slave workdir
-        """
-        MozillaBuildFactory.__init__(self, **kwargs)
-        self.configRepository = self.getRepository(configRepoPath)
-        self.mobileRepoPath = mobileRepoPath
-        if mobileRepoPath:
-            self.mobileRepository = self.getRepository(mobileRepoPath)
-            self.mobileBranchName = self.getRepoName(self.mobileRepository)
-            self.mobileChangesetLink = '<a href=%s/rev' % (self.mobileRepository)
-            self.mobileChangesetLink += '/%(hg_revision)s title="Built from Mobile revision %(hg_revision)s">mobile:%(hg_revision)s</a>'
-        else:
-            # These are just here to keep checkconfig working while we
-            # support both mobile repo and non-mobile repo configurations.
-            self.mobileBranchName = self.branchName
-            self.mobileChangesetLink = ''
-        self.mobileRevision = mobileRevision
-        self.baseWorkDir = baseWorkDir
-        self.configSubDir = configSubDir
-        self.env = env
-        self.nightly = nightly
-        self.objdir = objdir
-        self.platform = platform
-        self.productName = productName
-        self.generateSymbols = generateSymbols
-        self.uploadSymbols = uploadSymbols
-        self.stageUsername = stageUsername
-        self.stageSshKey = stageSshKey
-        self.stageServer = stageServer
-        self.stageBasePath = stageBasePath
-        self.stageGroup = stageGroup
-        self.tinderboxBuildsDir = tinderboxBuildsDir
-        self.mozRevision = mozRevision
-        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
-                                                      mozconfig)
-        self.talosMasters = talosMasters or []
-        self.unittestMasters = unittestMasters or []
-        self.enable_try = enable_try
-        if enable_try:
-            self.clobber = clobber = True
-            assert try_subdir is not None
-            self.try_subdir = try_subdir
-
-        if nightly:
-            self.clobber = clobber = True
-        else:
-            self.clobber = clobber
-
-        self.triggeredSchedulers = triggeredSchedulers
-        self.triggerBuilds = triggerBuilds
-        self.mozconfigBranch = mozconfigBranch
-
-        if baseUploadDir is None:
-            self.baseUploadDir = self.mobileBranchName
-        else:
-            self.baseUploadDir = baseUploadDir
-
-        self.createSnippet = createSnippet
-        if createSnippet:
-            assert ausBaseUploadDir and updatePlatform and downloadBaseURL
-            assert ausUser and ausSshKey and ausHost
-            self.ausBaseUploadDir = ausBaseUploadDir
-            self.updatePlatform = updatePlatform
-            self.downloadBaseURL = downloadBaseURL
-            self.ausUser = ausUser
-            self.ausSshKey = ausSshKey
-            self.ausHost = ausHost
-            self.ausPreviousUploadDir = "%s/%s/%%(previous_buildid)s/en-US" % \
-              (self.ausBaseUploadDir, self.updatePlatform)
-            self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
-              (self.ausBaseUploadDir, self.updatePlatform)
-            self.latestDir = 'latest-%s-%s' % (self.branchName, self.platform)
-
-        self.mozChangesetLink = '<a href=%s/rev' % (self.repository)
-        self.mozChangesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
-
-        self.multiLocale = multiLocale
-        if multiLocale:
-            assert mozharnessConfig
-            self.mozharnessRepoPath = mozharnessRepoPath
-            self.mozharnessRevision = mozharnessRevision
-            self.mozharnessConfig = mozharnessConfig
-            self.mozharnessRepository = self.getRepository(mozharnessRepoPath)
-            self.mozharnessBranchName = self.getRepoName(self.mozharnessRepository)
-            self.mergeLocales = mergeLocales
-            self.compareLocalesRepository = self.getRepository(compareLocalesRepoPath)
-            self.compareLocalesRevision = compareLocalesRevision
-
-    def addTriggeredBuildsSteps(self,
-                                triggeredSchedulers=None):
-        '''Trigger other schedulers.
-        We don't include these steps by default because different
-        children may want to trigger builds at different stages.
-
-        If triggeredSchedulers is None, then the schedulers listed in
-        self.triggeredSchedulers will be triggered.
-        '''
-        if triggeredSchedulers is None:
-            if self.triggeredSchedulers is None:
-                return True
-            triggeredSchedulers = self.triggeredSchedulers
-
-        for triggeredScheduler in triggeredSchedulers:
-            self.addStep(Trigger(
-                schedulerNames=[triggeredScheduler],
-                copy_properties=['buildid'],
-                waitForFinish=False))
-
-    def addHgPullSteps(self, repository=None,
-                       targetDirectory=None, workdir=None,
-                       cloneTimeout=60*20,
-                       revision='default',
-                       propertyPrefix="hg",
-                       clobber=False,
-                       changesetLink=None):
-        assert (repository and workdir)
-        if (targetDirectory == None):
-            targetDirectory = self.getRepoName(repository)
-
-        if clobber:
-            self.addStep(ShellCommand(
-                name='clobber_%s_dir' % targetDirectory,
-                command=['rm', '-rf', targetDirectory],
-                timeout=60*60,
-                workdir=workdir,
-            ))
-        self.addStep(MercurialCloneCommand,
-            name='checkout',
-            command=['bash', '-c',
-                     'if [ ! -d %s ]; then hg clone %s %s; fi' %
-                     (targetDirectory, repository, targetDirectory)],
-            workdir=workdir,
-            description=['checking', 'out', targetDirectory],
-            descriptionDone=['checked', 'out', targetDirectory],
-            timeout=cloneTimeout
-        )
-        self.addStep(ShellCommand,
-            name='hg_pull',
-            command=['hg', 'pull'],
-            workdir="%s/%s" % (workdir, targetDirectory),
-            description=['pulling', targetDirectory],
-            descriptionDone=['pulled', targetDirectory],
-            haltOnFailure=True
-        )
-        if revision:
-            rev_list = ['--rev', revision]
-        else:
-            rev_list = []
-        self.addStep(ShellCommand,
-            name='hg_update',
-            command=['hg', 'update', '-C'] + rev_list,
-            workdir="%s/%s" % (workdir, targetDirectory),
-            description=['updating', targetDirectory],
-            descriptionDone=['updated', targetDirectory],
-            haltOnFailure=True
-        )
-        if changesetLink:
-            self.addStep(SetProperty(
-                command=['hg', 'identify', '-i'],
-                property='%s_revision' % propertyPrefix,
-                workdir='%s/%s' % (workdir, targetDirectory)
-            ))
-            changesetLink = changesetLink.replace('hg_revision',
-                                                  '%s_revision' % propertyPrefix)
-            self.addStep(OutputStep(
-                name='tinderboxprint_changeset',
-                data=['TinderboxPrint:', WithProperties(changesetLink)]
-            ))
-
-    def getMozconfig(self):
-        self.addStep(ShellCommand,
-            name='rm_configs',
-            command=['rm', '-rf', 'configs'],
-            workdir=self.baseWorkDir,
-            description=['removing', 'configs'],
-            descriptionDone=['remove', 'configs'],
-            haltOnFailure=True
-        )
-        self.addHgPullSteps(repository=self.configRepository,
-                            workdir=self.baseWorkDir,
-                            targetDirectory='configs',
-                            revision=self.mozconfigBranch)
-        self.addStep(ShellCommand,
-            name='copy_mozconfig',
-            command=['cp', self.mozconfig,
-                     '%s/.mozconfig' % self.branchName],
-            workdir=self.baseWorkDir,
-            description=['copying', 'mozconfig'],
-            descriptionDone=['copied', 'mozconfig'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='cat_mozconfig',
-            command=['cat', '.mozconfig'],
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['cat', 'mozconfig']
-        )
-
-    def addPreBuildSteps(self):
-        pass
-
-    def missingMobileDir(self, step):
-        return not step.build.getProperties().has_key("mobile_dir") or len(step.build.getProperty("mobile_dir")) == 0;
-
-    def addBaseRepoSteps(self):
-        if self.enable_try:
-            self.addStep(Mercurial(
-                name='hg_update',
-                mode='clobber',
-                baseURL='http://%s/' % self.hgHost,
-                defaultBranch=self.repoPath,
-                timeout=60*60,
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                locks=[hg_try_lock.access('counting')],
-            ))
-            self.addStep(SetProperty(
-                name='set_moz_rev',
-                command=['hg', 'parent', '--template={node}'],
-                extract_fn = short_hash,
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            ))
-            moz_csl = self.mozChangesetLink.replace('hg_revision',
-                                                    'got_revision')
-            mobile_csl = self.mobileChangesetLink.replace('hg_revision',
-                                                          'mobile_rev')
-            self.addStep(SetProperty(
-                name='mobile_dir',
-                command=['bash', '-c',
-                  'if [ -d mobile ] ; then echo mobile; fi'],
-                property='mobile_dir',
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName)
-            ))
-            self.addStep(SetProperty(
-                name='mobile_repo',
-                command=['bash', '-c',
-                  'if [ -f mobile-repo ] ; then ' +
-                  'cat mobile-repo ; else ' +
-                  'echo "Missing mobile/ and mobile-repo! Exiting!"; '+
-                  'exit -1 ; fi'],
-                property='mobile_repo',
-                description=["read", "mobile-repo"],
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                haltOnFailure=True,
-                doStepIf=self.missingMobileDir
-            ))
-            self.addStep(SetProperty(
-                name='mobile_rev',
-                command=['bash', '-c',
-                  'if [[ -f mobile-rev ]] ; then ' +
-                  'cat mobile-rev ; else ' +
-                  'echo default ; fi'],
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                property='requested_mobile_rev',
-                description=["read", "mobile-rev"],
-                doStepIf=self.missingMobileDir
-            ))
-            mobile_clone_cmd = 'hg clone -U http://%s/' % self.hgHost
-            mobile_clone_cmd += '%(mobile_repo)s mobile'
-            self.addStep(MercurialCloneCommand(
-                name='mobile_clone',
-                command=['bash', '-c', WithProperties(mobile_clone_cmd)],
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                description=["clone", "mobile-repo"],
-                haltOnFailure=True,
-                doStepIf=self.missingMobileDir
-            ))
-            mobile_update_cmd = 'hg update --rev %(requested_mobile_rev)s'
-            self.addStep(ShellCommand(
-                name='mobile_update',
-                command=['bash', '-c', WithProperties(mobile_update_cmd)],
-                workdir='%s/%s/mobile' % (self.baseWorkDir, self.branchName),
-                haltOnFailure=True,
-                description=["update", "mobile-repo"],
-                doStepIf=self.missingMobileDir
-            ))
-            self.addStep(SetProperty(
-                name='mobile_ident',
-                command=['hg', 'ident', '-R', 'mobile', '-i'],
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                property='mobile_rev',
-                description=["set", "mobile_rev"],
-                doStepIf=self.missingMobileDir
-            ))
-            self.addStep(OutputStep(
-                name='show_moz_rev',
-                data=WithProperties('TinderboxPrint: ' + moz_csl),
-            ))
-            self.addStep(OutputStep(
-                name='show_mobile_rev',
-                data=WithProperties('TinderboxPrint: ' + mobile_csl),
-                doStepIf=self.missingMobileDir
-            ))
- 
-        else:
-            self.addHgPullSteps(repository=self.repository,
-                            workdir=self.baseWorkDir,
-                            changesetLink=self.mozChangesetLink,
-                            revision=self.mozRevision,
-                            propertyPrefix="mozilla",
-                            cloneTimeout=60*60)
-            if self.mobileRepoPath:
-                self.addHgPullSteps(repository=self.mobileRepository,
-                    workdir='%s/%s' % (self.baseWorkDir,
-                    self.branchName),
-                    changesetLink=self.mobileChangesetLink,
-                    revision=self.mobileRevision,
-                    propertyPrefix="mobile",
-                    targetDirectory='mobile')
-                self.addStep(SetProperty(
-                    name='set_got_revision',
-                    command=WithProperties("echo %(mozilla_revision)s:%(mobile_revision)s"),
-                    workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                    property='got_revision'
-                ))
-            else:
-                self.addStep(SetProperty(
-                    name='set_got_revision',
-                    command=WithProperties("echo %(mozilla_revision)s"),
-                    workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                    property='got_revision'
-                ))
-            if self.multiLocale:
-                self.addHgPullSteps(repository=self.mozharnessRepository,
-                                    workdir=self.baseWorkDir,
-                                    revision=self.mozharnessRevision,
-                                    clobber=self.clobber,
-                                    targetDirectory='mozharness',
-                                    cloneTimeout=60*30)
-                self.addHgPullSteps(repository=self.compareLocalesRepository,
-                                    workdir=self.baseWorkDir,
-                                    revision=self.compareLocalesRevision,
-                                    clobber=self.clobber,
-                                    cloneTimeout=60*30)
-
-    def addSymbolSteps(self):
-        if self.generateSymbols:
-            self.addStep(ShellCommand,
-                name='make_buildsymbols',
-                command=['make', 'buildsymbols'],
-                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                      self.objdir),
-                env=self.env,
-                haltOnFailure=True
-            )
-        if self.uploadSymbols:
-            self.addStep(ShellCommand,
-                name='make_uploadsymbols',
-                command=['make', 'uploadsymbols'],
-                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                      self.objdir),
-                env=self.env,
-                haltOnFailure=True
-            )
-
-    def addUpdateSteps(self):
-        pass
-
-    def addUploadSteps(self, platform):
-        if self.enable_try:
-            self.addStep(SetBuildProperty(
-                name='set_who',
-                property_name='who',
-                value=lambda x: str(x.source.changes[0].who),
-            ))
-            remote_location = '%s/%s/try-%s' % (self.stageBasePath,
-                            self.try_subdir, self.platform)
-            ssh_string = 'ssh -i ~/.ssh/%s %s@%s mkdir -p %s' % \
-                    (self.stageSshKey, self.stageUsername,
-                     self.stageServer, remote_location)
-            scp_string = 'scp -i ~/.ssh/%s %s %s@%s:%s' % \
-                    (self.stageSshKey, self.packageGlob,
-                     self.stageUsername, self.stageServer, remote_location)
-            self.addStep(ShellCommand(
-                name='mkdir_remote',
-                command=['bash', '-c', WithProperties(ssh_string)],
-                workdir=self.baseWorkDir,
-            ))
-            self.addStep(ShellCommand(
-                name='upload',
-                command=['bash', '-c', WithProperties(scp_string)],
-                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                      self.objdir),
-            ))
-            if 'maemo5-gtk' in self.platform:
-                self.addStep(SetProperty(
-                    name='find_browser',
-                    command=['bash', '-c', 'ls fennec-*.linux-gnueabi-arm.tar.bz2'],
-                    property='browser_file',
-                    workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName,
-                                          self.objdir),
-                ))
-    
-                http_remote_path = remote_location.replace('/home/ftp/pub/', 'pub/mozilla.org/')
-                stage_dir = 'http://%s/%s' % (self.stageServer, http_remote_path)
-                browser_http_path_string = stage_dir + '/%(browser_file)s'
-    
-                files = [WithProperties(browser_http_path_string)]
-    
-                self.addStep(SendChangeStep(
-                    master='production-mobile-master.build.mozilla.org:9010',
-                    branch='tryserver-n900-gtk',
-                    files=files,
-                    revision=WithProperties('%(got_revision)s'),
-                    user=WithProperties('%(who)s'),
-                ))
-                self.addStep(SendChangeStep(
-                    master='staging-mobile-master.build.mozilla.org:9010',
-                    branch='tryserver-n900-gtk',
-                    files=files,
-                    revision=WithProperties('%(got_revision)s'),
-                    user=WithProperties('%(who)s'),
-                ))
-    
-        else:
-            self.addStep(SetProperty,
-                name="get_buildid",
-                command=['python', 'config/printconfigsetting.py',
-                         '%s/dist/bin/application.ini' % (self.objdir),
-                         'App', 'BuildID'],
-                property='buildid',
-                workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-                description=['getting', 'buildid'],
-                descriptionDone=['got', 'buildid']
-            )
-            self.addStep(MozillaStageUpload,
-                name="upload_to_stage",
-                description=['upload','to','stage'],
-                objdir="%s/%s" % (self.branchName, self.objdir),
-                username=self.stageUsername,
-                milestone=self.baseUploadDir,
-                remoteHost=self.stageServer,
-                remoteBasePath=self.stageBasePath,
-                platform=platform,
-                group=self.stageGroup,
-                packageGlob=self.packageGlob,
-                sshKey=self.stageSshKey,
-                uploadCompleteMar=False,
-                releaseToLatest=self.nightly,
-                releaseToDated=self.nightly,
-                releaseToTinderboxBuilds=True,
-                tinderboxBuildsDir=self.baseUploadDir,
-                remoteCandidatesPath=self.stageBasePath,
-                dependToDated=True,
-                workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                            self.objdir)
-            )
-
-    def processCommand(self, **kwargs):
-        '''This function is overridden by MaemoBuildFactory to
-        adjust the command and workdir appropriately for scratchbox.
-
-        Taken from BaseRepackFactory.
-        '''
-        return kwargs
-
-    def addMakeUploadSteps(self, subdir=None, sendchange=True,
-                           locale=None):
-        self.addStep(SetProperty,
-            name="get_buildid",
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % (self.objdir),
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        if self.enable_try:
-            self.addStep(SetBuildProperty(
-                name='set_who',
-                property_name='who',
-                value=lambda x: str(x.source.changes[0].who),
-            ))
-        # From NightlyBuildFactory doUpload, but with altered workdir
-        # and with platform in the nightly dir.
-        # We should be able to get rid of this duplicate code with
-        # bug 557260.
-        uploadEnv = self.env.copy()
-        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
-                          'UPLOAD_USER': self.stageUsername,
-                          'UPLOAD_TO_TEMP': '1'})
-        if self.stageSshKey:
-            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
-        if self.tinderboxBuildsDir is None:
-            tinderboxBuildsDir = "%s-%s" % (self.branchName, self.platform)
-        else:
-            tinderboxBuildsDir = self.tinderboxBuildsDir
-        uploadArgs = dict(
-                upload_dir=tinderboxBuildsDir,
-                product=self.productName,
-                buildid=WithProperties("%(buildid)s"),
-                as_list=False,
-            )
-        if self.hgHost.startswith('ssh'):
-            uploadArgs['to_shadow'] = True
-            uploadArgs['to_tinderbox_dated'] = False
-        else:
-            uploadArgs['to_shadow'] = False
-            if self.enable_try:
-                uploadArgs['to_try'] = True
-                uploadArgs['to_tinderbox_dated'] = False
-                uploadArgs['revision'] = WithProperties('%(got_revision)s')
-                uploadArgs['who'] = WithProperties('%(who)s')
-                uploadArgs['builddir'] = tinderboxBuildsDir
-            else:
-                uploadArgs['to_tinderbox_dated'] = True
-        if subdir:
-            uploadArgs['builddir'] = subdir
-
-        if self.nightly:
-            uploadArgs['to_dated'] = True
-            uploadArgs['to_latest'] = True
-            uploadArgs['branch'] = '%s-%s' % (self.branchName, self.platform)
-
-        uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
-
-        makeUploadCommand = ['make', 'upload']
-        if locale:
-            makeUploadCommand += ['AB_CD=%s' % locale]
-        self.addStep(SetProperty, **self.processCommand(
-            name='make_upload',
-            command=makeUploadCommand,
-            env=uploadEnv,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                  self.objdir),
-            extract_fn = parse_make_upload,
-            haltOnFailure=True,
-            description=['make', 'upload'],
-            timeout=40*60 # 40 minutes
-        ))
-        sendchangePlatform = None
-        if self.platform == 'android-r7':
-            sendchangePlatform = 'android'
-        if 'linux' in self.platform:
-            sendchangePlatform = 'linux'
-        user = "sendchange"
-        if self.enable_try:
-            user = WithProperties("%(who)s")
-        if len(self.talosMasters) > 0 and sendchange:
-            talosBranch = "%s-%s-talos" % (self.branchName, sendchangePlatform)
-            for master, warn, retries in self.talosMasters:
-                self.addStep(SendChangeStep(
-                 name='sendchange_%s' % master,
-                 warnOnFailure=warn,
-                 master=master,
-                 retries=retries,
-                 branch=talosBranch,
-                 revision=WithProperties("%(got_revision)s"),
-                 files=[WithProperties('%(packageUrl)s')],
-                 user=user)
-                )
-        if len(self.unittestMasters) > 0 and sendchange:
-            unittestType = 'mobile' if 'linux' in self.platform else 'opt'
-            unittestBranch = "%s-%s-%s-unittest" % (self.branchName,
-                                                    sendchangePlatform,
-                                                    unittestType)
-            for master, warn, retries in self.unittestMasters:
-                self.addStep(SendChangeStep(
-                 name='sendchange_%s' % master,
-                 warnOnFailure=warn,
-                 master=master,
-                 retries=retries,
-                 branch=unittestBranch,
-                 revision=WithProperties("%(got_revision)s"),
-                 files=[WithProperties('%(packageUrl)s'),
-                        WithProperties('%(testsUrl)s')],
-                 user=user,
-                ))
-
-    def addMultiLocaleSteps(self, scriptName="mozharness/scripts/multil10n.py"):
-        mergeLocalesArg = "--merge-locales"
-        if not self.mergeLocales:
-            mergeLocalesArg = "--no-merge-locales"
-        self.addStep(ShellCommand(
-            name='run_multil10n',
-            command=['python', scriptName,
-                     '--config-file', self.mozharnessConfig,
-                     mergeLocalesArg,
-                     '--only-pull-locale-source', '--only-add-locales',
-                     '--only-package-multi'],
-            workdir=self.baseWorkDir,
-            description=['running', 'multil10n', 'steps'],
-            descriptionDone=['ran', 'multil10n', 'steps'],
-            haltOnFailure=True
-        ))
-
-class MobileDesktopBuildFactory(MobileBuildFactory):
-    def __init__(self, packageGlobList=['-r', 'mobile/dist/*.tar.bz2',
-                                        'xulrunner/dist/*.tar.bz2'],
-                 **kwargs):
-        """This class creates a desktop fennec build.  -r in package glob
-        is to ensure that all files are uploaded as this is the first
-        option given to scp.  hack alert!"""
-        MobileBuildFactory.__init__(self, **kwargs)
-        self.packageGlob = ' '.join(packageGlobList)
-
-        self.addPreCleanSteps()
-        self.addBaseRepoSteps()
-        self.getMozconfig()
-        self.addPreBuildSteps()
-        self.addBuildSteps()
-        self.addPackageSteps()
-        self.addSymbolSteps()
-        do_sendchange = True if 'linux' in self.platform else False
-        self.addMakeUploadSteps(sendchange=do_sendchange)
-        if self.triggerBuilds:
-            self.addTriggeredBuildsSteps()
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
-
-    def addPreCleanSteps(self):
-        self.addStep(ShellCommand,
-                name='rm_cltbld_logs',
-                command='rm -f /tmp/*_cltbld.log',
-                description=['removing', 'log', 'file'],
-                workdir=self.baseWorkDir
-            )
-        if self.clobber:
-            self.addStep(ShellCommand,
-                name='clobber_%s_dir' % self.branchName,
-                command=['rm', '-rf', self.branchName],
-                description=['clobber', 'build'],
-                timeout=60*60,
-                workdir=self.baseWorkDir
-            )
-
-    def addBuildSteps(self):
-        self.addStep(ShellCommand,
-                name='compile',
-                command=['make', '-f', 'client.mk', 'build'],
-                description=['compile'],
-                workdir=self.baseWorkDir + "/" +  self.branchName,
-                env=self.env,
-                haltOnFailure=True
-            )
-
-    def addPackageSteps(self):
-        self.addStep(ShellCommand,
-            name='rm_mobile_pkg',
-            command=['rm', '-rvf', 'dist/fennec*'],
-            workdir='%s/%s/%s' % (self.baseWorkDir,
-            self.branchName, self.objdir),
-            env=self.env,
-            haltOnFailure=True,
-        )
-        self.addStep(ShellCommand,
-            name='make_mobile_pkg',
-            command=['make', 'package'],
-            workdir='%s/%s/%s' % (self.baseWorkDir,
-            self.branchName, self.objdir),
-            description=['make', 'mobile', 'package'],
-            env=self.env,
-            haltOnFailure=True,
-        )
-        self.addStep(ShellCommand,
-            name='make_pkg_tests',
-            command=['make', 'package-tests'],
-            workdir='%s/%s/%s' % (self.baseWorkDir,
-                self.branchName, self.objdir),
-            env=self.env,
-            haltOnFailure=True,
-        )
-
-class MaemoBuildFactory(MobileBuildFactory):
-    def __init__(self, baseBuildDir, scratchboxPath="/scratchbox/moz_scratchbox",
-                 sb_target='CHINOOK-ARMEL-2007',
-                 scratchboxHome='/scratchbox/users/cltbld/home/cltbld',
-                 packageGlobList=None,
-                 debs=True,
-                 mergeLocales=True,
-                 objdirRelPath=None, objdirAbsPath=None,
-                 **kwargs):
-        MobileBuildFactory.__init__(self, **kwargs)
-        self.baseBuildDir = baseBuildDir
-        self.packageGlob = ' '.join(packageGlobList)
-        self.scratchboxPath = scratchboxPath
-        self.scratchboxHome = scratchboxHome
-        self.mergeLocales = mergeLocales
-        self.sb_target = sb_target
-        self.debs = debs
-        self.addStep(ShellCommand(
-            name='set-target',
-            command=[self.scratchboxPath, '-p', 'sb-conf', 'select', self.sb_target],
-            description=['set-target'],
-            haltOnFailure=True,
-        ))
-        self.addStep(ShellCommand(
-            name='show-target',
-            command=[self.scratchboxPath, '-p',
-            "echo -n TinderboxPrint: && sb-conf current | sed 's/ARMEL// ; s/_// ; s/-//'"],
-            description=['show-target'],
-            haltOnFailure=False,
-        ))
-        if objdirRelPath:
-            self.objdirRelPath = objdirRelPath
-        else:
-            self.objdirRelPath = 'build/%s/%s/%s' % (self.baseBuildDir,
-                                                     self.branchName,
-                                                     self.objdir)
-        if objdirAbsPath:
-            self.objdirAbsPath = objdirAbsPath
-        else:
-            self.objdirAbsPath = '%s/%s/%s' % (self.baseWorkDir,
-                                               self.branchName,
-                                               self.objdir)
-
-        self.addPreCleanSteps()
-        self.addBaseRepoSteps()
-        self.getMozconfig()
-        self.addPreBuildSteps()
-        self.addBuildSteps()
-        self.addPackageSteps()
-        self.addSymbolSteps()
-        if self.multiLocale:
-            self.addMakeUploadSteps(subdir="en-US")
-        else:
-            self.addMakeUploadSteps()
-        if self.triggerBuilds:
-            self.addTriggeredBuildsSteps()
-        if self.multiLocale:
-            self.addMultiLocaleSteps(scriptName="mozharness/scripts/maemo_multi_locale_build.py")
-            self.addMakeUploadSteps(locale="multi")
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
-
-    def addPreCleanSteps(self):
-        self.addStep(ShellCommand,
-            name='rm_logfile',
-            command = 'rm -f /tmp/*_cltbld.log',
-            description=['removing', 'logfile'],
-            descriptionDone=['removed', 'logfile']
-        )
-        if self.clobber:
-            self.addStep(ShellCommand,
-                name='clobber_%s_dir' % self.branchName,
-                command=['rm', '-rf', self.branchName],
-                env=self.env,
-                workdir=self.baseWorkDir,
-                timeout=60*60
-            )
-        else:
-            # Must use a workdir of self.baseWorkDir; a workdir of
-            # self.objdirAbsPath can create an empty mozilla-central
-            # dir and break hg.
-            self.addStep(ShellCommand,
-                name='rm_old_builds',
-                command=['bash', '-c', 'rm -rf %s/%s/dist/fennec* ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/mobile/*.deb ' %
-                         (self.branchName, self.objdir) +
-                         '%s/%s/dist/bin' %
-                         (self.branchName, self.objdir)],
-                workdir=self.baseWorkDir,
-                description=['removing', 'old', 'builds'],
-                descriptionDone=['removed', 'old', 'builds']
-            )
-
-    def addBuildSteps(self, extraEnv=''):
-        self.addStep(ShellCommand,
-            name='compile',
-            command=[self.scratchboxPath, '-p', '-d',
-                     'build/%s/%s' % (self.baseBuildDir, self.branchName),
-                     'make -f client.mk build %s' %  extraEnv],
-            description=['compile'],
-            env={'PKG_CONFIG_PATH': '/usr/lib/pkgconfig:/usr/local/lib/pkgconfig'},
-            haltOnFailure=True
-        )
-
-    def addPackageSteps(self, multiLocale=False):
-        extraArgs=''
-        if multiLocale:
-            extraArgs='AB_CD=multi'
-        self.addStep(ShellCommand,
-            name='rm_pkg',
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s' % (self.objdirRelPath),
-                     'rm -rfv dist/fennec*'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='make_pkg',
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s' % (self.objdirRelPath),
-                     'make package', extraArgs],
-            description=['make', 'package'],
-            haltOnFailure=True
-        )
-        if self.debs:
-            self.addStep(ShellCommand,
-                         name='make_mobile_deb',
-                         command=[self.scratchboxPath, '-p', '-d',
-                                  '%s' % (self.objdirRelPath),
-                                  'make deb', extraArgs],
-                         description=['make', 'mobile', 'deb'],
-                         haltOnFailure=True
-            )
-        # Build tests for multi-locale nightly builds, dependent builds
-        # and nightly builds which are not multi-locale like Electrolysis and Tracemonkey 
-        self.addStep(ShellCommand,
-            name='make_pkg_tests',
-            command=[self.scratchboxPath, '-p', '-d',
-                     '%s' % (self.objdirRelPath),
-                     'make package-tests PYTHON=python2.5', extraArgs],
-            description=['make', 'package-tests'],
-            haltOnFailure=True
-        )
-
-    def addSymbolSteps(self):
-        if self.generateSymbols:
-            self.addStep(ShellCommand,
-                name='make_buildsymbols',
-                command=[self.scratchboxPath, '-p', '-d',
-                         self.objdirRelPath,
-                         'make buildsymbols'],
-                description=['make', 'buildsymbols'],
-                env=self.env,
-                haltOnFailure=True
-            )
-        if self.uploadSymbols:
-            self.addStep(ShellCommand,
-                name='make_uploadsymbols',
-                command=[self.scratchboxPath, '-p', '-k', '-d',
-                         self.objdirRelPath,
-                         'make uploadsymbols'],
-                description=['make', 'uploadsymbols'],
-                env=self.env,
-                haltOnFailure=True
-            )
-    
-    def processCommand(self, verbose=True, **kwargs):
-        '''Modifies a command to make it suitable for Scratchbox'''
-        if kwargs['workdir'].startswith(self.scratchboxHome):
-            kwargs['workdir'] = kwargs['workdir'].replace(self.scratchboxHome+'/','')
-        kwargs['command'] = [self.scratchboxPath,
-                             '-d', kwargs['workdir']] + kwargs['command']
-        if verbose:
-            kwargs['command'].insert(1, '-p')
-        if 'env' in kwargs and kwargs['env']:
-            kwargs['command'].insert(1, '-k')
-        return kwargs
 
 def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
     '''Given a build object, figure out which files have the include_substr
@@ -7548,7 +6642,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     workdir='build/mozmill',
                     timeout=5*60,
                     flunkOnFailure=True
-                    ))                    
+                    ))
 
 
 class RemoteUnittestFactory(MozillaTestFactory):
@@ -7680,9 +6774,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  haltOnFailure=True,
                 ))
                 variant = name.split('-', 1)[1]
+                if 'browser-chrome' in name:
+                    stepProc = unittest_steps.RemoteMochitestBrowserChromeStep
+                else:
+                    stepProc = unittest_steps.RemoteMochitestStep
                 if suite.get('testPaths', None):
                     for tp in suite.get('testPaths', []):
-                        self.addStep(unittest_steps.RemoteMochitestStep(
+                        self.addStep(stepProc(
                          variant=variant,
                          testPath=tp,
                          workdir='build/tests',
@@ -7690,7 +6788,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          app=self.remoteProcessName,
                         ))
                 else:
-                    self.addStep(unittest_steps.RemoteMochitestStep(
+                    self.addStep(stepProc(
                      variant=variant,
                      workdir='build/tests',
                      timeout=2400,
@@ -7751,7 +6849,7 @@ class TalosFactory(RequestSortingBuildFactory):
     """Create working talos build factory"""
     def __init__(self, OS, supportUrlBase, envName, buildBranch, branchName,
             configOptions, talosCmd, customManifest=None, customTalos=None,
-            workdirBase=None, fetchSymbols=False, plugins=None, pageset=None,
+            workdirBase=None, fetchSymbols=False, plugins=None, pagesets=[],
             remoteTests=False, productName="firefox", remoteExtras=None,
             talosAddOns=[], addonTester=False, releaseTester=False,
             talosBranch=None, branch=None):
@@ -7776,7 +6874,7 @@ class TalosFactory(RequestSortingBuildFactory):
         self.customTalos = customTalos
         self.fetchSymbols = fetchSymbols
         self.plugins = plugins
-        self.pageset = pageset
+        self.pagesets = pagesets[:]
         self.talosAddOns = talosAddOns[:]
         self.exepath = None
         self.env = MozillaEnvironments[envName]
@@ -7839,6 +6937,16 @@ class TalosFactory(RequestSortingBuildFactory):
              warnOnFailure=False,
              description="move tp4 out of talos dir to tp4-%random%",
              command=["if", "exist", "talos\\page_load_test\\tp4", "mv", "talos\\page_load_test\\tp4", "tp4-%random%"],
+             env=self.env)
+            )
+            #required step due to long filename length in tp5
+            self.addStep(ShellCommand(
+             name='mv tp5',
+             workdir=os.path.join(self.workdirBase),
+             flunkOnFailure=False,
+             warnOnFailure=False,
+             description="move tp5 out of talos dir to tp5-%random%",
+             command=["if", "exist", "talos\\page_load_test\\tp5", "mv", "talos\\page_load_test\\tp5", "tp5-%random%"],
              env=self.env)
             )
             self.addStep(ShellCommand(
@@ -8114,7 +7222,7 @@ class TalosFactory(RequestSortingBuildFactory):
         elif self.remoteTests:
             self.addStep(ShellCommand(
              name='copy_talos',
-             command=["cp", "-r", "../../talos-data/talos", "."],
+             command=["cp", "-rv", "/builds/talos-data/talos", "."],
              workdir=self.workdirBase,
              description="copying talos",
              haltOnFailure=True,
@@ -8123,7 +7231,7 @@ class TalosFactory(RequestSortingBuildFactory):
             )
             self.addStep(ShellCommand(
              name='copy_fennecmark',
-             command=["cp", "-r", "../../talos-data/bench@taras.glek",
+             command=["cp", "-rv", "/builds/talos-data/bench@taras.glek",
                       "talos/mobile_profile/extensions/"],
              workdir=self.workdirBase,
              description="copying fennecmark",
@@ -8133,7 +7241,7 @@ class TalosFactory(RequestSortingBuildFactory):
             )
             self.addStep(ShellCommand(
              name='copy_pageloader',
-             command=["cp", "-r", "../../talos-data/pageloader@mozilla.org",
+             command=["cp", "-rv", "/builds/talos-data/pageloader@mozilla.org",
                       "talos/mobile_profile/extensions/"],
              workdir=self.workdirBase,
              description="copying pageloader",
@@ -8163,13 +7271,13 @@ class TalosFactory(RequestSortingBuildFactory):
              workdir=os.path.join(self.workdirBase, "talos/base_profile"),
             ))
 
-        if self.pageset:
+        for pageset in self.pagesets:
             self.addStep(DownloadFile(
-             url="%s/%s" % (self.supportUrlBase, self.pageset),
+             url="%s/%s" % (self.supportUrlBase, pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
             ))
             self.addStep(UnpackFile(
-             filename=os.path.basename(self.pageset),
+             filename=os.path.basename(pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
             ))
 
@@ -8427,7 +7535,7 @@ class PartnerRepackFactory(ReleaseFactory):
             description=['remove', 'partners', 'repo'],
             workdir=self.baseWorkDir,
         )
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
             name='clone_partners_repo',
             command=['hg', 'clone',
                      'http://%s/%s' % (self.hgHost,
@@ -8437,7 +7545,7 @@ class PartnerRepackFactory(ReleaseFactory):
             description=['clone', 'partners', 'repo'],
             workdir=self.baseWorkDir,
             haltOnFailure=True
-        )
+        ))
         self.addStep(ShellCommand,
             name='update_partners_repo',
             command=['hg', 'update', '-C', '-r', self.partnersRepoRevision],
@@ -8526,367 +7634,6 @@ class PartnerRepackFactory(ReleaseFactory):
              description=['upload', 'partner', 'status'],
              haltOnFailure=True
             )
-
-class ReleaseMobileDesktopBuildFactory(MobileDesktopBuildFactory):
-    def __init__(self, **kwargs):
-        MobileDesktopBuildFactory.__init__(self, **kwargs)
-
-    def addUploadSteps(self, platform):
-        self.addStep(SetProperty,
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % self.objdir,
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(ShellCommand,
-         name='echo_buildID',
-         command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                '%s_info.txt' % self.platform)],
-         workdir='%s/%s/%s/dist' % (self.baseWorkDir, self.branchName, self.objdir)
-        )
-        self.packageGlob = '%s dist/%s_info.txt' % (self.packageGlob,
-                                                    self.platform)
-        self.addStep(MozillaStageUpload,
-            objdir="%s/%s" % (self.branchName, self.objdir),
-            username=self.stageUsername,
-            milestone=self.baseUploadDir,
-            remoteHost=self.stageServer,
-            remoteBasePath=self.stageBasePath,
-            platform=platform,
-            group=self.stageGroup,
-            packageGlob=self.packageGlob,
-            sshKey=self.stageSshKey,
-            uploadCompleteMar=False,
-            releaseToLatest=False,
-            releaseToDated=False,
-            releaseToTinderboxBuilds=False,
-            releaseToCandidates=True,
-            tinderboxBuildsDir=self.baseUploadDir,
-            remoteCandidatesPath=self.stageBasePath,
-            dependToDated=True,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                  self.objdir)
-        )
-
-class AndroidBuildFactory(MobileBuildFactory):
-    def __init__(self, uploadPlatform='linux',
-                       packageGlobList=['dist/*.apk',], **kwargs):
-        """This class creates an Android build.
-        """
-        MobileBuildFactory.__init__(self, **kwargs)
-        self.packageGlob = ' '.join(packageGlobList)
-        if uploadPlatform is not None:
-            self.uploadPlatform = uploadPlatform
-        else:
-            self.uploadPlatform = self.platform
-
-        self.objdir = 'objdir'
-
-        self.addPreCleanSteps()
-        self.addBaseRepoSteps()
-        self.getMozconfig()
-        self.addPreBuildSteps()
-        self.addBuildSteps()
-        self.addPackageSteps()
-        if not self.multiLocale and self.createSnippet:
-            self.addUpdateSteps()
-        self.addSymbolSteps()
-        if self.multiLocale:
-            self.addMakeUploadSteps(subdir="en-US", uploadSnippet=False)
-        else:
-            self.addMakeUploadSteps()
-        if self.triggerBuilds:
-            self.addTriggeredBuildsSteps()
-        if self.multiLocale:
-            self.addMultiLocaleSteps()
-            if self.createSnippet:
-                self.addUpdateSteps()
-            self.addMakeUploadSteps(sendchange=False, locale='multi')
-        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
-            self.addPeriodicRebootSteps()
-
-    def addPreCleanSteps(self):
-        self.addStep(ShellCommand,
-                name='rm_cltbld_logs',
-                command='rm -f /tmp/*_cltbld.log',
-                description=['removing', 'log', 'file'],
-                workdir=self.baseWorkDir
-            )
-        if self.clobber:
-            self.addStep(ShellCommand,
-                name='clobber_%s_dir' % self.branchName,
-                command=['rm', '-rf', self.branchName],
-                description=['clobber', 'build'],
-                timeout=60*60,
-                workdir=self.baseWorkDir
-            )
-
-    def addBuildSteps(self):
-        # forcing of PATH to contain jdk6 is only required while bug #567945 is active
-        if self.env is None:
-            envJava = {}
-        else:
-            envJava = self.env.copy()
-        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH', '/opt/local/bin:/tools/python/bin:/tools/buildbot/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/cltbld/bin')
-
-        self.addStep(ShellCommand,
-                name='compile',
-                command=['make', '-f', 'client.mk', 'build'],
-                description=['compile'],
-                workdir=self.baseWorkDir + "/" +  self.branchName,
-                env=envJava,
-                haltOnFailure=True
-            )
-
-    def addPackageSteps(self, locale=None):
-        if self.env is None:
-            envJava = {}
-        else:
-            envJava = self.env.copy()
-            envJava['JARSIGNER'] = WithProperties('%(toolsdir)s/release/signing/mozpass.py')
-        makePackageCommand = ['make', 'package']
-        makePackageTestsCommand = ['make', 'package-tests']
-        if locale:
-            makePackageCommand += ['AB_CD=%s' % locale]
-            makePackageTestsCommand += ['AB_CD=%s' % locale]
-
-        self.addStep(ShellCommand,
-            name='rm_android_pkg',
-            command=['rm', '-rfv', 'dist/fennec*'],
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-            env=envJava,
-            haltOnFailure=True,
-        )
-        self.addStep(ShellCommand,
-            name='make_android_pkg',
-            command=makePackageCommand,
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-            description=['make', 'android', 'package'],
-            env=envJava,
-            haltOnFailure=True,
-        )
-        self.addStep(ShellCommand,
-           name='make_pkg_tests',
-           command=makePackageTestsCommand,
-           workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-           env=envJava,
-           haltOnFailure=True,
-        )
-
-    def previousApkExists(self, step):
-        return step.build.getProperties().has_key("previousApk") and len(step.build.getProperty("previousApk")) > 0;
-
-    def getPreviousApk(self, subdir=None):
-        url = '%s/nightly/%s/' % (self.downloadBaseURL, self.latestDir)
-        if subdir:
-            url += "%s/" % subdir
-        url += "%(completeMarFilename)s"
-        self.addStep(ShellCommand(
-            name='get_previous_apk',
-            description=['get', 'previous', 'apk'],
-            command=['bash', '-c',
-                     WithProperties('wget -O previous.apk %s' % url)],
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            flunkOnFailure=False,
-            haltOnFailure=False,
-            warnOnFailure=True
-        ))
-
-    def getPreviousBuildID(self, subdir=None):
-        self.getPreviousApk(subdir=subdir)
-        self.addStep(SetProperty(
-            name='test_previous_apk',
-            property='previousApk',
-            command='test -s previous.apk && ls previous.apk',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            flunkOnFailure=False,
-            haltOnFailure=False,
-            warnOnFailure=True
-        ))
-        self.addStep(ShellCommand(
-            name='unzip_previous_apk',
-            command=['unzip', '-o', 'previous.apk', 'application.ini'],
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'previous', 'buildid'],
-            descriptionDone=['got', 'previous', 'buildid'],
-            doStepIf=self.previousApkExists,
-            haltOnFailure=True,
-        ))
-        self.addStep(SetProperty,
-            name='get_previous_buildid',
-            command=['python', 'config/printconfigsetting.py',
-                     'application.ini', 'App', 'BuildID'],
-            property='previous_buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'previous', 'buildid'],
-            descriptionDone=['got', 'previous', 'buildid'],
-            doStepIf=self.previousApkExists,
-            haltOnFailure=True,
-        )
-
-    def _createSnippet(self):
-        self.addStep(CreateCompleteUpdateSnippet(
-            name='create_complete_update_snippet',
-            objdir='%s/%s/%s' % (self.baseWorkDir, self.branchName,
-                                 self.objdir),
-            milestone=self.baseUploadDir,
-            baseurl='%s/nightly' % self.downloadBaseURL,
-            hashType=self.hashType)
-        )
-
-    def addUpdateSteps(self):
-        # Normally we'd make a mar first, but we'll create a snippet of
-        # the apk for now.
-        self.addFilePropertiesSteps(filename='fennec*.apk',
-                                    directory='%s/%s/%s/dist' % \
-                                      (self.baseWorkDir, self.branchName,
-                                       self.objdir),
-                                    fileType='completeMar',
-                                    haltOnFailure=True)
-        self.addStep(SetProperty,
-            name="get_buildid",
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % self.objdir,
-                     'App', 'BuildID'],
-            property='buildid',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'buildid'],
-            descriptionDone=['got', 'buildid']
-        )
-        self.addStep(SetProperty(
-            name="get_app_version",
-            command=['python', 'config/printconfigsetting.py',
-                     '%s/dist/bin/application.ini' % self.objdir,
-                     'App', 'Version'],
-            property='appVersion',
-            workdir='%s/%s' % (self.baseWorkDir, self.branchName),
-            description=['getting', 'app', 'version'],
-            descriptionDone=['got', 'app', 'version']
-        ))
-        envJava = {}
-        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get('PATH', '/opt/local/bin:/tools/python/bin:/tools/buildbot/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/cltbld/bin')
-        self.addStep(ShellCommand,
-            name='verify_android_signature',
-            command= ['bash', '-c',
-                 WithProperties('%(toolsdir)s/release/signing/verify-android-signature.sh --apk=dist/%(completeMarFilename)s --tools-dir=%(toolsdir)s --nightly')],
-            workdir='%s/%s/%s' % (self.baseWorkDir, self.branchName, self.objdir),
-            description=['verify', 'android', 'signature'],
-            env=envJava,
-            haltOnFailure=True,
-        )
-        self._createSnippet()
-        self.addStep(ShellCommand,
-            name='cat_complete_snippet',
-            description=['cat','complete','snippet'],
-            command=['cat','complete.update.snippet'],
-            workdir='%s/%s/%s/dist/update' % (self.baseWorkDir,
-                                              self.branchName, self.objdir),
-        )
-
-    def unsetFilepath(self, rv, stdout, stderr):
-        return {'filepath': None}
-
-    def addFilePropertiesSteps(self, filename, directory, fileType,
-                               maxDepth=1, haltOnFailure=False):
-        '''From Coop's patch for the now-defunct WinmoBuildFactory.'''
-        self.addStep(FindFile(
-            name='find_filepath',
-            filename=filename,
-            directory=directory,
-            filetype='file',
-            max_depth=maxDepth,
-            property_name='filepath',
-            workdir='.',
-            haltOnFailure=haltOnFailure
-        ))
-        self.addStep(SetProperty,
-            command=['basename', WithProperties('%(filepath)s')],
-            property=fileType+'Filename',
-            workdir='.',
-            name='set_'+fileType.lower()+'_filename',
-            haltOnFailure=haltOnFailure
-        )
-        self.addStep(SetProperty,
-            command=['bash', '-c',
-                     WithProperties("ls -l %(filepath)s")],
-            workdir='.',
-            name='set_'+fileType.lower()+'_size',
-            extract_fn = self.parseFileSize(propertyName=fileType+'Size'),
-            haltOnFailure=haltOnFailure
-        )
-        self.addStep(SetProperty,
-            command=['bash', '-c',
-                     WithProperties('openssl ' + 'dgst -' + self.hashType +
-                                    ' %(filepath)s')],
-            workdir='.',
-            name='set_'+fileType.lower()+'_hash',
-            extract_fn=self.parseFileHash(propertyName=fileType+'Hash'),
-            haltOnFailure=haltOnFailure
-        )
-        self.addStep(SetProperty,
-            name='unset_filepath',
-            command='echo "filepath:"',
-            workdir=directory,
-            extract_fn = self.unsetFilepath,
-        )
-
-    def _uploadSnippet(self):
-        self.addStep(ShellCommand,
-            name='create_aus_previous_updir',
-            command=['ssh', '-l', self.ausUser, self.ausHost,
-                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
-                     WithProperties('mkdir -p %s' % self.ausPreviousUploadDir)],
-            description=['create', 'aus', 'upload', 'dir'],
-            doStepIf=self.previousApkExists,
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='upload_complete_snippet',
-            command=['scp', '-o', 'User=%s' % self.ausUser,
-                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
-                     'dist/update/complete.update.snippet',
-                     WithProperties("%s:'%s/complete.txt'" % \
-                       (self.ausHost, self.ausPreviousUploadDir))],
-            workdir='%s/%s/%s' % (self.baseWorkDir,
-                                  self.branchName, self.objdir),
-            description=['upload', 'complete', 'snippet'],
-            doStepIf=self.previousApkExists,
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand,
-            name='create_aus_current_updir',
-            command=['ssh', '-l', self.ausUser, self.ausHost,
-                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
-                     WithProperties('mkdir -p %s' % self.ausFullUploadDir)],
-            description=['create', 'aus', 'upload', 'dir'],
-            haltOnFailure=True
-        )
-        self.addStep(ShellCommand(
-            name='create_empty_snippets',
-            doStepIf = self.previousApkExists,
-            command=['ssh', '-l', self.ausUser, self.ausHost,
-                     '-i', '/home/cltbld/.ssh/%s' % self.ausSshKey,
-                     WithProperties('touch %s/complete.txt %s/partial.txt %s' % \
-                       (self.ausFullUploadDir, self.ausFullUploadDir,
-                        self.ausFullUploadDir))],
-            description=['create', 'empty', 'snippets'],
-            haltOnFailure=True,
-        ))
-
-    def addMakeUploadSteps(self, subdir=None, uploadSnippet=True, **kwargs):
-        if self.createSnippet and uploadSnippet:
-            self.getPreviousBuildID(subdir=subdir)
-        MobileBuildFactory.addMakeUploadSteps(self, subdir=subdir, **kwargs)
-        # ausFullUploadDir contains an interpolation of the buildid property.
-        # We expect the property to be set by the parent call to
-        # addUploadSteps()
-        if self.createSnippet and uploadSnippet:
-            self._uploadSnippet()
-
 def rc_eval_func(exit_statuses):
     def eval_func(cmd, step):
         rc = cmd.rc

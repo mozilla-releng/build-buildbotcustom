@@ -38,7 +38,8 @@ from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS, worst_status
 from buildbot.status.builder import STDOUT, STDERR #ScratchboxProperty
 
-from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand
+from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand, \
+  addRetryEvaluateCommand, RetryingShellCommand
 from buildbotcustom.common import genBuildID, genBuildUID
 
 def errbackAfter(wrapped_d, timeout):
@@ -136,7 +137,7 @@ class ScratchboxCommand(ShellCommand):
                     string_list.append(arg.fmtstring)
                 else:
                     string_list.append(arg)
-            string_command = ' '.join(string_list)
+            string_command = ' '.join([str(x) for x in string_list])
         elif issubclass(self.command.__class__, WithProperties):
             use_with_properties = True
             string_command = self.command.fmtstring
@@ -216,7 +217,7 @@ class ScratchboxProperty(ScratchboxCommand):
         else:
             return [ "no change" ]
 
-
+RetryingScratchboxProperty = addRetryEvaluateCommand(ScratchboxProperty)
 
 class CreateDir(ShellCommand):
     name = "create dir"
@@ -602,7 +603,7 @@ class MozillaClobberer(ShellCommand):
     description=['checking', 'clobber', 'times']
 
     def __init__(self, branch, clobber_url, clobberer_path, clobberTime=None,
-                 timeout=3600, workdir='..', **kwargs):
+                 timeout=3600, workdir='..', command=[], **kwargs):
         command = ['python', clobberer_path, '-s', 'tools']
         if clobberTime:
             command.extend(['-t', str(clobberTime)])
