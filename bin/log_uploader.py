@@ -297,7 +297,7 @@ if __name__ == "__main__":
                 uploadArgs.update(dict(
                     to_try=False,
                     who=None,
-                    revision=None,
+                    revision=build.getProperty('got_revision'),
                     buildid=buildid,
                     ))
             post_upload_cmd = postUploadCmdPrefix(**uploadArgs)
