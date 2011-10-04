@@ -2475,6 +2475,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 upload_dir=tinderboxBuildsDir,
                 product=self.stageProduct,
                 buildid=WithProperties("%(buildid)s"),
+                revision=WithProperties("%(got_revision)s"),
                 as_list=False,
             )
         if self.hgHost.startswith('ssh'):
