@@ -90,6 +90,8 @@ class L10nMixin(object):
         if localesURL:
             self.localesURL = localesURL
         else:
+            # Make sure that branch is not none when using this path
+            assert branch != None
             # revision will be expanded later
             self.localesURL = "%s%s/raw-file/%%(revision)s/%s" % \
                                       (repo, branch, localesFile)
@@ -185,7 +187,7 @@ class TriggerableL10n(Triggerable, L10nMixin):
 
     compare_attrs = ('name', 'builderNames', 'branch')
 
-    def __init__(self, name,  builderNames, branch=None, **kwargs):
+    def __init__(self, name,  builderNames, **kwargs):
         L10nMixin.__init__(self, **kwargs)
         Triggerable.__init__(self, name, builderNames)
 

@@ -1061,6 +1061,7 @@ def generateBranchObjects(config, name):
                 'profiledBuild': False,
                 'productName': config['product_name'],
                 'mozconfig': pf['mozconfig'],
+                'srcMozconfig': pf.get('src_mozconfig'),
                 'use_scratchbox': pf.get('use_scratchbox'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
