@@ -723,15 +723,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.complete_platform = self.platform
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
-        # We need to know what the platform that we should use on
-        # stage should be.  It would be great to be able to do this
-        # programatically, but some variations work differently to others.
-        # Instead of changing the world. lets keep the modification to platforms
-        # that opt in
-        if stagePlatform:
-            self.stagePlatform = stagePlatform
-        else:
-            self.stagePlatform = self.platform
+        self.stagePlatform = stagePlatform
         # it turns out that the cruft is useful for dealing with multiple types
         # of builds that are all done using the same self.platform.
         # Examples of what happens:
@@ -1059,15 +1051,31 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
     def addDoBuildSteps(self):
-        buildcmd = 'build'
-        if self.profiledBuild:
-            buildcmd = 'profiledbuild'
         workdir=WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir="build"
+        # XXX This is a hack but we don't have any intention of adding
+        # more branches that are missing MOZ_PGO.  Once these branches
+        # are all EOL'd, lets remove this and just put 'build' in the 
+        # command argv
+        if self.complete_platform.startswith('win32') and \
+            self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0') and \
+            self.profiledBuild:
+            bldtgt = 'profiledbuild'
+        else:
+            bldtgt = 'build'
+
+        command = ['make', '-f', 'client.mk', bldtgt,
+                   WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
+
+        if self.profiledBuild:
+            # when 191,192 and 20 are finished, we can remove this condition
+            # and just append MOZ_PGO=1 to command depending on self.profiledBuild
+            if not self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
+                command.append('MOZ_PGO=1')
         self.addStep(ScratchboxCommand(
          name='compile',
-         command=['make', '-f', 'client.mk', buildcmd, WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')],
+         command=command,
          description=['compile'],
          env=self.env,
          haltOnFailure=True,
@@ -2531,13 +2539,23 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             ))
 
-        talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
+        if self.profiledBuild and self.branchName not in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
+            talosBranch = "%s-%s-pgo-talos" % (self.branchName, self.complete_platform)
+        else:
+            talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
+
         sendchange_props = {
                 'buildid': WithProperties('%(buildid:-)s'),
                 'builduid': WithProperties('%(builduid:-)s'),
                 }
         if self.nightly:
             sendchange_props['nightly_build'] = True
+        # Not sure if this having this property is useful now
+        # but it is
+        if self.profiledBuild:
+            sendchange_props['pgo_build'] = True
+        else:
+            sendchange_props['pgo_build'] = False
 
         if not uploadMulti:
             for master, warn, retries in self.talosMasters:
