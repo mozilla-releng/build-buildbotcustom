@@ -2665,9 +2665,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     # We only want to append '-Non-PGO' to platforms that
                     # also have PGO builds.
                     if not platform in branch_config.get('pgo_platforms', []):
-                        opt_talos_branch = branchName
+                        opt_branch_name = branchName
+                        opt_talos_branch = talosBranch
                     else:
-                        opt_talos_branch = branchName + '-Non-PGO'
+                        opt_branch_name = branchName + '-Non-PGO'
+                        opt_talos_branch = talosBranch + '-Non-PGO'
 
                     factory_kwargs = {
                         "OS": slave_platform.split('-')[0],
@@ -2675,9 +2677,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "envName": platform_config['env_name'],
                         "workdirBase": "../talos-data",
                         "buildBranch": buildBranch,
-                        "branchName": branchName + '-Non-PGO',
+                        "branchName": opt_branch_name,
                         "branch": branch,
-                        "talosBranch": talosBranch,
+                        "talosBranch": opt_talos_branch,
                         "configOptions": talosConfig,
                         "talosCmd": talosCmd,
                         "fetchSymbols": branch_config['fetch_symbols'] and
