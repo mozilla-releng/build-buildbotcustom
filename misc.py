@@ -3178,7 +3178,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             slaves = SLAVES[base_platform]
             interpreter = None
 
-        env = config['env'][platform]
+        env = config['env'][platform].copy()
         env['HG_REPO'] = config['hgurl'] + config['repo_path']
 
         for variant in variants:
