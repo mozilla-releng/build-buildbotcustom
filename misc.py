@@ -942,6 +942,7 @@ def generateBranchObjects(config, name):
                             Nightly,
                             [buildIDSchedFunc, buildUIDSchedFunc])(
                             name="%s pgo" % name,
+                            branch=config['repo_path'],
                             builderNames=pgoBuilders,
                             hour=range(0,24,config['periodic_pgo_interval']),
                         )
