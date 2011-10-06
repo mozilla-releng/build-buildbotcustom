@@ -684,10 +684,11 @@ def generateBranchObjects(config, name):
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
             is_shadow=bool(name=='shadow-central'), platform_prop='stage_platform',product_prop='product')
 
+    # this comment is for grepping! SubprocessLogHandler
     branchObjects['status'].append(QueuedCommandHandler(
         logUploadCmd,
         QueueDir.getQueue('commands'),
-        builders=builders + unittestBuilders + debugBuilders,
+        builders=builders + unittestBuilders + debugBuilders + pgoBuilders,
     ))
 
     if nightlyBuilders:
@@ -942,6 +943,7 @@ def generateBranchObjects(config, name):
                             Nightly,
                             [buildIDSchedFunc, buildUIDSchedFunc])(
                             name="%s pgo" % name,
+                            branch=config['repo_path'],
                             builderNames=pgoBuilders,
                             hour=range(0,24,config['periodic_pgo_interval']),
                         )
@@ -2728,7 +2730,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'properties': {
                                 'branch': branchProperty,
                                 'platform': slave_platform,
-                                'stage_platform': stage_platform,
+                                'stage_platform': stage_platform + '-pgo',
                                 'product': stage_product,
                                 'builddir': builddir,
                                 'slavebuilddir': slavebuilddir,
@@ -2777,8 +2779,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 pgo_builders.extend(generateTestBuilderNames(
                                 '%s %s pgo test' % (platform_name, branch), suites_name, suites))
                         # Collect test builders for the TinderboxMailNotifier
-                        all_test_builders[tinderboxTree].extend(test_builders)
-                        all_builders.extend(test_builders)
+                        all_test_builders[tinderboxTree].extend(test_builders + pgo_builders)
+                        all_builders.extend(test_builders + pgo_builders)
 
                         triggeredUnittestBuilders.append(('tests-%s-%s-%s-unittest' % (branch, slave_platform, test_type),
                                                          test_builders, merge_tests))
@@ -2810,6 +2812,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 pgo_builder_kwargs = test_builder_kwargs.copy()
                                 pgo_builder_kwargs['name_prefix'] = "%s %s pgo test" % (platform_name, branch)
                                 pgo_builder_kwargs['build_dir_prefix'] += '_pgo'
+                                pgo_builder_kwargs['stagePlatform'] += '-pgo'
                                 branchObjects['builders'].extend(generateTestBuilder(**pgo_builder_kwargs))
 
                         for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
