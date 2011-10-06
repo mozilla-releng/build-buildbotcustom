@@ -3180,6 +3180,9 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             slaves = SLAVES[base_platform]
             interpreter = None
 
+        env = config['env'][platform].copy()
+        env['HG_REPO'] = config['hgurl'] + config['repo_path']
+
         for variant in variants:
             f = ScriptFactory(
                     config['scripts_repo'],
@@ -3197,7 +3200,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                     'factory': f,
                     'category': branch,
-                    'env': config['env'][platform],
+                    'env': env,
                     'properties': {'branch': branch},
                     }
             builders.append(builder)
@@ -3310,7 +3313,7 @@ def generateProjectObjects(project, config, SLAVES):
             }
 
     # Fuzzing
-    if project == 'fuzzing':
+    if project.startswith('fuzzing'):
         fuzzingObjects = generateFuzzingObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, fuzzingObjects)
 
@@ -3320,17 +3323,17 @@ def generateProjectObjects(project, config, SLAVES):
         buildObjects = mergeBuildObjects(buildObjects, nanojitObjects)
 
     # Valgrind
-    elif project == 'valgrind':
+    elif project.startswith('valgrind'):
         valgrindObjects = generateValgrindObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, valgrindObjects)
 
     # Jetpack
-    elif project == 'jetpack':
+    elif project.startswith('jetpack'):
         jetpackObjects = generateJetpackObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, jetpackObjects)
 
     # Spidermonkey
-    elif project == 'spidermonkey':
+    elif project.startswith('spidermonkey'):
         spiderMonkeyObjects = generateSpiderMonkeyObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
 
