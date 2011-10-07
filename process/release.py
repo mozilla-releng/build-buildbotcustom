@@ -43,7 +43,7 @@ from buildbotcustom.status.errors import update_verify_error
 from buildbotcustom.status.queued_command import QueuedCommandHandler
 from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
-from mozilla_buildtools.queuedir import QueueDir
+from buildtools.queuedir import QueueDir
 import BuildSlaves
 
 DEFAULT_PARALLELIZATION = 10
