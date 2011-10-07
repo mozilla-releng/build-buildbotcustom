@@ -28,7 +28,7 @@ import buildbotcustom.status.queued_command
 import buildbotcustom.status.log_handlers
 import buildbotcustom.misc_scheduler
 import build.paths
-import mozilla_buildtools.queuedir
+import buildtools.queuedir
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -40,7 +40,7 @@ reload(buildbotcustom.status.queued_command)
 reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
 reload(build.paths)
-reload(mozilla_buildtools.queuedir)
+reload(buildtools.queuedir)
 
 from buildbotcustom.common import reallyShort
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
@@ -61,7 +61,7 @@ from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
 from buildbotcustom.status.queued_command import QueuedCommandHandler
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from build.paths import getRealpath
-from mozilla_buildtools.queuedir import QueueDir
+from buildtools.queuedir import QueueDir
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
