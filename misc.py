@@ -16,6 +16,7 @@ from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import WARNINGS
 
+import buildbotcustom.common
 import buildbotcustom.changes.hgpoller
 import buildbotcustom.process.factory
 import buildbotcustom.log
@@ -37,6 +38,7 @@ reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
 reload(build.paths)
 
+from buildbotcustom.common import reallyShort
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
@@ -58,60 +60,6 @@ from build.paths import getRealpath
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
-
-def reallyShort(name):
-    mappings = {
-        'mozilla': None,
-        'central': 'cen',
-        '1.9.1': '191',
-        '1.9.2': '192',
-        'tracemonkey': 'tm',
-        'places': 'plc',
-        'electrolysis': 'e10s',
-        'jaegermonkey': 'jm',
-        'shadow': 'sh',
-        'mobile': 'mb',
-        'desktop': None,
-        'debug': 'dbg',
-        'xulrunner': 'xr',
-        'build': 'bld',
-        'linux': 'lnx',
-        'win32': 'w32',
-        'win64': 'w64',
-        'macosx': 'osx',
-        'macosx64': 'osx64',
-        'linux64': 'lnx64',
-        'android': 'andrd',
-        'release': 'rel',
-        'mochitests': 'mochi',
-        'mochitest': 'm',
-        'other': 'oth',
-        'browser': 'br',
-        'nightly': 'ntly',
-        'tryserver': 'try',
-        'cedar': 'ced',
-        'birch': 'bir',
-        'maple': 'map',
-        'leopard': 'leo',
-        'snowleopard': 'snow',
-        'fedora': 'fed',
-        'fedora64': 'fed64',
-        'repack': 'rpk',
-    }
-    hyphen_seperated_words = name.split('-')
-    words = []
-    for word in hyphen_seperated_words:
-        space_seperated_words = word.split('_')
-        for word in space_seperated_words:
-            words.extend(word.split(' '))
-    new_words = []
-    for word in words:
-        if word in mappings.keys():
-            if mappings[word]:
-                new_words.append(mappings[word])
-        else:
-            new_words.append(word)
-    return '-'.join(new_words)
 
 def get_l10n_repositories(file, l10nRepoPath, relbranch):
     """Reads in a list of locale names and revisions for their associated
@@ -178,6 +126,13 @@ def isImportantL10nFile(change, l10nModules):
         for basepath in l10nModules:
             if f.startswith(basepath):
                 return True
+    return False
+
+def changeContainsProduct(change, productName):
+    products = change.properties.getProperty("products")
+    if isinstance(products, basestring) and \
+        productName in products.split(','):
+            return True
     return False
 
 def generateTestBuilderNames(name_prefix, suites_name, suites):
@@ -942,11 +897,17 @@ def generateBranchObjects(config, name):
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
     if nightlyBuilders or xulrunnerNightlyBuilders:
+        goodFunc = lastGoodFunc(
+                branch=config['repo_path'],
+                builderNames=builders,
+                triggerBuildIfNoChanges=False,
+                l10nBranch=config.get('l10n_repo_path')
+                )
+
         nightly_scheduler = makePropertiesScheduler(
                 SpecificNightly,
                 [buildIDSchedFunc, buildUIDSchedFunc])(
-                    ssFunc=lastGoodFunc(config['repo_path'],
-                        builderNames=builders),
+                    ssFunc=goodFunc,
                     name="%s nightly" % name,
                     branch=config['repo_path'],
                     # bug 482123 - keep the minute to avoid problems with DST
@@ -1643,6 +1604,8 @@ def generateBranchObjects(config, name):
         # -- end of per-platform loop --
 
     if config['enable_weekly_bundle']:
+        stageBasePath = '%s/%s' % (config['stage_base_path'],
+                                   pf['stage_product'])
         bundle_factory = ScriptFactory(
             config['hgurl'] + config['build_tools_repo_path'],
             'scripts/bundle/hg-bundle.sh',
@@ -1654,7 +1617,7 @@ def generateBranchObjects(config, name):
                 config['repo_path'],
                 config['stage_server'],
                 config['stage_username'],
-                config['stage_base_path'],
+                stageBasePath,
                 config['stage_ssh_key'],
                 ],
         )
@@ -2967,7 +2930,7 @@ def generateValgrindObjects(config, slaves):
         builder = {'name': 'valgrind-%s' % platform,
                    'builddir': 'valgrind-%s' % platform,
                    'slavenames': slaves[platform],
-                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                   'nextSlave': _nextSlowSlave,
                    'factory': f,
                    'category': 'idle',
                    'env': env,

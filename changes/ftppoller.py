@@ -75,6 +75,7 @@ class FtpPollerBase(base.ChangeSource):
             c = changes.Change(who = url,
                            comments = "success",
                            files = [],
+                           properties={'who': url},
                            branch = self.branch)
             self.parent.addChange(c)
 
@@ -101,6 +102,7 @@ class FtpPoller(FtpPollerBase):
         # buildbot restarts or file already exists, so we don't want to trigger anything
         if self.gotFile == 1:
             if re.search(self.searchString, pageContents):
+                self.stopService()
                 return False
             else:
                 self.gotFile = 0
@@ -109,6 +111,7 @@ class FtpPoller(FtpPollerBase):
         if self.gotFile == 0:
             if re.search(self.searchString, pageContents):
                 self.gotFile = 1
+                self.stopService()
                 return True
 
 
@@ -185,6 +188,7 @@ class LocalesFtpPoller(FtpPollerBase):
         # buildbot restarts or all files already exist, so we don't want to trigger anything
         if self.gotAllFiles:
             if self.searchAllStrings(pageContents, locales):
+                self.stopService()
                 return False
             else:
                 self.gotAllFiles = False
@@ -193,6 +197,7 @@ class LocalesFtpPoller(FtpPollerBase):
         else:
             if self.searchAllStrings(pageContents, locales):
                 self.gotAllFiles = True
+                self.stopService()
                 return True
 
     def _process_changes(self, results, url):

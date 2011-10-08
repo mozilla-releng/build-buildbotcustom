@@ -6,7 +6,7 @@ from buildbot.db import dbspec, connector
 from buildbot.db.schema.manager import DBSchemaManager
 from buildbot.changes.changes import Change
 
-from buildbotcustom.misc_scheduler import lastChangeset, lastGoodRev, \
+from buildbotcustom.misc_scheduler import lastChange, lastGoodRev, \
     getLatestRev, getLastBuiltRevision, lastGoodFunc
 from buildbotcustom.scheduler import SpecificNightly
 
@@ -27,6 +27,10 @@ def createTestData(db):
                     (`changeid`, `author`, `is_dir`, `comments`, `when_timestamp`, `branch`, `revision`, `revlink`)
                     VALUES
                     (2, 'me', 0, 'here', 1, 'b2', 'r234567890', 'from poller')""")
+    db.runQueryNow("""INSERT INTO changes
+                    (`changeid`, `author`, `is_dir`, `comments`, `when_timestamp`, `branch`, `revision`, `revlink`)
+                    VALUES
+                    (3, 'me', 0, 'here', 88200, 'b2-l10n', 'r98765432', 'from poller')""")
 
     # Buildsets
     for i in range(1,3):
@@ -65,7 +69,7 @@ class TestLastGoodFuncs(unittest.TestCase):
         self.dbc.stop()
         shutil.rmtree(self.basedir)
 
-    def test_lastChangeset(self):
+    def test_lastChange(self):
         # First, we need to add a few changes!
         c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important', revlink='from poller')
         c2 = Change(who='me!', branch='b2', revision='2', files=[], comments='really important', revlink='from poller')
@@ -73,17 +77,17 @@ class TestLastGoodFuncs(unittest.TestCase):
         for c in [c1, c2, c3]:
             self.dbc.addChangeToDatabase(c)
 
-        c = self.dbc.runInteractionNow(lambda t : lastChangeset(self.dbc, t, 'b1'))
-        self.assertEquals(c, c3.revision)
+        c = self.dbc.runInteractionNow(lambda t : lastChange(self.dbc, t, 'b1'))
+        self.assertEquals(c.revision, c3.revision)
 
-        c = self.dbc.runInteractionNow(lambda t : lastChangeset(self.dbc, t, 'b2'))
-        self.assertEquals(c, c2.revision)
+        c = self.dbc.runInteractionNow(lambda t : lastChange(self.dbc, t, 'b2'))
+        self.assertEquals(c.revision, c2.revision)
 
-    def test_lastChangeset_ignores_changes_with_no_revlink(self):
+    def test_lastChange_ignores_changes_with_no_revlink(self):
         c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important')
         self.dbc.addChangeToDatabase(c1)
 
-        c = self.dbc.runInteractionNow(lambda t : lastChangeset(self.dbc, t, 'b1'))
+        c = self.dbc.runInteractionNow(lambda t : lastChange(self.dbc, t, 'b1'))
         self.assertEquals(c, None)
 
     def test_lastGoodRev(self):
@@ -138,13 +142,40 @@ class TestLastGoodFuncs(unittest.TestCase):
     def test_lastGoodFunc(self):
         createTestData(self.dbc)
 
-        ssFunc = lastGoodFunc('b1', ['builder1', 'builder2'])
-        ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
-        self.assertEquals(ss.revision, 'r1')
+        with mock.patch('time.time') as t:
+            # Check that ssFunc returns something for both branches
+            t.return_value = 10
+            ssFunc = lastGoodFunc('b1', ['builder1', 'builder2'])
+            ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
+            self.assertEquals(ss.revision, 'r1')
 
-        ssFunc = lastGoodFunc('b2', ['builder1', 'builder2'])
-        ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
-        self.assertEquals(ss.revision, 'r234567890')
+            t.return_value = 10
+            ssFunc = lastGoodFunc('b2', ['builder1', 'builder2'])
+            ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
+            self.assertEquals(ss.revision, 'r234567890')
+
+            # Check that ssFunc returns None if triggerBuildIfNoChanges=False
+            # and there are no good builds in the past 24 hours.
+            # We achieve this by faking the clock
+            t.return_value = 48*3600
+            ssFunc = lastGoodFunc('b1', ['builder1', 'builder2'], triggerBuildIfNoChanges=False)
+            ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
+            self.assertEquals(ss, None)
+
+            # Check that ssFunc returns something if triggerBuildIfNoChanges=False
+            # and there are no good builds in the past 24 hours, but there are
+            # l10n changes.
+            t.return_value = 25*3600
+            ssFunc = lastGoodFunc('b2', ['builder1', 'builder2'], triggerBuildIfNoChanges=False, l10nBranch='b2-l10n')
+            ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
+            self.assertEquals(ss.revision, 'r234567890')
+
+            # Check that ssFunc returns None if triggerBuildIfNoChanges=False
+            # and there are no good builds or l10n changes in the past 24 hours.
+            t.return_value = 72*3600
+            ssFunc = lastGoodFunc('b2', ['builder1', 'builder2'], triggerBuildIfNoChanges=False, l10nBranch='b2-l10n')
+            ss = self.dbc.runInteractionNow(lambda t: ssFunc(self.s, t))
+            self.assertEquals(ss, None)
 
 class TestSpecificNightlyScheduler(unittest.TestCase):
     basedir = "test_misc_scheduler_nightly_scheduler"

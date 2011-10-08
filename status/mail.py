@@ -4,7 +4,7 @@ from email.utils import formatdate
 from zope.interface import implements
 from twisted.internet import defer
 from twisted.mail.smtp import sendmail
-from twisted.python import log as twlog
+from twisted.python import log as twlog, failure
 
 from buildbot import interfaces
 from buildbot.status import base
@@ -28,13 +28,14 @@ class ChangeNotifier(base.StatusReceiverMultiService):
     compare_attrs = ('fromaddr', 'categories', 'branches', 'subject',
             'relayhost', 'lookup', 'extraRecipients', 'sendToInterestedUsers',
             'messageFormatter', 'extraHeaders', 'smtpUser', 'smtpPassword',
-            'smtpPort')
+            'smtpPort', 'changeIsImportant')
 
     def __init__(self, fromaddr, categories=None, branches=None,
             subject="Notifcation of change %(revision)s on branch %(branch)s",
             relayhost="localhost", lookup=None, extraRecipients=None,
             sendToInterestedUsers=True, messageFormatter=defaultChangeMessage,
-            extraHeaders=None, smtpUser=None, smtpPassword=None, smtpPort=25):
+            extraHeaders=None, smtpUser=None, smtpPassword=None, smtpPort=25,
+            changeIsImportant=None):
 
         base.StatusReceiverMultiService.__init__(self)
 
@@ -57,6 +58,9 @@ class ChangeNotifier(base.StatusReceiverMultiService):
         self.extraHeaders = extraHeaders
         self.messageFormatter = messageFormatter
         self.sendToInterestedUsers = sendToInterestedUsers
+        if changeIsImportant:
+            assert callable(changeIsImportant)
+        self.changeIsImportant = changeIsImportant
         if extraRecipients:
             assert isinstance(extraRecipients, (list, tuple))
             for r in extraRecipients:
@@ -90,6 +94,15 @@ class ChangeNotifier(base.StatusReceiverMultiService):
 
         if self.categories and change.category not in self.categories:
             return
+
+        if self.changeIsImportant:
+            try:
+                if not self.changeIsImportant(change):
+                    return
+            except:
+                twlog.err(failure.Failure(),
+                          'in changeIsImportant check for %s' % change)
+                return
 
         return self.buildMessage(change)
 
