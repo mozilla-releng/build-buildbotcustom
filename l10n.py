@@ -202,7 +202,7 @@ class DependentL10n(Dependent, L10nMixin):
     'upstream' scheduler has completed successfully.
     """
 
-    compare_attrs = ('name', 'upstream', 'builders')
+    compare_attrs = Dependent.compare_attrs[:]
 
     def __init__(self, name, upstream, builderNames, **kwargs):
         Dependent.__init__(self, name, upstream, builderNames)
