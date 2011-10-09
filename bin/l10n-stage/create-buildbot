@@ -83,7 +83,7 @@ class L10nReporter(Dummy):
         self.step_status.setText(self.desc)
         Dummy.done(self)
 
-f.addStep(L10nReporter, timeout=2, name='l10nstep')
+f.addStep(L10nReporter(timeout=2, name='l10nstep'))
 
 enBuild = factory.BuildFactory()
 class EnBuildStep(Dummy):
@@ -104,10 +104,10 @@ class EnBuildStep(Dummy):
         self.step_status.setText(self.desc)
         Dummy.done(self)
 
-enBuild.addStep(EnBuildStep, timeout=15, name='enstep')
+enBuild.addStep(EnBuildStep(timeout=15, name='enstep'))
 
 enNightly = factory.BuildFactory()
-enNightly.addStep(EnBuildStep, timeout=15, name='enstep')
+enNightly.addStep(EnBuildStep(timeout=15, name='enstep'))
 
 c['builders'] = [
     {'name': 'Firefox test linux',
