@@ -31,6 +31,7 @@ import buildbotcustom.env
 import buildbotcustom.misc_scheduler
 import build.paths
 import release.info
+import release.paths
 reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
@@ -45,6 +46,7 @@ reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
+reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
   upload_errors
@@ -71,6 +73,8 @@ import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
 from buildbot.status.builder import SUCCESS, FAILURE
+
+from release.paths import makeCandidatesDir
 
 # limit the number of clones of the try repository so that we don't kill
 # dm-vcview04 if the master is restarted, or there is a large number of pushes
@@ -604,7 +608,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
 class MercurialBuildFactory(MozillaBuildFactory):
     def __init__(self, env, objdir, platform, configRepoPath, configSubDir,
                  profiledBuild, mozconfig, use_scratchbox=False, productName=None,
-                 scratchbox_target=None, android_signing=False,
+                 scratchbox_target='FREMANTLE_ARMEL', android_signing=False,
                  buildRevision=None, stageServer=None, stageUsername=None,
                  stageGroup=None, stageSshKey=None, stageBasePath=None,
                  stageProduct=None, post_upload_include_platform=False,
@@ -688,9 +692,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
         self.use_scratchbox = use_scratchbox
-        self.scratchbox_target = scratchbox_target # unimplemented because we only use one
-                                                   # target for now (unlikely to change)
-        assert scratchbox_target is None, 'unimplemented'
+        self.scratchbox_target = scratchbox_target
         self.android_signing = android_signing
         self.post_upload_include_platform = post_upload_include_platform
         self.useSharedCheckouts = useSharedCheckouts
@@ -795,6 +797,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 command=['bash', '-c', 'pwd -W'],
                 property='toolsdir',
                 workdir='tools'
+            ))
+        if self.use_scratchbox:
+            self.addStep(ScratchboxCommand(
+                command=["sb-conf", "select", self.scratchbox_target],
+                name='set_target',
+                env=self.env,
+                sb=True,
+                workdir='/',
             ))
 
         if self.enable_ccache:
@@ -2596,6 +2606,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         pass
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
+        info_txt = '%s_info.txt' % self.complete_platform
         # Make sure the complete MAR has been generated
         if self.enableUpdatePackaging:
             self.addStep(ShellCommand(
@@ -2608,8 +2619,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         self.addStep(ShellCommand(
          name='echo_buildID',
          command=['bash', '-c',
-                  WithProperties('echo buildID=%(buildid)s > ' + \
-                                '%s_info.txt' % self.platform)],
+                  WithProperties('echo buildID=%(buildid)s > ' + info_txt)],
          workdir='build/%s/dist' % self.mozillaObjdir
         ))
 
@@ -2617,7 +2627,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
                           'UPLOAD_USER': self.stageUsername,
                           'UPLOAD_TO_TEMP': '1',
-                          'UPLOAD_EXTRA_FILES': '%s_info.txt' % self.platform})
+                          'UPLOAD_EXTRA_FILES': info_txt})
         if self.stageSshKey:
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
@@ -2659,6 +2669,21 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
          sb=self.use_scratchbox,
         ))
+
+        if self.productName == 'fennec' and not uploadMulti:
+            cmd = ['scp']
+            if self.stageSshKey:
+                cmd.append('-oIdentityFile=~/.ssh/%s' % self.stageSshKey)
+            cmd.append(info_txt)
+            candidates_dir = makeCandidatesDir(self.productName, self.version,
+                                               self.buildNumber)
+            cmd.append('%s@%s:%s' % (self.stageUsername, self.stageServer,
+                                     candidates_dir))
+            self.addStep(RetryingShellCommand(
+                name='upload_buildID',
+                command=cmd,
+                workdir='build/%s/dist' % self.mozillaObjdir
+            ))
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
@@ -5055,7 +5080,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 '--long-version=%s' % self.longVersion,
                 '-n', str(self.buildNumber), '-a', self.ausServerUrl,
                 '-s', self.stagingServer, '-c', verifyConfigPath,
-                '-d', oldCandidatesDir, '-l', 'old-shipped-locales',
+                '-d', oldCandidatesDir, '-l', 'shipped-locales',
+                '--old-shipped-locales', 'old-shipped-locales',
                 '--pretty-candidates-dir']
         if self.binaryName:
             bcmd.extend(['--binary-name', self.binaryName])
@@ -6254,7 +6280,8 @@ def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
 class MozillaTestFactory(MozillaBuildFactory):
     def __init__(self, platform, productName='firefox',
                  downloadSymbols=True, downloadTests=False,
-                 posixBinarySuffix='-bin', resetHwClock=False, **kwargs):
+                 posixBinarySuffix='-bin', resetHwClock=False, stackwalk_cgi=None,
+                 **kwargs):
         #Note: the posixBinarySuffix is needed because some products (firefox)
         #use 'firefox-bin' and some (fennec) use 'fennec' for the name of the
         #actual application binary.  This is only applicable to posix-like
@@ -6270,6 +6297,7 @@ class MozillaTestFactory(MozillaBuildFactory):
         self.downloadSymbols = downloadSymbols
         self.downloadTests = downloadTests
         self.resetHwClock = resetHwClock
+        self.stackwalk_cgi = stackwalk_cgi
 
         assert self.platform in getSupportedPlatforms()
 
@@ -6401,19 +6429,26 @@ class MozillaTestFactory(MozillaBuildFactory):
                         return build_url[:-len(suffix)] + '.crashreporter-symbols.zip'
             else:
                 return parse_sendchange_files(build, include_substr='.crashreporter-symbols.')
-        self.addStep(DownloadFile(
-            url_fn=get_symbols_url,
-            filename_property='symbols_filename',
-            url_property='symbols_url',
-            name='download_symbols',
-            ignore_certs=self.ignoreCerts,
-            workdir='build/symbols'
-        ))
-        self.addStep(UnpackFile(
-            filename=WithProperties('%(symbols_filename)s'),
-            name='unpack_symbols',
-            workdir='build/symbols'
-        ))
+
+        if not self.stackwalk_cgi:
+            self.addStep(DownloadFile(
+                url_fn=get_symbols_url,
+                filename_property='symbols_filename',
+                url_property='symbols_url',
+                name='download_symbols',
+                ignore_certs=self.ignoreCerts,
+                workdir='build/symbols'
+            ))
+            self.addStep(UnpackFile(
+                filename=WithProperties('%(symbols_filename)s'),
+                name='unpack_symbols',
+                workdir='build/symbols'
+            ))
+        else:
+            self.addStep(SetBuildProperty(
+                property_name='symbols_url',
+                value=get_symbols_url,
+            ))
 
     def addPrepareTestsSteps(self):
         def get_tests_url(build):
@@ -6483,19 +6518,27 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
     def __init__(self, platform, test_suites, env, productName='firefox',
                  mochitest_leak_threshold=None,
                  crashtest_leak_threshold=None, totalChunks=None,
-                 thisChunk=None, chunkByDir=None, **kwargs):
+                 thisChunk=None, chunkByDir=None, stackwalk_cgi=None,
+                 **kwargs):
         platform = platform.split('-')[0]
         self.test_suites = test_suites
         self.totalChunks = totalChunks
         self.thisChunk = thisChunk
         self.chunkByDir = chunkByDir
+
         self.env = MozillaEnvironments['%s-unittest' % platform].copy()
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        if stackwalk_cgi and kwargs.get('downloadSymbols'):
+            self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
+        else:
+            self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
         self.env.update(env)
+
         self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
                                 'crashtest': crashtest_leak_threshold,}
+
         MozillaTestFactory.__init__(self, platform, productName,
-                                    downloadTests=True, **kwargs)
+                                    downloadTests=True, stackwalk_cgi=stackwalk_cgi,
+                                    **kwargs)
 
     def addSetupSteps(self):
         if 'linux' in self.platform:
@@ -6507,6 +6550,10 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
 
     def addRunTestSteps(self):
         # Run them!
+        if self.stackwalk_cgi and self.downloadSymbols:
+            symbols_path = '%(symbols_url)s'
+        else:
+            symbols_path = 'symbols'
         for suite in self.test_suites:
             leak_threshold = self.leak_thresholds.get(suite, None)
             if suite.startswith('mobile-mochitest'):
@@ -6525,7 +6572,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
                  env=self.env,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  testPath='mobile',
                  leakThreshold=leak_threshold,
                  chunkByDir=self.chunkByDir,
@@ -6546,7 +6593,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 self.addStep(unittest_steps.MozillaPackagedMochitests(
                  variant=variant,
                  env=self.env,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  leakThreshold=leak_threshold,
                  chunkByDir=self.chunkByDir,
                  totalChunks=self.totalChunks,
@@ -6565,7 +6612,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
                  env=self.env,
                  platform=self.platform,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  maxTime=120*60, # Two Hours
                 ))
             elif suite in ('jsreftest', ):
@@ -6577,12 +6624,12 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  haltOnFailure=True,
                  name='unpack jsreftest tests',
                  ))
- 
+
                 self.addStep(unittest_steps.MozillaPackagedReftests(
                  suite=suite,
                  env=self.env,
                  leakThreshold=leak_threshold,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  maxTime=2*60*60, # Two Hours
                 ))
             elif suite == 'jetpack':
@@ -6598,7 +6645,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   suite=suite,
                   env=self.env,
                   leakThreshold=leak_threshold,
-                  symbols_path='symbols',
+                  symbols_path=symbols_path,
                   maxTime=120*60, # Two Hours
                  ))
             elif suite in ('reftest', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
@@ -6619,7 +6666,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  suite=suite,
                  env=self.env,
                  leakThreshold=leak_threshold,
-                 symbols_path='symbols',
+                 symbols_path=symbols_path,
                  maxTime=2*60*60, # Two Hours
                 ))
             elif suite == 'mozmill':
@@ -6852,6 +6899,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addCleanupSteps()
         self.addStep(DisconnectStep(
             name='reboot device',
+            workdir='.',
             alwaysRun=True,
             force_disconnect=True,
             warnOnFailure=False,
@@ -6886,7 +6934,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.branchName.lower().startswith('shadow'):
             self.ignoreCerts = True
         self.remoteTests = remoteTests
-        self.configOptions = configOptions[:]
+        self.configOptions = configOptions['suites'][:]
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
@@ -7339,9 +7387,15 @@ class TalosFactory(RequestSortingBuildFactory):
     def addDownloadExtensionStep(self):
         def get_addon_url(build):
             import urlparse
+            import urllib
             base_url = 'https://addons.mozilla.org/'
             addon_url = build.getProperty('addonUrl')
-            return urlparse.urljoin(base_url, addon_url)
+            #addon_url may be encoded, also we want to ensure that http%3A// becomes http://
+            parsed_url = urlparse.urlsplit(urllib.unquote_plus(addon_url).replace('%3A', ':'))
+            if parsed_url[1]: #there is a netloc, this is already a full path to a given addon
+              return urlparse.urlunsplit(parsed_url)
+            else:
+              return urlparse.urljoin(base_url, addon_url)
 
         self.addStep(DownloadFile(
          url_fn=get_addon_url,

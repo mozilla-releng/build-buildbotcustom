@@ -25,7 +25,8 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  makeLogUploadCommand, changeContainsProduct, nomergeBuilders
+  makeLogUploadCommand, changeContainsProduct, nomergeBuilders, \
+  changeContainsProperties
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -70,6 +71,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         all_slaves.extend(platform_slaves)
         if 'win' not in p:
             unix_slaves.extend(platform_slaves)
+    unix_slaves = [x for x in set(unix_slaves)]
+    all_slaves = [x for x in set(all_slaves)]
 
     signedPlatforms = releaseConfig.get('signedPlatforms', ('win32',))
 
@@ -311,14 +314,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             releaseConfig['buildNumber'],
             protocol='http',
             server=releaseConfig['ftpServer'])
-        signed_apk_url = '%s%s/%s/%s-%s.%s.eabi-arm.apk' % \
+        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.eabi-arm.apk' % \
             (candidatesDir,
              branchConfig['platforms']['linux-android']['stage_platform'],
              locale, releaseConfig['productName'], releaseConfig['version'],
              locale)
         change_source.append(UrlPoller(
             branch=builderPrefix('android_post_signing'),
-            url=signed_apk_url,
+            url=enUS_signed_apk_url,
             pollInterval=60*10
         ))
         if branchConfig['platforms']['linux-android'].get('multi_locale'):
@@ -1114,7 +1117,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('updates'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates')),
@@ -1488,6 +1491,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     branches=[builderPrefix('post_signing')],
                     messageFormatter=createReleaseChangeMessage,
                 ))
+        if releaseConfig['productName'] == 'fennec':
+            #send a message when android signing is complete
+            status.append(ChangeNotifier(
+                    fromaddr="release@mozilla.com",
+                    relayhost="mail.build.mozilla.org",
+                    sendToInterestedUsers=False,
+                    extraRecipients=[recipient],
+                    branches=[builderPrefix('android_post_signing')],
+                    messageFormatter=createReleaseChangeMessage,
+                    changeIsImportant=lambda c: \
+                    changeContainsProperties(c, dict(who=enUS_signed_apk_url))
+                ))
 
     #send the nice(passing) release messages
     status.append(MailNotifier(
@@ -1522,24 +1537,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 messageFormatter=createReleaseAVVendorsMessage,
             ))
 
-    status.append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=branchConfig["tinderbox_tree"] + "-Release",
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in builders],
-        logCompression="gzip")
-    )
+    if not releaseConfig.get('disable_tinderbox_mail'):
+        status.append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=branchConfig["tinderbox_tree"] + "-Release",
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in builders],
+            logCompression="gzip")
+        )
 
-    status.append(TinderboxMailNotifier(
-        fromaddr="mozilla2.buildbot@build.mozilla.org",
-        tree=branchConfig["tinderbox_tree"] + "-Release",
-        extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-        relayhost="mail.build.mozilla.org",
-        builders=[b['name'] for b in test_builders],
-        logCompression="gzip",
-        errorparser="unittest")
-    )
+        status.append(TinderboxMailNotifier(
+            fromaddr="mozilla2.buildbot@build.mozilla.org",
+            tree=branchConfig["tinderbox_tree"] + "-Release",
+            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
+            relayhost="mail.build.mozilla.org",
+            builders=[b['name'] for b in test_builders],
+            logCompression="gzip",
+            errorparser="unittest")
+        )
 
     builders.extend(test_builders)
 
