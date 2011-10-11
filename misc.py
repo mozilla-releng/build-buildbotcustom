@@ -2666,7 +2666,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                     # We only want to append '-Non-PGO' to platforms that
                     # also have PGO builds.
-                    if not platform in branch_config.get('pgo_platforms', []):
+                    if not platform in branch_config.get('pgo_platforms', []) or not branch_config.get('add_pgo_builders'):
                         opt_branch_name = branchName
                         opt_talos_branch = talosBranch
                     else:
@@ -2708,6 +2708,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'slavebuilddir': slavebuilddir,
                         },
                     }
+
                     if not merge:
                         nomergeBuilders.append(builder['name'])
 
@@ -2719,6 +2720,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     if do_pgo:
                         pgo_factory_kwargs = factory_kwargs.copy()
                         pgo_factory_kwargs['branchName'] = branchName
+                        pgo_factory_kwargs['talosBranch'] = talosBranch
                         pgo_factory = factory_class(**pgo_factory_kwargs)
                         pgo_builder = {
                             'name': "%s %s pgo talos %s" % (platform_name, branch, suite),
