@@ -616,8 +616,12 @@ def generateBranchObjects(config, name):
                     unittestPrettyNames[platform] = '%s debug test' % base_name
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
-            # Skip l10n, unit tests and nightlies for debug builds
-            continue
+            # Skip l10n, unit tests
+            # Skip nightlies for debug builds unless requested  
+            if pf.has_key('enable_nightly'):
+                    do_nightly = pf['enable_nightly']
+            else:
+                continue
         elif pf.get('enable_dep', True):
             builders.append(pretty_name)
             prettyNames[platform] = pretty_name
