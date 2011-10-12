@@ -2695,10 +2695,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                     slavebuilddir= 'test'
                     factory = factory_class(**factory_kwargs)
-                    slave_key = branch_config.get('slave_key', 'slaves')
                     builder = {
                         'name': "%s %s talos %s" % (platform_name, branch, suite),
-                        'slavenames': platform_config[slave_platform][slave_key],
+                        'slavenames': platform_config[slave_platform]['slaves'],
                         'builddir': builddir,
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
@@ -2796,8 +2795,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             # create the builders
-                            slave_key = branch_config.get('slave_key', 'slaves')
-                            slavenames = platform_config[slave_platform][slave_key]
                             test_builder_kwargs = {
                                 "config": branch_config,
                                 "branch_name": branch,
@@ -2808,7 +2805,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "suites": suites,
                                 "mochitestLeakThreshold": branch_config.get('mochitest_leak_threshold', None),
                                 "crashtestLeakThreshold": branch_config.get('crashtest_leak_threshold', None),
-                                "slaves": slavenames,
+                                "slaves": platform_config[slave_platform]['slaves'],
                                 "resetHwClock": branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
                                 "stagePlatform": stage_platform,
                                 "stageProduct": stage_product
