@@ -2727,7 +2727,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'slavenames': platform_config[slave_platform]['slaves'],
                             'builddir': builddir + '-pgo',
                             'slavebuilddir': slavebuilddir + '-pgo',
-                            'factory': factory,
+                            'factory': pgo_factory,
                             'category': branch,
                             'properties': {
                                 'branch': branchProperty,
