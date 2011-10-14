@@ -7761,6 +7761,14 @@ def rc_eval_func(exit_statuses):
         return worst_status(regex_status, rc_status)
     return eval_func
 
+def extractProperties(rv, stdout, stderr):
+    props = {}
+    stdout = stdout.strip()
+    for l in filter(None, stdout.split('\n')):
+        e = filter(None, l.split(':'))
+        props[e[0]] = e[1].strip()
+    return props
+
 class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
             extra_data=None, extra_args=None,
@@ -7785,6 +7793,11 @@ class ScriptFactory(BuildFactory):
                 workdir="."
             ))
             env['EXTRA_DATA'] = 'data.json'
+        self.addStep(ShellCommand(
+            name="clobber_properties",
+            command=['rm', '-rf', 'properties'],
+            workdir=".",
+        ))
         self.addStep(ShellCommand(
             name="clobber_scripts",
             command=['rm', '-rf', 'scripts'],
@@ -7825,3 +7838,11 @@ class ScriptFactory(BuildFactory):
             workdir=".",
             haltOnFailure=True,
             warnOnWarnings=True))
+
+        self.addStep(SetProperty(
+            name='set_script_properties',
+            command=['bash', '-c', 'cat *'],
+            workdir='properties',
+            extract_fn=extractProperties,
+            alwaysRun=True,
+        ))
