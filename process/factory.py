@@ -381,11 +381,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
          name='tinderboxsummarymessage_buildername',
          data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
         ))
-        if self.branchName in ('try',):
-            self.addStep(OutputStep(
-             name='tinderboxprint_revision',
-             data=WithProperties('TinderboxPrint: s: %(revision)s'),
-            ))
         self.addInitialSteps()
 
     def addInitialSteps(self):
@@ -607,7 +602,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
 
 class MercurialBuildFactory(MozillaBuildFactory):
     def __init__(self, env, objdir, platform, configRepoPath, configSubDir,
-                 profiledBuild, mozconfig, use_scratchbox=False, productName=None,
+                 profiledBuild, mozconfig, srcMozconfig=None,
+                 use_scratchbox=False, productName=None,
                  scratchbox_target='FREMANTLE_ARMEL', android_signing=False,
                  buildRevision=None, stageServer=None, stageUsername=None,
                  stageGroup=None, stageSshKey=None, stageBasePath=None,
@@ -634,6 +630,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  mozharnessTag='default',
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
+                 mozharnessMultiOptions=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -650,6 +647,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.configSubDir = configSubDir
         self.profiledBuild = profiledBuild
         self.mozconfig = mozconfig
+        self.srcMozconfig = srcMozconfig
         self.productName = productName
         self.buildRevision = buildRevision
         self.stageServer = stageServer
@@ -727,15 +725,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.complete_platform = self.platform
         # we don't need the extra cruft in 'platform' anymore
         self.platform = platform.split('-')[0]
-        # We need to know what the platform that we should use on
-        # stage should be.  It would be great to be able to do this
-        # programatically, but some variations work differently to others.
-        # Instead of changing the world. lets keep the modification to platforms
-        # that opt in
-        if stagePlatform:
-            self.stagePlatform = stagePlatform
-        else:
-            self.stagePlatform = self.platform
+        self.stagePlatform = stagePlatform
         # it turns out that the cruft is useful for dealing with multiple types
         # of builds that are all done using the same self.platform.
         # Examples of what happens:
@@ -822,6 +812,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.multiLocaleScript = multiLocaleScript
             self.multiLocaleConfig = multiLocaleConfig
             self.multiLocaleMerge = multiLocaleMerge
+            if mozharnessMultiOptions:
+                self.mozharnessMultiOptions = mozharnessMultiOptions
+            else:
+                self.mozharnessMultiOptions = ['--only-pull-locale-source',
+                                               '--only-add-locales',
+                                               '--only-package-multi']
 
             self.addMultiLocaleRepoSteps()
 
@@ -957,6 +953,35 @@ class MercurialBuildFactory(MozillaBuildFactory):
              defaultBranch=self.repoPath,
              timeout=60*60, # 1 hour
             ))
+        elif self.useSharedCheckouts:
+            self.addStep(JSONPropertiesDownload(
+                name="download_props",
+                slavedest="buildprops.json",
+                workdir='.'
+            ))
+
+            env = self.env.copy()
+            env['PROPERTIES_FILE'] = 'buildprops.json'
+            cmd = [
+                    'python',
+                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
+                    'http://%s/%s' % (self.hgHost, self.repoPath),
+                    'build',
+                  ]
+            self.addStep(ShellCommand(
+                name='hg_update',
+                command=cmd,
+                timeout=60*60,
+                env=env,
+                workdir='.',
+                haltOnFailure=True,
+                flunkOnFailure=True,
+            ))
+            self.addStep(SetProperty(
+                name = 'set_got_revision',
+                command=['hg', 'parent', '--template={node}'],
+                extract_fn = short_hash
+            ))
         else:
             self.addStep(Mercurial(
              name='hg_update',
@@ -965,6 +990,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              defaultBranch=self.repoPath,
              timeout=60*60, # 1 hour
             ))
+
         if self.buildRevision:
             self.addStep(ShellCommand(
              name='hg_update',
@@ -988,43 +1014,38 @@ class MercurialBuildFactory(MozillaBuildFactory):
          name='tinderboxprint_changeset',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
+        self.addStep(SetBuildProperty(
+            name='set_comments',
+            property_name="comments",
+            value=lambda build:build.source.changes[-1].comments if len(build.source.changes) > 0 else "",
+        ))
 
     def addConfigSteps(self):
         assert self.configRepoPath is not None
         assert self.configSubDir is not None
         assert self.mozconfig is not None
-        configRepo = self.getRepository(self.configRepoPath)
 
-        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
-                                                      self.mozconfig)
-        self.addStep(ShellCommand(
-         name='rm_configs',
-         command=['rm', '-rf', 'configs'],
-         description=['removing', 'configs'],
-         descriptionDone=['remove', 'configs'],
-         haltOnFailure=True
-        ))
-        self.addStep(MercurialCloneCommand(
-         name='hg_clone_configs',
-         command=['hg', 'clone', configRepo, 'configs'],
-         description=['checking', 'out', 'configs'],
-         descriptionDone=['checkout', 'configs'],
-         haltOnFailure=True
-        ))
-        self.addStep(ShellCommand(
-         name='hg_update',
-         command=['hg', 'update', '-r', self.mozconfigBranch],
-         description=['updating', 'mozconfigs'],
-         workdir="build/configs",
-         haltOnFailure=True
-        ))
-        self.addStep(ShellCommand(
-         # cp configs/mozilla2/$platform/$repo/$type/mozconfig .mozconfig
-         name='cp_mozconfig',
-         command=['cp', self.mozconfig, '.mozconfig'],
-         description=['copying', 'mozconfig'],
-         descriptionDone=['copy', 'mozconfig'],
-         haltOnFailure=True
+        configRepo = self.getRepository(self.configRepoPath)
+        hg_mozconfig = '%s/raw-file/%s/%s/%s/mozconfig' % (
+                configRepo, self.mozconfigBranch, self.configSubDir, self.mozconfig)
+        if self.srcMozconfig:
+            cmd = ['bash', '-c',
+                    '''if [ -f "%(src_mozconfig)s" ]; then
+                        echo Using in-tree mozconfig;
+                        cp %(src_mozconfig)s .mozconfig;
+                    else
+                        echo Downloading mozconfig;
+                        wget -O .mozconfig %(hg_mozconfig)s;
+                    fi'''.replace("\n","") % {'src_mozconfig': self.srcMozconfig, 'hg_mozconfig': hg_mozconfig}]
+        else:
+            cmd = ['wget', '-O', '.mozconfig', hg_mozconfig]
+
+        self.addStep(RetryingShellCommand(
+            name='get_mozconfig',
+            command=cmd,
+            description=['getting', 'mozconfig'],
+            descriptionDone=['got', 'mozconfig'],
+            haltOnFailure=True
         ))
         self.addStep(ShellCommand(
          name='cat_mozconfig',
@@ -1032,15 +1053,31 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
     def addDoBuildSteps(self):
-        buildcmd = 'build'
-        if self.profiledBuild:
-            buildcmd = 'profiledbuild'
         workdir=WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir="build"
+        # XXX This is a hack but we don't have any intention of adding
+        # more branches that are missing MOZ_PGO.  Once these branches
+        # are all EOL'd, lets remove this and just put 'build' in the 
+        # command argv
+        if self.complete_platform.startswith('win32') and \
+            self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0') and \
+            self.profiledBuild:
+            bldtgt = 'profiledbuild'
+        else:
+            bldtgt = 'build'
+
+        command = ['make', '-f', 'client.mk', bldtgt,
+                   WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
+
+        if self.profiledBuild:
+            # when 191,192 and 20 are finished, we can remove this condition
+            # and just append MOZ_PGO=1 to command depending on self.profiledBuild
+            if not self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
+                command.append('MOZ_PGO=1')
         self.addStep(ScratchboxCommand(
          name='compile',
-         command=['make', '-f', 'client.mk', buildcmd, WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')],
+         command=command,
          description=['compile'],
          env=self.env,
          haltOnFailure=True,
@@ -1095,11 +1132,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 extract_fn=get_ctors,
                 ))
 
-            self.addStep(OutputStep(
-                name='tinderboxprint_ctors',
-                data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
-                ))
-
             if self.graphServer:
                 self.addBuildInfoSteps()
                 self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
@@ -1109,10 +1141,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                              resultsname=self.baseName,
                                              env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
                                              propertiesFile="properties.json"))
+            else:
+                self.addStep(OutputStep(
+                    name='tinderboxprint_ctors',
+                    data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
+                    ))
 
     def addLeakTestSteps(self):
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(AliveTest(
           env=leakEnv,
           workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -1252,6 +1290,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addCheckTestSteps(self):
         env = self.env.copy()
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
          warnOnWarnings=True,
@@ -1274,6 +1313,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addValgrindCheckSteps(self):
         env = self.env.copy()
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check-valgrind",
          warnOnWarnings=True,
@@ -1455,9 +1495,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                    '--config-file', self.multiLocaleConfig]
             if self.multiLocaleMerge:
                 cmd.append('--merge-locales')
-            cmd.extend(['--only-pull-locale-source',
-                        '--only-add-locales',
-                        '--only-package-multi'])
+            cmd.extend(self.mozharnessMultiOptions)
             self.addStep(ShellCommand(
                 name='mozharness_multilocale',
                 command=cmd,
@@ -1719,12 +1757,18 @@ class TryBuildFactory(MercurialBuildFactory):
          name='tinderboxprint_changeset_link',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
+        self.addStep(SetBuildProperty(
+            name='set_comments',
+            property_name="comments",
+            value=lambda build:build.source.changes[-1].comments if len(build.source.changes) > 0 else "",
+        ))
 
     def addLeakTestSteps(self):
         # we want the same thing run a few times here, with different
         # extraArgs
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         for args in [['-register'], ['-CreateProfile', 'default'],
                      ['-P', 'default']]:
             self.addStep(AliveTest(
@@ -1879,7 +1923,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(SetBuildProperty(
              name='set_who',
              property_name='who',
-             value=lambda build:str(build.source.changes[0].who),
+             value=lambda build:str(build.source.changes[0].who) if len(build.source.changes) > 0 else "",
              haltOnFailure=True
         ))
 
@@ -1939,6 +1983,7 @@ class TryBuildFactory(MercurialBuildFactory):
              revision=WithProperties('%(got_revision)s'),
              files=[WithProperties('%(packageUrl)s')],
              user=WithProperties('%(who)s'),
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
         for master, warn, retries in self.unittestMasters:
@@ -1952,6 +1997,7 @@ class TryBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s'),
                      WithProperties('%(testsUrl)s')],
              user=WithProperties('%(who)s'),
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -2207,8 +2253,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                      WithProperties('ssh -l %s -i ~/.ssh/%s %s ' % (self.stageUsername,
                                                                     self.stageSshKey,
                                                                     self.stageServer) +
-                                    'ls -1t %s | grep %s' % (self.latestDir,
-                                                             marPattern))
+                                    'ls -1t %s | grep %s | head -n 1' % (self.latestDir,
+                                                                        marPattern))
                      ],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
             flunkOnFailure=False,
@@ -2451,6 +2497,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 upload_dir=tinderboxBuildsDir,
                 product=self.stageProduct,
                 buildid=WithProperties("%(buildid)s"),
+                revision=WithProperties("%(got_revision)s"),
                 as_list=False,
             )
         if self.hgHost.startswith('ssh'):
@@ -2506,13 +2553,23 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
             ))
 
-        talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
+        if self.profiledBuild and self.branchName not in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
+            talosBranch = "%s-%s-pgo-talos" % (self.branchName, self.complete_platform)
+        else:
+            talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
+
         sendchange_props = {
                 'buildid': WithProperties('%(buildid:-)s'),
                 'builduid': WithProperties('%(builduid:-)s'),
                 }
         if self.nightly:
             sendchange_props['nightly_build'] = True
+        # Not sure if this having this property is useful now
+        # but it is
+        if self.profiledBuild:
+            sendchange_props['pgo_build'] = True
+        else:
+            sendchange_props['pgo_build'] = False
 
         if not uploadMulti:
             for master, warn, retries in self.talosMasters:
@@ -2525,6 +2582,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=[WithProperties('%(packageUrl)s')],
                  user="sendchange",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -2542,6 +2600,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  revision=WithProperties("%(got_revision)s"),
                  files=files,
                  user="sendchange-unittest",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -2702,6 +2761,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              revision=WithProperties("%(got_revision)s"),
              files=[WithProperties('%(packageUrl)s')],
              user="sendchange",
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -2716,6 +2776,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              files=[WithProperties('%(packageUrl)s'),
                     WithProperties('%(testsUrl)s')],
              user="sendchange-unittest",
+             comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
 
@@ -4109,11 +4170,29 @@ class ReleaseTaggingFactory(ReleaseFactory):
                  description=['update', repoName],
                  haltOnFailure=True
                 ))
+
+                self.addStep(SetProperty(
+                 command=['sh', '-c', 'hg branches | grep %s | wc -l' % repoRelbranchName],
+                 property='branch_match_count',
+                 workdir=repoName,
+                 haltOnFailure=True,
+                ))
+
                 self.addStep(ShellCommand(
                  name='hg_branch',
                  command=['hg', 'branch', repoRelbranchName],
                  workdir=repoName,
                  description=['branch %s' % repoName],
+                 doStepIf=lambda step: int(step.getProperty('branch_match_count')) == 0,
+                 haltOnFailure=True
+                ))
+
+                self.addStep(ShellCommand(
+                 name='switch_branch',
+                 command=['hg', 'up', '-C', repoRelbranchName],
+                 workdir=repoName,
+                 description=['switch to', repoRelbranchName],
+                 doStepIf=lambda step: int(step.getProperty('branch_match_count')) > 0,
                  haltOnFailure=True
                 ))
             # if buildNumber > 1 we need to switch to it with 'hg up -C'
@@ -4971,6 +5050,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                       '%s builds' % self.version],
          env={'PYTHONPATH': WithProperties('%(toolsdir)s/lib/python')},
          haltOnFailure=False,
+         flunkOnFailure=False,
          workdir=self.updateDir
         ))
 
@@ -5409,6 +5489,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.doUpload()
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         self.addPreTestSteps()
 
@@ -5482,6 +5563,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s'),
                         WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -5554,7 +5636,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
             ))
             self.addStep(SetBuildProperty(
              property_name="who",
-             value=lambda build:build.source.changes[0].who,
+             value=lambda build:build.source.changes[0].who if len(build.source.changes) > 0 else "",
              haltOnFailure=True
             ))
 
@@ -5595,7 +5677,8 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
                  revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
                  files=[WithProperties('%(packageUrl)s')],
-                 user=WithProperties('%(who)s'))
+                 user=WithProperties('%(who)s')),
+                 comments=WithProperties('%(comments:-)s'),
                 )
 
 class CCUnittestBuildFactory(MozillaBuildFactory):
@@ -5765,6 +5848,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.doUpload()
 
         self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
+        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         self.addPreTestSteps()
 
@@ -5842,6 +5926,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  files=[WithProperties('%(packageUrl)s'),
                         WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest",
+                 comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
                 ))
 
@@ -6531,6 +6616,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
             self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
         else:
             self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.env.update(env)
 
         self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
@@ -6897,13 +6983,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
 
     def addTearDownSteps(self):
         self.addCleanupSteps()
-        self.addStep(DisconnectStep(
+        self.addStep(ShellCommand(
             name='reboot device',
             workdir='.',
             alwaysRun=True,
-            force_disconnect=True,
             warnOnFailure=False,
             flunkOnFailure=False,
+            timeout=60*30,
             description='Reboot Device',
             command=['python', '/builds/sut_tools/reboot.py',
                       WithProperties("%(sut_ip)s"),
@@ -7328,14 +7414,26 @@ class TalosFactory(RequestSortingBuildFactory):
             ))
 
         if self.plugins:
-            self.addStep(DownloadFile(
-             url="%s/%s" % (self.supportUrlBase, self.plugins),
-             workdir=os.path.join(self.workdirBase, "talos/base_profile"),
-            ))
-            self.addStep(UnpackFile(
-             filename=os.path.basename(self.plugins),
-             workdir=os.path.join(self.workdirBase, "talos/base_profile"),
-            ))
+            #32 bit (includes mac browsers)
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android', 'leopard', 'snowleopard', 'leopard-o'):
+                self.addStep(DownloadFile(
+                 url="%s/%s" % (self.supportUrlBase, self.plugins['32']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
+                self.addStep(UnpackFile(
+                 filename=os.path.basename(self.plugins['32']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
+            #64 bit
+            if self.OS in ('w764', 'fedora64'):
+                self.addStep(DownloadFile(
+                 url="%s/%s" % (self.supportUrlBase, self.plugins['64']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
+                self.addStep(UnpackFile(
+                 filename=os.path.basename(self.plugins['64']),
+                 workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                ))
 
         for pageset in self.pagesets:
             self.addStep(DownloadFile(
@@ -7455,17 +7553,17 @@ class TalosFactory(RequestSortingBuildFactory):
                 pass
             return False
         if self.remoteTests:
-            self.addStep(DisconnectStep(
+            self.addStep(ShellCommand(
                          name='reboot device',
-                         flunkOnFailure=True,
+                         flunkOnFailure=False,
                          warnOnFailure=False,
                          alwaysRun=True,
                          workdir=self.workdirBase,
                          description="Reboot Device",
+                         timeout=60*30,
                          command=['python', '/builds/sut_tools/reboot.py',
                                   WithProperties("%(sut_ip)s"),
                                  ],
-                         force_disconnect=do_disconnect,
                          env=self.env)
             )
         else:
@@ -7732,6 +7830,14 @@ def rc_eval_func(exit_statuses):
         return worst_status(regex_status, rc_status)
     return eval_func
 
+def extractProperties(rv, stdout, stderr):
+    props = {}
+    stdout = stdout.strip()
+    for l in filter(None, stdout.split('\n')):
+        e = filter(None, l.split(':'))
+        props[e[0]] = e[1].strip()
+    return props
+
 class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
             extra_data=None, extra_args=None,
@@ -7756,6 +7862,11 @@ class ScriptFactory(BuildFactory):
                 workdir="."
             ))
             env['EXTRA_DATA'] = 'data.json'
+        self.addStep(ShellCommand(
+            name="clobber_properties",
+            command=['rm', '-rf', 'properties'],
+            workdir=".",
+        ))
         self.addStep(ShellCommand(
             name="clobber_scripts",
             command=['rm', '-rf', 'scripts'],
@@ -7796,3 +7907,11 @@ class ScriptFactory(BuildFactory):
             workdir=".",
             haltOnFailure=True,
             warnOnWarnings=True))
+
+        self.addStep(SetProperty(
+            name='set_script_properties',
+            command=['bash', '-c', 'cat *'],
+            workdir='properties',
+            extract_fn=extractProperties,
+            alwaysRun=True,
+        ))

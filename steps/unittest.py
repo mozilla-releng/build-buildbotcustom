@@ -147,6 +147,8 @@ def summarizeLogRemoteMochitest(name, log):
             if line.startswith('Browser Chrome Test Summary'):
                 found = True
     if found:
+        if d.has_key('Failed') and str(d['Failed']) != '0':
+            d['Failed'] = emphasizeFailureText(d['Failed'])
         summary = "%(Passed)s/%(Failed)s/%(Todo)s" % d
     # Return the summary.
     return "TinderboxPrint: %s<br/>%s\n" % (name, summary)

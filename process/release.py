@@ -9,6 +9,7 @@ from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
 from buildbot.steps.shell import WithProperties
+from buildbot.status.builder import Results
 
 import release.platforms
 import release.paths
@@ -38,10 +39,11 @@ from release.platforms import buildbot2ftp, sl_platform_map
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
-from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from buildbotcustom.status.errors import update_verify_error
+from buildbotcustom.status.queued_command import QueuedCommandHandler
 from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
+from mozilla_buildtools.queuedir import QueueDir
 import BuildSlaves
 
 DEFAULT_PARALLELIZATION = 10
@@ -124,6 +126,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         msgdict = {}
         releaseName = releasePrefix()
         job_status = "failed" if results else "success"
+        job_status_repr = Results[results]
         allplatforms = list(releaseConfig['enUSPlatforms'])
         xrplatforms = list(releaseConfig.get('xulrunnerPlatforms', []))
         stage = name.replace(builderPrefix(""), "")
@@ -511,7 +514,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         mirror_scheduler1 = TriggerBouncerCheck(
             name=builderPrefix('ready-for-rel-test'),
             configRepo=config_repo,
-            minUptake=10000,
+            minUptake=releaseConfig.get('releasetestUptake', 10000),
             builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
                           [builderPrefix('final_verification', platform)
                            for platform in releaseConfig.get('verifyConfigs', {}).keys()],
@@ -523,7 +526,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         mirror_scheduler2 = TriggerBouncerCheck(
             name=builderPrefix('ready-for-release'),
             configRepo=config_repo,
-            minUptake=45000,
+            minUptake=releaseConfig.get('releaseUptake', 45000),
             builderNames=[builderPrefix('ready_for_release')],
             username=BuildSlaves.tuxedoUsername,
             password=BuildSlaves.tuxedoPassword)
@@ -760,7 +763,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         pf = branchConfig['platforms'][platform]
         mozconfig = '%s/%s/release' % (platform, sourceRepoInfo['name'])
         if platform in releaseConfig['talosTestPlatforms']:
-            talosMasters = branchConfig['talos_masters']
+            talosMasters = pf['talos_masters']
         else:
             talosMasters = None
 
@@ -774,16 +777,21 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             unittestBranch = None
 
         if not releaseConfig.get('skip_build'):
+            platform_env = pf['env'].copy()
+            if 'update_channel' in branchConfig:
+                platform_env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
             if platform in releaseConfig['l10nPlatforms']:
                 triggeredSchedulers = [builderPrefix('%s_repack' % platform)]
             else:
                 triggeredSchedulers = None
             multiLocaleConfig = releaseConfig.get(
-                'mozharness_config', {}).get(platform)
+                'mozharness_config', {}).get('platforms', {}).get(platform)
+            mozharnessMultiOptions = releaseConfig.get(
+                'mozharness_config', {}).get('multilocaleOptions')
             enableUpdatePackaging = bool(releaseConfig.get('verifyConfigs',
                                                       {}).get(platform))
             build_factory = ReleaseBuildFactory(
-                env=pf['env'],
+                env=platform_env,
                 objdir=pf['platform_objdir'],
                 platform=platform,
                 hgHost=branchConfig['hghost'],
@@ -823,9 +831,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
                 compareLocalesRepoPath=branchConfig['compare_locales_repo_path'],
                 mozharnessRepoPath=branchConfig['mozharness_repo_path'],
-                mozharnessTag=branchConfig['mozharness_tag'],
+                mozharnessTag=releaseTag,
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
+                mozharnessMultiOptions=mozharnessMultiOptions,
                 usePrettyNames=releaseConfig.get('usePrettyNames', True),
                 enableUpdatePackaging=enableUpdatePackaging,
                 mozconfigBranch=releaseTag,
@@ -851,6 +860,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 ))
 
         if platform in releaseConfig['l10nPlatforms']:
+            env = builder_env.copy()
+            env.update(pf['env'])
+            if 'update_channel' in branchConfig:
+                env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
+
             if not releaseConfig.get('disableStandaloneRepacks'):
                 standalone_factory = ScriptFactory(
                     scriptRepo=tools_repo,
@@ -858,8 +872,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptName='scripts/l10n/standalone_repacks.sh',
                     extra_args=[platform, branchConfigFile]
                 )
-                env = builder_env.copy()
-                env.update(pf['env'])
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
                     'slavenames': branchConfig['l10n_slaves'][platform],
@@ -892,8 +904,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
                 builddir = builderPrefix('%s_repack' % platform) + \
                                          '_' + str(n)
-                env = builder_env.copy()
-                env.update(pf['env'])
                 builders.append({
                     'name': builderName,
                     'slavenames': branchConfig['l10n_slaves'][platform],
@@ -1565,11 +1575,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     logUploadCmd = makeLogUploadCommand(sourceRepoInfo['name'], branchConfig,
             platform_prop=None, product=product)
 
-    status.append(SubprocessLogHandler(
+    status.append(QueuedCommandHandler(
         logUploadCmd + [
             '--release', '%s/%s' % (
                 releaseConfig['version'], releaseConfig['buildNumber'])
             ],
+        QueueDir.getQueue('commands'),
         builders=[b['name'] for b in builders + test_builders],
     ))
 

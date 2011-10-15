@@ -1,5 +1,5 @@
 from os import path
-from time import strftime, strptime
+from time import gmtime, strftime, strptime
 
 import buildbot
 from buildbotcustom.common import getSupportedPlatforms
