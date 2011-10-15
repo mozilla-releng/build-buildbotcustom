@@ -2145,6 +2145,11 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          name='tinderboxprint_changeset',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
+        self.addStep(SetBuildProperty(
+            name='set_comments',
+            property_name="comments",
+            value=lambda build:build.source.changes[-1].comments if len(build.source.changes) > 0 else "",
+        ))
 
     def addUploadSteps(self, pkgArgs=None):
         MercurialBuildFactory.addUploadSteps(self, pkgArgs)
