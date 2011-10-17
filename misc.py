@@ -616,8 +616,12 @@ def generateBranchObjects(config, name):
                     unittestPrettyNames[platform] = '%s debug test' % base_name
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
-            # Skip l10n, unit tests and nightlies for debug builds
-            continue
+            # Skip l10n, unit tests
+            # Skip nightlies for debug builds unless requested  
+            if pf.has_key('enable_nightly'):
+                    do_nightly = pf['enable_nightly']
+            else:
+                continue
         elif pf.get('enable_dep', True):
             builders.append(pretty_name)
             prettyNames[platform] = pretty_name
@@ -657,6 +661,9 @@ def generateBranchObjects(config, name):
                 l10nNightlyBuilders[builder]['platform'] = platform
             if config['enable_shark'] and pf.get('enable_shark'):
                 nightlyBuilders.append('%s shark' % base_name)
+            if config['enable_valgrind'] and \
+               platform in config['valgrind_platforms']:
+                nightlyBuilders.append('%s valgrind' % base_name)
         # Regular unittest builds
         if pf.get('enable_unittests'):
             unittestBuilders.append('%s unit test' % base_name)
@@ -1278,7 +1285,7 @@ def generateBranchObjects(config, name):
             nightly_kwargs.update(multiargs)
             nightly_kwargs.update(ausargs)
 
-			# We make the assumption that *all* nightly builds
+            # We make the assumption that *all* nightly builds
             # are to be done with PGO.  This is to ensure that all
             # branches get some PGO coverage
             # We do not stick '-pgo' in the stage_platform for
@@ -1471,6 +1478,30 @@ def generateBranchObjects(config, name):
                                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
+            if config['enable_valgrind'] and \
+               platform in config['valgrind_platforms']:
+                valgrind_env=platform_env.copy()
+                valgrind_env['REVISION'] = WithProperties("%(revision)s")
+                mozilla2_valgrind_factory = ScriptFactory(
+                    "%s%s" % (config['hgurl'],config['build_tools_repo_path']),
+                    'scripts/valgrind/valgrind.sh',
+                )
+                mozilla2_valgrind_builder = {
+                    'name': '%s valgrind' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s-valgrind' % (name, platform),
+                    'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform)),
+                    'factory': mozilla2_valgrind_factory,
+                    'category': name,
+                    'env': valgrind_env,
+                    'nextSlave': _nextSlowSlave,
+                    'properties': {'branch': name,
+                                   'platform': platform,
+                                   'stage_platform': stage_platform,
+                                   'product': pf['stage_product'],
+                                   'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform))},
+                }
+                branchObjects['builders'].append(mozilla2_valgrind_builder)
 
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
@@ -2691,10 +2722,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                     slavebuilddir= 'test'
                     factory = factory_class(**factory_kwargs)
-                    slave_key = branch_config.get('slave_key', 'slaves')
                     builder = {
                         'name': "%s %s talos %s" % (platform_name, branch, suite),
-                        'slavenames': platform_config[slave_platform][slave_key],
+                        'slavenames': platform_config[slave_platform]['slaves'],
                         'builddir': builddir,
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
@@ -2792,8 +2822,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             # create the builders
-                            slave_key = branch_config.get('slave_key', 'slaves')
-                            slavenames = platform_config[slave_platform][slave_key]
                             test_builder_kwargs = {
                                 "config": branch_config,
                                 "branch_name": branch,
@@ -2804,7 +2832,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "suites": suites,
                                 "mochitestLeakThreshold": branch_config.get('mochitest_leak_threshold', None),
                                 "crashtestLeakThreshold": branch_config.get('crashtest_leak_threshold', None),
-                                "slaves": slavenames,
+                                "slaves": platform_config[slave_platform]['slaves'],
                                 "resetHwClock": branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
                                 "stagePlatform": stage_platform,
                                 "stageProduct": stage_product
@@ -3119,55 +3147,6 @@ def generateNanojitObjects(config, SLAVES):
             'status': status,
             }
 
-def generateValgrindObjects(config, slaves):
-    builders = []
-    branch = os.path.basename(config['repo_path'])
-
-    for platform in config['platforms']:
-        f = ScriptFactory(
-                config['scripts_repo'],
-                'scripts/valgrind/valgrind.sh',
-                )
-
-        env = config[platform]['env']
-        builder = {'name': 'valgrind-%s' % platform,
-                   'builddir': 'valgrind-%s' % platform,
-                   'slavenames': slaves[platform],
-                   'nextSlave': _nextSlowSlave,
-                   'factory': f,
-                   'category': branch,
-                   'env': env,
-                   'properties': {'branch': branch},
-                  }
-        builders.append(builder)
-
-    # Set up scheduler
-    scheduler = PersistentScheduler(
-            name="valgrind",
-            builderNames=[b['name'] for b in builders],
-            numPending=1,
-            pollInterval=config['job_interval'],
-            )
-
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-        )
-        status = [tbox_mailer]
-
-    return {
-            'builders': builders,
-            'schedulers': [scheduler],
-            'status': status,
-            }
-
 def generateSpiderMonkeyObjects(config, SLAVES):
     builders = []
     branch = os.path.basename(config['repo_path'])
@@ -3326,11 +3305,6 @@ def generateProjectObjects(project, config, SLAVES):
     elif project == 'nanojit':
         nanojitObjects = generateNanojitObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, nanojitObjects)
-
-    # Valgrind
-    elif project.startswith('valgrind'):
-        valgrindObjects = generateValgrindObjects(config, SLAVES)
-        buildObjects = mergeBuildObjects(buildObjects, valgrindObjects)
 
     # Jetpack
     elif project.startswith('jetpack'):
