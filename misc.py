@@ -1642,7 +1642,7 @@ def generateBranchObjects(config, name):
                     hgHost=config['hghost'],
                     repoPath=config['repo_path'],
                     buildToolsRepoPath=config['build_tools_repo_path'],
-                    buildSpace=5,
+                    buildSpace=7,
                     clobberURL=config['base_clobber_url'],
                     clobberTime=clobberTime,
                     buildsBeforeReboot=pf['builds_before_reboot'],
