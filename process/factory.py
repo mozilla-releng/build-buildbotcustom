@@ -7841,8 +7841,10 @@ class ScriptFactory(BuildFactory):
 
         self.addStep(SetProperty(
             name='set_script_properties',
-            command=['bash', '-c', 'cat *'],
+            command=['bash', '-c', 'for file in `ls -1`; do cat $file; done'],
             workdir='properties',
             extract_fn=extractProperties,
             alwaysRun=True,
+            warnOnFailure=False,
+            flunkOnFailure=False,
         ))
