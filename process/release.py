@@ -39,7 +39,8 @@ from release.platforms import buildbot2ftp, sl_platform_map
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
-from buildbotcustom.status.errors import update_verify_error
+from buildbotcustom.status.errors import update_verify_error, \
+     permission_check_error
 from buildbotcustom.status.queued_command import QueuedCommandHandler
 from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
@@ -1182,6 +1183,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             extra_args=[branchConfigFile, 'permissions'],
             script_timeout=3*60*60,
             scriptName='scripts/release/push-to-mirrors.sh',
+            log_eval_func=lambda c, s: regex_log_evaluator(
+                c, s, permission_check_error),
         )
 
         builders.append({
