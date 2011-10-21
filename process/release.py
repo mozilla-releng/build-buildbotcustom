@@ -483,6 +483,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderNames=[builderPrefix('antivirus')]
         )
         schedulers.append(antivirus_scheduler)
+    if releaseConfig.get('enableAutomaticPushToMirrors') and \
+        releaseConfig.get('verifyConfigs'):
+        if releaseConfig.get('disableVirusCheck'):
+            upstream_scheduler = updates_scheduler
+        else:
+            upstream_scheduler = antivirus_scheduler
+        push_to_mirrors_scheduler = Dependent(
+            name=builderPrefix('push_to_mirrors'),
+            upstream=upstream_scheduler,
+            builderNames=[builderPrefix('push_to_mirrors')],
+        )
+        schedulers.append(push_to_mirrors_scheduler)
 
     if releaseConfig.get('majorUpdateRepoPath'):
         majorUpdateBuilderNames = []
@@ -1246,7 +1258,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'env': builder_env,
             'properties': {
                 'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs')),
-                'release_config': releaseConfigFile
+                'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
                 },
         })
         notify_builders.append(builderPrefix('push_to_mirrors'))
