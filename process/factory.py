@@ -4698,7 +4698,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
                  fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
-                 **kwargs):
+                 schema=None, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4722,6 +4722,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                            macosx_info.txt in the candidates directory on the
                            staging server (to cope with the transition in mac
                            builds, see bug 630085)
+           schema: The style of snippets to write (changed in bug 459972)
         """
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
@@ -4761,6 +4762,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.fakeMacInfoTxt = fakeMacInfoTxt
         self.longVersion = longVersion or self.version
         self.oldLongVersion = oldLongVersion or self.oldVersion
+        self.schema = schema
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4893,6 +4895,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
+        if self.schema:
+            bumpCommand.extend(['-s', str(self.schema)])
         self.addStep(ShellCommand(
          name='bump',
          command=bumpCommand,
@@ -5212,6 +5216,8 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
+        if self.schema:
+            bumpCommand.extend(['-s', str(self.schema)])
         self.addStep(ShellCommand(
          name='create_config',
          command=bumpCommand,
