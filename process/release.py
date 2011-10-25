@@ -1135,7 +1135,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             oldBinaryName=releaseConfig['oldBinaryName'],
             testOlderPartials=releaseConfig['testOlderPartials'],
             longVersion=releaseConfig.get('longVersion', None),
-            oldLongVersion=releaseConfig.get('oldLongVersion', None)
+            oldLongVersion=releaseConfig.get('oldLongVersion', None),
+            schema=releaseConfig.get('snippetSchema', None),
         )
 
         builders.append({
@@ -1341,7 +1342,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             oldRepoPath=sourceRepoInfo['path'],
             triggerSchedulers=[builderPrefix('major_update_verify')],
             releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
-            fakeMacInfoTxt=releaseConfig['majorFakeMacInfoTxt']
+            fakeMacInfoTxt=releaseConfig['majorFakeMacInfoTxt'],
+            schema=releaseConfig.get('majorSnippetSchema', None),
         )
 
         builders.append({
