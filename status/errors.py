@@ -3,7 +3,7 @@ import re
 from buildbot.status.builder import EXCEPTION, FAILURE, RETRY, WARNINGS
 
 global_errors = ((re.compile("No space left on device"), RETRY),
-                 (re.compile("Remote Device Error"), EXCEPTION),
+                 (re.compile("Remote Device Error"), RETRY),
                  (re.compile("Connection to the other side was lost in a non-clean fashion"), RETRY),
                  (re.compile("Automation Error:"), RETRY),
                 )
