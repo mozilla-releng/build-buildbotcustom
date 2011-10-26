@@ -1268,11 +1268,17 @@ def generateBranchObjects(config, name):
             if create_snippet and 'android' in platform:
                 # Ideally, this woud use some combination of product name and
                 # stage_platform, but that can be done in a follow up.
-                ausargs = {
-                    'downloadBaseURL': config['mobile_download_base_url'],
-                    'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                    'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
-                }
+                # Android doesn't create updates for all the branches that
+                # Firefox desktop does.
+                if config.get('create_mobile_snippet'):
+                    ausargs = {
+                        'downloadBaseURL': config['mobile_download_base_url'],
+                        'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
+                        'ausBaseUploadDir': config['aus2_mobile_base_upload_dir'],
+                    }
+                else:
+                    create_snippet = False
+                    ausargs = {}
             else:
                 ausargs = {
                     'downloadBaseURL': config['download_base_url'],
