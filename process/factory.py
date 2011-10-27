@@ -1145,6 +1145,137 @@ class MercurialBuildFactory(MozillaBuildFactory):
                     data=WithProperties('TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
                     ))
 
+    def addLeakTestStepsCommon(self, baseUrl, leakEnv, graphAndUpload):
+        """ Helper function for the two implementations of addLeakTestSteps.
+        * baseUrl Base of the URL where we get the old logs.
+        * leakEnv Environment used for running firefox.
+        * graphAndUpload Used to prevent the try jobs from doing talos graph
+          posts and uploading logs."""
+        if self.platform == 'macosx64':
+            return
+
+        self.addStep(AliveTest(
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          extraArgs=['--trace-malloc', 'malloc.log',
+                     '--shutdown-leaks=sdleak.log'],
+          timeout=3600, # 1 hour, because this takes a long time on win32
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        self.addStep(RetryingShellCommand(
+          name='get_malloc_log',
+          env=self.env,
+          workdir='.',
+          command=['wget', '-O', 'malloc.log.old',
+                   '%s/malloc.log' % baseUrl]
+          ))
+        self.addStep(RetryingShellCommand(
+          name='get_sdleak_log',
+          env=self.env,
+          workdir='.',
+          command=['wget', '-O', 'sdleak.tree.old',
+                   '%s/sdleak.tree' % baseUrl]
+          ))
+        self.addStep(ShellCommand(
+          name='mv_malloc_log',
+          env=self.env,
+          command=['mv',
+                   '%s/_leaktest/malloc.log' % self.mozillaObjdir,
+                   '../malloc.log'],
+          ))
+        self.addStep(ShellCommand(
+          name='mv_sdleak_log',
+          env=self.env,
+          command=['mv',
+                   '%s/_leaktest/sdleak.log' % self.mozillaObjdir,
+                   '../sdleak.log'],
+          ))
+        self.addStep(CompareLeakLogs(
+          name='compare_current_leak_log',
+          mallocLog='../malloc.log',
+          platform=self.platform,
+          env=self.env,
+          objdir=self.mozillaObjdir,
+          testname='current',
+          tbPrint=self.tbPrint,
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        if self.graphServer and graphAndUpload:
+            self.addBuildInfoSteps()
+            self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+            self.addStep(GraphServerPost(server=self.graphServer,
+                                         selector=self.graphSelector,
+                                         branch=self.graphBranch,
+                                         resultsname=self.baseName,
+                                         env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                         propertiesFile="properties.json"))
+        self.addStep(CompareLeakLogs(
+          name='compare_previous_leak_log',
+          mallocLog='../malloc.log.old',
+          platform=self.platform,
+          env=self.env,
+          objdir=self.mozillaObjdir,
+          testname='previous'
+          ))
+        self.addStep(ShellCommand(
+          name='create_sdleak_tree',
+          env=self.env,
+          workdir='.',
+          command=['bash', '-c',
+                   'perl build%s/tools/trace-malloc/diffbloatdump.pl '
+                   '--depth=15 --use-address /dev/null sdleak.log '
+                   '> sdleak.tree' % self.mozillaDir],
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
+            self.addStep(ShellCommand(
+              name='create_sdleak_raw',
+              env=self.env,
+              workdir='.',
+              command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
+              ))
+                # Bug 571443 - disable fix-macosx-stack.pl
+            if self.platform == 'macosx64':
+                self.addStep(ShellCommand(
+                  workdir='.',
+                  command=['cp', 'sdleak.tree.raw', 'sdleak.tree'],
+                  ))
+            else:
+                self.addStep(ShellCommand(
+                  name='get_fix_stack',
+                  env=self.env,
+                  workdir='.',
+                  command=['/bin/bash', '-c',
+                           'perl '
+                           'build%s/tools/rb/fix-%s-stack.pl '
+                           'sdleak.tree.raw '
+                           '> sdleak.tree' % (self.mozillaDir,
+                                              self.platform.replace("64", "")),
+                           ],
+                  warnOnFailure=True,
+                  haltOnFailure=True
+                    ))
+        if graphAndUpload:
+            self.addStep(RetryingShellCommand(
+              name='upload_logs',
+              env=self.env,
+              command=['scp', '-o', 'User=%s' % self.stageUsername,
+                       '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
+                       '../malloc.log', '../sdleak.tree',
+                       '%s:%s/%s' % (self.stageServer, self.stageBasePath,
+                                     self.logUploadDir)]
+              ))
+        self.addStep(ShellCommand(
+          name='compare_sdleak_tree',
+          env=self.env,
+          workdir='.',
+          command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
+                   '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
+          ))
+
     def addLeakTestSteps(self):
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
@@ -1163,127 +1294,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
           haltOnFailure=True
         ))
 
-        if self.platform != 'macosx64':
-            self.addStep(AliveTest(
-             env=leakEnv,
-             workdir='build/%s/_leaktest' % self.mozillaObjdir,
-             extraArgs=['--trace-malloc', 'malloc.log',
-                        '--shutdown-leaks=sdleak.log'],
-             timeout=3600, # 1 hour, because this takes a long time on win32
-             warnOnFailure=True,
-             haltOnFailure=True
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_malloc_log',
-             env=self.env,
-             workdir='.',
-             command=['wget', '-O', 'malloc.log.old',
-                      '%s/malloc.log' % self.logBaseUrl]
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_sdleak_log',
-             env=self.env,
-             workdir='.',
-             command=['wget', '-O', 'sdleak.tree.old',
-                      '%s/sdleak.tree' % self.logBaseUrl]
-            ))
-            self.addStep(ShellCommand(
-             name='mv_malloc_log',
-             env=self.env,
-             command=['mv',
-                      '%s/_leaktest/malloc.log' % self.mozillaObjdir,
-                      '../malloc.log'],
-            ))
-            self.addStep(ShellCommand(
-             name='mv_sdleak_log',
-             env=self.env,
-             command=['mv',
-                      '%s/_leaktest/sdleak.log' % self.mozillaObjdir,
-                      '../sdleak.log'],
-            ))
-            self.addStep(CompareLeakLogs(
-             name='compare_current_leak_log',
-             mallocLog='../malloc.log',
-             platform=self.platform,
-             env=self.env,
-             objdir=self.mozillaObjdir,
-             testname='current',
-             tbPrint=self.tbPrint,
-             warnOnFailure=True,
-             haltOnFailure=True
-            ))
-            if self.graphServer:
-                self.addBuildInfoSteps()
-                self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
-                self.addStep(GraphServerPost(server=self.graphServer,
-                                             selector=self.graphSelector,
-                                             branch=self.graphBranch,
-                                             resultsname=self.baseName,
-                                             env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
-                                             propertiesFile="properties.json"))
-            self.addStep(CompareLeakLogs(
-             name='compare_previous_leak_log',
-             mallocLog='../malloc.log.old',
-             platform=self.platform,
-             env=self.env,
-             objdir=self.mozillaObjdir,
-             testname='previous'
-            ))
-            self.addStep(ShellCommand(
-             name='create_sdleak_tree',
-             env=self.env,
-             workdir='.',
-             command=['bash', '-c',
-                      'perl build%s/tools/trace-malloc/diffbloatdump.pl '
-                      '--depth=15 --use-address /dev/null sdleak.log '
-                      '> sdleak.tree' % self.mozillaDir],
-             warnOnFailure=True,
-             haltOnFailure=True
-            ))
-            if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
-                self.addStep(ShellCommand(
-                 name='create_sdleak_raw',
-                 env=self.env,
-                 workdir='.',
-                 command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
-                ))
-                # Bug 571443 - disable fix-macosx-stack.pl
-                if self.platform == 'macosx64':
-                    self.addStep(ShellCommand(
-                     workdir='.',
-                     command=['cp', 'sdleak.tree.raw', 'sdleak.tree'],
-                    ))
-                else:
-                    self.addStep(ShellCommand(
-                     name='get_fix_stack',
-                     env=self.env,
-                     workdir='.',
-                     command=['/bin/bash', '-c',
-                              'perl '
-                              'build%s/tools/rb/fix-%s-stack.pl '
-                              'sdleak.tree.raw '
-                              '> sdleak.tree' % (self.mozillaDir,
-                                                 self.platform.replace("64", "")),
-                              ],
-                     warnOnFailure=True,
-                     haltOnFailure=True
-                    ))
-            self.addStep(RetryingShellCommand(
-             name='upload_logs',
-             env=self.env,
-             command=['scp', '-o', 'User=%s' % self.stageUsername,
-                      '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-                      '../malloc.log', '../sdleak.tree',
-                      '%s:%s/%s' % (self.stageServer, self.stageBasePath,
-                                    self.logUploadDir)]
-            ))
-            self.addStep(ShellCommand(
-             name='compare_sdleak_tree',
-             env=self.env,
-             workdir='.',
-             command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
-                      '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
-            ))
+        self.addLeakTestStepsCommon(self.logBaseUrl, leakEnv, True)
 
     def addCheckTestSteps(self):
         env = self.env.copy()
@@ -1776,112 +1787,10 @@ class TryBuildFactory(MercurialBuildFactory):
                 warnOnFailure=True,
                 haltOnFailure=True
             ))
+        baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s' % \
+            (self.stageServer, self.productName, self.platform)
 
-        if self.platform != 'macosx64':
-            self.addStep(AliveTest(
-             env=leakEnv,
-             workdir='build/%s/_leaktest' % self.mozillaObjdir,
-             extraArgs=['--trace-malloc', 'malloc.log',
-                        '--shutdown-leaks=sdleak.log'],
-             timeout=3600, # 1 hour, because this takes a long time on win32
-             warnOnFailure=True,
-             haltOnFailure=True
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_malloc_log',
-             env=self.env,
-             workdir='.',
-             command=['wget', '-O', 'malloc.log.old',
-                      'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/malloc.log' % \
-                         (self.stageServer, self.productName, self.platform)],
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_sdleak_log',
-             env=self.env,
-             workdir='.',
-             command=['wget', '-O', 'sdleak.tree.old',
-                      'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/sdleak.tree' % \
-                         (self.stageServer, self.productName, self.platform)],
-            ))
-            self.addStep(ShellCommand(
-             name='mv_malloc_log',
-             env=self.env,
-             command=['mv',
-                      '%s/_leaktest/malloc.log' % self.mozillaObjdir,
-                      '../malloc.log'],
-            ))
-            self.addStep(ShellCommand(
-             name='mv_sdleak_log',
-             env=self.env,
-             command=['mv',
-                      '%s/_leaktest/sdleak.log' % self.mozillaObjdir,
-                      '../sdleak.log'],
-            ))
-            self.addStep(CompareLeakLogs(
-             name='compare_current_leak_log',
-             mallocLog='../malloc.log',
-             platform=self.platform,
-             env=self.env,
-             objdir=self.mozillaObjdir,
-             testname='current',
-             tbPrint=self.tbPrint,
-             warnOnFailure=True,
-             haltOnFailure=True
-            ))
-            self.addStep(CompareLeakLogs(
-             name='compare_previous_leak_log',
-             mallocLog='../malloc.log.old',
-             platform=self.platform,
-             env=self.env,
-             objdir=self.mozillaObjdir,
-             testname='previous'
-            ))
-            self.addStep(ShellCommand(
-             name='create_sdleak_tree',
-             env=self.env,
-             workdir='.',
-             command=['bash', '-c',
-                      'perl build%s/tools/trace-malloc/diffbloatdump.pl '
-                      '--depth=15 --use-address /dev/null sdleak.log '
-                      '> sdleak.tree' % self.mozillaDir],
-             warnOnFailure=True,
-             haltOnFailure=True
-            ))
-            if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
-                self.addStep(ShellCommand(
-                 name='create_sdleak_raw',
-                 env=self.env,
-                 workdir='.',
-                 command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
-                ))
-                # Bug 571443 - disable fix-macosx-stack.pl
-                if self.platform == 'macosx64':
-                    self.addStep(ShellCommand(
-                     workdir='.',
-                     command=['cp', 'sdleak.tree.raw', 'sdleak.tree'],
-                    ))
-                else:
-                    self.addStep(ShellCommand(
-                     name='get_fix_stack',
-                     env=self.env,
-                     workdir='.',
-                     command=['/bin/bash', '-c',
-                              'perl '
-                              'build%s/tools/rb/fix-%s-stack.pl '
-                              'sdleak.tree.raw '
-                              '> sdleak.tree' % (self.mozillaDir,
-                                                 self.platform.replace("64", ""))
-                              ],
-                     warnOnFailure=True,
-                     haltOnFailure=True
-                    ))
-            self.addStep(ShellCommand(
-             name='compare_sdleak_tree',
-             env=self.env,
-             workdir='.',
-             command=['perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
-                      '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
-            ))
+        self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
 
     def addCodesighsSteps(self):
         self.addStep(ShellCommand(
@@ -4634,7 +4543,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
                  fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
-                 **kwargs):
+                 schema=None, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4658,6 +4567,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                            macosx_info.txt in the candidates directory on the
                            staging server (to cope with the transition in mac
                            builds, see bug 630085)
+           schema: The style of snippets to write (changed in bug 459972)
         """
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
@@ -4697,6 +4607,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.fakeMacInfoTxt = fakeMacInfoTxt
         self.longVersion = longVersion or self.version
         self.oldLongVersion = oldLongVersion or self.oldVersion
+        self.schema = schema
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4829,6 +4740,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
+        if self.schema:
+            bumpCommand.extend(['-s', str(self.schema)])
         self.addStep(ShellCommand(
          name='bump',
          command=bumpCommand,
@@ -5148,6 +5061,8 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
+        if self.schema:
+            bumpCommand.extend(['-s', str(self.schema)])
         self.addStep(ShellCommand(
          name='create_config',
          command=bumpCommand,

@@ -618,9 +618,7 @@ def generateBranchObjects(config, name):
                 triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
             # Skip l10n, unit tests
             # Skip nightlies for debug builds unless requested  
-            if pf.has_key('enable_nightly'):
-                    do_nightly = pf['enable_nightly']
-            else:
+            if not pf.has_key('enable_nightly'):
                 continue
         elif pf.get('enable_dep', True):
             builders.append(pretty_name)
@@ -1158,7 +1156,7 @@ def generateBranchObjects(config, name):
                 }
                 branchObjects['builders'].append(pgo_builder)
 
-        # skip nightlies for debug builds
+        # skip nightlies for debug builds unless requested at platform level
         if platform.find('debug') > -1:
             if pf.get('enable_unittests'):
                 for suites_name, suites in config['unittest_suites']:
@@ -1177,7 +1175,8 @@ def generateBranchObjects(config, name):
                         suites_name, suites, mochitestLeakThreshold,
                         crashtestLeakThreshold, stagePlatform=stage_platform,
                         stageProduct=pf['stage_product']))
-            continue
+            if not pf.has_key('enable_nightly'):
+                continue
 
         if config['enable_nightly']:
             if pf.has_key('enable_nightly'):
@@ -1268,11 +1267,17 @@ def generateBranchObjects(config, name):
             if create_snippet and 'android' in platform:
                 # Ideally, this woud use some combination of product name and
                 # stage_platform, but that can be done in a follow up.
-                ausargs = {
-                    'downloadBaseURL': config['mobile_download_base_url'],
-                    'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                    'ausBaseUploadDir': config.get('aus2_mobile_base_upload_dir', 'fake'),
-                }
+                # Android doesn't create updates for all the branches that
+                # Firefox desktop does.
+                if config.get('create_mobile_snippet'):
+                    ausargs = {
+                        'downloadBaseURL': config['mobile_download_base_url'],
+                        'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
+                        'ausBaseUploadDir': config['aus2_mobile_base_upload_dir'],
+                    }
+                else:
+                    create_snippet = False
+                    ausargs = {}
             else:
                 ausargs = {
                     'downloadBaseURL': config['download_base_url'],
