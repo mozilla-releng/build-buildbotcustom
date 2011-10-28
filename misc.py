@@ -3231,28 +3231,34 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 
 def generateJetpackObjects(config, SLAVES):
     builders = []
-    for platform in config['platforms'].keys():
-        slaves = SLAVES[platform]
-        jetpackTarball = "%s/%s/%s" % (config['hgurl'] , config['repo_path'], config['jetpack_tarball'])
-        f = ScriptFactory(
-                config['scripts_repo'],
-                'buildfarm/utils/run_jetpack.py',
-                extra_args=("--platform", platform, "--tarball-url", jetpackTarball,
-                           "--ftp-url", config['ftp_url'], "--extension", config['platforms'][platform]['ext'],),
-                interpreter='python',
-                log_eval_func=rc_eval_func({1: WARNINGS}),
-                )
-
-        builder = {'name': 'jetpack-%s' % platform,
-                   'builddir': 'jetpack-%s' % platform,
-                   'slavebuilddir': 'test',
-                   'slavenames': slaves,
-                   'factory': f,
-                   'category': 'jetpack',
-                   'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
-                  }
-        builders.append(builder)
-        nomergeBuilders.append(builder)
+    for branch in config['branches']:
+        for platform in config['platforms'].keys():
+            slaves = SLAVES[platform]
+            jetpackTarball = "%s/%s/%s" % (config['hgurl'] , config['repo_path'], config['jetpack_tarball'])
+            ftp_url = config['ftp_url']
+            types = ['opt','debug']
+            for type in types:
+                if type == 'debug':
+                    ftp_url = ftp_url + "-debug"
+                f = ScriptFactory(
+                        config['scripts_repo'],
+                        'buildfarm/utils/run_jetpack.py',
+                        extra_args=("-p", platform, "-t", jetpackTarball, "-b", branch,
+                                   "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
+                        interpreter='python',
+                        log_eval_func=rc_eval_func({1: WARNINGS}),
+                        )
+    
+                builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
+                           'builddir': 'jetpack-%s-%s-%s' % (branch, platform, type),
+                           'slavebuilddir': 'test',
+                           'slavenames': slaves,
+                           'factory': f,
+                           'category': 'jetpack',
+                           'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
+                          }
+                builders.append(builder)
+                nomergeBuilders.append(builder)
 
     # Set up polling
     poller = HgPoller(
