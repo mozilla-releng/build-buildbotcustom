@@ -1151,9 +1151,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         * leakEnv Environment used for running firefox.
         * graphAndUpload Used to prevent the try jobs from doing talos graph
           posts and uploading logs."""
-        if self.platform == 'macosx64':
-            return
-
         self.addStep(AliveTest(
           env=leakEnv,
           workdir='build/%s/_leaktest' % self.mozillaObjdir,
@@ -1237,7 +1234,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
               workdir='.',
               command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
               ))
-                # Bug 571443 - disable fix-macosx-stack.pl
+            # Bug 571443 - disable fix-macosx-stack.pl
             if self.platform == 'macosx64':
                 self.addStep(ShellCommand(
                   workdir='.',
