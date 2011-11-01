@@ -459,11 +459,12 @@ class DownloadFile(ShellCommand):
             self.addCompleteLog("errors", "Automation Error: %s" % str(e))
             return self.finished(FAILURE)
 
+        renderedUrl = self.build.getProperties().render(url)
         if self.url_property:
-            self.setProperty(self.url_property, url, "DownloadFile")
+            self.setProperty(self.url_property, renderedUrl, "DownloadFile")
         if self.filename_property:
             self.setProperty(self.filename_property,
-                    os.path.basename(url), "DownloadFile")
+                    os.path.basename(renderedUrl), "DownloadFile")
 
         if self.ignore_certs:
             self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", url])
