@@ -571,7 +571,7 @@ def generateBranchObjects(config, name):
     triggeredUnittestBuilders = []
     nightlyBuilders = []
     xulrunnerNightlyBuilders = []
-    pgoBuilders = []
+    periodicPgoBuilders = [] # Only used for the 'periodic' strategy. rename to perodicPgoBuilders?
     debugBuilders = []
     weeklyBuilders = []
     coverageBuilders = []
@@ -586,6 +586,10 @@ def generateBranchObjects(config, name):
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
     l10nPollInterval = config.get('l10nPollInterval', 5*60)
+
+    # We only understand a couple PGO strategies
+    assert config['pgo_strategy'] in ('per-checkin', 'periodic', None), \
+            "%s is not an understood PGO strategy" % config['pgo_strategy']
 
     # This section is to make it easier to disable certain products.
     # Ideally we could specify a shorter platforms key on the branch,
@@ -643,8 +647,8 @@ def generateBranchObjects(config, name):
             do_nightly = False
 
         # Check if platform as a PGO builder
-        if config['enable_pgo'] and platform in config['pgo_platforms']:
-            pgoBuilders.append('%s pgo-build' % pf['base_name'])
+        if config['pgo_strategy'] == 'periodic' and platform in config['pgo_platforms']:
+            periodicPgoBuilders.append('%s pgo-build' % pf['base_name'])
 
         if do_nightly:
             builder = '%s nightly' % base_name
@@ -693,7 +697,7 @@ def generateBranchObjects(config, name):
     branchObjects['status'].append(QueuedCommandHandler(
         logUploadCmd,
         QueueDir.getQueue('commands'),
-        builders=builders + unittestBuilders + debugBuilders + pgoBuilders,
+        builders=builders + unittestBuilders + debugBuilders + periodicPgoBuilders,
     ))
 
     if nightlyBuilders:
@@ -943,13 +947,13 @@ def generateBranchObjects(config, name):
         )
         branchObjects['schedulers'].append(nightly_scheduler)
 
-    if len(pgoBuilders) > 0:
+    if len(periodicPgoBuilders) > 0:
         pgo_scheduler = makePropertiesScheduler(
                             Nightly,
                             [buildIDSchedFunc, buildUIDSchedFunc])(
                             name="%s pgo" % name,
                             branch=config['repo_path'],
-                            builderNames=pgoBuilders,
+                            builderNames=periodicPgoBuilders,
                             hour=range(0,24,config['periodic_pgo_interval']),
                         )
         branchObjects['schedulers'].append(pgo_scheduler)
@@ -1001,7 +1005,7 @@ def generateBranchObjects(config, name):
         talosMasters = pf['talos_masters']
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         # Generate the PGO branch even if it isn't on for dep builds
-        # because we will still use it for nightlies
+        # because we will still use it for nightlies... maybe
         pgoUnittestBranch = "%s-%s-pgo-unittest" % (name, platform)
         tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
@@ -1053,6 +1057,21 @@ def generateBranchObjects(config, name):
         stageBasePath = '%s/%s' % (config['stage_base_path'],
                                        pf['stage_product'])
 
+        # For the 'per-checkin' pgo strategy, we want PGO
+        # enabled on what would be 'opt' builds.
+        if platform in config['pgo_platforms']:
+            if config['pgo_strategy'] == 'periodic' or config['pgo_strategy'] == None:
+                per_checkin_build_uses_pgo = False
+            elif config['pgo_strategy'] == 'per-checkin':
+                per_checkin_build_uses_pgo = True
+        else:
+            # All platforms that can't do PGO... shouldn't do PGO.
+            per_checkin_build_uses_pgo = False
+
+        if per_checkin_build_uses_pgo:
+            per_checkin_unittest_branch = pgoUnittestBranch
+        else:
+            per_checkin_unittest_branch = unittestBranch
 
         # Some platforms shouldn't do dep builds (i.e. RPM)
         if pf.get('enable_dep', True):
@@ -1065,7 +1084,7 @@ def generateBranchObjects(config, name):
                 'buildToolsRepoPath': config['build_tools_repo_path'],
                 'configRepoPath': config['config_repo_path'],
                 'configSubDir': config['config_subdir'],
-                'profiledBuild': False,
+                'profiledBuild': per_checkin_build_uses_pgo,
                 'productName': config['product_name'],
                 'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
@@ -1096,7 +1115,7 @@ def generateBranchObjects(config, name):
                 'talosMasters': talosMasters,
                 'packageTests': packageTests,
                 'unittestMasters': pf.get('unittest_masters', config['unittest_masters']),
-                'unittestBranch': unittestBranch,
+                'unittestBranch': per_checkin_unittest_branch,
                 'tinderboxBuildsDir': tinderboxBuildsDir,
                 'enable_ccache': pf.get('enable_ccache', False),
                 'useSharedCheckouts': pf.get('enable_shared_checkouts', False),
@@ -1134,7 +1153,7 @@ def generateBranchObjects(config, name):
             # We have some platforms which need to be built every X hours with PGO.
             # These builds are as close to regular dep builds as we can make them, 
             # other than PGO
-            if config['enable_pgo'] and platform in config['pgo_platforms']:
+            if config['pgo_strategy'] == 'periodic' and platform in config['pgo_platforms']:
                 pgo_kwargs = factory_kwargs.copy()
                 pgo_kwargs['profiledBuild'] = True
                 pgo_kwargs['stagePlatform'] += '-pgo'
@@ -1295,11 +1314,15 @@ def generateBranchObjects(config, name):
             # branches get some PGO coverage
             # We do not stick '-pgo' in the stage_platform for
             # nightlies because it'd be ugly and break stuff
-            if platform in config['pgo_platforms'] and \
-               name not in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
-                nightlyUnittestBranch = pgoUnittestBranch
+            if platform in config['pgo_platforms']:
                 nightly_pgo = True
+                nightlyUnittestBranch = pgoUnittestBranch
             else:
+                nightlyUnittestBranch = unittestBranch
+                nightly_pgo = False
+
+            # More 191,192,20 special casing
+            if name in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
                 nightlyUnittestBranch = unittestBranch
                 nightly_pgo = False
 
@@ -2649,6 +2672,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     # prettyNames is a mapping to pass to the try_parser for validation
     prettyNames = {}
 
+    # We only understand a couple PGO strategies
+    assert branch_config['pgo_strategy'] in ('per-checkin', 'periodic', None), \
+            "%s is not an understood PGO strategy" % branch_config['pgo_strategy']
+
     buildBranch = branch_config['build_branch']
     talosCmd = branch_config['talos_command']
 
@@ -2673,11 +2700,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         stage_product = platform_config['stage_product']
 
         # Decide whether this platform should have PGO builders created
-        if branch_config.get('add_pgo_builders',False) and \
-           platform in branch_config.get('pgo_platforms', []):
-               do_pgo = True
+        if branch_config['pgo_strategy'] and platform in branch_config['pgo_platforms']:
+            create_pgo_builders = True
         else:
-           do_pgo = False
+            create_pgo_builders = False
 
         # if platform is in the branch config check for overriding slave_platforms at the branch level
         # before creating the builders & schedulers
@@ -2702,12 +2728,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                     # We only want to append '-Non-PGO' to platforms that
                     # also have PGO builds.
-                    if not platform in branch_config.get('pgo_platforms', []) or not branch_config.get('add_pgo_builders'):
-                        opt_branch_name = branchName
-                        opt_talos_branch = talosBranch
-                    else:
+                    if create_pgo_builders:
                         opt_branch_name = branchName + '-Non-PGO'
                         opt_talos_branch = talosBranch + '-Non-PGO'
+                    else:
+                        opt_branch_name = branchName
+                        opt_talos_branch = talosBranch
 
                     factory_kwargs = {
                         "OS": slave_platform.split('-')[0],
@@ -2752,7 +2778,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     branch_builders[tinderboxTree].append(builder['name'])
                     all_builders.append(builder['name'])
 
-                    if do_pgo:
+                    if create_pgo_builders:
                         pgo_factory_kwargs = factory_kwargs.copy()
                         pgo_factory_kwargs['branchName'] = branchName
                         pgo_factory_kwargs['talosBranch'] = talosBranch
@@ -2812,7 +2838,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             test_builders.extend(generateTestBuilderNames(
                                 '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
-                            if do_pgo and test_type == 'opt':
+                            if create_pgo_builders and test_type == 'opt':
                                 pgo_builders.extend(generateTestBuilderNames(
                                 '%s %s pgo test' % (platform_name, branch), suites_name, suites))
                         # Collect test builders for the TinderboxMailNotifier
@@ -2821,7 +2847,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                         triggeredUnittestBuilders.append(('tests-%s-%s-%s-unittest' % (branch, slave_platform, test_type),
                                                          test_builders, merge_tests))
-                        if do_pgo and test_type == 'opt':
+                        if create_pgo_builders and test_type == 'opt':
                             pgoUnittestBuilders.append(('tests-%s-%s-pgo-unittest' % (branch, slave_platform),
                                                        pgo_builders, merge_tests))
 
@@ -2843,7 +2869,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "stageProduct": stage_product
                             }
                             branchObjects['builders'].extend(generateTestBuilder(**test_builder_kwargs))
-                            if do_pgo and test_type == 'opt':
+                            if create_pgo_builders and test_type == 'opt':
                                 pgo_builder_kwargs = test_builder_kwargs.copy()
                                 pgo_builder_kwargs['name_prefix'] = "%s %s pgo test" % (platform_name, branch)
                                 pgo_builder_kwargs['build_dir_prefix'] += '_pgo'
