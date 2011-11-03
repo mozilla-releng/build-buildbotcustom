@@ -6489,6 +6489,15 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
             ))
 
     def addRunTestSteps(self):
+        if self.platform.startswith('mac'):
+            self.addStep(ShellCommand(
+                name='show_resolution',
+                flunkOnFailure=False,
+                warnOnFailure=False,
+                haltOnFailure=False,
+                workdir='/Users/cltbld',
+                command=['bash', '-c', 'screenresolution get && screenresolution list']
+            ))
         # Run them!
         if self.stackwalk_cgi and self.downloadSymbols:
             symbols_path = '%(symbols_url)s'
@@ -7399,6 +7408,15 @@ class TalosFactory(RequestSortingBuildFactory):
         )
 
     def addRunTestStep(self):
+        if self.OS in ('lion', 'snowleopard'):
+            self.addStep(ShellCommand(
+                name='show_resolution',
+                flunkOnFailure=False,
+                warnOnFailure=False,
+                haltOnFailure=False,
+                workdir='/Users/cltbld',
+                command=['bash', '-c', 'screenresolution get && screenresolution list']
+            ))
         self.addStep(talos_steps.MozillaRunPerfTests(
          warnOnWarnings=True,
          workdir=os.path.join(self.workdirBase, "talos/"),
