@@ -1123,6 +1123,8 @@ def generateBranchObjects(config, name):
                 'l10nCheckTest': pf.get('l10n_check_test', False),
                 'android_signing': pf.get('android_signing', False),
                 'post_upload_include_platform': pf.get('post_upload_include_platform', False),
+                'baseMirrorUrls': config.get('base_mirror_urls'),
+                'baseBundleUrls': config.get('base_bundle_urls'),
             }
             factory_kwargs.update(extra_args)
 
@@ -1377,6 +1379,8 @@ def generateBranchObjects(config, name):
                 l10nCheckTest=pf.get('l10n_check_test', False),
                 android_signing=pf.get('android_signing', False),
                 post_upload_include_platform=pf.get('post_upload_include_platform', False),
+                baseMirrorUrls=config.get('base_mirror_urls'),
+                baseBundleUrls=config.get('base_bundle_urls'),
                 **nightly_kwargs
             )
 
@@ -1402,6 +1406,8 @@ def generateBranchObjects(config, name):
                     # TODO Linux and mac are not working with mozconfig at this point
                     # and this will disable it for now. We will fix this in bug 518359.
                     env = {}
+                    if 'HG_SHARE_BASE_DIR' in platform_env:
+                        env['HG_SHARE_BASE_DIR'] = platform_env['HG_SHARE_BASE_DIR']
                     objdir = ''
                     mozconfig = None
 
@@ -1439,6 +1445,7 @@ def generateBranchObjects(config, name):
                         buildSpace=l10nSpace,
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
+                        baseMirrorUrls=config.get('base_mirror_urls'),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -1534,7 +1541,11 @@ def generateBranchObjects(config, name):
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
+            env = {}
+            if 'HG_SHARE_BASE_DIR' in platform_env:
+                env['HG_SHARE_BASE_DIR'] = platform_env['HG_SHARE_BASE_DIR']
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
+                env=env,
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
@@ -1554,6 +1565,7 @@ def generateBranchObjects(config, name):
                 buildSpace=l10nSpace,
                 clobberURL=config['base_clobber_url'],
                 clobberTime=clobberTime,
+                baseMirrorUrls=config.get('base_mirror_urls'),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
