@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 from datetime import datetime
 import os.path, re
-from time import strftime
 import urllib
 import random
 
@@ -347,7 +346,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
             clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-            branchName=None, baseWorkDir='build', hashType='sha512', **kwargs):
+            branchName=None, baseWorkDir='build', hashType='sha512',
+            baseMirrorUrls=None, baseBundleUrls=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -362,6 +362,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         self.buildsBeforeReboot = buildsBeforeReboot
         self.baseWorkDir = baseWorkDir
         self.hashType = hashType
+        self.baseMirrorUrls = baseMirrorUrls
+        self.baseBundleUrls = baseBundleUrls
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -596,6 +598,62 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             workdir=directory,
             extract_fn = self.unsetFilepath,
         ))
+
+    def makeHgtoolStep(self, name='hg_update', repo_url=None, wc=None,
+            mirrors=None, bundles=None, env=None,
+            clone_by_revision=False, rev=None, workdir='build',
+            use_properties=True, locks=None):
+
+        if not env:
+            env = self.env
+
+        if use_properties:
+            env = env.copy()
+            env['PROPERTIES_FILE'] = 'buildprops.json'
+
+        cmd = ['python', WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py")]
+
+        if clone_by_revision:
+            cmd.append('--clone-by-revision')
+
+        if mirrors is None and self.baseMirrorUrls:
+            mirrors = ["%s/%s" % (url, self.repoPath) for url in self.baseMirrorUrls]
+
+        if mirrors:
+            for mirror in mirrors:
+                cmd.extend(["--mirror", mirror])
+
+        if bundles is None and self.baseBundleUrls:
+            bundles = ["%s/%s.hg" % (url, self.getRepoName(self.repository)) for url in self.baseBundleUrls]
+
+        if bundles:
+            for bundle in bundles:
+                cmd.extend(["--bundle", bundle])
+
+        if not repo_url:
+            repo_url = self.repository
+
+        if rev:
+            cmd.extend(["--rev", rev])
+
+        cmd.append(repo_url)
+
+        if wc:
+            cmd.append(wc)
+
+        if locks is None:
+            locks = []
+
+        return RetryingShellCommand(
+            name=name,
+            command=cmd,
+            timeout=60*60,
+            env=env,
+            workdir=workdir,
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            locks=locks,
+        )
 
 
 class MercurialBuildFactory(MozillaBuildFactory):
@@ -958,23 +1016,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 workdir='.'
             ))
 
-            env = self.env.copy()
-            env['PROPERTIES_FILE'] = 'buildprops.json'
-            cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    'http://%s/%s' % (self.hgHost, self.repoPath),
-                    'build',
-                  ]
-            self.addStep(ShellCommand(
-                name='hg_update',
-                command=cmd,
-                timeout=60*60,
-                env=env,
-                workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
+            self.addStep(self.makeHgtoolStep(wc='build', workdir='.'))
+
             self.addStep(SetProperty(
                 name = 'set_got_revision',
                 command=['hg', 'parent', '--template={node}'],
@@ -1717,24 +1760,15 @@ class TryBuildFactory(MercurialBuildFactory):
                 workdir='.'
             ))
 
-            env = self.env.copy()
-            env['PROPERTIES_FILE'] = 'buildprops.json'
-            cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    'http://%s/%s' % (self.hgHost, self.repoPath),
-                    'build',
-                  ]
-            self.addStep(ShellCommand(
-                name='hg_update',
-                command=cmd,
-                timeout=60*60,
-                locks=[hg_try_lock.access('counting')],
-                env=env,
-                workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
+            step = self.makeHgtoolStep(
+                    clone_by_revision=True,
+                    bundles=[],
+                    wc='build',
+                    workdir='.',
+                    locks=[hg_try_lock.access('counting')],
+                    )
+            self.addStep(step)
+
         else:
             self.addStep(Mercurial(
             name='hg_update',
@@ -2996,40 +3030,27 @@ class BaseRepackFactory(MozillaBuildFactory):
         ))
 
     def getSources(self):
-        self.addStep(ShellCommand(
-         name='get_enUS_src',
-         command=[
-                  'python',
-                  WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                  WithProperties("--rev=%(en_revision)s"),
-                  'http://%s/%s' % (self.hgHost, self.repoPath),
-                  self.origSrcDir,
-                 ],
-         env=self.env,
-         descriptionDone="en-US source",
-         workdir=self.baseWorkDir,
-         locks=[hg_l10n_lock.access('counting')],
-         haltOnFailure=True,
-         flunkOnFailure=True,
-         timeout=30*60 # 30 minutes
-        ))
-        self.addStep(ShellCommand(
-         name='get_locale_src',
-         command=[
-                  'python',
-                  WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                  WithProperties("--rev=%(l10n_revision)s"),
-                  WithProperties("http://" + self.hgHost + "/" + \
-                                 self.l10nRepoPath + "/%(locale)s")
-                 ],
-         env=self.env,
-         descriptionDone="locale source",
-         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
-         locks=[hg_l10n_lock.access('counting')],
-         haltOnFailure=True,
-         flunkOnFailure=True,
-         timeout=5*60, # 5 minutes
-        ))
+        step = self.makeHgtoolStep(
+                name='get_enUS_src',
+                wc=self.origSrcDir,
+                rev=WithProperties("%(en_revision)s"),
+                locks=[hg_l10n_lock.access('counting')],
+                workdir=self.baseWorkDir,
+                use_properties=False,
+                )
+        self.addStep(step)
+
+        step = self.makeHgtoolStep(
+                name='get_locale_src',
+                rev=WithProperties("%(l10n_revision)s"),
+                repo_url=WithProperties("http://" + self.hgHost + "/" + \
+                                 self.l10nRepoPath + "/%(locale)s"),
+                workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
+                locks=[hg_l10n_lock.access('counting')],
+                use_properties=False,
+                mirrors=[],
+                )
+        self.addStep(step)
 
     def updateEnUS(self):
         '''Update the en-US source files to the revision used by
