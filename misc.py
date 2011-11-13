@@ -1879,14 +1879,17 @@ def generateCCBranchObjects(config, name):
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
             is_shadow=bool(name=='shadow-central'), product=config['product_name'])
 
-    branchObjects['status'].append(SubprocessLogHandler(
+    # this comment is for grepping! SubprocessLogHandler
+    branchObjects['status'].append(QueuedCommandHandler(
         logUploadCmd,
+        QueueDir.getQueue('commands'),
         builders=builders + unittestBuilders + debugBuilders,
     ))
 
     if nightlyBuilders:
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd + ['--nightly'],
+            QueueDir.getQueue('commands'),
             builders=nightlyBuilders,
         ))
 
@@ -1974,13 +1977,15 @@ def generateCCBranchObjects(config, name):
         ))
 
         # Log uploads for dep l10n repacks
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd + ['--l10n'],
+            QueueDir.getQueue('commands'),
             builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
         ))
         # and for nightly repacks
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd + ['--l10n', '--nightly'],
+            QueueDir.getQueue('commands'),
             builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
@@ -2103,8 +2108,9 @@ def generateCCBranchObjects(config, name):
             errorparser="unittest"
         ))
 
-        branchObjects['status'].append(SubprocessLogHandler(
+        branchObjects['status'].append(QueuedCommandHandler(
             logUploadCmd,
+            QueueDir.getQueue('commands'),
             builders=test_builders,
         ))
 
