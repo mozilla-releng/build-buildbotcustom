@@ -3916,15 +3916,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             ))
 
     def doRepack(self):
-        # For releases we have to make memory/jemalloc
-        if self.platform.startswith('win32'):
-            self.addStep(ShellCommand(
-             name='make_memory_jemalloc',
-             command=['make'],
-             workdir='build/'+self.mozillaObjdir+'/memory/jemalloc',
-             description=['make memory/jemalloc'],
-             haltOnFailure=True
-            ))
         # Because we're generating updates we need to build the libmar tools
         for dir in ('nsprpub', 'modules/libmar'):
             self.addStep(ShellCommand(
