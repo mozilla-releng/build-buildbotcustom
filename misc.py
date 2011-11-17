@@ -1269,7 +1269,7 @@ def generateBranchObjects(config, name):
 
 
             multiargs = {}
-            if config.get('enable_l10n') and pf.get('multi_locale'):
+            if config.get('enable_l10n') and config.get('enable_multi_locale') and pf.get('multi_locale'):
                 multiargs['multiLocale'] = True
                 multiargs['multiLocaleMerge'] = config['multi_locale_merge']
                 multiargs['compareLocalesRepoPath'] = config['compare_locales_repo_path']
