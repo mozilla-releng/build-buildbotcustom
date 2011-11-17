@@ -1125,6 +1125,7 @@ def generateBranchObjects(config, name):
                 'post_upload_include_platform': pf.get('post_upload_include_platform', False),
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
+                'mozillaDir': config.get('mozilla_dir', None),
             }
             factory_kwargs.update(extra_args)
 
