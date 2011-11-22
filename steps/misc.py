@@ -41,6 +41,7 @@ from buildbot.status.builder import STDOUT, STDERR #ScratchboxProperty
 from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand, \
   addRetryEvaluateCommand, RetryingShellCommand
 from buildbotcustom.common import genBuildID, genBuildUID
+from buildbotcustom.try_parser import processMessage
 
 def errbackAfter(wrapped_d, timeout):
     # Thanks to Dustin!
@@ -404,8 +405,17 @@ class SendChangeStep(ShellCommand):
             bb_cmd = ['buildbot', 'sendchange', '--master', self.master,
                       '--username', user, '--branch', branch,
                       '--revision', revision]
-            if comments:
-                bb_cmd.extend(['--comments', comments])
+            if isinstance(comments, basestring):
+                if re.search('try: ', comments, re.MULTILINE):
+                    comments = 'try: ' + ' '.join(processMessage(comments))
+                else:
+                    try:
+                        comments = comments.splitlines()[0]
+                    except IndexError:
+                        comments = ''
+                comments = re.sub(r'[\r\n^<>|;&"\'%$]', '_', comments)
+                if comments:
+                    bb_cmd.extend(['--comments', comments])
 
             for key, value in sendchange_props:
                 bb_cmd.extend(['--property', '%s:%s' % (key, value)])
