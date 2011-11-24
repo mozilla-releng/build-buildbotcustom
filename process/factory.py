@@ -4245,7 +4245,8 @@ class SingleSourceFactory(ReleaseFactory):
                   self.bundleFile],
          workdir='.',
          description=['create bundle'],
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=30*60 # 30 minutes
         ))
         self.addStep(ShellCommand(
          name='delete_metadata',
@@ -4269,7 +4270,8 @@ class SingleSourceFactory(ReleaseFactory):
          workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
          env=self.env,
          description=['make source-package'],
-         haltOnFailure=True
+         haltOnFailure=True,
+         timeout=30*60 # 30 minutes
         ))
         self.addStep(ShellCommand(
          name='mv_source-package',
