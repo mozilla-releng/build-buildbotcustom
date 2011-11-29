@@ -3436,7 +3436,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='make_bsdiff',
             command=['sh', '-c',
                      'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
-                     'make -C nsprpub; make -C config;' +
+                     'make tier_nspr; make -C config;' +
                      'make -C modules/libmar; make -C modules/libbz2;' +
                      'make -C other-licenses/bsdiff;'
                      'fi'],
@@ -3452,10 +3452,10 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
 
     def doRepack(self):
         self.addStep(ShellCommand(
-         name='make_nsprpub',
-         command=['make'],
-         workdir='%s/%s/nsprpub' % (self.baseWorkDir, self.mozillaObjdir),
-         description=['make nsprpub'],
+         name='make_tier_nspr',
+         command=['make', 'tier_nspr'],
+         workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
+         description=['make tier_nspr'],
          haltOnFailure=True
         ))
         if self.l10nNightlyUpdate:
@@ -3724,12 +3724,18 @@ class ReleaseRepackFactory(BaseRepackFactory, ReleaseFactory):
              haltOnFailure=True
             ))
         # Because we're generating updates we need to build the libmar tools
-        for dir in ('nsprpub', 'modules/libmar'):
-            self.addStep(ShellCommand(
-             name='make_%s' % dir,
+        self.addStep(ShellCommand(
+            name='make_tier_nspr',
+            command=['make','tier_nspr'],
+            workdir='build/'+self.mozillaObjdir,
+            description=['make tier_nspr'],
+            haltOnFailure=True
+            ))
+        self.addStep(ShellCommand(
+             name='make_libmar',
              command=['make'],
-             workdir='build/'+self.mozillaObjdir+'/'+dir,
-             description=['make ' + dir],
+             workdir='build/'+self.mozillaObjdir+'/modules/libmar',
+             description=['make libmar'],
              haltOnFailure=True
             ))
 
