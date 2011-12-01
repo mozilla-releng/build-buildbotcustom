@@ -753,7 +753,7 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
                   "python -u xpcshell/runxpcshelltests.py"])
 
         if symbols_path:
-            script += " --symbols-path=%s" % symbols_path
+            script += " --symbols-path=../%s" % symbols_path
         script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell" + bin_extension
 
         self.command = ['bash', '-c', WithProperties(script)]
@@ -814,7 +814,7 @@ class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandRepor
             self.command.append("--test-path=%s" % testPath)
 
         if symbols_path:
-            self.command.append(WithProperties("--symbols-path=%s" % symbols_path))
+            self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
 
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
@@ -839,7 +839,7 @@ class MozillaPackagedReftests(ReftestMixin, ShellCommandReportTimeout):
                 '--extra-profile-file=bin/plugins',
                 ]
         if symbols_path:
-            self.command.append(WithProperties("--symbols-path=%s" % symbols_path))
+            self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
         if leakThreshold:
             self.command.append('--leak-threshold=%d' % leakThreshold)
         self.command.extend(self.getSuiteOptions(suite))
@@ -880,12 +880,14 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
 
 
 class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
-    def __init__(self, variant, testPath=None, xrePath='../hostutils/xre',
+    def __init__(self, variant, symbols_path=None, testPath=None,
+                 xrePath='../hostutils/xre',
                  utilityPath='../hostutils/bin', certificatePath='certs',
                  app='org.mozilla.fennec', consoleLevel='INFO', **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
-        self.addFactoryArguments(variant=variant, testPath=testPath,
+        self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
+                                 testPath=testPath,
                                  xrePath=xrePath, utilityPath=utilityPath,
                                  certificatePath=certificatePath, app=app,
                                  consoleLevel=consoleLevel)
@@ -906,6 +908,9 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
         if testPath:
             self.command.extend(['--test-path', testPath])
 
+        if symbols_path:
+            self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
+
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
     def __init__(self, **kwargs):
@@ -922,12 +927,13 @@ class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
 
 
 class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
-    def __init__(self, suite, xrePath='../hostutils/xre',
+    def __init__(self, suite, symbols_path=None, xrePath='../hostutils/xre',
                  utilityPath='../hostutils/bin', app='org.mozilla.fennec',
                  totalChunks=None, thisChunk=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(suite=suite, xrePath=xrePath,
+                                 symbols_path=symbols_path,
                                  utilityPath=utilityPath, app=app,
                                  totalChunks=totalChunks, thisChunk=thisChunk)
 
@@ -946,3 +952,7 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                        ]
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
         self.command.extend(self.getSuiteOptions(suite))
+
+        if symbols_path:
+            self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
+
