@@ -550,7 +550,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
     return builders
 
 
-def generateBranchObjects(config, name):
+def generateBranchObjects(config, name, secrets=None):
     """name is the name of branch which is usually the last part of the path
        to the repository. For example, 'mozilla-central', 'mozilla-aurora', or
        'mozilla-1.9.1'.
@@ -567,6 +567,8 @@ def generateBranchObjects(config, name):
         'schedulers': [],
         'status': []
     }
+    if secrets is None:
+        secrets = {}
     builders = []
     unittestBuilders = []
     triggeredUnittestBuilders = []
@@ -1124,6 +1126,7 @@ def generateBranchObjects(config, name):
                 'l10nCheckTest': pf.get('l10n_check_test', False),
                 'android_signing': pf.get('android_signing', False),
                 'post_upload_include_platform': pf.get('post_upload_include_platform', False),
+                'signingServers': secrets.get(config.get('dep_signing_servers')),
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
@@ -1381,6 +1384,7 @@ def generateBranchObjects(config, name):
                 l10nCheckTest=pf.get('l10n_check_test', False),
                 android_signing=pf.get('android_signing', False),
                 post_upload_include_platform=pf.get('post_upload_include_platform', False),
+                signingServers=secrets.get(config.get('nightly_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 **nightly_kwargs
@@ -1407,14 +1411,11 @@ def generateBranchObjects(config, name):
                 if platform in config['l10n_platforms']:
                     # TODO Linux and mac are not working with mozconfig at this point
                     # and this will disable it for now. We will fix this in bug 518359.
-                    env = {}
-                    if 'HG_SHARE_BASE_DIR' in platform_env:
-                        env['HG_SHARE_BASE_DIR'] = platform_env['HG_SHARE_BASE_DIR']
                     objdir = ''
                     mozconfig = None
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
-                        env=env,
+                        env=platform_env,
                         objdir=objdir,
                         platform=platform,
                         hgHost=config['hghost'],
@@ -1447,6 +1448,7 @@ def generateBranchObjects(config, name):
                         buildSpace=l10nSpace,
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
+                        signingServers=secrets.get(config.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
                     )
                     mozilla2_l10n_nightly_builder = {
@@ -1498,7 +1500,8 @@ def generateBranchObjects(config, name):
                     buildSpace=buildSpace,
                     clobberURL=config['base_clobber_url'],
                     clobberTime=clobberTime,
-                    buildsBeforeReboot=pf['builds_before_reboot']
+                    buildsBeforeReboot=pf['builds_before_reboot'],
+                    signingServers=secrets.get(config.get('dep_signing_servers')),
                 )
                 mozilla2_shark_builder = {
                     'name': '%s shark' % pf['base_name'],
@@ -1543,11 +1546,8 @@ def generateBranchObjects(config, name):
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
-            env = {}
-            if 'HG_SHARE_BASE_DIR' in platform_env:
-                env['HG_SHARE_BASE_DIR'] = platform_env['HG_SHARE_BASE_DIR']
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
-                env=env,
+                env=platform_env,
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
@@ -1567,6 +1567,7 @@ def generateBranchObjects(config, name):
                 buildSpace=l10nSpace,
                 clobberURL=config['base_clobber_url'],
                 clobberTime=clobberTime,
+                signingServers=secrets.get(config.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
             )
             mozilla2_l10n_dep_builder = {
@@ -1750,6 +1751,7 @@ def generateBranchObjects(config, name):
                  clobberTime=clobberTime,
                  buildsBeforeReboot=pf['builds_before_reboot'],
                  packageSDK=True,
+                 signingServers=secrets.get(config.get('nightly_signing_servers')),
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],

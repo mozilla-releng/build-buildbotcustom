@@ -82,14 +82,19 @@ hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
 
 class DummyFactory(BuildFactory):
-    def __init__(self):
+    def __init__(self, delay=5, triggers=None):
         BuildFactory.__init__(self)
-        self.addStep(Dummy())
+        self.addStep(Dummy(delay))
+        if triggers:
+            self.addStep(Trigger(
+                schedulerNames=triggers,
+                waitForFinish=False,
+                ))
 
-def makeDummyBuilder(name, slaves, category=None):
+def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None):
     builder = {
             'name': name,
-            'factory': DummyFactory(),
+            'factory': DummyFactory(delay, triggers),
             'builddir': name,
             'slavenames': slaves,
             }
@@ -689,6 +694,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
                  mozharnessMultiOptions=None,
+                 signingServers=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -837,6 +843,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                                              self.stagePlatform)
             self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
                         ( self.stageServer, self.stageProduct, self.logUploadDir)
+
+        if signingServers:
+            cmd = [
+                env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "-t", "%(basedir)s/build/token",
+                "-n", "%(basedir)s/build/nonce",
+                "-c", "%(toolsdir)s/release/signing/host.cert",
+                ]
+            for ss, user, passwd in signingServers:
+                cmd.extend(['-H', ss])
+            self.env['MOZ_SIGN_CMD'] = WithProperties(" ".join(cmd))
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
@@ -1351,9 +1368,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addL10nCheckTestSteps(self):
+        # We override MOZ_SIGN_CMD here because it's not necessary
         self.addStep(ShellCommand(
          name='make l10n check',
-         command=['make', 'l10n-check'],
+         command=['make', 'l10n-check', 'MOZ_SIGN_CMD='],
          workdir='build/%s' % self.objdir,
          env=self.env,
          haltOnFailure=False,
@@ -2562,7 +2580,8 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
 class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
-            usePrettyNames=True, enableUpdatePackaging=True, **kwargs):
+            usePrettyNames=True, enableUpdatePackaging=True,
+            signingFormats=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
@@ -2795,7 +2814,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
                  mergeLocales=True, mozconfigBranch="production", 
-                 testPrettyNames=False, **kwargs):
+                 testPrettyNames=False, signingServers=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.env = env.copy()
@@ -2824,6 +2843,17 @@ class BaseRepackFactory(MozillaBuildFactory):
             self.configRepoPath = configRepoPath
             self.configRepo = self.getRepository(self.configRepoPath,
                                              kwargs['hgHost'])
+
+        if signingServers:
+            cmd = [
+                env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "-t", "%(basedir)s/build/token",
+                "-n", "%(basedir)s/build/nonce",
+                "-c", "%(toolsdir)s/release/signing/host.cert",
+                ]
+            for ss, user, passwd in signingServers:
+                cmd.extend(['-H', ss])
+            self.env['MOZ_SIGN_CMD'] = WithProperties(" ".join(cmd))
 
         self.addStep(SetBuildProperty(
          property_name='tree',
