@@ -26,6 +26,7 @@ import buildbotcustom.steps.transfer
 import buildbotcustom.steps.updates
 import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
+import buildbotcustom.steps.signing
 import buildbotcustom.env
 import buildbotcustom.misc_scheduler
 import build.paths
@@ -42,6 +43,7 @@ reload(buildbotcustom.steps.transfer)
 reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
+reload(buildbotcustom.steps.signing)
 reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
@@ -64,6 +66,7 @@ from buildbotcustom.steps.test import AliveTest, \
 from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
+from buildbotcustom.steps.signing import SigningServerAuthenication
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
   genBuildID, reallyShort
@@ -760,6 +763,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.useSharedCheckouts = useSharedCheckouts
         self.testPrettyNames = testPrettyNames
         self.l10nCheckTest = l10nCheckTest
+        self.signingServers = signingServers
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -984,6 +988,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addSourceSteps()
         self.addConfigSteps()
         self.addDoBuildSteps()
+        if self.signingServers:
+            self.addGetTokenSteps()
         if self.doBuildAnalysis:
             self.addBuildAnalysisSteps()
 
@@ -1110,6 +1116,26 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(ShellCommand(
          name='cat_mozconfig',
          command=['cat', '.mozconfig'],
+        ))
+
+    def addGetTokenSteps(self):
+        server_cert = os.path.join(
+            os.path.dirname(build.paths.__file__),
+            '../../../release/signing/host.cert')
+        token = "build/token"
+        nonce = "build/nonce"
+        self.addStep(ShellCommand(
+            command=['rm', '-f', nonce],
+            workdir='.',
+            name='rm_nonce',
+            description=['remove', 'old', 'nonce'],
+        ))
+        self.addStep(SigningServerAuthenication(
+            servers=self.signingServers,
+            server_cert=server_cert,
+            slavedest=token,
+            workdir='.',
+            name='download_token',
         ))
 
     def addDoBuildSteps(self):
@@ -2834,6 +2860,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.mozconfig = mozconfig
         self.mozconfigBranch = mozconfigBranch
         self.testPrettyNames = testPrettyNames
+        self.signingServers = signingServers
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -2941,6 +2968,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tinderboxPrintRevisions()
         self.compareLocalesSetup()
         self.compareLocales()
+        if self.signingServers:
+            self.addGetTokenSteps()
         self.doRepack()
         self.doUpload()
         if self.testPrettyNames:
