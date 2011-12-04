@@ -1395,11 +1395,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
     def addL10nCheckTestSteps(self):
         # We override MOZ_SIGN_CMD here because it's not necessary
+        # Disable signing for l10n check steps
+        env = self.env
+        if 'MOZ_SIGN_CMD' in env:
+            env = env.copy()
+            del env['MOZ_SIGN_CMD']
+
         self.addStep(ShellCommand(
          name='make l10n check',
-         command=['make', 'l10n-check', 'MOZ_SIGN_CMD='],
+         command=['make', 'l10n-check'],
          workdir='build/%s' % self.objdir,
-         env=self.env,
+         env=env,
          haltOnFailure=False,
          flunkOnFailure=False,
          warnOnFailure=True,
@@ -1433,13 +1439,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addTestPrettyNamesSteps(self):
+        # Disable signing for l10n check steps
+        env = self.env
+        if 'MOZ_SIGN_CMD' in env:
+            env = env.copy()
+            del env['MOZ_SIGN_CMD']
+
         if 'mac' in self.platform:
             # Need to run this target or else the packaging targets will
             # fail.
             self.addStep(ShellCommand(
              name='postflight_all',
              command=['make', '-f', 'client.mk', 'postflight_all'],
-             env=self.env,
+             env=env,
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=False,
@@ -1451,7 +1463,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(ShellCommand(
              name='make %s pretty' % t,
              command=['make', t, 'MOZ_PKG_PRETTYNAMES=1'],
-             env=self.env,
+             env=env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=False,
              flunkOnFailure=False,
@@ -1462,7 +1474,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              command=['make', '-C',
                       '%s/tools/update-packaging' % self.mozillaObjdir,
                       'MOZ_PKG_PRETTYNAMES=1'],
-             env=self.env,
+             env=env,
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=True,
@@ -1472,7 +1484,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  name='make l10n check pretty',
                 command=['make', 'l10n-check', 'MOZ_PKG_PRETTYNAMES=1'],
                 workdir='build/%s' % self.objdir,
-                env=self.env,
+                env=env,
                 haltOnFailure=False,
                 flunkOnFailure=False,
                 warnOnFailure=True,
