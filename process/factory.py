@@ -26,6 +26,7 @@ import buildbotcustom.steps.transfer
 import buildbotcustom.steps.updates
 import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
+import buildbotcustom.steps.signing
 import buildbotcustom.env
 import buildbotcustom.misc_scheduler
 import build.paths
@@ -42,6 +43,7 @@ reload(buildbotcustom.steps.transfer)
 reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
+reload(buildbotcustom.steps.signing)
 reload(buildbotcustom.env)
 reload(build.paths)
 reload(release.info)
@@ -64,6 +66,7 @@ from buildbotcustom.steps.test import AliveTest, \
 from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
+from buildbotcustom.steps.signing import SigningServerAuthenication
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
   genBuildID, reallyShort
@@ -82,14 +85,19 @@ hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
 
 class DummyFactory(BuildFactory):
-    def __init__(self):
+    def __init__(self, delay=5, triggers=None):
         BuildFactory.__init__(self)
-        self.addStep(Dummy())
+        self.addStep(Dummy(delay))
+        if triggers:
+            self.addStep(Trigger(
+                schedulerNames=triggers,
+                waitForFinish=False,
+                ))
 
-def makeDummyBuilder(name, slaves, category=None):
+def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None):
     builder = {
             'name': name,
-            'factory': DummyFactory(),
+            'factory': DummyFactory(delay, triggers),
             'builddir': name,
             'slavenames': slaves,
             }
@@ -689,6 +697,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
                  mozharnessMultiOptions=None,
+                 signingServers=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -754,6 +763,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.useSharedCheckouts = useSharedCheckouts
         self.testPrettyNames = testPrettyNames
         self.l10nCheckTest = l10nCheckTest
+        self.signingServers = signingServers
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -837,6 +847,17 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                                              self.stagePlatform)
             self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
                         ( self.stageServer, self.stageProduct, self.logUploadDir)
+
+        if signingServers:
+            cmd = [
+                env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "-t", "%(basedir)s/build/token",
+                "-n", "%(basedir)s/build/nonce",
+                "-c", "%(toolsdir)s/release/signing/host.cert",
+                ]
+            for ss, user, passwd in signingServers:
+                cmd.extend(['-H', ss])
+            self.env['MOZ_SIGN_CMD'] = WithProperties(" ".join(cmd))
 
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths.
@@ -967,6 +988,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addSourceSteps()
         self.addConfigSteps()
         self.addDoBuildSteps()
+        if self.signingServers:
+            self.addGetTokenSteps()
         if self.doBuildAnalysis:
             self.addBuildAnalysisSteps()
 
@@ -1093,6 +1116,26 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(ShellCommand(
          name='cat_mozconfig',
          command=['cat', '.mozconfig'],
+        ))
+
+    def addGetTokenSteps(self):
+        server_cert = os.path.join(
+            os.path.dirname(build.paths.__file__),
+            '../../../release/signing/host.cert')
+        token = "build/token"
+        nonce = "build/nonce"
+        self.addStep(ShellCommand(
+            command=['rm', '-f', nonce],
+            workdir='.',
+            name='rm_nonce',
+            description=['remove', 'old', 'nonce'],
+        ))
+        self.addStep(SigningServerAuthenication(
+            servers=self.signingServers,
+            server_cert=server_cert,
+            slavedest=token,
+            workdir='.',
+            name='download_token',
         ))
 
     def addDoBuildSteps(self):
@@ -1351,11 +1394,18 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addL10nCheckTestSteps(self):
+        # We override MOZ_SIGN_CMD here because it's not necessary
+        # Disable signing for l10n check steps
+        env = self.env
+        if 'MOZ_SIGN_CMD' in env:
+            env = env.copy()
+            del env['MOZ_SIGN_CMD']
+
         self.addStep(ShellCommand(
          name='make l10n check',
          command=['make', 'l10n-check'],
          workdir='build/%s' % self.objdir,
-         env=self.env,
+         env=env,
          haltOnFailure=False,
          flunkOnFailure=False,
          warnOnFailure=True,
@@ -1389,13 +1439,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
         )
 
     def addTestPrettyNamesSteps(self):
+        # Disable signing for l10n check steps
+        env = self.env
+        if 'MOZ_SIGN_CMD' in env:
+            env = env.copy()
+            del env['MOZ_SIGN_CMD']
+
         if 'mac' in self.platform:
             # Need to run this target or else the packaging targets will
             # fail.
             self.addStep(ShellCommand(
              name='postflight_all',
              command=['make', '-f', 'client.mk', 'postflight_all'],
-             env=self.env,
+             env=env,
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=False,
@@ -1407,7 +1463,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(ShellCommand(
              name='make %s pretty' % t,
              command=['make', t, 'MOZ_PKG_PRETTYNAMES=1'],
-             env=self.env,
+             env=env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=False,
              flunkOnFailure=False,
@@ -1418,7 +1474,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              command=['make', '-C',
                       '%s/tools/update-packaging' % self.mozillaObjdir,
                       'MOZ_PKG_PRETTYNAMES=1'],
-             env=self.env,
+             env=env,
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=True,
@@ -1428,7 +1484,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  name='make l10n check pretty',
                 command=['make', 'l10n-check', 'MOZ_PKG_PRETTYNAMES=1'],
                 workdir='build/%s' % self.objdir,
-                env=self.env,
+                env=env,
                 haltOnFailure=False,
                 flunkOnFailure=False,
                 warnOnFailure=True,
@@ -2562,7 +2618,8 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
 class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
-            usePrettyNames=True, enableUpdatePackaging=True, **kwargs):
+            usePrettyNames=True, enableUpdatePackaging=True,
+            signingFormats=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
@@ -2795,7 +2852,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
                  mergeLocales=True, mozconfigBranch="production", 
-                 testPrettyNames=False, **kwargs):
+                 testPrettyNames=False, signingServers=None, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.env = env.copy()
@@ -2815,6 +2872,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.mozconfig = mozconfig
         self.mozconfigBranch = mozconfigBranch
         self.testPrettyNames = testPrettyNames
+        self.signingServers = signingServers
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -2824,6 +2882,17 @@ class BaseRepackFactory(MozillaBuildFactory):
             self.configRepoPath = configRepoPath
             self.configRepo = self.getRepository(self.configRepoPath,
                                              kwargs['hgHost'])
+
+        if signingServers:
+            cmd = [
+                env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "-t", "%(basedir)s/build/token",
+                "-n", "%(basedir)s/build/nonce",
+                "-c", "%(toolsdir)s/release/signing/host.cert",
+                ]
+            for ss, user, passwd in signingServers:
+                cmd.extend(['-H', ss])
+            self.env['MOZ_SIGN_CMD'] = WithProperties(" ".join(cmd))
 
         self.addStep(SetBuildProperty(
          property_name='tree',
@@ -2911,6 +2980,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tinderboxPrintRevisions()
         self.compareLocalesSetup()
         self.compareLocales()
+        if self.signingServers:
+            self.addGetTokenSteps()
         self.doRepack()
         self.doUpload()
         if self.testPrettyNames:

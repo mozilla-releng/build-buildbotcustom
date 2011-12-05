@@ -294,10 +294,17 @@ if __name__ == "__main__":
                         uploadArgs['to_shadow'] = False
                         uploadArgs['to_tinderbox_dated'] = True
 
+                props = build.getProperties()
+                if props.getProperty('got_revision') is not None:
+                    revision=props['got_revision']
+                elif props.getProperty('revision') is not None:
+                    revision=props['revision']
+                else:
+                    revision=None
                 uploadArgs.update(dict(
                     to_try=False,
                     who=None,
-                    revision=None,
+                    revision=revision,
                     buildid=buildid,
                     ))
             post_upload_cmd = postUploadCmdPrefix(**uploadArgs)
