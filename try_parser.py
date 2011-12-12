@@ -12,7 +12,7 @@ from twisted.python import log
 def expandTestSuites(user_suites,valid_suites):
     test_suites = []
     for u in user_suites:
-        if u == 'mochitests':
+        if u == 'mochitests' or u == 'mochitest':
             for v in valid_suites:
                 if v.startswith('mochitest'):
                     test_suites.append(v)
@@ -24,6 +24,10 @@ def expandTestSuites(user_suites,valid_suites):
             num = u.split('-')[1]
             for v in valid_suites:
                 if v.startswith('mochitest') and re.search(num,v.split('/')[0]):
+                    test_suites.append(v)
+        elif u == 'reftests' or u == 'reftest':
+            for v in valid_suites:
+                if v.startswith('reftest'):
                     test_suites.append(v)
         else:
             # validate other test names
