@@ -3272,6 +3272,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 
 def generateJetpackObjects(config, SLAVES):
     builders = []
+    branch = os.path.basename(config['repo_path'])
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
