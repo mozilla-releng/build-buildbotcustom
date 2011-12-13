@@ -858,6 +858,7 @@ def generateBranchObjects(config, name, secrets=None):
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
+    nomergeBuilders.extend(periodicPgoBuilders) # these should never, ever merge
     extra_args['treeStableTimer'] = None
 
     branchObjects['schedulers'].append(scheduler_class(
