@@ -858,6 +858,7 @@ def generateBranchObjects(config, name, secrets=None):
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
+    nomergeBuilders.extend(periodicPgoBuilders) # these should never, ever merge
     extra_args['treeStableTimer'] = None
 
     branchObjects['schedulers'].append(scheduler_class(
@@ -1387,6 +1388,7 @@ def generateBranchObjects(config, name, secrets=None):
                 signingServers=secrets.get(pf.get('nightly_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
+                mozillaDir=config.get('mozilla_dir', None),
                 **nightly_kwargs
             )
 
@@ -3272,6 +3274,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 
 def generateJetpackObjects(config, SLAVES):
     builders = []
+    branch = os.path.basename(config['repo_path'])
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
