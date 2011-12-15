@@ -1134,6 +1134,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             longVersion=releaseConfig.get('longVersion', None),
             oldLongVersion=releaseConfig.get('oldLongVersion', None),
             schema=releaseConfig.get('snippetSchema', None),
+            useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', False),
         )
 
         builders.append({
@@ -1341,6 +1342,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
             fakeMacInfoTxt=releaseConfig['majorFakeMacInfoTxt'],
             schema=releaseConfig.get('majorSnippetSchema', None),
+            useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', True),
         )
 
         builders.append({

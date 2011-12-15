@@ -4642,7 +4642,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
                  fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
-                 schema=None, **kwargs):
+                 schema=None, useBetaChannelForRelease=False, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4707,6 +4707,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.longVersion = longVersion or self.version
         self.oldLongVersion = oldLongVersion or self.oldVersion
         self.schema = schema
+        self.useBetaChannelForRelease = useBetaChannelForRelease
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4763,8 +4764,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             'beta': {}
         }
         if self.useBetaChannel:
-            self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
-            self.channels['beta']['dir'] = 'aus2.beta'
+            if self.useBetaChannelForRelease:
+                self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
+                self.channels['beta']['dir'] = 'aus2.beta'
             self.channels['release'] = {
                 'dir': 'aus2',
                 'compareTo': 'releasetest',
