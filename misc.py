@@ -3274,7 +3274,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 
 def generateJetpackObjects(config, SLAVES):
     builders = []
-    branch = os.path.basename(config['repo_path'])
+    project_branch = os.path.basename(config['repo_path'])
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
@@ -3299,6 +3299,7 @@ def generateJetpackObjects(config, SLAVES):
                            'slavenames': slaves,
                            'factory': f,
                            'category': 'jetpack',
+                           'properties': {'branch': project_branch},
                            'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
                           }
                 builders.append(builder)
