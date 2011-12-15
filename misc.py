@@ -2765,6 +2765,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "talosCmd": talosCmd,
                         "fetchSymbols": branch_config['fetch_symbols'] and
                           platform_config[slave_platform].get('download_symbols',True),
+                        "talos_from_source_code": branch_config.get('talos_from_source_code', False)
                     }
                     factory_kwargs.update(extra)
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
