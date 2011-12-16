@@ -4642,7 +4642,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
                  binaryName=None, oldBinaryName=None, testOlderPartials=False,
                  fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
-                 schema=None, **kwargs):
+                 schema=None, useBetaChannelForRelease=False, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4707,6 +4707,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.longVersion = longVersion or self.version
         self.oldLongVersion = oldLongVersion or self.oldVersion
         self.schema = schema
+        self.useBetaChannelForRelease = useBetaChannelForRelease
 
         self.patcherConfigFile = 'patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
@@ -4763,8 +4764,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             'beta': {}
         }
         if self.useBetaChannel:
-            self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
-            self.channels['beta']['dir'] = 'aus2.beta'
+            if self.useBetaChannelForRelease:
+                self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
+                self.channels['beta']['dir'] = 'aus2.beta'
             self.channels['release'] = {
                 'dir': 'aus2',
                 'compareTo': 'releasetest',
@@ -6991,7 +6993,7 @@ class TalosFactory(RequestSortingBuildFactory):
             workdirBase=None, fetchSymbols=False, plugins=None, pagesets=[],
             remoteTests=False, productName="firefox", remoteExtras=None,
             talosAddOns=[], addonTester=False, releaseTester=False,
-            talosBranch=None, branch=None):
+            talosBranch=None, branch=None, talos_from_source_code=False):
 
         BuildFactory.__init__(self)
 
@@ -7021,6 +7023,7 @@ class TalosFactory(RequestSortingBuildFactory):
         self.releaseTester = releaseTester
         self.productName = productName
         self.remoteExtras = remoteExtras
+        self.talos_from_source_code = talos_from_source_code
         if talosBranch is None:
             self.talosBranch = branchName
         else:
@@ -7057,6 +7060,16 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addUpdateConfigStep()
         self.addRunTestStep()
         self.addRebootStep()
+
+    def python25(self, platform):
+        if (platform.startswith('fedora')):
+            return "/home/cltbld/bin/python"
+        elif (platform == "leopard"):
+            return "/usr/bin/python"
+        elif (platform in ("snowleopard", "lion")):
+            return "/Users/cltbld/bin/python"
+        elif (platform in ('w764', 'win7', 'xp')):
+            return "C:\\mozilla-build\\python25\\python.exe"
 
     def _propertyIsSet(self, step, prop):
         return step.build.getProperties().has_key(prop)
@@ -7314,10 +7327,27 @@ class TalosFactory(RequestSortingBuildFactory):
             )
 
         if self.customTalos is None and not self.remoteTests:
-            self.addStep(DownloadFile(
-              url=WithProperties("%s/zips/talos.zip" % self.supportUrlBase),
-              workdir=self.workdirBase,
-            ))
+            if self.talos_from_source_code:
+                self.addStep(DownloadFile(
+                    url=WithProperties("%s/tools/scripts/talos/talos_from_code.py" % \
+                                       self.supportUrlBase),
+                    workdir=self.workdirBase,
+                    haltOnFailure=True,
+                ))
+                self.addStep(ShellCommand(
+                    name='retrieve specified talos.zip in talos.json',
+                    command=[self.python25(self.OS), 'talos_from_code.py', \
+                            '--talos_json_url', \
+                            WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
+                    workdir=self.workdirBase,
+                    haltOnFailure=True,
+                ))
+            else:
+                self.addStep(DownloadFile(
+                  url=WithProperties("%s/zips/talos.zip" % self.supportUrlBase),
+                  workdir=self.workdirBase,
+                ))
+
             self.addStep(UnpackFile(
              filename='talos.zip',
              workdir=self.workdirBase,

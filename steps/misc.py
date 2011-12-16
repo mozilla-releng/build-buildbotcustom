@@ -414,6 +414,7 @@ class SendChangeStep(ShellCommand):
                     except IndexError:
                         comments = ''
                 comments = re.sub(r'[\r\n^<>|;&"\'%$]', '_', comments)
+                comments = comments.encode('ascii', 'replace')
                 if comments:
                     bb_cmd.extend(['--comments', comments])
 

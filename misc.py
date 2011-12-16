@@ -2765,6 +2765,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "talosCmd": talosCmd,
                         "fetchSymbols": branch_config['fetch_symbols'] and
                           platform_config[slave_platform].get('download_symbols',True),
+                        "talos_from_source_code": branch_config.get('talos_from_source_code', False)
                     }
                     factory_kwargs.update(extra)
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
@@ -3274,7 +3275,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
 
 def generateJetpackObjects(config, SLAVES):
     builders = []
-    branch = os.path.basename(config['repo_path'])
+    project_branch = os.path.basename(config['repo_path'])
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
@@ -3299,6 +3300,7 @@ def generateJetpackObjects(config, SLAVES):
                            'slavenames': slaves,
                            'factory': f,
                            'category': 'jetpack',
+                           'properties': {'branch': project_branch},
                            'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
                           }
                 builders.append(builder)
