@@ -1,4 +1,5 @@
 from urllib import urlencode
+from random import shuffle
 
 from OpenSSL.SSL import Context, TLSv1_METHOD, VERIFY_PEER,\
      VERIFY_FAIL_IF_NO_PEER_CERT, OP_NO_SSLv2
@@ -9,6 +10,7 @@ from twisted.internet.ssl import ContextFactory
 from twisted.web.client import getPage
 from twisted.python.failure import Failure
 from twisted.internet import reactor
+from twisted.python import log
 from buildbot.steps.transfer import StringDownload
 
 
@@ -52,6 +54,7 @@ class SigningServerAuthenication(StringDownload):
         self.addFactoryArguments(servers=servers, server_cert=server_cert,
                                  duration=duration)
         self.servers = list(servers)
+        shuffle(self.servers)
         self.server_cert = server_cert
         self.duration = duration
         self.attempts = attempts
@@ -106,10 +109,7 @@ class SigningServerAuthenication(StringDownload):
             URLPath(self.uri).netloc, self.server_cert)
         d = getPage(self.uri, method=method, headers=headers,
                     postdata=urlencode(postdata), contextFactory=contextFactory)
-        d.addCallbacks(
-            self.downloadSignature,
-            lambda e: reactor.callLater(self.sleeptime, self.start)
-        )
+        d.addCallbacks(self.downloadSignature, self.requestFailed)
 
     def downloadSignature(self, res):
         self.s = res
@@ -119,3 +119,11 @@ class SigningServerAuthenication(StringDownload):
         if not self.interrupted:
             self.interrupted = True
             StringDownload.interrupt(self, 'Interrupted')
+
+    def requestFailed(self, err):
+        msg = "%s: token generation failed, error message: %s" \
+                % (self, err.getErrorMessage())
+        log.msg(msg)
+        if self.stdio_log:
+            self.stdio_log.addStdout('%s\n' % msg)
+        reactor.callLater(self.sleeptime, self.start)
