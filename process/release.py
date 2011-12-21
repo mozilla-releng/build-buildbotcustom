@@ -524,7 +524,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         mirror_scheduler1 = TriggerBouncerCheck(
             name=builderPrefix('ready-for-rel-test'),
             configRepo=config_repo,
-            minUptake=releaseConfig.get('releasetestUptake', 10000),
+            minUptake=releaseConfig.get('releasetestUptake', 3),
             builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
                           [builderPrefix('final_verification', platform)
                            for platform in releaseConfig.get('verifyConfigs', {}).keys()],

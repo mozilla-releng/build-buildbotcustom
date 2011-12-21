@@ -3346,7 +3346,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
                  ausHost=None, l10nNightlyUpdate=False, l10nDatedDirs=False,
-                 createPartial=False, **kwargs):
+                 createPartial=False, extraConfigureArgs=[], **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
@@ -3357,6 +3357,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.ausHost = ausHost
         self.createPartial = createPartial
         self.geriatricMasters = []
+        self.extraConfigureArgs = extraConfigureArgs
 
         # This is required because this __init__ doesn't call the
         # NightlyBuildFactory __init__ where self.complete_platform
@@ -3406,7 +3407,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         if l10nNightlyUpdate and self.nightly:
             env.update({'MOZ_MAKE_COMPLETE_MAR': '1', 
                         'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL})
-            self.extraConfigureArgs = ['--enable-update-packaging']
+            self.extraConfigureArgs += ['--enable-update-packaging']
 
 
         BaseRepackFactory.__init__(self, env=env, **kwargs)
