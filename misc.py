@@ -372,9 +372,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         slavenames = slaves
     if not category:
         category = branch_name
-    productName = 'firefox'
-    if 'mobile' in name_prefix or 'Android' in name_prefix:
-        productName = 'fennec'
+    productName = pf['product_name']
     branchProperty = branch_name
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     properties = {'branch': branchProperty, 'platform': platform,
@@ -483,7 +481,7 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
         slavenames = slaves
     if not category:
         category = branch_name
-    productName = config['product_name']
+    productName = pf['product_name']
     posixBinarySuffix = '-bin'
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
@@ -637,7 +635,7 @@ def generateBranchObjects(config, name, secrets=None):
                 l10nBuilders[base_name] = {}
                 l10nBuilders[base_name]['tree'] = config['l10n_tree']
                 l10nBuilders[base_name]['l10n_builder'] = \
-                    '%s %s %s l10n dep' % (config['product_name'].capitalize(),
+                    '%s %s %s l10n dep' % (pf['product_name'].capitalize(),
                                        name, platform)
                 l10nBuilders[base_name]['platform'] = platform
         # Check if branch wants nightly builds
@@ -661,7 +659,7 @@ def generateBranchObjects(config, name, secrets=None):
                 l10nNightlyBuilders[builder] = {}
                 l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
                 l10nNightlyBuilders[builder]['l10n_builder'] = \
-                    '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
+                    '%s %s %s l10n nightly' % (pf['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
             if config['enable_shark'] and pf.get('enable_shark'):
@@ -1089,7 +1087,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'configRepoPath': config['config_repo_path'],
                 'configSubDir': config['config_subdir'],
                 'profiledBuild': per_checkin_build_uses_pgo,
-                'productName': config['product_name'],
+                'productName': pf['product_name'],
                 'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
                 'use_scratchbox': pf.get('use_scratchbox'),
@@ -1344,7 +1342,7 @@ def generateBranchObjects(config, name, secrets=None):
                 configRepoPath=config['config_repo_path'],
                 configSubDir=config['config_subdir'],
                 profiledBuild=nightly_pgo,
-                productName=config['product_name'],
+                productName=pf['product_name'],
                 mozconfig=pf['mozconfig'],
                 srcMozconfig=pf.get('src_mozconfig'),
                 use_scratchbox=pf.get('use_scratchbox'),
@@ -1422,8 +1420,8 @@ def generateBranchObjects(config, name, secrets=None):
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],
-                        project=config['product_name'],
-                        appName=config['app_name'],
+                        project=pf['product_name'],
+                        appName=pf['app_name'],
                         enUSBinaryURL=config['enUS_binaryURL'],
                         nightly=True,
                         configRepoPath=config['config_repo_path'],
@@ -1485,7 +1483,7 @@ def generateBranchObjects(config, name, secrets=None):
                     configRepoPath=config['config_repo_path'],
                     configSubDir=config['config_subdir'],
                     profiledBuild=False,
-                    productName=config['product_name'],
+                    productName=pf['product_name'],
                     mozconfig='%s/%s/shark' % (platform, name),
                     srcMozconfig=pf.get('src_shark_mozconfig'),
                     stageServer=config['stage_server'],
@@ -1553,8 +1551,8 @@ def generateBranchObjects(config, name, secrets=None):
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
-                project=config['product_name'],
-                appName=config['app_name'],
+                project=pf['product_name'],
+                appName=pf['app_name'],
                 enUSBinaryURL=config['enUS_binaryURL'],
                 nightly=False,
                 l10nDatedDirs=config['l10nDatedDirs'],
@@ -1603,7 +1601,7 @@ def generateBranchObjects(config, name, secrets=None):
             unittest_factory = factory_class(
                 env=pf.get('unittest-env', {}),
                 platform=platform,
-                productName=config['product_name'],
+                productName=pf['product_name'],
                 config_repo_path=config['config_repo_path'],
                 config_dir=config['config_subdir'],
                 objdir=config['objdir_unittests'],
@@ -1680,7 +1678,7 @@ def generateBranchObjects(config, name, secrets=None):
             if platform == 'linux':
                 codecoverage_factory = CodeCoverageFactory(
                     platform=platform,
-                    productName=config['product_name'],
+                    productName=pf['product_name'],
                     config_repo_path=config['config_repo_path'],
                     config_dir=config['config_subdir'],
                     objdir=config['objdir_unittests'],
@@ -1870,7 +1868,7 @@ def generateCCBranchObjects(config, name):
                 l10nBuilders[base_name] = {}
                 l10nBuilders[base_name]['tree'] = config['l10n_tree']
                 l10nBuilders[base_name]['l10n_builder'] = \
-                    '%s %s %s l10n dep' % (config['product_name'].capitalize(),
+                    '%s %s %s l10n dep' % (pf['product_name'].capitalize(),
                                        name, platform)
                 l10nBuilders[base_name]['platform'] = platform
         # Check if branch wants nightly builds
@@ -1890,7 +1888,7 @@ def generateCCBranchObjects(config, name):
                 l10nNightlyBuilders[builder] = {}
                 l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
                 l10nNightlyBuilders[builder]['l10n_builder'] = \
-                    '%s %s %s l10n nightly' % (config['product_name'].capitalize(),
+                    '%s %s %s l10n nightly' % (pf['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
             if config['enable_shark'] and platform.startswith('macosx'):
@@ -1918,7 +1916,7 @@ def generateCCBranchObjects(config, name):
         weeklyBuilders.append('%s hg bundle' % name)
 
     logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'), product=config['product_name'])
+            is_shadow=bool(name=='shadow-central'), product=pf['product_name'])
 
     branchObjects['status'].append(SubprocessLogHandler(
         logUploadCmd,
@@ -2095,7 +2093,7 @@ def generateCCBranchObjects(config, name):
             builderNames=l10n_builders,
             fileIsImportant=lambda c: isImportantL10nFile(c, config['l10n_modules']),
             properties={
-                'app': config['app_name'],
+                'app': pf['app_name'],
                 'en_revision': 'default',
                 'l10n_revision': 'default',
                 }
@@ -2245,7 +2243,7 @@ def generateCCBranchObjects(config, name):
             configRepoPath=config['config_repo_path'],
             configSubDir=config['config_subdir'],
             profiledBuild=pf['profiled_build'],
-            productName=config['product_name'],
+            productName=pf['product_name'],
             mozconfig=pf['mozconfig_dep'],
             branchName=name,
             stageServer=config['stage_server'],
@@ -2335,7 +2333,7 @@ def generateCCBranchObjects(config, name):
                 configRepoPath=config['config_repo_path'],
                 configSubDir=config['config_subdir'],
                 profiledBuild=pf['profiled_build'],
-                productName=config['product_name'],
+                productName=pf['product_name'],
                 mozconfig=pf['mozconfig'],
                 branchName=name,
                 stageServer=config['stage_server'],
@@ -2398,8 +2396,8 @@ def generateCCBranchObjects(config, name):
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],
-                        project=config['product_name'],
-                        appName=config['app_name'],
+                        project=pf['product_name'],
+                        appName=pf['app_name'],
                         enUSBinaryURL=config['enUS_binaryURL'],
                         nightly=True,
                         configRepoPath=config['config_repo_path'],
@@ -2452,7 +2450,7 @@ def generateCCBranchObjects(config, name):
                     configRepoPath=config['config_repo_path'],
                     configSubDir=config['config_subdir'],
                     profiledBuild=False,
-                    productName=config['product_name'],
+                    productName=pf['product_name'],
                     mozconfig='%s/%s/shark' % (platform, name),
                     branchName=name,
                     stageServer=config['stage_server'],
@@ -2489,8 +2487,8 @@ def generateCCBranchObjects(config, name):
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
-                project=config['product_name'],
-                appName=config['app_name'],
+                project=pf['product_name'],
+                appName=pf['app_name'],
                 enUSBinaryURL=config['enUS_binaryURL'],
                 nightly=False,
                 branchName=name,
@@ -2534,9 +2532,9 @@ def generateCCBranchObjects(config, name):
             unittest_factory = factory_class(
                 env=pf.get('unittest-env', {}),
                 platform=platform,
-                productName=config['product_name'],
+                productName=pf['product_name'],
                 branchName=name,
-                brandName=config['brand_name'],
+                brandName=pf['brand_name'],
                 config_repo_path=config['config_repo_path'],
                 config_dir=config['config_subdir'],
                 objdir=config['objdir_unittests'],
@@ -2613,7 +2611,7 @@ def generateCCBranchObjects(config, name):
             if platform == 'linux':
                 codecoverage_factory = CodeCoverageFactory(
                     platform=platform,
-                    productName=config['product_name'],
+                    productName=pf['product_name'],
                     config_repo_path=config['config_repo_path'],
                     config_dir=config['config_subdir'],
                     objdir=config['objdir_unittests'],
@@ -3064,9 +3062,10 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
+    pf = config['platforms'].get(platform, {})
     extra_args = ['-b', config['repo_path']]
-    if config['product_name'] is not None:
-        extra_args.extend(['-p', config['product_name']])
+    if pf['product_name'] is not None:
+        extra_args.extend(['-p', pf['product_name']])
     if config['hg_username'] is not None:
         extra_args.extend(['-u', config['hg_username']])
     if config['hg_ssh_key'] is not None:
