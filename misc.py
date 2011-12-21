@@ -9,6 +9,8 @@ import random
 import re
 import sys, os, time
 
+from copy import deepcopy
+
 from twisted.python import log
 
 from buildbot.scheduler import Nightly, Scheduler, Triggerable
@@ -2766,7 +2768,18 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                           platform_config[slave_platform].get('download_symbols',True),
                         "talos_from_source_code": branch_config.get('talos_from_source_code', False)
                     }
-                    factory_kwargs.update(extra)
+
+                    if extra and extra.get('remoteTests', False) and 'xul' in platform:
+                        myextra      = deepcopy(extra)
+                        remoteExtras = myextra.get('remoteExtras', {})
+                        reOptions    = remoteExtras.get('options', [])
+                        reOptions.append('--nativeUI')
+                        remoteExtras['options'] = reOptions
+                        myextra['remoteExtras'] = remoteExtras
+                        factory_kwargs.update(myextra)
+                    else:
+                        factory_kwargs.update(extra)
+
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                     slavebuilddir= 'test'
                     factory = factory_class(**factory_kwargs)
