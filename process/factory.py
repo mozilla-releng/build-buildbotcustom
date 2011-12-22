@@ -7077,13 +7077,9 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addRunTestStep()
         self.addRebootStep()
 
-    def python25(self, platform):
-        if (platform.startswith('fedora')):
-            return "/home/cltbld/bin/python"
-        elif (platform == "leopard"):
-            return "/usr/bin/python"
-        elif (platform in ("snowleopard", "lion")):
-            return "/Users/cltbld/bin/python"
+    def pythonWithSimpleJson(self, platform):
+        if (platform in ("fedora", "fedora64", "leopard", "snowleopard", "lion")):
+            return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
 
@@ -7390,7 +7386,7 @@ class TalosFactory(RequestSortingBuildFactory):
                 ))
                 self.addStep(ShellCommand(
                     name='retrieve specified talos.zip in talos.json',
-                    command=[self.python25(self.OS), 'talos_from_code.py', \
+                    command=[self.pythonWithSimpleJson(self.OS), 'talos_from_code.py', \
                             '--talos_json_url', \
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
