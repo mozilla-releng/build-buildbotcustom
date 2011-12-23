@@ -5018,6 +5018,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         #      a beta marker, like "10.0b2".
         #      This is talked about in detail in bug 711275.
         if self.productName == 'firefox' and self.version.startswith('10.0b'):
+            doEditSnippets = True
+        if self.productName == 'seamonkey' and self.version.startswith('2.7b'):
+            doEditSnippets = True
+        if doEditSnippets:
             cmd = ['bash', WithProperties('%(toolsdir)s/release/edit-snippets.sh'),
                    'appVersion', self.version]
             cmd.extend(self.dirMap.keys())
