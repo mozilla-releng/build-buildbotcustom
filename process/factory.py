@@ -4963,21 +4963,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['patcher:', 'create patches'],
          haltOnFailure=True
         ))
-        # XXX: For Firefox 10 betas we want the appVersion in the snippets to
-        #      show a version change with each one, so we change them from the
-        #      the appVersion (which is always "10") to the version, which has
-        #      a beta marker, like "10.0b2".
-        #      This is talked about in detail in bug 711275.
-        if self.productName == 'firefox' and self.version.startswith('10.0b'):
-            cmd = ['bash', WithProperties('%(toolsdir)s/release/edit-snippets.sh'),
-                   'appVersion', self.version]
-            cmd.extend(self.dirMap.keys())
-            self.addStep(ShellCommand(
-             name='switch_appv_in_snippets',
-             command=cmd,
-             haltOnFailure=True,
-             workdir=self.updateDir,
-            ))
 
     def createBuildNSnippets(self):
         command = ['python',
