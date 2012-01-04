@@ -1479,6 +1479,7 @@ def generateBranchObjects(config, name, secrets=None):
                     env=platform_env,
                     objdir=shark_objdir,
                     platform=platform,
+                    stagePlatform=stage_platform,
                     hgHost=config['hghost'],
                     repoPath=config['repo_path'],
                     buildToolsRepoPath=config['build_tools_repo_path'],
@@ -1504,6 +1505,7 @@ def generateBranchObjects(config, name, secrets=None):
                     clobberURL=config['base_clobber_url'],
                     clobberTime=clobberTime,
                     buildsBeforeReboot=pf['builds_before_reboot'],
+                    post_upload_include_platform=pf.get('post_upload_include_platform', False),
                 )
                 mozilla2_shark_builder = {
                     'name': '%s shark' % pf['base_name'],
@@ -2445,6 +2447,7 @@ def generateCCBranchObjects(config, name):
                     env= pf['env'],
                     objdir=config['objdir'],
                     platform=platform,
+                    stagePlatform=stage_platform,
                     hgHost=config['hghost'],
                     repoPath=config['repo_path'],
                     mozRepoPath=config['mozilla_repo_path'],
@@ -2469,7 +2472,8 @@ def generateCCBranchObjects(config, name):
                     buildSpace=buildSpace,
                     clobberURL=config['base_clobber_url'],
                     clobberTime=clobberTime,
-                    buildsBeforeReboot=pf['builds_before_reboot']
+                    buildsBeforeReboot=pf['builds_before_reboot'],
+                    post_upload_include_platform=pf.get('post_upload_include_platform', False),
                 )
                 mozilla2_shark_builder = {
                     'name': '%s shark' % pf['base_name'],
