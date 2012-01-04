@@ -47,7 +47,7 @@ class SigningServerAuthenication(StringDownload):
     d = None
     interrupted = False
 
-    def __init__(self, servers, server_cert, duration=2*3600, attempts=5,
+    def __init__(self, servers, server_cert, duration=4*3600, attempts=5,
                  sleeptime=60, **kwargs):
         kwargs['s'] = ''
         StringDownload.__init__(self, **kwargs)
