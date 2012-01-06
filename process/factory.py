@@ -851,6 +851,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if signingServers:
             cmd = [
                 env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "--cachedir", "%(basedir)s/signing_cache",
                 "-t", "%(basedir)s/build/token",
                 "-n", "%(basedir)s/build/nonce",
                 "-c", "%(toolsdir)s/release/signing/host.cert",
@@ -2886,6 +2887,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         if signingServers:
             cmd = [
                 env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "--cachedir", "%(basedir)s/signing_cache",
                 "-t", "%(basedir)s/build/token",
                 "-n", "%(basedir)s/build/nonce",
                 "-c", "%(toolsdir)s/release/signing/host.cert",
