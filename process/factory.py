@@ -1147,9 +1147,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
         # more branches that are missing MOZ_PGO.  Once these branches
         # are all EOL'd, lets remove this and just put 'build' in the 
         # command argv
-        if self.complete_platform.startswith('win32') and \
-            self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0') and \
-            self.profiledBuild:
+        if self.complete_platform == 'win32' and \
+           self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0') and \
+           self.productName == 'firefox':
             bldtgt = 'profiledbuild'
         else:
             bldtgt = 'build'
@@ -1158,10 +1158,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                    WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
 
         if self.profiledBuild:
-            # when 191,192 and 20 are finished, we can remove this condition
-            # and just append MOZ_PGO=1 to command depending on self.profiledBuild
-            if not self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
-                command.append('MOZ_PGO=1')
+            command.append('MOZ_PGO=1')
         self.addStep(ScratchboxCommand(
          name='compile',
          command=command,
