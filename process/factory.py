@@ -6964,6 +6964,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  timeout=2400,
                  app=self.remoteProcessName,
                  env=self.env,
+                 cmdOptions=self.remoteExtras.get('cmdOptions'),
                 ))
             elif name == 'jsreftest':
                 totalChunks = suite.get('totalChunks', None)
@@ -6983,6 +6984,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  timeout=2400,
                  app=self.remoteProcessName,
                  env=self.env,
+                 cmdOptions=self.remoteExtras.get('cmdOptions'),
                 ))
 
     def addTearDownSteps(self):
