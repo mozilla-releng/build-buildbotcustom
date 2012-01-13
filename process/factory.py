@@ -851,6 +851,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if signingServers:
             cmd = [
                 env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "--cachedir", "%(basedir)s/signing_cache",
                 "-t", "%(basedir)s/build/token",
                 "-n", "%(basedir)s/build/nonce",
                 "-c", "%(toolsdir)s/release/signing/host.cert",
@@ -1146,9 +1147,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
         # more branches that are missing MOZ_PGO.  Once these branches
         # are all EOL'd, lets remove this and just put 'build' in the 
         # command argv
-        if self.complete_platform.startswith('win32') and \
-            self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0') and \
-            self.profiledBuild:
+        if self.complete_platform == 'win32' and \
+           self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0') and \
+           self.productName == 'firefox':
             bldtgt = 'profiledbuild'
         else:
             bldtgt = 'build'
@@ -1157,10 +1158,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                    WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
 
         if self.profiledBuild:
-            # when 191,192 and 20 are finished, we can remove this condition
-            # and just append MOZ_PGO=1 to command depending on self.profiledBuild
-            if not self.branchName in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
-                command.append('MOZ_PGO=1')
+            command.append('MOZ_PGO=1')
         self.addStep(ScratchboxCommand(
          name='compile',
          command=command,
@@ -2886,6 +2884,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         if signingServers:
             cmd = [
                 env.get('PYTHON26', 'python'), "%(toolsdir)s/release/signing/signtool.py",
+                "--cachedir", "%(basedir)s/signing_cache",
                 "-t", "%(basedir)s/build/token",
                 "-n", "%(basedir)s/build/nonce",
                 "-c", "%(toolsdir)s/release/signing/host.cert",
@@ -6965,6 +6964,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  timeout=2400,
                  app=self.remoteProcessName,
                  env=self.env,
+                 cmdOptions=self.remoteExtras.get('cmdOptions'),
                 ))
             elif name == 'jsreftest':
                 totalChunks = suite.get('totalChunks', None)
@@ -6984,6 +6984,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  timeout=2400,
                  app=self.remoteProcessName,
                  env=self.env,
+                 cmdOptions=self.remoteExtras.get('cmdOptions'),
                 ))
 
     def addTearDownSteps(self):
@@ -7180,12 +7181,20 @@ class TalosFactory(RequestSortingBuildFactory):
                 env=self.env,
                 haltOnFailure=True)
             )
+        if not self.remoteTests:
+            self.addStep(DownloadFile(
+             url=WithProperties("%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase),
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+            ))
+
 
     def addDmgInstaller(self):
         if self.OS in ('leopard', 'tiger', 'snowleopard', 'lion'):
             self.addStep(DownloadFile(
              url=WithProperties("%s/tools/buildfarm/utils/installdmg.sh" % self.supportUrlBase),
              workdir=self.workdirBase,
+             haltOnFailure=True,
             ))
 
     def addDownloadBuildStep(self):
@@ -7198,6 +7207,7 @@ class TalosFactory(RequestSortingBuildFactory):
          url_property="fileURL",
          filename_property="filename",
          workdir=self.workdirBase,
+         haltOnFailure=True,
          ignore_certs=self.ignoreCerts,
          name="Download build",
         ))
@@ -7207,6 +7217,7 @@ class TalosFactory(RequestSortingBuildFactory):
             #build is packaged in a windows installer 
             self.addStep(DownloadFile( 
              url=WithProperties("%s/tools/buildfarm/utils/firefoxInstallConfig.ini" % self.supportUrlBase),
+             haltOnFailure=True,
              workdir=self.workdirBase,
             ))
             self.addStep(SetProperty(
@@ -7227,12 +7238,14 @@ class TalosFactory(RequestSortingBuildFactory):
              filename=WithProperties("../%(filename)s"),
              workdir="%s/%s" % (self.workdirBase, self.productName),
              name="Unpack build",
+             haltOnFailure=True,
             ))
         else:
             self.addStep(UnpackFile(
              filename=WithProperties("%(filename)s"),
              workdir=self.workdirBase,
              name="Unpack build",
+             haltOnFailure=True,
             ))
         if self.OS in ('xp', 'vista', 'win7', 'w764'):
             self.addStep(ShellCommand(
@@ -7325,18 +7338,13 @@ class TalosFactory(RequestSortingBuildFactory):
                 name='check sdk okay'))
 
     def addSetupSteps(self):
-        if not self.remoteTests:
-            self.addStep(DownloadFile(
-             url=WithProperties("%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase),
-             workdir=self.workdirBase,
-            ))
-
         if self.customManifest:
             self.addStep(FileDownload(
              mastersrc=self.customManifest,
              slavedest="tp3.manifest",
-             workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
-            )
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+             haltOnFailure=True,
+             ))
 
         if self.customTalos is None and not self.remoteTests:
             if self.talos_from_source_code:
@@ -7358,16 +7366,19 @@ class TalosFactory(RequestSortingBuildFactory):
                 self.addStep(DownloadFile(
                   url=WithProperties("%s/zips/talos.zip" % self.supportUrlBase),
                   workdir=self.workdirBase,
+                  haltOnFailure=True,
                 ))
 
             self.addStep(UnpackFile(
              filename='talos.zip',
              workdir=self.workdirBase,
+             haltOnFailure=True,
             ))
             self.addStep(DownloadFile(
              url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
-             workdir=os.path.join(self.workdirBase, "talos/page_load_test"))
-            )
+             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+             haltOnFailure=True,
+             ))
         elif self.remoteTests:
             self.addStep(ShellCommand(
              name='copy_talos',
@@ -7404,10 +7415,12 @@ class TalosFactory(RequestSortingBuildFactory):
              slavedest=self.customTalos,
              workdir=self.workdirBase,
              blocksize=640*1024,
+             haltOnFailure=True,
             ))
             self.addStep(UnpackFile(
              filename=self.customTalos,
              workdir=self.workdirBase,
+             haltOnFailure=True,
             ))
 
     def addPluginInstallSteps(self):
@@ -7417,20 +7430,24 @@ class TalosFactory(RequestSortingBuildFactory):
                 self.addStep(DownloadFile(
                  url=WithProperties("%s/%s" % (self.supportUrlBase, self.plugins['32'])),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                 haltOnFailure=True,
                 ))
                 self.addStep(UnpackFile(
                  filename=os.path.basename(self.plugins['32']),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                 haltOnFailure=True,
                 ))
             #64 bit
             if self.OS in ('w764', 'fedora64'):
                 self.addStep(DownloadFile(
                  url=WithProperties("%s/%s" % (self.supportUrlBase, self.plugins['64'])),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                 haltOnFailure=True,
                 ))
                 self.addStep(UnpackFile(
                  filename=os.path.basename(self.plugins['64']),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
+                 haltOnFailure=True,
                 ))
 
     def addPagesetInstallSteps(self):
@@ -7438,10 +7455,12 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(DownloadFile(
              url=WithProperties("%s/%s" % (self.supportUrlBase, pageset)),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+             haltOnFailure=True,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(pageset),
              workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+             haltOnFailure=True,
             ))
 
     def addAddOnInstallSteps(self):
@@ -7449,10 +7468,12 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(DownloadFile(
              url=WithProperties("%s/%s" % (self.supportUrlBase, addOn)),
              workdir=os.path.join(self.workdirBase, "talos"),
+             haltOnFailure=True,
             ))
             self.addStep(UnpackFile(
              filename=os.path.basename(addOn),
              workdir=os.path.join(self.workdirBase, "talos"),
+             haltOnFailure=True,
             ))
 
     def addDownloadSymbolsStep(self):
@@ -7501,7 +7522,8 @@ class TalosFactory(RequestSortingBuildFactory):
          name="Download extension",
          ignore_certs=True,
          wget_args=['-O', TalosFactory.extName],
-         doStepIf=lambda step: self._propertyIsSet(step, 'addonUrl')
+         doStepIf=lambda step: self._propertyIsSet(step, 'addonUrl'),
+         haltOnFailure=True,
         ))
 
     def addPrepareDeviceStep(self):

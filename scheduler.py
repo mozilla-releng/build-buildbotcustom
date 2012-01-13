@@ -341,10 +341,11 @@ class TriggerBouncerCheck(Triggerable):
         self.working = False
         return None # eat the failure
 
-class AggregatingScheduler(BaseScheduler):
+class AggregatingScheduler(BaseScheduler, Triggerable):
     """This scheduler waits until at least one build of each of
     `upstreamBuilders` completes with a result in `okResults`. Once this
     happens, it triggers builds on `builderNames` with `properties` set.
+    Use trigger() method to reset its state.
 
     `okResults` should be a tuple of acceptable result codes, and defaults to
     (SUCCESS,WARNINGS)."""
@@ -365,6 +366,31 @@ class AggregatingScheduler(BaseScheduler):
                 "remainingBuilders": self.upstreamBuilders,
                 "lastCheck": now(),
                 }
+
+    def startService(self):
+        self.parent.db.runInteractionNow(self._startService)
+        BaseScheduler.startService(self)
+
+    def _startService(self, t):
+        state = self.get_state(t)
+        # Remove deleted/renamed upstream builders to prevent undead schedulers
+        for b in list(state['remainingBuilders']):
+            if b not in self.upstreamBuilders:
+                state['remainingBuilders'].remove(b)
+        # Add new upstream builders
+        for b in self.upstreamBuilders:
+            if b not in state['remainingBuilders']:
+                state['remainingBuilders'].append(b)
+        self.set_state(t, state)
+
+    def trigger(self, ss, set_props=None):
+        """Reset scheduler state"""
+        self.parent.db.runInteractionNow(self._trigger)
+
+    def _trigger(self, t):
+        state = self.get_initial_state(None)
+        state['lastReset'] = state['lastCheck']
+        self.set_state(t, state)
 
     def run(self):
         d = self.parent.db.runInteraction(self._run)

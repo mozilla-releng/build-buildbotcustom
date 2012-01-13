@@ -104,8 +104,7 @@ class L10nMixin(object):
         # Make sure a supported platform is passed. Allow variations, but make
         # sure to convert them to the form the locales files ues.
         assert platform in ('linux', 'linux64', 'win32', 'win64',
-                'macosx', 'macosx64', 'osx', 'osx64',
-                'maemo', 'android-r7')
+                'macosx', 'macosx64', 'osx', 'osx64')
 
         self.platform = platform
         if self.platform.startswith('macosx'):

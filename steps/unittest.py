@@ -929,13 +929,14 @@ class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
 class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, xrePath='../hostutils/xre',
                  utilityPath='../hostutils/bin', app='org.mozilla.fennec',
-                 totalChunks=None, thisChunk=None, **kwargs):
+                 totalChunks=None, thisChunk=None, cmdOptions=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(suite=suite, xrePath=xrePath,
                                  symbols_path=symbols_path,
                                  utilityPath=utilityPath, app=app,
-                                 totalChunks=totalChunks, thisChunk=thisChunk)
+                                 totalChunks=totalChunks, thisChunk=thisChunk,
+                                 cmdOptions=cmdOptions)
 
         self.name = suite
         if totalChunks:
@@ -950,6 +951,8 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
                         '--enable-privilege'
                        ]
+        if cmdOptions:
+          self.command.extend(cmdOptions)
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
         self.command.extend(self.getSuiteOptions(suite))
 
