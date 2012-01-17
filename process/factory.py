@@ -6572,6 +6572,16 @@ class MozillaTestFactory(MozillaBuildFactory):
             self.addPeriodicRebootSteps()
 
 
+def resolution_step():
+    return ShellCommand(
+        name='show_resolution',
+        flunkOnFailure=False,
+        warnOnFailure=False,
+        haltOnFailure=False,
+        workdir='/Users/cltbld',
+        command=['bash', '-c', 'screenresolution get && screenresolution list && system_profiler SPDisplaysDataType']
+    )
+
 class UnittestPackagedBuildFactory(MozillaTestFactory):
     def __init__(self, platform, test_suites, env, productName='firefox',
                  mochitest_leak_threshold=None,
@@ -6608,15 +6618,8 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
             ))
 
     def addRunTestSteps(self):
-        if self.platform.startswith('mac'):
-            self.addStep(ShellCommand(
-                name='show_resolution',
-                flunkOnFailure=False,
-                warnOnFailure=False,
-                haltOnFailure=False,
-                workdir='/Users/cltbld',
-                command=['bash', '-c', 'screenresolution get && screenresolution list']
-            ))
+        if self.platform.startswith('macosx64'):
+            self.addStep(resolution_step())
         # Run them!
         if self.stackwalk_cgi and self.downloadSymbols:
             symbols_path = '%(symbols_url)s'
@@ -6776,6 +6779,8 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     timeout=5*60,
                     flunkOnFailure=True
                     ))
+        if self.platform.startswith('macosx64'):
+            self.addStep(resolution_step())
 
 
 class RemoteUnittestFactory(MozillaTestFactory):
@@ -7597,14 +7602,7 @@ class TalosFactory(RequestSortingBuildFactory):
 
     def addRunTestStep(self):
         if self.OS in ('lion', 'snowleopard'):
-            self.addStep(ShellCommand(
-                name='show_resolution',
-                flunkOnFailure=False,
-                warnOnFailure=False,
-                haltOnFailure=False,
-                workdir='/Users/cltbld',
-                command=['bash', '-c', 'screenresolution get && screenresolution list']
-            ))
+            self.addStep(resolution_step())
         self.addStep(talos_steps.MozillaRunPerfTests(
          warnOnWarnings=True,
          workdir=os.path.join(self.workdirBase, "talos/"),
@@ -7613,6 +7611,8 @@ class TalosFactory(RequestSortingBuildFactory):
          command=self.talosCmd,
          env=self.env)
         )
+        if self.OS in ('lion', 'snowleopard'):
+            self.addStep(resolution_step())
 
     def addRebootStep(self):
         if self.OS in ('lion',):
