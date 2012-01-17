@@ -6942,13 +6942,18 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          env=self.env,
                         ))
                 else:
+                    totalChunks = suite.get('totalChunks', None)
+                    thisChunk = suite.get('thisChunk', None)
                     self.addStep(stepProc(
                      variant=variant,
                      symbols_path=symbols_path,
+                     testManifest=suite.get('testManifest', None),
                      workdir='build/tests',
                      timeout=2400,
                      app=self.remoteProcessName,
                      env=self.env,
+                     totalChunks=totalChunks,
+                     thisChunk=thisChunk,
                     ))
             elif name.startswith('reftest') or name == 'crashtest':
                 totalChunks = suite.get('totalChunks', None)
