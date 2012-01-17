@@ -16,7 +16,8 @@ from twisted.python import log
 from buildbot.scheduler import Nightly, Scheduler, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
-from buildbot.status.builder import WARNINGS
+from buildbot.status.builder import WARNINGS, FAILURE, EXCEPTION, RETRY
+from buildbot.process.buildstep import regex_log_evaluator
 
 import buildbotcustom.common
 import buildbotcustom.changes.hgpoller
@@ -365,7 +366,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         build_dir_prefix, suites_name, suites,
                         mochitestLeakThreshold, crashtestLeakThreshold,
                         slaves=None, resetHwClock=False, category=None,
-                        stagePlatform=None, stageProduct=None):
+                        stagePlatform=None, stageProduct=None,
+                        mozharness=False, mozharness_python=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -393,6 +395,32 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             branchName=branch_name,
             remoteExtras=pf.get('remote_extras'),
             downloadSymbols=pf.get('download_symbols', True),
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': properties,
+        }
+        builders.append(builder)
+    elif mozharness:
+        # suites is a dict!
+        extra_args = suites.get('extra_args', [])
+        factory = ScriptFactory(
+            interpreter=mozharness_python,
+            scriptRepo=suites['mozharness_repo'],
+            scriptName=suites['script_path'],
+            hg_bin=suites['hg_bin'],
+            extra_args=suites.get('extra_args', []),
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
+             (re.compile('# TBPL WARNING #'), WARNINGS),
+             (re.compile('# TBPL FAILURE #'), FAILURE),
+             (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
+             (re.compile('# TBPL RETRY #'), RETRY),
+            ))
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
@@ -2902,6 +2930,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "stagePlatform": stage_platform,
                                 "stageProduct": stage_product
                             }
+                            if isinstance(suites, dict) and "mozharness_repo" in suites:
+                                test_builder_kwargs['mozharness'] = True
+                                test_builder_kwargs['mozharness_python'] = platform_config['mozharness_python']
                             branchObjects['builders'].extend(generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builder_kwargs = test_builder_kwargs.copy()
