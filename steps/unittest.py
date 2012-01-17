@@ -879,18 +879,24 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
         return SUCCESS
 
 
-class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
+class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, variant, symbols_path=None, testPath=None,
-                 xrePath='../hostutils/xre',
+                 xrePath='../hostutils/xre', testManifest=None,
                  utilityPath='../hostutils/bin', certificatePath='certs',
-                 app='org.mozilla.fennec', consoleLevel='INFO', **kwargs):
+                 app='org.mozilla.fennec', consoleLevel='INFO', 
+                 totalChunks=None, thisChunk=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
+
+        if totalChunks:
+            assert 1 <= thisChunk <= totalChunks
+
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
-                                 testPath=testPath,
-                                 xrePath=xrePath, utilityPath=utilityPath,
+                                 testPath=testPath, xrePath=xrePath,
+                                 testManifest=testManifest, utilityPath=utilityPath,
                                  certificatePath=certificatePath, app=app,
-                                 consoleLevel=consoleLevel)
+                                 consoleLevel=consoleLevel,
+                                 totalChunks=totalChunks, thisChunk=thisChunk)
 
         self.name = 'mochitest-%s' % variant
         self.command = ['python', 'mochitest/runtestsremote.py',
@@ -907,9 +913,11 @@ class RemoteMochitestStep(MochitestMixin, ShellCommandReportTimeout):
         self.command.extend(self.getVariantOptions(variant))
         if testPath:
             self.command.extend(['--test-path', testPath])
-
+        if testManifest:
+            self.command.extend(['--run-only-tests', testManifest])
         if symbols_path:
             self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
+        self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
 
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
