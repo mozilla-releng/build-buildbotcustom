@@ -10,6 +10,7 @@ from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import Results
+from buildbot.process.factory import BuildFactory
 
 import release.platforms
 import release.paths
@@ -24,7 +25,7 @@ reload(build.paths)
 reload(release.info)
 
 from buildbotcustom.status.mail import ChangeNotifier
-from buildbotcustom.misc import get_l10n_repositories, isHgPollerTriggered, \
+from buildbotcustom.misc import get_l10n_repositories, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
   makeLogUploadCommand, changeContainsProduct, nomergeBuilders, \
   changeContainsProperties
@@ -33,11 +34,13 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, ReleaseFinalVerification, L10nVerifyFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
-  TuxedoEntrySubmitterFactory, makeDummyBuilder
-from buildbotcustom.changes.ftppoller import UrlPoller, LocalesFtpPoller
-from release.platforms import buildbot2ftp, sl_platform_map
+  TuxedoEntrySubmitterFactory, makeDummyBuilder, get_signing_cmd, \
+  SigningScriptFactory
+from buildbotcustom.changes.ftppoller import UrlPoller
+from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
-from buildbotcustom.scheduler import TriggerBouncerCheck, makePropertiesScheduler
+from buildbotcustom.scheduler import TriggerBouncerCheck, \
+     makePropertiesScheduler, AggregatingScheduler
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
 from buildbotcustom.status.errors import update_verify_error, \
      permission_check_error
@@ -50,7 +53,8 @@ import BuildSlaves
 DEFAULT_PARALLELIZATION = 10
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig,
-                                 releaseConfigFile, sourceRepoKey="mozilla"):
+                                 releaseConfigFile, sourceRepoKey="mozilla",
+                                 secrets=None):
     # This variable is one thing that forces us into reconfiging prior to a
     # release. It should be removed as soon as nothing depends on it.
     sourceRepoInfo = releaseConfig['sourceRepositories'][sourceRepoKey]
@@ -77,7 +81,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     unix_slaves = [x for x in set(unix_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
-    signedPlatforms = releaseConfig.get('signedPlatforms', ('win32',))
+    signedPlatforms = ()
+    if not releaseConfig.get('enableSigningAtBuildTime', True):
+        signedPlatforms = releaseConfig.get('signedPlatforms', ('win32',))
+    if secrets is None:
+        secrets = {}
+    signingServers = secrets.get('release-signing')
+    if releaseConfig.get('enableSigningAtBuildTime', True):
+        assert signingServers, 'Please provide a valid list of signing servers'
 
     def builderPrefix(s, platform=None):
         if platform:
@@ -150,12 +161,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         ftpURL = genericFtpUrl()
         if 'xulrunner' in platform:
             ftpURL = ftpURL.replace(releaseConfig['productName'], 'xulrunner')
+        isPlatformUnsigned = False
         if platform:
             platformDir = buildbot2ftp(bare_platform)
             if 'xulrunner' in platform:
                 platformDir = ''
             if bare_platform in signedPlatforms:
                 platformDir = 'unsigned/%s' % platformDir
+                isPlatformUnsigned = True
             ftpURL = '/'.join([
                 ftpURL.strip('/'),
                 platformDir])
@@ -163,10 +176,17 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         stage = stage.replace("%s_" % platform, "") if platform else stage
         #try to load a unique message template for the platform(if defined, step and results
         #if none exists, fall back to the default template
-        possible_templates = ("%s/%s_%s_%s" % (releaseConfig['releaseTemplates'], platform, stage, job_status),
+        possible_templates = ["%s/%s_%s_%s" % (releaseConfig['releaseTemplates'], platform, stage, job_status),
             "%s/%s_%s" % (releaseConfig['releaseTemplates'], stage, job_status),
             "%s/%s_default_%s" % (releaseConfig['releaseTemplates'], platform, job_status),
-            "%s/default_%s" % (releaseConfig['releaseTemplates'], job_status))
+            "%s/default_%s" % (releaseConfig['releaseTemplates'], job_status)]
+        if isPlatformUnsigned:
+            unsigned_templates = []
+            for t in possible_templates:
+                path, template = os.path.split(t)
+                unsigned_templates.append(
+                    os.path.join(path, 'unsigned_%s' % template))
+            possible_templates = possible_templates + unsigned_templates
         template = None
         for t in possible_templates:
             if os.access(t, os.R_OK):
@@ -265,295 +285,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     change_source = []
     notify_builders = []
     status = []
-
-    ##### Change sources and Schedulers
-    if releaseConfig['doPartnerRepacks'] and \
-       releaseConfig['productName'] == 'firefox':
-        for p in releaseConfig['l10nPlatforms']:
-            ftpPlatform =  buildbot2ftp(p)
-
-            candidatesDir = makeCandidatesDir(
-                releaseConfig['productName'],
-                releaseConfig['version'],
-                releaseConfig['buildNumber'],
-                protocol='http',
-                server=releaseConfig['ftpServer'])
-            ftpURL = '%s%s' % (candidatesDir, ftpPlatform)
-            if p in signedPlatforms:
-                ftpURL = '%sunsigned/%s' % (candidatesDir, ftpPlatform)
-
-            shippedLocalesFile = "%s/%s/raw-file/%s/%s" % (
-                branchConfig['hgurl'], sourceRepoInfo['path'], releaseTag,
-                releaseConfig['shippedLocalesPath'])
-            change_source.append(LocalesFtpPoller(
-                branch=builderPrefix("post_%s_l10n" % p),
-                ftpURLs=[ftpURL],
-                pollInterval=60*5, # 5 minutes
-                platform=p,
-                localesFile=shippedLocalesFile,
-                sl_platform_map=sl_platform_map,
-            ))
-
-    if releaseConfig['productName'] == 'firefox':
-        change_source.append(UrlPoller(
-            branch=builderPrefix("post_signing"),
-            url='%s/win32_signing_build%s.log' % (
-                makeCandidatesDir(
-                    releaseConfig['productName'],
-                    releaseConfig['version'],
-                    releaseConfig['buildNumber'],
-                    protocol='http',
-                    server=releaseConfig['ftpServer']),
-                releaseConfig['buildNumber']),
-            pollInterval=60*10,
-        ))
-
-    if releaseConfig['productName'] == 'fennec':
-        locale = 'en-US'
-        candidatesDir = makeCandidatesDir(
-            releaseConfig['productName'],
-            releaseConfig['version'],
-            releaseConfig['buildNumber'],
-            protocol='http',
-            server=releaseConfig['ftpServer'])
-        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-            (candidatesDir,
-             buildbot2ftp('linux-android'),
-             locale, releaseConfig['productName'], releaseConfig['version'],
-             locale)
-        change_source.append(UrlPoller(
-            branch=builderPrefix('android_post_signing'),
-            url=enUS_signed_apk_url,
-            pollInterval=60*10
-        ))
-        if branchConfig['platforms']['linux-android'].get('multi_locale'):
-            locale = 'multi'
-            signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-                           (candidatesDir,
-                            buildbot2ftp('linux-android'),
-                            locale,
-                            releaseConfig['productName'],
-                            releaseConfig['version'],
-                            locale)
-            change_source.append(UrlPoller(
-                branch=builderPrefix('android_post_signing'),
-                url=signed_apk_url,
-                pollInterval=60*10
-            ))
-
-
-    if releaseConfig.get('enable_repo_setup'):
-        repo_setup_scheduler = Scheduler(
-            name=builderPrefix('%s_repo_setup' % releaseConfig['productName']),
-            branch=sourceRepoInfo['path'],
-            treeStableTimer=None,
-            builderNames=[builderPrefix(
-                '%s_repo_setup' % releaseConfig['productName'])],
-            fileIsImportant=lambda c: not isHgPollerTriggered(c,
-                branchConfig['hgurl'])
-        )
-        schedulers.append(repo_setup_scheduler)
-        tag_scheduler = Dependent(
-            name=builderPrefix('%s_tag' % releaseConfig['productName']),
-            upstream=repo_setup_scheduler,
-            builderNames=[builderPrefix(
-                '%s_tag' % releaseConfig['productName'])],
-        )
-        if not releaseConfig.get('skip_release_download'):
-            release_downloader_scheduler = Scheduler(
-                name=builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName']),
-                branch=sourceRepoInfo['path'],
-                treeStableTimer=None,
-                builderNames=[builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName'])],
-                fileIsImportant=lambda c: changeContainsProduct(c,
-                                            releaseConfig['productName'])
-            )
-            schedulers.append(release_downloader_scheduler)
-    else:
-        tag_scheduler = Scheduler(
-            name=builderPrefix('%s_tag' % releaseConfig['productName']),
-            branch=sourceRepoInfo['path'],
-            treeStableTimer=None,
-            builderNames=[builderPrefix(
-                '%s_tag' % releaseConfig['productName'])],
-            fileIsImportant=lambda c: \
-            changeContainsProduct(c, releaseConfig['productName'])
-        )
-
-    schedulers.append(tag_scheduler)
-
-    tag_downstream = [builderPrefix('%s_source' % releaseConfig['productName'])]
-
-    if releaseConfig['buildNumber'] == 1 \
-       and not releaseConfig.get('disableBouncerEntries'):
-        tag_downstream.append(builderPrefix('bouncer_submitter'))
-
-        if releaseConfig['doPartnerRepacks']:
-            tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
-
-    if releaseConfig.get('xulrunnerPlatforms'):
-        tag_downstream.append(builderPrefix('xulrunner_source'))
-
-    for platform in releaseConfig['enUSPlatforms']:
-        tag_downstream.append(builderPrefix('%s_build' % platform))
-        notify_builders.append(builderPrefix('%s_build' % platform))
-        if platform in releaseConfig['l10nPlatforms']:
-            repack_scheduler = Triggerable(
-                name=builderPrefix('%s_repack' % platform),
-                builderNames=l10nBuilders(platform).values(),
-            )
-            schedulers.append(repack_scheduler)
-            repack_complete_scheduler = Dependent(
-                name=builderPrefix('%s_repack_complete' % platform),
-                upstream=repack_scheduler,
-                builderNames=[builderPrefix('repack_complete', platform),]
-            )
-            schedulers.append(repack_complete_scheduler)
-            notify_builders.append(builderPrefix('repack_complete', platform))
-
-    for platform in releaseConfig.get('xulrunnerPlatforms', []):
-        tag_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
-
-    DependentID = makePropertiesScheduler(Dependent, [buildIDSchedFunc, buildUIDSchedFunc])
-
-    schedulers.append(
-        DependentID(
-            name=builderPrefix('%s_build' % releaseConfig['productName']),
-            upstream=tag_scheduler,
-            builderNames=tag_downstream,
-        ))
-
-    if releaseConfig['doPartnerRepacks']:
-        for platform in releaseConfig.get('partnerRepackPlatforms',
-                                          releaseConfig['l10nPlatforms']):
-            partner_scheduler = Scheduler(
-                name=builderPrefix('partner_repacks', platform),
-                treeStableTimer=0,
-                branch=builderPrefix('post_%s_l10n' % platform),
-                builderNames=[builderPrefix('partner_repack', platform)],
-            )
-            schedulers.append(partner_scheduler)
-
-    if releaseConfig.get('verifyConfigs'):
-        for platform in releaseConfig['l10nPlatforms']:
-            l10n_verify_scheduler = Scheduler(
-                name=builderPrefix('l10n_verification', platform),
-                treeStableTimer=0,
-                branch=builderPrefix('post_signing'),
-                builderNames=[builderPrefix('l10n_verification', platform)]
-            )
-            schedulers.append(l10n_verify_scheduler)
-
-        updates_scheduler = Scheduler(
-            name=builderPrefix('updates'),
-            treeStableTimer=0,
-            branch=builderPrefix('post_signing'),
-            builderNames=[builderPrefix('updates')]
-        )
-        schedulers.append(updates_scheduler)
-        notify_builders.append(builderPrefix('updates'))
-
-        updateBuilderNames = []
-        for platform in sorted(releaseConfig.get('verifyConfigs', {}).keys()):
-            updateBuilderNames.extend(updateVerifyBuilders(platform).values())
-        update_verify_scheduler = Dependent(
-            name=builderPrefix('update_verify'),
-            upstream=updates_scheduler,
-            builderNames=updateBuilderNames
-        )
-        schedulers.append(update_verify_scheduler)
-
-    if not releaseConfig.get('disablePermissionCheck'):
-        check_permissions_scheduler = Dependent(
-            name=builderPrefix('check_permissions'),
-            upstream=updates_scheduler,
-            builderNames=[builderPrefix('check_permissions')]
-        )
-        schedulers.append(check_permissions_scheduler)
-
-    if not releaseConfig.get('disableVirusCheck'):
-        antivirus_scheduler = Dependent(
-            name=builderPrefix('antivirus'),
-            upstream=updates_scheduler,
-            builderNames=[builderPrefix('antivirus')]
-        )
-        schedulers.append(antivirus_scheduler)
-    if releaseConfig.get('enableAutomaticPushToMirrors') and \
-        releaseConfig.get('verifyConfigs'):
-        if releaseConfig.get('disableVirusCheck'):
-            upstream_scheduler = updates_scheduler
-        else:
-            upstream_scheduler = antivirus_scheduler
-        push_to_mirrors_scheduler = Dependent(
-            name=builderPrefix('push_to_mirrors'),
-            upstream=upstream_scheduler,
-            builderNames=[builderPrefix('push_to_mirrors')],
-        )
-        schedulers.append(push_to_mirrors_scheduler)
-
-    if releaseConfig.get('majorUpdateRepoPath'):
-        majorUpdateBuilderNames = []
-        for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
-            majorUpdateBuilderNames.extend(
-                majorUpdateVerifyBuilders(platform).values())
-        major_update_verify_scheduler = Triggerable(
-            name=builderPrefix('major_update_verify'),
-            builderNames=majorUpdateBuilderNames
-        )
-        schedulers.append(major_update_verify_scheduler)
-
-    for platform in releaseConfig['unittestPlatforms']:
-        platform_test_builders = []
-        for suites_name, suites in branchConfig['unittest_suites']:
-            platform_test_builders.extend(
-                    generateTestBuilderNames(
-                        builderPrefix('%s_test' % platform),
-                        suites_name, suites))
-
-        s = Scheduler(
-         name=builderPrefix('%s-opt-unittest' % platform),
-         treeStableTimer=0,
-         branch=builderPrefix('%s-opt-unittest' % platform),
-         builderNames=platform_test_builders,
-        )
-        schedulers.append(s)
-
-    if not releaseConfig.get('disableBouncerEntries'):
-        mirror_scheduler1 = TriggerBouncerCheck(
-            name=builderPrefix('ready-for-rel-test'),
-            configRepo=config_repo,
-            minUptake=releaseConfig.get('releasetestUptake', 3),
-            builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
-                          [builderPrefix('final_verification', platform)
-                           for platform in releaseConfig.get('verifyConfigs', {}).keys()],
-            username=BuildSlaves.tuxedoUsername,
-            password=BuildSlaves.tuxedoPassword)
-
-        schedulers.append(mirror_scheduler1)
-
-        mirror_scheduler2 = TriggerBouncerCheck(
-            name=builderPrefix('ready-for-release'),
-            configRepo=config_repo,
-            minUptake=releaseConfig.get('releaseUptake', 45000),
-            builderNames=[builderPrefix('ready_for_release')],
-            username=BuildSlaves.tuxedoUsername,
-            password=BuildSlaves.tuxedoPassword)
-
-        schedulers.append(mirror_scheduler2)
-
-    if releaseConfig['productName'] == 'fennec':
-        android_signature_verification_scheduler = Scheduler(
-            name=builderPrefix('android_signature_verification_scheduler'),
-            branch=builderPrefix('android_post_signing'),
-            treeStableTimer=None,
-            builderNames=[builderPrefix('android_signature_verification')],
-        )
-        schedulers.append(android_signature_verification_scheduler)
-    # Purposely, there is not a Scheduler for ReleaseFinalVerification
-    # This is a step run very shortly before release, and is triggered manually
-    # from the waterfall
+    updates_upstream_builders = []
+    post_signing_builders = []
+    post_update_builders = []
+    deliverables_builders = []
+    post_deliverables_builders = []
+    post_antivirus_builders = []
 
     ##### Builders
     builder_env = {
@@ -702,6 +439,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mozconfig=mozconfig,
             configRepoPath=branchConfig['config_repo_path'],
             configSubDir=branchConfig['config_subdir'],
+            signingServers=signingServers,
+            enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
         )
 
         builders.append({
@@ -720,6 +459,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                reallyShort(
                    builderPrefix('%s_source' % releaseConfig['productName']))}
         })
+        deliverables_builders.append(
+                builderPrefix('%s_source' % releaseConfig['productName']))
 
         if releaseConfig.get('xulrunnerPlatforms'):
             mozconfig = 'linux/%s/xulrunner' % sourceRepoInfo['name']
@@ -741,6 +482,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mozconfig=mozconfig,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
+                signingServers=signingServers,
+                enableSigning=False,
             )
 
             builders.append({
@@ -828,6 +571,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 productName=releaseConfig['productName'],
                 version=releaseConfig['version'],
                 buildNumber=releaseConfig['buildNumber'],
+                oldVersion=releaseConfig['oldVersion'],
+                oldBuildNumber=releaseConfig['oldBuildNumber'],
                 talosMasters=talosMasters,
                 packageTests=packageTests,
                 unittestMasters=unittestMasters,
@@ -849,6 +594,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 usePrettyNames=releaseConfig.get('usePrettyNames', True),
                 enableUpdatePackaging=enableUpdatePackaging,
                 mozconfigBranch=releaseTag,
+                signingServers=signingServers,
+                enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+                createPartial=releaseConfig.get('enablePartialMarsAtBuildTime', True),
             )
 
             builders.append({
@@ -869,6 +617,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 slaves=all_slaves,
                 category=builderPrefix(''),
                 ))
+        updates_upstream_builders.append(builderPrefix('%s_build' % platform))
+        deliverables_builders.append(builderPrefix('%s_build' % platform))
 
         if platform in releaseConfig['l10nPlatforms']:
             env = builder_env.copy()
@@ -877,11 +627,17 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
 
             if not releaseConfig.get('disableStandaloneRepacks'):
-                standalone_factory = ScriptFactory(
+                extra_args = [platform, branchConfigFile]
+                if releaseConfig.get('enablePartialMarsAtBuildTime', True):
+                    extra_args.append('generatePartials')
+                standalone_factory = SigningScriptFactory(
+                    signingServers=signingServers,
+                    env=env,
+                    enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                     scriptRepo=tools_repo,
                     interpreter='bash',
                     scriptName='scripts/l10n/standalone_repacks.sh',
-                    extra_args=[platform, branchConfigFile]
+                    extra_args=extra_args,
                 )
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
@@ -905,12 +661,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                     str(l10nChunks), str(n)]
                     )
                 else:
-                    repack_factory = ScriptFactory(
+                    extra_args = [platform, branchConfigFile, str(l10nChunks),
+                                  str(n)]
+                    if releaseConfig.get('enablePartialMarsAtBuildTime', True):
+                        extra_args.append('generatePartials')
+                    repack_factory = SigningScriptFactory(
+                        signingServers=signingServers,
+                        env=env,
+                        enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                         scriptRepo=tools_repo,
                         interpreter='bash',
                         scriptName='scripts/l10n/release_repacks.sh',
-                        extra_args=[platform, branchConfigFile,
-                                    str(l10nChunks), str(n)]
+                        extra_args=extra_args,
                     )
 
                 builddir = builderPrefix('%s_repack' % platform) + \
@@ -936,6 +698,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 slaves=all_slaves,
                 category=builderPrefix(''),
             ))
+            updates_upstream_builders.append(
+                builderPrefix('repack_complete', platform))
+            deliverables_builders.append(
+                builderPrefix('repack_complete', platform))
 
         if platform in releaseConfig['unittestPlatforms']:
             mochitestLeakThreshold = pf.get('mochitest_leak_threshold', None)
@@ -991,6 +757,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildNumber=releaseConfig['buildNumber'],
                 clobberURL=branchConfig['base_clobber_url'],
                 packageSDK=True,
+                enableSigning=False,
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
@@ -1028,6 +795,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stagingServer=releaseConfig['stagingServer'],
                 stageUsername=branchConfig['stage_username'],
                 stageSshKey=branchConfig['stage_ssh_key'],
+                signingServers=signingServers,
+                enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
             )
 
             if 'macosx64' in branchConfig['platforms']:
@@ -1058,6 +827,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                reallyShort(builderPrefix(
                                    'partner_repack', platform))}
             })
+            deliverables_builders.append(
+                builderPrefix('partner_repack', platform))
 
     if not releaseConfig.get('disableL10nVerification'):
         for platform in releaseConfig['l10nPlatforms']:
@@ -1091,6 +862,50 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'properties': {'slavebuilddir':reallyShort(
                     builderPrefix('l10n_verification', platform))}
             })
+            post_signing_builders.append(
+                builderPrefix('l10n_verification', platform))
+
+    if not releaseConfig.get('enableSigningAtBuildTime', True) and \
+       releaseConfig['productName'] == 'firefox':
+        builders.append(makeDummyBuilder(
+            name=builderPrefix('signing_done'),
+            slaves=all_slaves,
+            category=builderPrefix('')
+        ))
+
+    if releaseConfig.get('enableSigningAtBuildTime', True) and \
+           releaseConfig['productName'] == 'firefox':
+        pf = branchConfig['platforms']['linux']
+        env = builder_env.copy()
+        env.update(pf['env'])
+        checksums_factory = SigningScriptFactory(
+            signingServers=signingServers,
+            env=env,
+            scriptRepo=tools_repo,
+            interpreter='bash',
+            scriptName='scripts/release/generate-sums.sh',
+            extra_args=[branchConfigFile],
+        )
+        builders.append({
+            'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
+            'slavenames': branchConfig['platforms']['linux']['slaves'] + \
+                branchConfig['platforms']['linux64']['slaves'],
+            'category': builderPrefix(''),
+            'builddir': builderPrefix(
+                '%s_checksums' % releaseConfig['productName']),
+            'slavebuilddir': reallyShort(
+                builderPrefix('%s_checksums' % releaseConfig['productName'])),
+            'factory': checksums_factory,
+            'env': builder_env,
+            'properties': {
+                'slavebuilddir': builderPrefix(
+                    '%s_checksums' % releaseConfig['productName']),
+                'script_repo_revision': releaseTag,
+                'release_config': releaseConfigFile,
+            }
+        })
+        post_deliverables_builders.append(
+            builderPrefix('%s_checksums' % releaseConfig['productName']))
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
@@ -1137,6 +952,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             oldLongVersion=releaseConfig.get('oldLongVersion', None),
             schema=releaseConfig.get('snippetSchema', None),
             useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', False),
+            signingServers=signingServers,
+            useChecksums=releaseConfig.get('enablePartialMarsAtBuildTime', True),
         )
 
         builders.append({
@@ -1150,12 +967,19 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'env': builder_env,
             'properties': {'slavebuilddir': reallyShort(builderPrefix('updates'))}
         })
+        post_signing_builders.append(builderPrefix('updates'))
+        notify_builders.append(builderPrefix('updates'))
+        if not releaseConfig.get('enableSigningAtBuildTime', True) or \
+           not releaseConfig.get('enablePartialMarsAtBuildTime', True):
+            deliverables_builders.append(builderPrefix('updates'))
     elif releaseConfig.get('verifyConfigs'):
         builders.append(makeDummyBuilder(
             name=builderPrefix('updates'),
             slaves=all_slaves,
             category=builderPrefix('')
         ))
+        post_signing_builders.append(builderPrefix('updates'))
+        notify_builders.append(builderPrefix('updates'))
 
 
     for platform in sorted(releaseConfig.get('verifyConfigs', {}).keys()):
@@ -1189,6 +1013,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                'release_tag': releaseTag,
                                'release_config': releaseConfigFile},
             })
+            post_update_builders.append(builderName)
 
     if not releaseConfig.get('disablePermissionCheck'):
         check_permissions_factory = ScriptFactory(
@@ -1212,6 +1037,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                            'script_repo_revision': releaseTag,
                            'release_config': releaseConfigFile},
         })
+        post_deliverables_builders.append(builderPrefix('check_permissions'))
 
     if not releaseConfig.get('disableVirusCheck'):
         antivirus_factory = ScriptFactory(
@@ -1233,6 +1059,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                            'script_repo_revision': releaseTag,
                            'release_config': releaseConfigFile},
         })
+        post_deliverables_builders.append(builderPrefix('antivirus'))
 
     if not releaseConfig.get('disablePushToMirrors'):
         push_to_mirrors_factory = ScriptFactory(
@@ -1491,6 +1318,288 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 },
         })
 
+
+    ##### Change sources and Schedulers
+
+    if not releaseConfig.get('enableSigningAtBuildTime', True) and \
+       releaseConfig['productName'] == 'firefox':
+        change_source.append(UrlPoller(
+            branch=builderPrefix("post_signing"),
+            url='%s/win32_signing_build%s.log' % (
+                makeCandidatesDir(
+                    releaseConfig['productName'],
+                    releaseConfig['version'],
+                    releaseConfig['buildNumber'],
+                    protocol='http',
+                    server=releaseConfig['ftpServer']),
+                releaseConfig['buildNumber']),
+            pollInterval=60*10,
+        ))
+        signing_done_scheduler = Scheduler(
+            name=builderPrefix('signing_done'),
+            treeStableTimer=0,
+            branch=builderPrefix('post_signing'),
+            builderNames=[builderPrefix('signing_done')]
+        )
+        schedulers.append(signing_done_scheduler)
+        notify_builders.append(builderPrefix('signing_done'))
+
+    if releaseConfig['productName'] == 'fennec':
+        locale = 'en-US'
+        candidatesDir = makeCandidatesDir(
+            releaseConfig['productName'],
+            releaseConfig['version'],
+            releaseConfig['buildNumber'],
+            protocol='http',
+            server=releaseConfig['ftpServer'])
+        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
+            (candidatesDir,
+             buildbot2ftp('linux-android'),
+             locale, releaseConfig['productName'], releaseConfig['version'],
+             locale)
+        change_source.append(UrlPoller(
+            branch=builderPrefix('android_post_signing'),
+            url=enUS_signed_apk_url,
+            pollInterval=60*10
+        ))
+        if branchConfig['platforms']['linux-android'].get('multi_locale'):
+            locale = 'multi'
+            signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
+                           (candidatesDir,
+                            buildbot2ftp('linux-android'),
+                            locale,
+                            releaseConfig['productName'],
+                            releaseConfig['version'],
+                            locale)
+            change_source.append(UrlPoller(
+                branch=builderPrefix('android_post_signing'),
+                url=signed_apk_url,
+                pollInterval=60*10
+            ))
+
+    reset_schedulers_scheduler = Scheduler(
+        name=builderPrefix('%s_reset_schedulers' % releaseConfig['productName']),
+        branch=sourceRepoInfo['path'],
+        treeStableTimer=None,
+        builderNames=[builderPrefix(
+            '%s_reset_schedulers' % releaseConfig['productName'])],
+        fileIsImportant=lambda c: changeContainsProduct(c,
+                                    releaseConfig['productName'])
+    )
+    schedulers.append(reset_schedulers_scheduler)
+    if releaseConfig.get('enable_repo_setup'):
+        repo_setup_scheduler = Dependent(
+            name=builderPrefix('%s_repo_setup' % releaseConfig['productName']),
+            upstream=reset_schedulers_scheduler,
+            builderNames=[builderPrefix(
+                '%s_repo_setup' % releaseConfig['productName'])],
+        )
+        schedulers.append(repo_setup_scheduler)
+        tag_scheduler = Dependent(
+            name=builderPrefix('%s_tag' % releaseConfig['productName']),
+            upstream=repo_setup_scheduler,
+            builderNames=[builderPrefix(
+                '%s_tag' % releaseConfig['productName'])],
+        )
+        if not releaseConfig.get('skip_release_download'):
+            release_downloader_scheduler = Scheduler(
+                name=builderPrefix(
+                    '%s_release_downloader' % releaseConfig['productName']),
+                branch=sourceRepoInfo['path'],
+                treeStableTimer=None,
+                builderNames=[builderPrefix(
+                    '%s_release_downloader' % releaseConfig['productName'])],
+                fileIsImportant=lambda c: changeContainsProduct(c,
+                                            releaseConfig['productName'])
+            )
+            schedulers.append(release_downloader_scheduler)
+    else:
+        tag_scheduler = Dependent(
+            name=builderPrefix('%s_tag' % releaseConfig['productName']),
+            upstream=reset_schedulers_scheduler,
+            builderNames=[builderPrefix(
+                '%s_tag' % releaseConfig['productName'])],
+        )
+    schedulers.append(tag_scheduler)
+
+    tag_downstream = [builderPrefix('%s_source' % releaseConfig['productName'])]
+
+    if releaseConfig['buildNumber'] == 1 \
+       and not releaseConfig.get('disableBouncerEntries'):
+        tag_downstream.append(builderPrefix('bouncer_submitter'))
+
+        if releaseConfig['doPartnerRepacks']:
+            tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
+
+    if releaseConfig.get('xulrunnerPlatforms'):
+        tag_downstream.append(builderPrefix('xulrunner_source'))
+
+    for platform in releaseConfig['enUSPlatforms']:
+        tag_downstream.append(builderPrefix('%s_build' % platform))
+        notify_builders.append(builderPrefix('%s_build' % platform))
+        if platform in releaseConfig['l10nPlatforms']:
+            repack_scheduler = Triggerable(
+                name=builderPrefix('%s_repack' % platform),
+                builderNames=l10nBuilders(platform).values(),
+            )
+            schedulers.append(repack_scheduler)
+            repack_complete_scheduler = Dependent(
+                name=builderPrefix('%s_repack_complete' % platform),
+                upstream=repack_scheduler,
+                builderNames=[builderPrefix('repack_complete', platform),]
+            )
+            schedulers.append(repack_complete_scheduler)
+            notify_builders.append(builderPrefix('repack_complete', platform))
+
+    for platform in releaseConfig.get('xulrunnerPlatforms', []):
+        tag_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
+
+    DependentID = makePropertiesScheduler(Dependent, [buildIDSchedFunc, buildUIDSchedFunc])
+
+    schedulers.append(
+        DependentID(
+            name=builderPrefix('%s_build' % releaseConfig['productName']),
+            upstream=tag_scheduler,
+            builderNames=tag_downstream,
+        ))
+
+    if releaseConfig.get('majorUpdateRepoPath'):
+        majorUpdateBuilderNames = []
+        for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
+            majorUpdateBuilderNames.extend(
+                majorUpdateVerifyBuilders(platform).values())
+        major_update_verify_scheduler = Triggerable(
+            name=builderPrefix('major_update_verify'),
+            builderNames=majorUpdateBuilderNames
+        )
+        schedulers.append(major_update_verify_scheduler)
+
+    for platform in releaseConfig['unittestPlatforms']:
+        platform_test_builders = []
+        for suites_name, suites in branchConfig['unittest_suites']:
+            platform_test_builders.extend(
+                    generateTestBuilderNames(
+                        builderPrefix('%s_test' % platform),
+                        suites_name, suites))
+
+        s = Scheduler(
+         name=builderPrefix('%s-opt-unittest' % platform),
+         treeStableTimer=0,
+         branch=builderPrefix('%s-opt-unittest' % platform),
+         builderNames=platform_test_builders,
+        )
+        schedulers.append(s)
+
+    if not releaseConfig.get('disableBouncerEntries'):
+        mirror_scheduler1 = TriggerBouncerCheck(
+            name=builderPrefix('ready-for-rel-test'),
+            configRepo=config_repo,
+            minUptake=releaseConfig.get('releasetestUptake', 3),
+            builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
+                          [builderPrefix('final_verification', platform)
+                           for platform in releaseConfig.get('verifyConfigs', {}).keys()],
+            username=BuildSlaves.tuxedoUsername,
+            password=BuildSlaves.tuxedoPassword)
+
+        schedulers.append(mirror_scheduler1)
+
+        mirror_scheduler2 = TriggerBouncerCheck(
+            name=builderPrefix('ready-for-release'),
+            configRepo=config_repo,
+            minUptake=releaseConfig.get('releaseUptake', 45000),
+            builderNames=[builderPrefix('ready_for_release')],
+            username=BuildSlaves.tuxedoUsername,
+            password=BuildSlaves.tuxedoPassword)
+
+        schedulers.append(mirror_scheduler2)
+
+    if releaseConfig['productName'] == 'fennec':
+        android_signature_verification_scheduler = Scheduler(
+            name=builderPrefix('android_signature_verification_scheduler'),
+            branch=builderPrefix('android_post_signing'),
+            treeStableTimer=None,
+            builderNames=[builderPrefix('android_signature_verification')],
+        )
+        schedulers.append(android_signature_verification_scheduler)
+
+    if releaseConfig.get('enableAutomaticPushToMirrors') and \
+        releaseConfig.get('verifyConfigs'):
+        if releaseConfig.get('disableVirusCheck'):
+            post_update_builders.append(builderPrefix('push_to_mirrors'))
+        else:
+            post_antivirus_builders.append(builderPrefix('push_to_mirrors'))
+
+    if releaseConfig['productName'] == 'firefox':
+        if not releaseConfig.get('enableSigningAtBuildTime', True):
+            updates_upstream_builders = [builderPrefix('signing_done')]
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix('%s_signing_done' % releaseConfig['productName']),
+            branch=builderPrefix('%s_signing_done' % releaseConfig['productName']),
+            upstreamBuilders=updates_upstream_builders,
+            builderNames=post_signing_builders,
+        ))
+    if releaseConfig.get('verifyConfigs'):
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix('updates_done'),
+            branch=builderPrefix('updates_done'),
+            upstreamBuilders=[builderPrefix('updates')],
+            builderNames=post_update_builders,
+        ))
+    if post_deliverables_builders:
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix('%s_deliverables_ready' % releaseConfig['productName']),
+            branch=builderPrefix('%s_deliverables_ready' % releaseConfig['productName']),
+            upstreamBuilders=deliverables_builders,
+            builderNames=post_deliverables_builders,
+        ))
+    if post_antivirus_builders:
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix('av_done'),
+            branch=builderPrefix('av_done'),
+            upstreamBuilders=[builderPrefix('antivirus')],
+            builderNames=post_antivirus_builders,
+        ))
+    if releaseConfig['doPartnerRepacks'] and \
+        releaseConfig['productName'] == 'firefox':
+        # TODO: revisit this once we have android partner repacks
+        for platform in releaseConfig.get('partnerRepackPlatforms',
+                                          releaseConfig['l10nPlatforms']):
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('%s_l10n_done' % releaseConfig['productName'],
+                                   platform),
+                branch=builderPrefix('%s_l10n_done' % releaseConfig['productName'],
+                                     platform),
+                upstreamBuilders=[builderPrefix('repack_complete', platform)],
+                builderNames=[builderPrefix('partner_repack', platform)],
+            ))
+
+    # This builder should be come after all AggregatingSchedulers are set
+    aggregating_shedulers = []
+    for s in schedulers:
+        if isinstance(s, AggregatingScheduler):
+            aggregating_shedulers.append(s.name)
+    if aggregating_shedulers:
+        scheduler_reset_factory = BuildFactory()
+        scheduler_reset_factory.addStep(Trigger(
+            schedulerNames=aggregating_shedulers,
+        ))
+        builders.append({
+            'name': builderPrefix(
+                '%s_reset_schedulers' % releaseConfig['productName']),
+            'slavenames': all_slaves,
+            'category': builderPrefix(''),
+            'builddir': builderPrefix(
+                '%s_reset_schedulers' % releaseConfig['productName']),
+            'factory': scheduler_reset_factory,
+        })
+    else:
+        builders.append(makeDummyBuilder(
+            name=builderPrefix(
+                '%s_reset_schedulers' % releaseConfig['productName']),
+            slaves=all_slaves,
+            category=builderPrefix(''),
+        ))
+
     # Separate email messages per list. Mailman doesn't try to avoid duplicate
     # messages in this case. See Bug 635527 for the details.
     tagging_started_recipients = releaseConfig['AllRecipients'][:]
@@ -1510,16 +1619,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ))
     for recipient in releaseConfig['AllRecipients'] + \
                      releaseConfig['PassRecipients']:
-        if releaseConfig['productName'] == 'firefox':
-            #send a message when signing is complete
-            status.append(ChangeNotifier(
-                    fromaddr="release@mozilla.com",
-                    relayhost="mail.build.mozilla.org",
-                    sendToInterestedUsers=False,
-                    extraRecipients=[recipient],
-                    branches=[builderPrefix('post_signing')],
-                    messageFormatter=createReleaseChangeMessage,
-                ))
         if releaseConfig['productName'] == 'fennec':
             #send a message when android signing is complete
             status.append(ChangeNotifier(
