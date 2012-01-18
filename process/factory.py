@@ -5472,10 +5472,11 @@ class UnittestBuildFactory(MozillaBuildFactory):
             objdir, mochitest_leak_threshold=None,
             crashtest_leak_threshold=None, uploadPackages=False,
             unittestMasters=None, unittestBranch=None, stageUsername=None,
-            stageServer=None, stageSshKey=None, run_a11y=True, **kwargs):
+            stageServer=None, stageSshKey=None, run_a11y=True,
+            env={}, **kwargs):
         self.env = {}
 
-        MozillaBuildFactory.__init__(self, **kwargs)
+        MozillaBuildFactory.__init__(self, env=env, **kwargs)
 
         self.productName = productName
         self.stageServer = stageServer
@@ -5783,10 +5784,10 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             unittestMasters=None, unittestBranch=None, stageUsername=None,
             stageServer=None, stageSshKey=None, exec_xpcshell_suites=True,
             exec_reftest_suites=True, exec_mochi_suites=True,
-            exec_mozmill_suites=False, run_a11y=True, **kwargs):
+            exec_mozmill_suites=False, run_a11y=True, env={}, **kwargs):
         self.env = {}
 
-        MozillaBuildFactory.__init__(self, **kwargs)
+        MozillaBuildFactory.__init__(self, env=env, **kwargs)
 
         self.productName = productName
         self.stageServer = stageServer
