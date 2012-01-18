@@ -6725,18 +6725,18 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         self.thisChunk = thisChunk
         self.chunkByDir = chunkByDir
 
-        self.env = MozillaEnvironments['%s-unittest' % platform].copy()
+        testEnv = MozillaEnvironments['%s-unittest' % platform].copy()
         if stackwalk_cgi and kwargs.get('downloadSymbols'):
-            self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
+            testEnv['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
         else:
-            self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
-        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        self.env.update(env)
+            testEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        testEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
+        testEnv.update(env)
 
         self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
                                 'crashtest': crashtest_leak_threshold,}
 
-        MozillaTestFactory.__init__(self, platform, productName,
+        MozillaTestFactory.__init__(self, platform, productName, env=testEnv,
                                     downloadTests=True, stackwalk_cgi=stackwalk_cgi,
                                     **kwargs)
 
