@@ -408,6 +408,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                     db.parmlist(len(self.upstreamBuilders)),
                     db.parmlist(len(self.okResults)),
                     )
+        q = db.quoteq(q)
         t.execute(q, tuple(self.upstreamBuilders) + tuple(self.okResults) +
                   (lastCheck,))
         return t.fetchall()
