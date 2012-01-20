@@ -63,7 +63,6 @@ from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, \
   CompareLeakLogs, Codesighs, GraphServerPost
-from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.steps.signing import SigningServerAuthenication
@@ -512,7 +511,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
              workdir='.',
              timeout=3600, # One hour, because Windows is slow
              extract_fn=parse_purge_builds,
-             log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error)
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error),
+             env=self.env,
             ))
 
     def addPeriodicRebootSteps(self):
