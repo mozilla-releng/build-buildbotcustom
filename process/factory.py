@@ -1232,11 +1232,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
             if self.graphServer:
                 self.addBuildInfoSteps()
                 self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+                gs_env = self.env.copy()
+                gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
                 self.addStep(GraphServerPost(server=self.graphServer,
                                              selector=self.graphSelector,
                                              branch=self.graphBranch,
                                              resultsname=self.baseName,
-                                             env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                             env=gs_env,
                                              propertiesFile="properties.json"))
             else:
                 self.addStep(OutputStep(
@@ -1299,13 +1301,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
           haltOnFailure=True
           ))
         if self.graphServer and graphAndUpload:
+            gs_env = self.env.copy()
+            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
             self.addBuildInfoSteps()
             self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
             self.addStep(GraphServerPost(server=self.graphServer,
                                          selector=self.graphSelector,
                                          branch=self.graphBranch,
                                          resultsname=self.baseName,
-                                         env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                         env=gs_env,
                                          propertiesFile="properties.json"))
         self.addStep(CompareLeakLogs(
           name='compare_previous_leak_log',
@@ -1665,13 +1669,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
         if self.graphServer:
+            gs_env = self.env.copy()
+            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
             self.addBuildInfoSteps()
             self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
             self.addStep(GraphServerPost(server=self.graphServer,
                                          selector=self.graphSelector,
                                          branch=self.graphBranch,
                                          resultsname=self.baseName,
-                                         env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                         env=gs_env,
                                          propertiesFile="properties.json"))
         self.addStep(ShellCommand(
          name='echo_codesize_log',

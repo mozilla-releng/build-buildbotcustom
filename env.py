@@ -42,6 +42,7 @@ MozillaEnvironments['win32-ref-platform'] = {
             'D:\\msvs8\\VC;' + \
             'D:\\msvs8\\Common7\\Tools;' + \
             'D:\\msvs8\\Common7\\Tools\\bin;' + \
+            'D:\\mozilla-build\\buildbotve\\scripts;' +\
             'd:\\mozilla-build\\hg;' + \
             'd:\\mozilla-build\\moztools\\bin;' + \
             'd:\\mozilla-build\\msys\\local\\bin;' + \
@@ -155,6 +156,7 @@ MozillaEnvironments['win32-perf-unittest'] = {
     "PATH": 'C:\\mozilla-build;' + \
             'C:\\mozilla-build\\msys\\bin;' + \
             'C:\\mozilla-build\\msys\\local\\bin;' + \
+            'C:\\mozilla-build\\buildbotve\\scripts;' +\
             'C:\\mozilla-build\\Python25;' + \
             'C:\\mozilla-build\\Python25\\Scripts;' + \
             'C:\\mozilla-build\\hg;' + \
