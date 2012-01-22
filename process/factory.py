@@ -2047,7 +2047,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 wc='build%s' % self.mozillaDir,
                 workdir='.',
                 rev=moz_rev,
-                repoURL=self.getRepository(self.mozRepoPath),
+                repo_url=self.getRepository(self.mozRepoPath),
                 )
             self.addStep(stepMC)
         else:
