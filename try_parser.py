@@ -12,7 +12,7 @@ from twisted.python import log
 def expandTestSuites(user_suites,valid_suites):
     test_suites = []
     for u in user_suites:
-        if u == 'mochitests':
+        if u == 'mochitests' or u == 'mochitest':
             for v in valid_suites:
                 if v.startswith('mochitest'):
                     test_suites.append(v)
@@ -24,6 +24,10 @@ def expandTestSuites(user_suites,valid_suites):
             num = u.split('-')[1]
             for v in valid_suites:
                 if v.startswith('mochitest') and re.search(num,v.split('/')[0]):
+                    test_suites.append(v)
+        elif u == 'reftests' or u == 'reftest':
+            for v in valid_suites:
+                if v.startswith('reftest'):
                     test_suites.append(v)
         else:
             # validate other test names
@@ -158,8 +162,8 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         # ugly
         user_platforms = []
         for user_platform in options.user_platforms.split(','):
-            if user_platform in ('android-r7', 'android'):
-                user_platform = 'linux-android'
+            if user_platform in ('android-r7', 'linux-android'):
+                user_platform = 'android'
             user_platforms.append(user_platform)
         options.user_platforms = user_platforms
 
