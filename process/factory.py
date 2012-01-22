@@ -2034,41 +2034,22 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 slavedest="buildprops.json",
                 workdir='.'
             ))
+
+            stepCC = self.makeHgtoolStep(
+                wc='build',
+                workdir='.',
+                rev=comm_rev,
+                )
+            self.addStep(stepCC)
             
-            env = self.env.copy()
-            env['PROPERTIES_FILE'] = 'buildprops.json'
-            cc_cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    self.getRepository(self.repoPath),
-                    '-r', comm_rev,
-                    'build',
-                    ]
-            self.addStep(ShellCommand(
-                name='hg_update',
-                command=cc_cmd,
-                timeout=60*60,
-                env=env,
+            stepMC = self.makeHgtoolStep(
+                name="moz_hg_update",
+                wc='build%s' % self.mozillaDir,
                 workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
-            moz_cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    self.getRepository(self.mozRepoPath),
-                    '-r', moz_rev,
-                    'build%s' % self.mozillaDir,
-                    ]
-            self.addStep(ShellCommand(
-                name='moz_hg_update',
-                command=moz_cmd,
-                timeout=60*60*2, # 2 hours
-                env=env,
-                workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
+                rev=moz_rev,
+                repoURL=self.getRepository(self.mozRepoPath),
+                )
+            self.addStep(stepMC)
         else:
             self.addStep(Mercurial(
                 name='hg_update',
