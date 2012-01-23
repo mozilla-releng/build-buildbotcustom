@@ -75,8 +75,7 @@ class MozillaUpdateConfig(ShellCommand):
             perfconfigurator = "PerfConfigurator.py"
 
         self.setCommand(["python", perfconfigurator, "-v", "-e", exePath,
-            "-t", title, "-b", self.branch,
-            '--branchName', self.branchName] + self.addOptions)
+            "-t", title, '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
