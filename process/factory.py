@@ -1704,8 +1704,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                     # Notice the '/' after the ':'. This prevents windows from trying to modify
                     # the path
                     '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
-                        self.logUploadDir)) +
-                    'codesize-auto.log' ]
+                        self.logUploadDir) +
+                    'codesize-auto.log') ]
         self.addStep(ShellCommand(
             name='upload_codesize_logs',
             command=cmd,
