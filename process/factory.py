@@ -1366,8 +1366,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                         # Notice the '/' after the ':'. This prevents windows from trying to modify
                         # the path
                         '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
-                        self.logUploadDir)) +
-                        'malloc.log sdleak.tree' ]
+                        self.logUploadDir) +
+                        'malloc.log sdleak.tree') ]
             self.addStep(ShellCommand(
                 name='upload_logs',
                 env=self.env,
