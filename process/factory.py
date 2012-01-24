@@ -4891,7 +4891,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             self.uploadMars()
         self.uploadSnippets()
         self.verifySnippets()
-        self.wait()
         self.trigger()
 
     def setChannelData(self):
@@ -5245,13 +5244,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 dir2=self.channels[chan2]['dir'],
                 workdir=self.updateDir
             ))
-
-    def wait(self):
-        self.addStep(ShellCommand(
-         name='wait_for_nfs_cache',
-         command=['sleep', '360'],
-         description=['wait for nfs cache', 'to expire']
-        ))
 
     def trigger(self):
         if self.triggerSchedulers:
