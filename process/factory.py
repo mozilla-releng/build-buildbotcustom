@@ -3957,7 +3957,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                         '/pub/mozilla.org/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
                                                     self.buildNumber)
-        longVersion = self.makeLongVersion(self.version)
 
         # This block sets platform specific data that our wget command needs.
         #  build is mapping between the local and remote filenames
@@ -3974,7 +3973,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         elif self.platform.startswith('macosx'):
             filename = '%s.dmg' % self.project
             builds[filename] = '%s %s.dmg' % (self.brandName,
-                                              longVersion)
+                                              self.version)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('win32'):
             platformDir = 'unsigned/' + platformDir
@@ -3982,7 +3981,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             instname = '%s.exe' % self.project
             builds[filename] = '%s-%s.zip' % (self.project, self.version)
             builds[instname] = '%s Setup %s.exe' % (self.brandName,
-                                                    longVersion)
+                                                    self.version)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
