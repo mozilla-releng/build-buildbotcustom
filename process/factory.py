@@ -5216,7 +5216,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 self.addStep(RetryingShellCommand(
                  name='backupsnip',
                  command=['bash', '-c',
-                          'ssh -l %s ' %  self.ausUser +
+                          'ssh -t -l %s ' %  self.ausUser +
                           '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
                           '~/bin/backupsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
@@ -5226,10 +5226,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 self.addStep(RetryingShellCommand(
                  name='pushsnip',
                  command=['bash', '-c',
-                          'ssh -l %s ' %  self.ausUser +
+                          'ssh -t -l %s ' %  self.ausUser +
                           '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
                           '~/bin/pushsnip %s' % remoteDir],
-                 timeout=3600, # 1 hour
+                 timeout=7200, # 2 hours
                  description=['pushsnip'],
                  haltOnFailure=True
                 ))
