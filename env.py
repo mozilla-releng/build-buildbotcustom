@@ -118,8 +118,7 @@ MozillaEnvironments['win32-unittest'] = {
     "DevEnvDir": "D:\\msvs8\\Common7\\IDE",
     "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
                'D:\\msvs8\\VC\\ATLMFC\\LIB',
-    "MOZ_HIDE_RESULTS_TABLE": '1',
-    "PATH": "${MOZILLABUILD}buildbotve\\scripts;${PATH}",
+    "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
 MozillaEnvironments['win64-unittest'] = {
