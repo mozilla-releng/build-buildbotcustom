@@ -1606,6 +1606,7 @@ def generateBranchObjects(config, name, secrets=None):
                 clobberTime=clobberTime,
                 signingServers=secrets.get(pf.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
+                extraConfigureArgs=config.get('l10n_extra_configure_args', []),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
@@ -3194,6 +3195,8 @@ def generateFuzzingObjects(config, SLAVES):
         env['HG_REPO'] = config['fuzzing_repo']
         env['FUZZ_REMOTE_HOST'] = config['fuzzing_remote_host']
         env['FUZZ_BASE_DIR'] = config['fuzzing_base_dir']
+        if 'win' in platform:
+            env['PATH'] = "${MOZILLABUILD}buildbotve\\scripts;${PATH}"
         builder = {'name': 'fuzzer-%s' % platform,
                    'builddir': 'fuzzer-%s' % platform,
                    'slavenames': SLAVES[platform],

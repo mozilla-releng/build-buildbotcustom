@@ -283,7 +283,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     test_builders = []
     schedulers = []
     change_source = []
-    notify_builders = []
+    important_builders = []
     status = []
     updates_upstream_builders = []
     post_signing_builders = []
@@ -410,7 +410,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'release_config': releaseConfigFile,
             }
         })
-        notify_builders.append(builderPrefix('%s_tag' % releaseConfig['productName']))
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('%s_tag' % releaseConfig['productName']),
@@ -770,8 +769,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'properties': {'slavebuilddir':
                     reallyShort(builderPrefix('xulrunner_%s_build' % platform))}
             })
-            notify_builders.append(
-                builderPrefix('xulrunner_%s_build' % platform))
         else:
             builders.append(makeDummyBuilder(
                 name=builderPrefix('xulrunner_%s_build' % platform),
@@ -968,7 +965,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'properties': {'slavebuilddir': reallyShort(builderPrefix('updates'))}
         })
         post_signing_builders.append(builderPrefix('updates'))
-        notify_builders.append(builderPrefix('updates'))
+        important_builders.append(builderPrefix('updates'))
         if not releaseConfig.get('enableSigningAtBuildTime', True) or \
            not releaseConfig.get('enablePartialMarsAtBuildTime', True):
             deliverables_builders.append(builderPrefix('updates'))
@@ -979,7 +976,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             category=builderPrefix('')
         ))
         post_signing_builders.append(builderPrefix('updates'))
-        notify_builders.append(builderPrefix('updates'))
+        important_builders.append(builderPrefix('updates'))
 
 
     for platform in sorted(releaseConfig.get('verifyConfigs', {}).keys()):
@@ -1090,7 +1087,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'script_repo_revision': releaseTag,
                 },
         })
-        notify_builders.append(builderPrefix('push_to_mirrors'))
 
     for platform in releaseConfig.get('verifyConfigs', {}).keys():
         final_verification_factory = ReleaseFinalVerification(
@@ -1121,14 +1117,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             slaves=all_slaves,
             category=builderPrefix(''),
             ))
-        notify_builders.append(builderPrefix('ready_for_releasetest_testing'))
+        important_builders.append(builderPrefix('ready_for_releasetest_testing'))
 
         builders.append(makeDummyBuilder(
             name=builderPrefix('ready_for_release'),
             slaves=all_slaves,
             category=builderPrefix(''),
             ))
-        notify_builders.append(builderPrefix('ready_for_release'))
+        important_builders.append(builderPrefix('ready_for_release'))
 
     if releaseConfig.get('majorUpdateRepoPath'):
         # Not attached to any Scheduler
@@ -1185,7 +1181,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'env': builder_env,
             'properties': {'slavebuilddir': reallyShort(builderPrefix('mu'))}
         })
-        notify_builders.append(builderPrefix('major_update'))
+        important_builders.append(builderPrefix('major_update'))
 
         for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
             for n, builderName in majorUpdateVerifyBuilders(platform).iteritems():
@@ -1342,7 +1338,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderNames=[builderPrefix('signing_done')]
         )
         schedulers.append(signing_done_scheduler)
-        notify_builders.append(builderPrefix('signing_done'))
+        important_builders.append(builderPrefix('signing_done'))
 
     if releaseConfig['productName'] == 'fennec':
         locale = 'en-US'
@@ -1436,7 +1432,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     for platform in releaseConfig['enUSPlatforms']:
         tag_downstream.append(builderPrefix('%s_build' % platform))
-        notify_builders.append(builderPrefix('%s_build' % platform))
+        if platform in releaseConfig['notifyPlatforms']:
+            important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
             repack_scheduler = Triggerable(
                 name=builderPrefix('%s_repack' % platform),
@@ -1449,7 +1446,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderNames=[builderPrefix('repack_complete', platform),]
             )
             schedulers.append(repack_complete_scheduler)
-            notify_builders.append(builderPrefix('repack_complete', platform))
 
     for platform in releaseConfig.get('xulrunnerPlatforms', []):
         tag_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
@@ -1604,7 +1600,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     # messages in this case. See Bug 635527 for the details.
     tagging_started_recipients = releaseConfig['AllRecipients'][:]
     if not releaseConfig.get('skip_tag'):
-        tagging_started_recipients.extend(releaseConfig['PassRecipients'])
+        tagging_started_recipients.extend(releaseConfig['ImportantRecipients'])
     for recipient in tagging_started_recipients:
         #send a message when we receive the sendchange and start tagging
         status.append(ChangeNotifier(
@@ -1617,8 +1613,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 changeIsImportant=lambda c: \
                 changeContainsProduct(c, releaseConfig['productName'])
             ))
-    for recipient in releaseConfig['AllRecipients'] + \
-                     releaseConfig['PassRecipients']:
+    for recipient in releaseConfig['AllRecipients']:
         if releaseConfig['productName'] == 'fennec':
             #send a message when android signing is complete
             status.append(ChangeNotifier(
@@ -1636,9 +1631,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     status.append(MailNotifier(
             fromaddr='release@mozilla.com',
             sendToInterestedUsers=False,
-            extraRecipients=releaseConfig['PassRecipients'],
+            extraRecipients=releaseConfig['ImportantRecipients'],
             mode='passing',
-            builders=notify_builders,
+            builders=important_builders,
             relayhost='mail.build.mozilla.org',
             messageFormatter=createReleaseMessage,
         ))

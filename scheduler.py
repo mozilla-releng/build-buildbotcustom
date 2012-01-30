@@ -352,6 +352,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
     compare_attrs = ('name', 'branch', 'builderNames', 'properties',
                      'upstreamBuilders', 'okResults')
+    working = False
 
     def __init__(self, name, branch, builderNames, upstreamBuilders,
                  okResults=(SUCCESS,WARNINGS), properties={}):
@@ -373,6 +374,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
     def _startService(self, t):
         state = self.get_state(t)
+        old_state = state.copy()
         # Remove deleted/renamed upstream builders to prevent undead schedulers
         for b in list(state['remainingBuilders']):
             if b not in self.upstreamBuilders:
@@ -381,6 +383,13 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         for b in self.upstreamBuilders:
             if b not in state['remainingBuilders']:
                 state['remainingBuilders'].append(b)
+        log.msg('%s <id=%s>: reloaded' % (self.__class__.__name__,
+                                          id(self)))
+        if old_state != state:
+            log.msg('%s <id=%s>: old state: %s' % (self.__class__.__name__,
+                                                   id(self), old_state))
+            log.msg('%s <id=%s>: new state: %s' % (self.__class__.__name__,
+                                                   id(self), state))
         self.set_state(t, state)
 
     def trigger(self, ss, set_props=None):
@@ -390,6 +399,8 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
     def _trigger(self, t):
         state = self.get_initial_state(None)
         state['lastReset'] = state['lastCheck']
+        log.msg('%s <id=%s>: reset state: %s' % (self.__class__.__name__,
+                id(self), state))
         self.set_state(t, state)
 
     def run(self):
@@ -414,6 +425,17 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         return t.fetchall()
 
     def _run(self, t):
+        if self.working:
+            log.msg('%s <id=%s>: another instance is still running, skipping.' \
+                    % (self.__class__.__name__, id(self)))
+            return
+        self.working = True
+        try:
+            self.processRequest(t)
+        finally:
+            self.working = False
+
+    def processRequest(self, t):
         db = self.parent.db
         state = self.get_state(t)
         # Check for new builds completed since lastCheck
@@ -435,10 +457,14 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
             ssid = db.get_sourcestampid(ss, t)
 
             # Start a build!
+            log.msg(
+                '%s <id=%s>: new buildset: name=%s, branch=%s, ssid=%s, builders: %s' \
+                % (self.__class__.__name__, id(self), self.name,
+                   self.branch, ssid, ', '.join(self.builderNames)))
             self.create_buildset(ssid, "downstream", t)
 
             # Reset the list of builders we're waiting for
-            state['remainingBuilders'] = self.upstreamBuilders
+            state = self.get_initial_state(None)
 
         self.set_state(t, state)
 

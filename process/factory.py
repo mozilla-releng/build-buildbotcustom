@@ -63,7 +63,6 @@ from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, \
   CompareLeakLogs, Codesighs, GraphServerPost
-from buildbotcustom.steps.transfer import MozillaStageUpload
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.steps.signing import SigningServerAuthenication
@@ -211,6 +210,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['testsUrl'] = m
         elif m.endswith('apk') and 'unsigned-unaligned' in m:
             retval['unsignedApkUrl'] = m
+        elif m.endswith('apk') and 'robocop' in m:
+            retval['robocopApkUrl'] = m
         elif 'jsshell-' in m and m.endswith('.zip'):
             retval['jsshellUrl'] = m
         else:
@@ -514,7 +515,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
              workdir='.',
              timeout=3600, # One hour, because Windows is slow
              extract_fn=parse_purge_builds,
-             log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error)
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error),
+             env=self.env,
             ))
 
     def addPeriodicRebootSteps(self):
@@ -1234,11 +1236,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
             if self.graphServer:
                 self.addBuildInfoSteps()
                 self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
+                gs_env = self.env.copy()
+                gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
                 self.addStep(GraphServerPost(server=self.graphServer,
                                              selector=self.graphSelector,
                                              branch=self.graphBranch,
                                              resultsname=self.baseName,
-                                             env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                             env=gs_env,
                                              propertiesFile="properties.json"))
             else:
                 self.addStep(OutputStep(
@@ -1261,20 +1265,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
           warnOnFailure=True,
           haltOnFailure=True
           ))
-        self.addStep(RetryingShellCommand(
-          name='get_malloc_log',
-          env=self.env,
-          workdir='.',
-          command=['wget', '-O', 'malloc.log.old',
-                   '%s/malloc.log' % baseUrl]
-          ))
-        self.addStep(RetryingShellCommand(
-          name='get_sdleak_log',
-          env=self.env,
-          workdir='.',
-          command=['wget', '-O', 'sdleak.tree.old',
-                   '%s/sdleak.tree' % baseUrl]
-          ))
+
+        # Download and unpack the old versions of malloc.log and sdleak.tree
+        cmd = ['bash', '-c', 
+                WithProperties('tools/buildfarm/utils/wget_unpack.sh ' +
+                               baseUrl + ' logs.tar.gz '+
+                               'malloc.log:malloc.log.old sdleak.tree:sdleak.tree.old') ]
+        self.addStep(ShellCommand(
+            name='get_logs',
+            env=self.env,
+            workdir='.',
+            command=cmd,
+        ))
+
         self.addStep(ShellCommand(
           name='mv_malloc_log',
           env=self.env,
@@ -1301,13 +1304,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
           haltOnFailure=True
           ))
         if self.graphServer and graphAndUpload:
+            gs_env = self.env.copy()
+            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
             self.addBuildInfoSteps()
             self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
             self.addStep(GraphServerPost(server=self.graphServer,
                                          selector=self.graphSelector,
                                          branch=self.graphBranch,
                                          resultsname=self.baseName,
-                                         env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                         env=gs_env,
                                          propertiesFile="properties.json"))
         self.addStep(CompareLeakLogs(
           name='compare_previous_leak_log',
@@ -1357,15 +1362,21 @@ class MercurialBuildFactory(MozillaBuildFactory):
                   haltOnFailure=True
                     ))
         if graphAndUpload:
-            self.addStep(RetryingShellCommand(
-              name='upload_logs',
-              env=self.env,
-              command=['scp', '-o', 'User=%s' % self.stageUsername,
-                       '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-                       '../malloc.log', '../sdleak.tree',
-                       '%s:%s/%s' % (self.stageServer, self.stageBasePath,
-                                     self.logUploadDir)]
-              ))
+            cmd = ['bash', '-c', 
+                    WithProperties('../tools/buildfarm/utils/pack_scp.sh ' +
+                        'logs.tar.gz ' + ' .. ' +
+                        '%s ' % self.stageUsername +
+                        '%s ' % self.stageSshKey +
+                        # Notice the '/' after the ':'. This prevents windows from trying to modify
+                        # the path
+                        '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
+                        self.logUploadDir) +
+                        'malloc.log sdleak.tree') ]
+            self.addStep(ShellCommand(
+                name='upload_logs',
+                env=self.env,
+                command=cmd,
+                ))
         self.addStep(ShellCommand(
           name='compare_sdleak_tree',
           env=self.env,
@@ -1646,12 +1657,18 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir=codesighs_dir,
          sb=self.use_scratchbox,
         ))
-        self.addStep(RetryingShellCommand(
-         name='get_codesize_log',
-         command=['wget', '-O', 'codesize-auto-old.log', '%s/codesize-auto.log' % self.logBaseUrl],
-         workdir='.',
-         env=self.env
+
+        cmd = ['/bin/bash', '-c', 
+                WithProperties('%(toolsdir)s/buildfarm/utils/wget_unpack.sh ' +
+                               self.logBaseUrl + ' codesize-auto.tar.gz '+
+                               'codesize-auto.log:codesize-auto.log.old') ]
+        self.addStep(ShellCommand(
+            name='get_codesize_logs',
+            env=self.env,
+            workdir='.',
+            command=cmd,
         ))
+
         if self.mozillaDir == '':
             codesighsObjdir = self.objdir
         else:
@@ -1667,28 +1684,37 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
         if self.graphServer:
+            gs_env = self.env.copy()
+            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
             self.addBuildInfoSteps()
             self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
             self.addStep(GraphServerPost(server=self.graphServer,
                                          selector=self.graphSelector,
                                          branch=self.graphBranch,
                                          resultsname=self.baseName,
-                                         env={'PYTHONPATH': [WithProperties('%(toolsdir)s/lib/python')]},
+                                         env=gs_env,
                                          propertiesFile="properties.json"))
         self.addStep(ShellCommand(
          name='echo_codesize_log',
          command=['cat', '../codesize-auto-diff.log'],
          workdir='build%s' % self.mozillaDir
         ))
-        self.addStep(RetryingShellCommand(
-         name='upload_codesize_log',
-         command=['scp', '-o', 'User=%s' % self.stageUsername,
-          '-o', 'IdentityFile=~/.ssh/%s' % self.stageSshKey,
-          '../codesize-auto.log',
-          '%s:%s/%s' % (self.stageServer, self.stageBasePath,
-                        self.logUploadDir)],
-         workdir='build%s' % self.mozillaDir
-        ))
+
+        cmd = ['/bin/bash', '-c', 
+                WithProperties('../tools/buildfarm/utils/pack_scp.sh ' +
+                    'codesize-auto.tar.gz ' + ' .. ' +
+                    '%s ' % self.stageUsername +
+                    '%s ' % self.stageSshKey +
+                    # Notice the '/' after the ':'. This prevents windows from trying to modify
+                    # the path
+                    '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
+                        self.logUploadDir) +
+                    'codesize-auto.log') ]
+        self.addStep(ShellCommand(
+            name='upload_codesize_logs',
+            command=cmd,
+            workdir='build%s' % self.mozillaDir
+            ))
 
     def addCreateSnippetsSteps(self, milestone_extra=''):
         if 'android' in self.complete_platform:
@@ -3821,11 +3847,11 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
     # Repeated here since the Parent classes fail hgtool/checkouts due to
     # relbranch issues, and not actually having the tag after clone
     def getSources(self):
-        self.addStep(MercurialCloneCommand,
+        self.addStep(MercurialCloneCommand(
          name='get_enUS_src',
          command=['sh', '-c',
           WithProperties('if [ -d '+self.origSrcDir+'/.hg ]; then ' +
-                         'hg -R '+self.origSrcDir+' pull ;'+
+                         'hg -R '+self.origSrcDir+' pull && '+
                          'hg -R '+self.origSrcDir+' up -C ;'+
                          'else ' +
                          'hg clone ' +
@@ -3837,8 +3863,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
          workdir=self.baseWorkDir,
          haltOnFailure=True,
          timeout=30*60 # 30 minutes
-        )
-        self.addStep(MercurialCloneCommand,
+        ))
+        self.addStep(MercurialCloneCommand(
          name='get_locale_src',
          command=['sh', '-c',
           WithProperties('if [ -d %(locale)s/.hg ]; then ' +
@@ -3853,7 +3879,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
          timeout=10*60, # 10 minutes
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
-        )
+        ))
         # build up the checkout command with all options
         co_command = ['python', 'client.py', 'checkout',
                       WithProperties('--comm-rev=%(en_revision)s')]
@@ -3880,14 +3906,14 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             co_command.append('--venkman-rev=%s' % self.buildRevision)
             co_command.append('--chatzilla-rev=%s' % self.buildRevision)
         # execute the checkout
-        self.addStep(ShellCommand,
+        self.addStep(ShellCommand(
          command=co_command,
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=60*60*3 # 3 hours (crazy, but necessary for now)
-        )
+        ))
 
     def updateSources(self):
         self.addStep(ShellCommand(
@@ -3911,37 +3937,37 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                      workdir=WithProperties('build/' + self.l10nRepoPath + 
                                             '/%(locale)s')
         ))
-        self.addStep(ShellCommand,
+        self.addStep(ShellCommand(
          command=['hg', 'up', '-C', '-r', self.buildRevision],
          workdir='build/'+self.mozillaSrcDir,
          description=['update mozilla',
                       'to %s' % self.buildRevision],
          haltOnFailure=True
-        )
+        ))
         if self.venkmanRepoPath:
-            self.addStep(ShellCommand,
+            self.addStep(ShellCommand(
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/venkman',
              description=['update venkman',
                           'to %s' % self.buildRevision],
              haltOnFailure=True
-            )
+            ))
         if self.inspectorRepoPath:
-            self.addStep(ShellCommand,
+            self.addStep(ShellCommand(
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/inspector',
              description=['update inspector',
                           'to %s' % self.buildRevision],
              haltOnFailure=True
-            )
+            ))
         if self.chatzillaRepoPath:
-            self.addStep(ShellCommand,
+            self.addStep(ShellCommand(
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/irc',
              description=['update chatzilla',
                           'to %s' % self.buildRevision],
              haltOnFailure=True
-            )
+            ))
 
     def preClean(self):
         # We need to know the absolute path to the input builds when we repack,
@@ -4908,7 +4934,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             self.uploadMars()
         self.uploadSnippets()
         self.verifySnippets()
-        self.wait()
         self.trigger()
 
     def setChannelData(self):
@@ -5234,7 +5259,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 self.addStep(RetryingShellCommand(
                  name='backupsnip',
                  command=['bash', '-c',
-                          'ssh -l %s ' %  self.ausUser +
+                          'ssh -t -l %s ' %  self.ausUser +
                           '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
                           '~/bin/backupsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
@@ -5244,10 +5269,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 self.addStep(RetryingShellCommand(
                  name='pushsnip',
                  command=['bash', '-c',
-                          'ssh -l %s ' %  self.ausUser +
+                          'ssh -t -l %s ' %  self.ausUser +
                           '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
                           '~/bin/pushsnip %s' % remoteDir],
-                 timeout=3600, # 1 hour
+                 timeout=7200, # 2 hours
                  description=['pushsnip'],
                  haltOnFailure=True
                 ))
@@ -5262,13 +5287,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 dir2=self.channels[chan2]['dir'],
                 workdir=self.updateDir
             ))
-
-    def wait(self):
-        self.addStep(ShellCommand(
-         name='wait_for_nfs_cache',
-         command=['sleep', '360'],
-         description=['wait for nfs cache', 'to expire']
-        ))
 
     def trigger(self):
         if self.triggerSchedulers:
@@ -5851,6 +5869,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.mochitest_leak_threshold = mochitest_leak_threshold
         self.mochichrome_leak_threshold = mochichrome_leak_threshold
         self.mochibrowser_leak_threshold = mochibrowser_leak_threshold
+        self.crashtest_leak_threshold = crashtest_leak_threshold
         self.exec_xpcshell_suites = exec_xpcshell_suites
         self.exec_reftest_suites = exec_reftest_suites
         self.exec_mochi_suites = exec_mochi_suites
@@ -6101,7 +6120,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             )
             self.addStep(unittest_steps.MozillaReftest, warnOnWarnings=True,
              test_name="crashtest",
-             leakThreshold=crashtest_leak_threshold,
+             leakThreshold=self.crashtest_leak_threshold,
              workdir="build/%s" % self.objdir,
             )
 
