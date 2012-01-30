@@ -7093,6 +7093,31 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/%s' % self.productName,
             name='unpack_build',
         ))
+        def get_robocop_url(build):
+            '''We assume 'robocop.apk' is in same directory as the
+            main apk, so construct url based on the build_url property
+            set when we downloaded that.
+            '''
+            build_url = build.getProperty('build_url')
+            build_url = build_url[:build_url.rfind('/')]
+            robocop_url = build_url + '/robocop.apk'
+            return robocop_url
+
+        # the goal of bug 715215 is to download robocop.apk if we
+        # think it will be needed. We can tell that by the platform
+        # being 'android' and 'robocop' being mentioned in the suite
+        # name. (The suite name must include 'robocop', as that data
+        # driven feature is used to append the robocop options to a
+        # command line.)
+        if self.platform == "android" and 'robocop' in self.suites[0]['suite']:
+            self.addStep(DownloadFile(
+                url_fn=get_robocop_url,
+                filename_property='robocop_filename',
+                url_property='robocop_url',
+                haltOnFailure=True,
+                ignore_certs=self.ignoreCerts,
+                name='download_robocop',
+            ))
         self.addStep(SetBuildProperty(
          property_name="exedir",
          value=self.productName

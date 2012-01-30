@@ -314,6 +314,8 @@ class MochitestMixin(object):
             return ['--setpref=dom.ipc.plugins.enabled=false',
                     '--setpref=dom.ipc.plugins.enabled.x86_64=false',
                     '--%s' % variant]
+        elif variant == 'robocop':
+            return ['--robocop=mochitest/robocop.ini']
         elif variant != 'plain':
             return ['--%s' % variant]
         else:
