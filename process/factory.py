@@ -318,6 +318,7 @@ def getPlatformMinidumpPath(platform):
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
+        # Android uses OSX because the Foopies are OSX.
         'linux-android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android-xul': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
