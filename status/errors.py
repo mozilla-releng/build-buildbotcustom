@@ -25,3 +25,12 @@ upload_errors = ((re.compile("Connection timed out"), RETRY),
                  (re.compile("Connection refused"), RETRY),
                  (re.compile("Connection reset by peer"), RETRY),
                 )
+
+tegra_errors = (
+    (re.compile("process killed by signal 9"), RETRY), # bug 
+    (re.compile("process killed by signal 15"), RETRY), # bug 
+    (re.compile("FAIL: failed to initialize browser"), RETRY), # bug 686085
+    (re.compile("FAIL: timeout exceeded"), EXCEPTION), # bug 675297
+    (re.compile("command timed out: 1200 seconds without output, killing pid"), RETRY), # bug 
+    (re.compile("Timed out while waiting for server startup."), RETRY), # bug 687098
+   )
