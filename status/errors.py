@@ -6,7 +6,7 @@ global_errors = ((re.compile("No space left on device"), RETRY),
                  (re.compile("Remote Device Error"), RETRY),
                  (re.compile("devicemanager.DMError"), RETRY),
                  (re.compile("Connection to the other side was lost in a non-clean fashion"), RETRY),
-                 (re.compile("program finished with exit code 80", RETRY)),
+                 (re.compile("program finished with exit code 80"), RETRY),
                 )
 hg_errors = ((re.compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re.compile("abort: .*: no match found!"), RETRY),
