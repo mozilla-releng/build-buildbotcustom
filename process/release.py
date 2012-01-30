@@ -1435,14 +1435,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if platform in releaseConfig['notifyPlatforms']:
             important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
+            l10nBuilderNames = l10nBuilders(platform).values()
             repack_scheduler = Triggerable(
                 name=builderPrefix('%s_repack' % platform),
-                builderNames=l10nBuilders(platform).values(),
+                builderNames=l10nBuilderNames,
             )
             schedulers.append(repack_scheduler)
-            repack_complete_scheduler = Dependent(
+            repack_complete_scheduler = AggregatingScheduler(
                 name=builderPrefix('%s_repack_complete' % platform),
-                upstream=repack_scheduler,
+                branch=builderPrefix('%s_repack_complete' % platform),
+                upstreamBuilders=l10nBuilderNames,
                 builderNames=[builderPrefix('repack_complete', platform),]
             )
             schedulers.append(repack_complete_scheduler)
