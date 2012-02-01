@@ -1040,7 +1040,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=60*60 # 1 hour
             ))
         pkg_patterns = []
-        for product in ('firefox-', 'fennec'):
+        for product in ('firefox-', 'fennec', 'seamonkey'):
             pkg_patterns.append('%s/dist/%s*' % (self.mozillaObjdir,
                                                   product))
 
@@ -2059,41 +2059,22 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 slavedest="buildprops.json",
                 workdir='.'
             ))
+
+            stepCC = self.makeHgtoolStep(
+                wc='build',
+                workdir='.',
+                rev=comm_rev,
+                )
+            self.addStep(stepCC)
             
-            env = self.env.copy()
-            env['PROPERTIES_FILE'] = 'buildprops.json'
-            cc_cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    self.getRepository(self.repoPath),
-                    '-r', comm_rev,
-                    'build',
-                    ]
-            self.addStep(ShellCommand(
-                name='hg_update',
-                command=cc_cmd,
-                timeout=60*60,
-                env=env,
+            stepMC = self.makeHgtoolStep(
+                name="moz_hg_update",
+                wc='build%s' % self.mozillaDir,
                 workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
-            moz_cmd = [
-                    'python',
-                    WithProperties("%(toolsdir)s/buildfarm/utils/hgtool.py"),
-                    self.getRepository(self.mozRepoPath),
-                    '-r', moz_rev,
-                    'build%s' % self.mozillaDir,
-                    ]
-            self.addStep(ShellCommand(
-                name='moz_hg_update',
-                command=moz_cmd,
-                timeout=60*60,
-                env=env,
-                workdir='.',
-                haltOnFailure=True,
-                flunkOnFailure=True,
-            ))
+                rev=moz_rev,
+                repo_url=self.getRepository(self.mozRepoPath),
+                )
+            self.addStep(stepMC)
         else:
             self.addStep(Mercurial(
                 name='hg_update',
@@ -2115,7 +2096,13 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          command=['hg', 'identify', '-i'],
          property='got_revision'
         ))
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
+        #Fix for bug 612319 to correct http://ssh:// changeset links
+        if self.hgHost[0:5] == "ssh://":
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
+                                                           self.repoPath)
+        else: 
+            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+                                                          self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
@@ -2161,11 +2148,22 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          workdir='build%s' % self.mozillaDir,
          property='hg_revision'
         ))
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
+        #Fix for bug 612319 to correct http://ssh:// changeset links
+        if self.hgHost[0:5] == "ssh://":
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
+                                                           self.mozRepoPath)
+        else: 
+            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+                                                          self.mozRepoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
+        ))
+        self.addStep(SetBuildProperty(
+            name='set_comments',
+            property_name="comments",
+            value=lambda build:build.source.changes[-1].comments if len(build.source.changes) > 0 else "",
         ))
 
     def addUploadSteps(self, pkgArgs=None):
@@ -3984,7 +3982,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                         '/pub/mozilla.org/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
                                                     self.buildNumber)
-        longVersion = self.makeLongVersion(self.version)
 
         # This block sets platform specific data that our wget command needs.
         #  build is mapping between the local and remote filenames
@@ -4001,7 +3998,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         elif self.platform.startswith('macosx'):
             filename = '%s.dmg' % self.project
             builds[filename] = '%s %s.dmg' % (self.brandName,
-                                              longVersion)
+                                              self.version)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
         elif self.platform.startswith('win32'):
             platformDir = 'unsigned/' + platformDir
@@ -4009,7 +4006,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             instname = '%s.exe' % self.project
             builds[filename] = '%s-%s.zip' % (self.project, self.version)
             builds[instname] = '%s Setup %s.exe' % (self.brandName,
-                                                    longVersion)
+                                                    self.version)
             self.env['ZIP_IN'] = WithProperties('%(srcdir)s/' + filename)
             self.env['WIN32_INSTALLER_IN'] = \
               WithProperties('%(srcdir)s/' + instname)
