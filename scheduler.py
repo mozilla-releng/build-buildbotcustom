@@ -404,6 +404,11 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         self.set_state(t, state)
 
     def run(self):
+        if self.working:
+            log.msg('%s <id=%s>: another instance is still running, skipping.' \
+                    % (self.__class__.__name__, id(self)))
+            return
+        self.working = True
         d = self.parent.db.runInteraction(self._run)
         return d
 
@@ -425,11 +430,6 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         return t.fetchall()
 
     def _run(self, t):
-        if self.working:
-            log.msg('%s <id=%s>: another instance is still running, skipping.' \
-                    % (self.__class__.__name__, id(self)))
-            return
-        self.working = True
         try:
             self.processRequest(t)
         finally:

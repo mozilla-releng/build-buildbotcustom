@@ -50,7 +50,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-  upload_errors
+  upload_errors, tegra_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -318,6 +318,7 @@ def getPlatformMinidumpPath(platform):
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
+        # Android uses OSX because the Foopies are OSX.
         'linux-android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android-xul': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
@@ -1266,7 +1267,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         # Download and unpack the old versions of malloc.log and sdleak.tree
         cmd = ['bash', '-c', 
-                WithProperties('tools/buildfarm/utils/wget_unpack.sh ' +
+                WithProperties('%(toolsdir)s/buildfarm/utils/wget_unpack.sh ' +
                                baseUrl + ' logs.tar.gz '+
                                'malloc.log:malloc.log.old sdleak.tree:sdleak.tree.old') ]
         self.addStep(ShellCommand(
@@ -1361,7 +1362,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                     ))
         if graphAndUpload:
             cmd = ['bash', '-c', 
-                    WithProperties('../tools/buildfarm/utils/pack_scp.sh ' +
+                    WithProperties('%(toolsdir)s/buildfarm/utils/pack_scp.sh ' +
                         'logs.tar.gz ' + ' .. ' +
                         '%s ' % self.stageUsername +
                         '%s ' % self.stageSshKey +
@@ -1699,7 +1700,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
         cmd = ['/bin/bash', '-c', 
-                WithProperties('../tools/buildfarm/utils/pack_scp.sh ' +
+                WithProperties('%(toolsdir)s/buildfarm/utils/pack_scp.sh ' +
                     'codesize-auto.tar.gz ' + ' .. ' +
                     '%s ' % self.stageUsername +
                     '%s ' % self.stageSshKey +
@@ -7045,14 +7046,17 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/hostutils',
             name='unpack_hostutils',
         ))
-        self.addStep(ShellCommand(
+        self.addStep(RetryingShellCommand(
             name='cleanup device',
             workdir='.',
             description="Cleanup Device",
             command=['python', '/builds/sut_tools/cleanup.py',
                      WithProperties("%(sut_ip)s"),
                     ],
-            haltOnFailure=True)
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+            )
         )
         self.addStep(ShellCommand(
             name='install app on device',
@@ -7374,7 +7378,7 @@ class TalosFactory(RequestSortingBuildFactory):
          env=self.env)
         )
         if self.remoteTests:
-            self.addStep(ShellCommand(
+            self.addStep(RetryingShellCommand(
                 name='cleanup device',
                 workdir=self.workdirBase,
                 description="Cleanup Device",
@@ -7382,8 +7386,10 @@ class TalosFactory(RequestSortingBuildFactory):
                          WithProperties("%(sut_ip)s"),
                         ],
                 env=self.env,
-                haltOnFailure=True)
-            )
+                haltOnFailure=True,
+                flunkOnFailure=True,
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+            ))
         if not self.remoteTests:
             self.addStep(DownloadFile(
              url=WithProperties("%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase),
