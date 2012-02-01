@@ -1,11 +1,8 @@
 import re, os, time, copy
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, worst_status
-from buildbot.process.buildstep import regex_log_evaluator
 
-from buildbotcustom.steps.base import ShellCommand, RetryingShellCommand
-from buildbotcustom.status.errors import tegra_errors
-
+from buildbotcustom.steps.base import ShellCommand
 
 class MozillaUpdateConfig(ShellCommand):
     """Configure YAML file for run_tests.py"""
@@ -96,15 +93,12 @@ class MozillaUpdateConfig(ShellCommand):
             self.setProperty("configFile", configFileMatch.group(1))
         return SUCCESS
 
-class MozillaRunPerfTests(RetryingShellCommand):
+class MozillaRunPerfTests(ShellCommand):
     """Run the performance tests"""
     name = "Run performance tests"
-    def __init__(self, log_eval_func=None, **kwargs):
-        self.super_class = RetryingShellCommand
-        if not log_eval_func:
-            log_eval_func = lambda c,s: regex_log_evaluator(c, s, tegra_errors)
-        RetryingShellCommand.__init__(self, log_eval_func=log_eval_func, 
-                                      **kwargs)
+    def __init__(self, **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
 
     def createSummary(self, log):
         summary = []
