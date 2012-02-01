@@ -27,12 +27,10 @@
 
 import re
 
-from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, HEADER, worst_status
 
-from buildbotcustom.steps.base import ShellCommand, RetryingShellCommand
-from buildbotcustom.status.errors import tegra_errors
+from buildbotcustom.steps.base import ShellCommand
 
 cvsCoLog = "cvsco.log"
 tboxClobberCvsCoLog = "tbox-CLOBBER-cvsco.log"
@@ -881,43 +879,17 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
         return SUCCESS
 
 
-class RemoteMochitestStep(MochitestMixin, ChunkingMixin, RetryingShellCommand):
+class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, variant, symbols_path=None, testPath=None,
                  xrePath='../hostutils/xre', testManifest=None,
                  utilityPath='../hostutils/bin', certificatePath='certs',
                  app='org.mozilla.fennec', consoleLevel='INFO', 
-                 totalChunks=None, thisChunk=None,
-                 log_eval_func=None, **kwargs):
+                 totalChunks=None, thisChunk=None, **kwargs):
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
 
         if totalChunks:
             assert 1 <= thisChunk <= totalChunks
-
-        self.name = 'mochitest-%s' % variant
-        command = ['python', 'mochitest/runtestsremote.py',
-                   '--deviceIP', WithProperties('%(sut_ip)s'),
-                   '--xre-path', xrePath,
-                   '--utility-path', utilityPath,
-                   '--certificate-path', certificatePath,
-                   '--app', app,
-                   '--console-level', consoleLevel,
-                   '--http-port', WithProperties('%(http_port)s'),
-                   '--ssl-port', WithProperties('%(ssl_port)s'),
-                   '--pidfile', WithProperties('%(basedir)s/../runtestsremote.pid')
-                   ]
-        command.extend(self.getVariantOptions(variant))
-        if testPath:
-            command.extend(['--test-path', testPath])
-        if testManifest:
-            command.extend(['--run-only-tests', testManifest])
-        if symbols_path:
-            command.append(WithProperties("--symbols-path=../%s" % symbols_path))
-        command.extend(self.getChunkOptions(totalChunks, thisChunk))
-
-        self.super_class = RetryingShellCommand
-        if not log_eval_func:
-            log_eval_func = lambda c,s: regex_log_evaluator(c, s, tegra_errors)
-        RetryingShellCommand.__init__(self, command=command,
-                                      log_eval_func=log_eval_func, **kwargs)
 
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
                                  testPath=testPath, xrePath=xrePath,
@@ -925,6 +897,27 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, RetryingShellCommand):
                                  certificatePath=certificatePath, app=app,
                                  consoleLevel=consoleLevel,
                                  totalChunks=totalChunks, thisChunk=thisChunk)
+
+        self.name = 'mochitest-%s' % variant
+        self.command = ['python', 'mochitest/runtestsremote.py',
+                        '--deviceIP', WithProperties('%(sut_ip)s'),
+                        '--xre-path', xrePath,
+                        '--utility-path', utilityPath,
+                        '--certificate-path', certificatePath,
+                        '--app', app,
+                        '--console-level', consoleLevel,
+                        '--http-port', WithProperties('%(http_port)s'),
+                        '--ssl-port', WithProperties('%(ssl_port)s'),
+                        '--pidfile', WithProperties('%(basedir)s/../runtestsremote.pid')
+                       ]
+        self.command.extend(self.getVariantOptions(variant))
+        if testPath:
+            self.command.extend(['--test-path', testPath])
+        if testManifest:
+            self.command.extend(['--run-only-tests', testManifest])
+        if symbols_path:
+            self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
+        self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
 
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
@@ -941,38 +934,36 @@ class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
                                        superResult)
 
 
-class RemoteReftestStep(ReftestMixin, ChunkingMixin, RetryingShellCommand):
+class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, xrePath='../hostutils/xre',
                  utilityPath='../hostutils/bin', app='org.mozilla.fennec',
-                 totalChunks=None, thisChunk=None, cmdOptions=None,
-                 log_eval_func=None, **kwargs):
-        self.name = suite
-        if totalChunks:
-            self.name += '-%i' % thisChunk
-        command = ['python', 'reftest/remotereftest.py',
-                   '--deviceIP', WithProperties('%(sut_ip)s'),
-                   '--xre-path', xrePath,
-                   '--utility-path', utilityPath,
-                   '--app', app,
-                   '--http-port', WithProperties('%(http_port)s'),
-                   '--ssl-port', WithProperties('%(ssl_port)s'),
-                   '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
-                   '--enable-privilege'
-                   ]
-        if cmdOptions:
-            command.extend(cmdOptions)
-        command.extend(self.getChunkOptions(totalChunks, thisChunk))
-        command.extend(self.getSuiteOptions(suite))
-
-        if symbols_path:
-            command.append(WithProperties("--symbols-path=../%s" % symbols_path))
-        self.super_class = RetryingShellCommand
-        if not log_eval_func:
-            log_eval_func = lambda c,s: regex_log_evaluator(c, s, tegra_errors)
-        RetryingShellCommand.__init__(self, command=command, log_eval_func=log_eval_func, **kwargs)
-
+                 totalChunks=None, thisChunk=None, cmdOptions=None, **kwargs):
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(suite=suite, xrePath=xrePath,
                                  symbols_path=symbols_path,
                                  utilityPath=utilityPath, app=app,
                                  totalChunks=totalChunks, thisChunk=thisChunk,
                                  cmdOptions=cmdOptions)
+
+        self.name = suite
+        if totalChunks:
+            self.name += '-%i' % thisChunk
+        self.command = ['python', 'reftest/remotereftest.py',
+                        '--deviceIP', WithProperties('%(sut_ip)s'),
+                        '--xre-path', xrePath,
+                        '--utility-path', utilityPath,
+                        '--app', app,
+                        '--http-port', WithProperties('%(http_port)s'),
+                        '--ssl-port', WithProperties('%(ssl_port)s'),
+                        '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
+                        '--enable-privilege'
+                       ]
+        if cmdOptions:
+          self.command.extend(cmdOptions)
+        self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
+        self.command.extend(self.getSuiteOptions(suite))
+
+        if symbols_path:
+            self.command.append(WithProperties("--symbols-path=../%s" % symbols_path))
+
