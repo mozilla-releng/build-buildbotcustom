@@ -7550,7 +7550,8 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.customTalos is None and not self.remoteTests:
             if self.talos_from_source_code:
                 self.addStep(DownloadFile(
-                    url=WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py"),
+                    url=WithProperties("%s/tools/scripts/talos/talos_from_code.py" % \
+                                       self.supportUrlBase),
                     workdir=self.workdirBase,
                     haltOnFailure=True,
                 ))
