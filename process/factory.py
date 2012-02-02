@@ -7521,44 +7521,6 @@ class TalosFactory(RequestSortingBuildFactory):
          name='get build info',
         ))
 
-        if self.productName == 'fennec':
-            # Figure out which platform revision we're running
-            def get_build_info(rc, stdout, stderr):
-                retval = {'mozilla_repository': None,
-                          'mozilla_changeset': None,
-                          'mozilla_buildid': None,
-                         }
-                stdout = "\n".join([stdout, stderr])
-                m = re.search("^BuildID\s*=\s*(\w+)", stdout, re.M)
-                if m:
-                    retval['mozilla_buildid'] = m.group(1)
-                m = re.search("^SourceStamp\s*=\s*(.*)", stdout, re.M)
-                if m:
-                    retval['mozilla_changeset'] = m.group(1).strip()
-                m = re.search("^SourceRepository\s*=\s*(\S+)", stdout, re.M)
-                if m:
-                    retval['mozilla_repository'] = m.group(1)
-                return retval
-
-            self.addStep(SetProperty(
-             command=['cat', WithProperties('%(exedir)s/platform.ini')],
-             workdir=os.path.join(self.workdirBase, "talos"),
-             extract_fn=get_build_info,
-             name='get platform build info',
-            ))
-
-            self.addStep(ShellCommand(
-                command=['echo', 'TinderboxPrint:',
-                         WithProperties('<a href=%(mozilla_repository)s/rev/%(mozilla_changeset)s ' +
-                                        'title="Built from Mozilla revision %(mozilla_changeset)s">' +
-                                        'moz:%(mozilla_changeset)s</a> <br />' +
-                                        '<a href=%(repo_path)s/rev/%(revision)s ' +
-                                        'title="Built from Mobile revision %(revision)s">' +
-                                        'mobile:%(revision)s</a>')],
-                description=['list', 'revisions'],
-                name='rev_info',
-            ))
-
         def check_sdk(cmd, step):
             txt = cmd.logs['stdio'].getText()
             m = re.search("MacOSX10\.5\.sdk", txt, re.M)
@@ -7593,9 +7555,9 @@ class TalosFactory(RequestSortingBuildFactory):
                     haltOnFailure=True,
                 ))
                 self.addStep(ShellCommand(
-                    name='retrieve specified talos.zip in talos.json',
+                    name='download files specified in talos.json',
                     command=[self.pythonWithSimpleJson(self.OS), 'talos_from_code.py', \
-                            '--talos_json_url', \
+                            '--talos-json-url', \
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
                     haltOnFailure=True,
@@ -7606,17 +7568,17 @@ class TalosFactory(RequestSortingBuildFactory):
                   workdir=self.workdirBase,
                   haltOnFailure=True,
                 ))
+                self.addStep(DownloadFile(
+                 url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
+                 workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+                 haltOnFailure=True,
+                 ))
 
             self.addStep(UnpackFile(
              filename='talos.zip',
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
-            self.addStep(DownloadFile(
-             url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
-             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
-             haltOnFailure=True,
-             ))
         elif self.remoteTests:
             self.addStep(ShellCommand(
              name='copy_talos',
