@@ -7559,9 +7559,9 @@ class TalosFactory(RequestSortingBuildFactory):
                     haltOnFailure=True,
                 ))
                 self.addStep(ShellCommand(
-                    name='retrieve specified talos.zip in talos.json',
+                    name='download files specified in talos.json',
                     command=[self.pythonWithSimpleJson(self.OS), 'talos_from_code.py', \
-                            '--talos_json_url', \
+                            '--talos-json-url', \
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
                     haltOnFailure=True,
@@ -7572,17 +7572,17 @@ class TalosFactory(RequestSortingBuildFactory):
                   workdir=self.workdirBase,
                   haltOnFailure=True,
                 ))
+                self.addStep(DownloadFile(
+                 url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
+                 workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+                 haltOnFailure=True,
+                 ))
 
             self.addStep(UnpackFile(
              filename='talos.zip',
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
-            self.addStep(DownloadFile(
-             url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
-             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
-             haltOnFailure=True,
-             ))
         elif self.remoteTests:
             self.addStep(ShellCommand(
              name='copy_talos',
