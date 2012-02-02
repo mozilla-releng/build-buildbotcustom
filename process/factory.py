@@ -7558,8 +7558,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.customTalos is None and not self.remoteTests:
             if self.talos_from_source_code:
                 self.addStep(DownloadFile(
-                    url=WithProperties("%s/tools/scripts/talos/talos_from_code.py" % \
-                                       self.supportUrlBase),
+                    url="https://hg.mozilla.org/build/tools/raw-file/default/scripts/talos/talos_from_code.py",
                     workdir=self.workdirBase,
                     haltOnFailure=True,
                 ))
