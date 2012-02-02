@@ -83,6 +83,9 @@ hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 
 hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
 
+# Limit ourselves to uploading 4 things at a time
+upload_lock = locks.MasterLock("upload_lock", maxCount=4)
+
 SIGNING_SERVER_CERT = os.path.join(
     os.path.dirname(build.paths.__file__),
     '../../../release/signing/host.cert')
@@ -1999,6 +2002,7 @@ class TryBuildFactory(MercurialBuildFactory):
              description=["upload"],
              timeout=40*60, # 40 minutes
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+             locks=[upload_lock.access('counting')],
         ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2555,6 +2559,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
              description=["upload"],
              timeout=60*60, # 60 minutes
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+             locks=[upload_lock.access('counting')],
             ))
         else:
             objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
@@ -2571,6 +2576,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 sb=self.use_scratchbox,
                 timeout=40*60, # 40 minutes
                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+                locks=[upload_lock.access('counting')],
             ))
 
         if self.profiledBuild and self.branchName not in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
@@ -3226,6 +3232,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=True,
          flunkOnFailure=True,
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+         locks=[upload_lock.access('counting')],
         ))
 
     def getSources(self):
@@ -5819,6 +5826,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
              haltOnFailure=True,
              description=['upload'],
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+             locks=[upload_lock.access('counting')],
             ))
 
             for master, warn, retries in self.unittestMasters:
