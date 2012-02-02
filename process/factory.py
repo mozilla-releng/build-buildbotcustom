@@ -7561,6 +7561,7 @@ class TalosFactory(RequestSortingBuildFactory):
                     url="https://hg.mozilla.org/build/tools/raw-file/default/scripts/talos/talos_from_code.py",
                     workdir=self.workdirBase,
                     haltOnFailure=True,
+                    wget_args=['--progress=dot:mega', '--no-check-certificate']
                 ))
                 self.addStep(ShellCommand(
                     name='download files specified in talos.json',
