@@ -303,7 +303,7 @@ def setReservedFileName(filename):
 def _nextFastReservedSlave(builder, available_slaves, only_fast=True):
     return _nextFastSlave(builder, available_slaves, only_fast, reserved=True)
 
-def _nextL10nSlave(n=8):
+def _nextL10nSlave(n=4):
     """Return a nextSlave function that restricts itself to choosing amongst
     the first n connnected slaves.  If there aren't enough slow slaves,
     fallback to using fast slaves."""
