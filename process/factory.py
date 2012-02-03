@@ -517,7 +517,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
              timeout=3600, # One hour, because Windows is slow
              extract_fn=parse_purge_builds,
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error),
-             env=self.env,
+             #env=self.env, #XXX Breaks SeaMonkey Repacks on old system
             ))
 
     def addPeriodicRebootSteps(self):
