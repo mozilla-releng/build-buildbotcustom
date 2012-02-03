@@ -1066,13 +1066,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptName='scripts/release/push-to-mirrors.sh',
         )
 
-        push_to_mirrors_factory.addStep(Trigger(
-            schedulerNames=[builderPrefix('ready-for-rel-test'),
-                            builderPrefix('ready-for-release')],
-            copy_properties=['script_repo_revision', 'release_config']
-        ))
-
-
         builders.append({
             'name': builderPrefix('push_to_mirrors'),
             'slavenames': unix_slaves,
@@ -1083,6 +1076,30 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'env': builder_env,
             'properties': {
                 'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs')),
+                'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
+                },
+        })
+
+    if not releaseConfig.get('disableBouncerEntries'):
+        trigger_uptake_factory = BuildFactory()
+        schedulerNames = [builderPrefix('ready-for-release')]
+        if releaseConfig.get('verifyConfigs'):
+            schedulerNames.append(builderPrefix('ready-for-rel-test'))
+        trigger_uptake_factory.addStep(Trigger(
+            schedulerNames=schedulerNames,
+            copy_properties=['script_repo_revision', 'release_config']
+        ))
+        builders.append({
+            'name': builderPrefix('start_uptake_monitoring'),
+            'slavenames': all_slaves,
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('start_uptake_monitoring'),
+            'slavebuilddir': reallyShort(builderPrefix('st_uptake')),
+            'factory': trigger_uptake_factory,
+            'env': builder_env,
+            'properties': {
+                'slavebuilddir': reallyShort(builderPrefix('st_uptake')),
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
                 },
@@ -1490,17 +1507,20 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         schedulers.append(s)
 
     if not releaseConfig.get('disableBouncerEntries'):
-        mirror_scheduler1 = TriggerBouncerCheck(
-            name=builderPrefix('ready-for-rel-test'),
-            configRepo=config_repo,
-            minUptake=releaseConfig.get('releasetestUptake', 3),
-            builderNames=[builderPrefix('ready_for_releasetest_testing')] + \
-                          [builderPrefix('final_verification', platform)
-                           for platform in releaseConfig.get('verifyConfigs', {}).keys()],
-            username=BuildSlaves.tuxedoUsername,
-            password=BuildSlaves.tuxedoPassword)
+        if releaseConfig.get('verifyConfigs'):
+            mirror_scheduler1 = TriggerBouncerCheck(
+                name=builderPrefix('ready-for-rel-test'),
+                configRepo=config_repo,
+                minUptake=releaseConfig.get('releasetestUptake', 3),
+                builderNames=[
+                    builderPrefix('ready_for_releasetest_testing')] + \
+                        [builderPrefix('final_verification', platform)
+                         for platform in
+                         releaseConfig.get('verifyConfigs', {}).keys()],
+                username=BuildSlaves.tuxedoUsername,
+                password=BuildSlaves.tuxedoPassword)
 
-        schedulers.append(mirror_scheduler1)
+            schedulers.append(mirror_scheduler1)
 
         mirror_scheduler2 = TriggerBouncerCheck(
             name=builderPrefix('ready-for-release'),
@@ -1571,6 +1591,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 upstreamBuilders=[builderPrefix('repack_complete', platform)],
                 builderNames=[builderPrefix('partner_repack', platform)],
             ))
+    if not releaseConfig.get('disablePushToMirrors'):
+        upstream_builders = [builderPrefix('push_to_mirrors')]
+        if releaseConfig.get('verifyConfigs'):
+            upstream_builders.append(builderPrefix('updates'))
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix('%s_uptake_check' % releaseConfig['productName']),
+            branch=builderPrefix('%s_uptake_check' % releaseConfig['productName']),
+            upstreamBuilders=upstream_builders,
+            builderNames=[builderPrefix('start_uptake_monitoring')]
+        ))
 
     # This builder should be come after all AggregatingSchedulers are set
     aggregating_shedulers = []
