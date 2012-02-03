@@ -582,7 +582,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stagePlatform=buildbot2ftp(platform),
                 use_scratchbox=pf.get('use_scratchbox'),
                 android_signing=pf.get('android_signing', False),
-                multiLocale=pf.get('multi_locale', False),
+                multiLocale=bool(releaseConfig.get('enableMultiLocale', False) and
+                                 pf.get('multi_locale', False))
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
                 compareLocalesRepoPath=branchConfig['compare_locales_repo_path'],
                 mozharnessRepoPath=branchConfig['mozharness_repo_path'],
