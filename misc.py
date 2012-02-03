@@ -503,7 +503,8 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
                           build_dir_prefix, suites_name, suites,
                           mochitestLeakThreshold, crashtestLeakThreshold,
                           slaves=None, resetHwClock=False, category=None,
-                          stagePlatform=None):
+                          stagePlatform=None, stageProduct=None,
+                          mozharness=False, mozharness_python=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -513,13 +514,101 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
     if not category:
         category = branch_name
     productName = pf['product_name']
-    posixBinarySuffix = '-bin'
-    if isinstance(suites, dict) and "totalChunks" in suites:
-        totalChunks = suites['totalChunks']
-        for i in range(totalChunks):
+    branchProperty = branch_name
+    posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
+    properties = {'branch': branchProperty, 'platform': platform,
+                  'slavebuilddir': 'test', 'stage_platform': stagePlatform,
+                  'product': stageProduct}
+    if pf.get('is_remote', False):
+        hostUtils = pf['host_utils_url']
+        factory = RemoteUnittestFactory(
+            platform=platform,
+            productName=productName,
+            hostUtils=hostUtils,
+            suites=suites,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            branchName=branch_name,
+            remoteExtras=pf.get('remote_extras'),
+            downloadSymbols=pf.get('download_symbols', True),
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': properties,
+        }
+        builders.append(builder)
+    elif mozharness:
+        # suites is a dict!
+        extra_args = suites.get('extra_args', [])
+        factory = ScriptFactory(
+            interpreter=mozharness_python,
+            scriptRepo=suites['mozharness_repo'],
+            scriptName=suites['script_path'],
+            hg_bin=suites['hg_bin'],
+            extra_args=suites.get('extra_args', []),
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
+             (re.compile('# TBPL WARNING #'), WARNINGS),
+             (re.compile('# TBPL FAILURE #'), FAILURE),
+             (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
+             (re.compile('# TBPL RETRY #'), RETRY),
+            ))
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': properties,
+        }
+        builders.append(builder)
+    else:
+        if isinstance(suites, dict) and "totalChunks" in suites:
+            totalChunks = suites['totalChunks']
+            for i in range(totalChunks):
+                factory = UnittestPackagedBuildFactory(
+                    platform=platform,
+                    test_suites=[suites['suite']],
+                    mochitest_leak_threshold=mochitestLeakThreshold,
+                    crashtest_leak_threshold=crashtestLeakThreshold,
+                    hgHost=config['hghost'],
+                    repoPath=config['repo_path'],
+                    productName=productName,
+                    posixBinarySuffix=posixBinarySuffix,
+                    buildToolsRepoPath=config['build_tools_repo_path'],
+                    buildSpace=1.0,
+                    buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+                    totalChunks=totalChunks,
+                    thisChunk=i+1,
+                    chunkByDir=suites.get('chunkByDir'),
+                    env=pf.get('unittest-env', {}),
+                    downloadSymbols=pf.get('download_symbols', True),
+                    resetHwClock=resetHwClock,
+                    stackwalk_cgi=config.get('stackwalk_cgi'),
+                )
+                builder = {
+                    'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                    'slavenames': slavenames,
+                    'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                    'slavebuilddir': 'test',
+                    'factory': factory,
+                    'category': category,
+                    'nextSlave': _nextSlowSlave,
+                    'properties': properties,
+                    'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
+                }
+                builders.append(builder)
+        else:
             factory = UnittestPackagedBuildFactory(
                 platform=platform,
-                test_suites=[suites['suite']],
+                test_suites=suites,
                 mochitest_leak_threshold=mochitestLeakThreshold,
                 crashtest_leak_threshold=crashtestLeakThreshold,
                 hgHost=config['hghost'],
@@ -529,55 +618,22 @@ def generateCCTestBuilder(config, branch_name, platform, name_prefix,
                 buildToolsRepoPath=config['build_tools_repo_path'],
                 buildSpace=1.0,
                 buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-                totalChunks=totalChunks,
-                thisChunk=i+1,
-                chunkByDir=suites.get('chunkByDir'),
-                env=pf.get('unittest-env', {}),
                 downloadSymbols=pf.get('download_symbols', True),
+                env=pf.get('unittest-env', {}),
                 resetHwClock=resetHwClock,
+                stackwalk_cgi=config.get('stackwalk_cgi'),
             )
             builder = {
-                'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                'name': '%s %s' % (name_prefix, suites_name),
                 'slavenames': slavenames,
-                'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                'builddir': '%s-%s' % (build_dir_prefix, suites_name),
                 'slavebuilddir': 'test',
                 'factory': factory,
                 'category': category,
-                'properties': {'branch': branch_name, 'platform': platform,
-                    'build_platform': platform, 'slavebuilddir': 'test',
-                    'stage_platform': stagePlatform},
+                'properties': properties,
                 'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
-    else:
-        factory = UnittestPackagedBuildFactory(
-            platform=platform,
-            test_suites=suites,
-            mochitest_leak_threshold=mochitestLeakThreshold,
-            crashtest_leak_threshold=crashtestLeakThreshold,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            productName=productName,
-            posixBinarySuffix=posixBinarySuffix,
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            buildSpace=1.0,
-            buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-            downloadSymbols=pf.get('download_symbols', True),
-            env=pf.get('unittest-env', {}),
-            resetHwClock=resetHwClock,
-        )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': {'branch': branch_name, 'platform': platform,
-                           'stage_platform': stagePlatform, 'build_platform': platform, 'slavebuilddir': 'test'},
-            'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-        }
-        builders.append(builder)
     return builders
 
 
