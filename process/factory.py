@@ -83,6 +83,9 @@ hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 
 hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
 
+# Limit ourselves to uploading 4 things at a time
+upload_lock = locks.MasterLock("upload_lock", maxCount=4)
+
 SIGNING_SERVER_CERT = os.path.join(
     os.path.dirname(build.paths.__file__),
     '../../../release/signing/host.cert')
@@ -2001,6 +2004,7 @@ class TryBuildFactory(MercurialBuildFactory):
              description=["upload"],
              timeout=40*60, # 40 minutes
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+             locks=[upload_lock.access('counting')],
         ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
@@ -2557,6 +2561,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
              description=["upload"],
              timeout=60*60, # 60 minutes
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+             locks=[upload_lock.access('counting')],
             ))
         else:
             objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
@@ -2573,6 +2578,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 sb=self.use_scratchbox,
                 timeout=40*60, # 40 minutes
                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+                locks=[upload_lock.access('counting')],
             ))
 
         if self.profiledBuild and self.branchName not in ('mozilla-1.9.1', 'mozilla-1.9.2', 'mozilla-2.0'):
@@ -3228,6 +3234,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=True,
          flunkOnFailure=True,
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+         locks=[upload_lock.access('counting')],
         ))
 
     def getSources(self):
@@ -5821,6 +5828,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
              haltOnFailure=True,
              description=['upload'],
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
+             locks=[upload_lock.access('counting')],
             ))
 
             for master, warn, retries in self.unittestMasters:
@@ -7088,6 +7096,31 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/%s' % self.productName,
             name='unpack_build',
         ))
+        def get_robocop_url(build):
+            '''We assume 'robocop.apk' is in same directory as the
+            main apk, so construct url based on the build_url property
+            set when we downloaded that.
+            '''
+            build_url = build.getProperty('build_url')
+            build_url = build_url[:build_url.rfind('/')]
+            robocop_url = build_url + '/robocop.apk'
+            return robocop_url
+
+        # the goal of bug 715215 is to download robocop.apk if we
+        # think it will be needed. We can tell that by the platform
+        # being 'android' and 'robocop' being mentioned in the suite
+        # name. (The suite name must include 'robocop', as that data
+        # driven feature is used to append the robocop options to a
+        # command line.)
+        if self.platform == "android" and 'robocop' in self.suites[0]['suite']:
+            self.addStep(DownloadFile(
+                url_fn=get_robocop_url,
+                filename_property='robocop_filename',
+                url_property='robocop_url',
+                haltOnFailure=True,
+                ignore_certs=self.ignoreCerts,
+                name='download_robocop',
+            ))
         self.addStep(SetBuildProperty(
          property_name="exedir",
          value=self.productName
@@ -7524,44 +7557,6 @@ class TalosFactory(RequestSortingBuildFactory):
          name='get build info',
         ))
 
-        if self.productName == 'fennec':
-            # Figure out which platform revision we're running
-            def get_build_info(rc, stdout, stderr):
-                retval = {'mozilla_repository': None,
-                          'mozilla_changeset': None,
-                          'mozilla_buildid': None,
-                         }
-                stdout = "\n".join([stdout, stderr])
-                m = re.search("^BuildID\s*=\s*(\w+)", stdout, re.M)
-                if m:
-                    retval['mozilla_buildid'] = m.group(1)
-                m = re.search("^SourceStamp\s*=\s*(.*)", stdout, re.M)
-                if m:
-                    retval['mozilla_changeset'] = m.group(1).strip()
-                m = re.search("^SourceRepository\s*=\s*(\S+)", stdout, re.M)
-                if m:
-                    retval['mozilla_repository'] = m.group(1)
-                return retval
-
-            self.addStep(SetProperty(
-             command=['cat', WithProperties('%(exedir)s/platform.ini')],
-             workdir=os.path.join(self.workdirBase, "talos"),
-             extract_fn=get_build_info,
-             name='get platform build info',
-            ))
-
-            self.addStep(ShellCommand(
-                command=['echo', 'TinderboxPrint:',
-                         WithProperties('<a href=%(mozilla_repository)s/rev/%(mozilla_changeset)s ' +
-                                        'title="Built from Mozilla revision %(mozilla_changeset)s">' +
-                                        'moz:%(mozilla_changeset)s</a> <br />' +
-                                        '<a href=%(repo_path)s/rev/%(revision)s ' +
-                                        'title="Built from Mobile revision %(revision)s">' +
-                                        'mobile:%(revision)s</a>')],
-                description=['list', 'revisions'],
-                name='rev_info',
-            ))
-
         def check_sdk(cmd, step):
             txt = cmd.logs['stdio'].getText()
             m = re.search("MacOSX10\.5\.sdk", txt, re.M)
@@ -7591,14 +7586,15 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.customTalos is None and not self.remoteTests:
             if self.talos_from_source_code:
                 self.addStep(DownloadFile(
-                    url=WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py"),
+                    url="https://hg.mozilla.org/build/tools/raw-file/default/scripts/talos/talos_from_code.py",
                     workdir=self.workdirBase,
                     haltOnFailure=True,
+                    wget_args=['--progress=dot:mega', '--no-check-certificate']
                 ))
                 self.addStep(ShellCommand(
-                    name='retrieve specified talos.zip in talos.json',
+                    name='download files specified in talos.json',
                     command=[self.pythonWithSimpleJson(self.OS), 'talos_from_code.py', \
-                            '--talos_json_url', \
+                            '--talos-json-url', \
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
                     haltOnFailure=True,
@@ -7609,17 +7605,17 @@ class TalosFactory(RequestSortingBuildFactory):
                   workdir=self.workdirBase,
                   haltOnFailure=True,
                 ))
+                self.addStep(DownloadFile(
+                 url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
+                 workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
+                 haltOnFailure=True,
+                 ))
 
             self.addStep(UnpackFile(
              filename='talos.zip',
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
-            self.addStep(DownloadFile(
-             url=WithProperties("%s/xpis/pageloader.xpi" % self.supportUrlBase),
-             workdir=os.path.join(self.workdirBase, "talos/page_load_test"),
-             haltOnFailure=True,
-             ))
         elif self.remoteTests:
             self.addStep(ShellCommand(
              name='copy_talos',
