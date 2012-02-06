@@ -2661,7 +2661,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
             usePrettyNames=True, enableUpdatePackaging=True, oldVersion=None,
-            oldBuildNumber=None, **kwargs):
+            oldBuildNumber=None, appVersion=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
@@ -2686,7 +2686,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         # The latter is only strictly necessary for RCs.
         if usePrettyNames:
             env['MOZ_PKG_PRETTYNAMES'] = '1'
-        env['MOZ_PKG_VERSION'] = version
+        if appVersion is None or self.version != appVersion:
+            env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
@@ -4406,7 +4407,7 @@ class SingleSourceFactory(ReleaseFactory):
                  stageUsername, stageSshKey, buildNumber, mozconfig,
                  configRepoPath, configSubDir, objdir='',
                  mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
-                 mozconfigBranch="production", **kwargs):
+                 mozconfigBranch="production", appVersion=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.mozconfig = mozconfig
@@ -4436,7 +4437,8 @@ class SingleSourceFactory(ReleaseFactory):
         # created in the expected place.
         self.env['MOZ_OBJDIR'] = self.objdir
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
-        self.env['MOZ_PKG_VERSION'] = version
+        if appVersion is None or version != appVersion:
+            self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
 
         # '-c' is for "release to candidates dir"
