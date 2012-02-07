@@ -499,88 +499,6 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             builders.append(builder)
     return builders
 
-def generateCCTestBuilder(config, branch_name, platform, name_prefix,
-                          build_dir_prefix, suites_name, suites,
-                          mochitestLeakThreshold, crashtestLeakThreshold,
-                          slaves=None, resetHwClock=False, category=None,
-                          stagePlatform=None):
-    builders = []
-    pf = config['platforms'].get(platform, {})
-    if slaves == None:
-        slavenames = config['platforms'][platform]['slaves']
-    else:
-        slavenames = slaves
-    if not category:
-        category = branch_name
-    productName = pf['product_name']
-    posixBinarySuffix = '-bin'
-    if isinstance(suites, dict) and "totalChunks" in suites:
-        totalChunks = suites['totalChunks']
-        for i in range(totalChunks):
-            factory = UnittestPackagedBuildFactory(
-                platform=platform,
-                test_suites=[suites['suite']],
-                mochitest_leak_threshold=mochitestLeakThreshold,
-                crashtest_leak_threshold=crashtestLeakThreshold,
-                hgHost=config['hghost'],
-                repoPath=config['repo_path'],
-                productName=productName,
-                posixBinarySuffix=posixBinarySuffix,
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                buildSpace=1.0,
-                buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-                totalChunks=totalChunks,
-                thisChunk=i+1,
-                chunkByDir=suites.get('chunkByDir'),
-                env=pf.get('unittest-env', {}),
-                downloadSymbols=pf.get('download_symbols', True),
-                resetHwClock=resetHwClock,
-            )
-            builder = {
-                'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
-                'slavenames': slavenames,
-                'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
-                'slavebuilddir': 'test',
-                'factory': factory,
-                'category': category,
-                'properties': {'branch': branch_name, 'platform': platform,
-                    'build_platform': platform, 'slavebuilddir': 'test',
-                    'stage_platform': stagePlatform},
-                'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-            }
-            builders.append(builder)
-    else:
-        factory = UnittestPackagedBuildFactory(
-            platform=platform,
-            test_suites=suites,
-            mochitest_leak_threshold=mochitestLeakThreshold,
-            crashtest_leak_threshold=crashtestLeakThreshold,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            productName=productName,
-            posixBinarySuffix=posixBinarySuffix,
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            buildSpace=1.0,
-            buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
-            downloadSymbols=pf.get('download_symbols', True),
-            env=pf.get('unittest-env', {}),
-            resetHwClock=resetHwClock,
-        )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': {'branch': branch_name, 'platform': platform,
-                           'stage_platform': stagePlatform, 'build_platform': platform, 'slavebuilddir': 'test'},
-            'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-        }
-        builders.append(builder)
-    return builders
-
-
 def generateBranchObjects(config, name, secrets=None):
     """name is the name of branch which is usually the last part of the path
        to the repository. For example, 'mozilla-central', 'mozilla-aurora', or
@@ -2363,7 +2281,7 @@ def generateCCBranchObjects(config, name):
                     else:
                         base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
 
-                    branchObjects['builders'].extend(generateCCTestBuilder(
+                    branchObjects['builders'].extend(generateTestBuilder(
                         config, name, platform, "%s debug test" % base_name,
                         "%s-%s-unittest" % (name, platform),
                         suites_name, suites, mochitestLeakThreshold,
@@ -2661,7 +2579,7 @@ def generateCCBranchObjects(config, name):
                 suites.remove('mochitest-a11y')
 
             if pf.get('enable_unittests'):
-                branchObjects['builders'].extend(generateCCTestBuilder(
+                branchObjects['builders'].extend(generateTestBuilder(
                     config, name, platform, "%s test" % pf['base_name'],
                     "%s-%s-unittest" % (name, platform),
                     suites_name, suites, mochitestLeakThreshold,
@@ -2675,7 +2593,7 @@ def generateCCBranchObjects(config, name):
                 suites.remove('mochitest-a11y')
 
             if pf.get('enable_opt_unittests'):
-                branchObjects['builders'].extend(generateCCTestBuilder(
+                branchObjects['builders'].extend(generateTestBuilder(
                     config, name, platform, "%s opt test" % pf['base_name'],
                     "%s-%s-opt-unittest" % (name, platform),
                     suites_name, suites, mochitestLeakThreshold,

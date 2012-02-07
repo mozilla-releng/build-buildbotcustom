@@ -2661,7 +2661,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
             usePrettyNames=True, enableUpdatePackaging=True, oldVersion=None,
-            oldBuildNumber=None, **kwargs):
+            oldBuildNumber=None, appVersion=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
@@ -2686,7 +2686,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         # The latter is only strictly necessary for RCs.
         if usePrettyNames:
             env['MOZ_PKG_PRETTYNAMES'] = '1'
-        env['MOZ_PKG_VERSION'] = version
+        if appVersion is None or self.version != appVersion:
+            env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
@@ -4406,7 +4407,7 @@ class SingleSourceFactory(ReleaseFactory):
                  stageUsername, stageSshKey, buildNumber, mozconfig,
                  configRepoPath, configSubDir, objdir='',
                  mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
-                 mozconfigBranch="production", **kwargs):
+                 mozconfigBranch="production", appVersion=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.mozconfig = mozconfig
@@ -4436,7 +4437,8 @@ class SingleSourceFactory(ReleaseFactory):
         # created in the expected place.
         self.env['MOZ_OBJDIR'] = self.objdir
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
-        self.env['MOZ_PKG_VERSION'] = version
+        if appVersion is None or version != appVersion:
+            self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
 
         # '-c' is for "release to candidates dir"
@@ -7093,6 +7095,31 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/%s' % self.productName,
             name='unpack_build',
         ))
+        def get_robocop_url(build):
+            '''We assume 'robocop.apk' is in same directory as the
+            main apk, so construct url based on the build_url property
+            set when we downloaded that.
+            '''
+            build_url = build.getProperty('build_url')
+            build_url = build_url[:build_url.rfind('/')]
+            robocop_url = build_url + '/robocop.apk'
+            return robocop_url
+
+        # the goal of bug 715215 is to download robocop.apk if we
+        # think it will be needed. We can tell that by the platform
+        # being 'android' and 'robocop' being mentioned in the suite
+        # name. (The suite name must include 'robocop', as that data
+        # driven feature is used to append the robocop options to a
+        # command line.)
+        if self.platform == "android" and 'robocop' in self.suites[0]['suite']:
+            self.addStep(DownloadFile(
+                url_fn=get_robocop_url,
+                filename_property='robocop_filename',
+                url_property='robocop_url',
+                haltOnFailure=True,
+                ignore_certs=self.ignoreCerts,
+                name='download_robocop',
+            ))
         self.addStep(SetBuildProperty(
          property_name="exedir",
          value=self.productName
@@ -8167,7 +8194,7 @@ class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
             extra_data=None, extra_args=None,
             script_timeout=1200, script_maxtime=None, log_eval_func=None,
-            hg_bin='hg'):
+            reboot_command=None, hg_bin='hg'):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -8228,6 +8255,7 @@ class ScriptFactory(BuildFactory):
             workdir='scripts'
         ))
         self.runScript()
+        self.reboot()
 
     def runScript(self):
         self.addStep(ShellCommand(
@@ -8250,6 +8278,27 @@ class ScriptFactory(BuildFactory):
             warnOnFailure=False,
             flunkOnFailure=False,
         ))
+
+    def reboot(self):
+        def do_disconnect(cmd):
+            try:
+                if 'SCHEDULED REBOOT' in cmd.logs['stdio'].getText():
+                    return True
+            except:
+                pass
+            return False
+        if self.reboot_command:
+            self.addStep(DisconnectStep(
+                name='reboot',
+                flunkOnFailure=False,
+                warnOnFailure=False,
+                alwaysRun=True,
+                workdir='.',
+                description="reboot",
+                command=self.reboot_command,
+                force_disconnect=do_disconnect,
+                env=self.env,
+            ))
 
 class SigningScriptFactory(ScriptFactory):
 
