@@ -69,6 +69,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     tools_repo = '%s%s' % (branchConfig['hgurl'], tools_repo_path)
     config_repo = '%s%s' % (branchConfig['hgurl'],
                              branchConfig['config_repo_path'])
+    mozharness_repo_path = releaseConfig.get('mozharness_repo_path',
+                                             branchConfig['mozharness_repo_path'])
+    mozharness_repo = '%s%s' % (branchConfig['hgurl'], mozharness_repo_path)
 
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
@@ -589,7 +592,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                  pf.get('multi_locale', False)),
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
                 compareLocalesRepoPath=branchConfig['compare_locales_repo_path'],
-                mozharnessRepoPath=branchConfig['mozharness_repo_path'],
+                mozharnessRepoPath=mozharness_repo_path,
                 mozharnessTag=releaseTag,
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
@@ -657,11 +660,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             for n, builderName in l10nBuilders(platform).iteritems():
                 if releaseConfig['productName'] == 'fennec':
                     repack_factory = ScriptFactory(
-                        scriptRepo=tools_repo,
-                        interpreter='bash',
-                        scriptName='scripts/l10n/release_mobile_repacks.sh',
-                        extra_args=[platform, branchConfigFile,
-                                    str(l10nChunks), str(n)]
+                        scriptRepo=mozharness_repo,
+                        scriptName='scripts/mobile_l10n.py',
+                        extra_args=['--cfg',
+                                    'single_locale/release_%s_%s.py' % (releaseConfig['sourceRepositories']['mobile']['name'], platform),
+                                    '--total-chunks', str(l10nChunks),
+                                    '--this-chunk', str(n)]
                     )
                 else:
                     extra_args = [platform, branchConfigFile, str(l10nChunks),
@@ -910,6 +914,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
+        releaseChannel = releaseConfig.get('releaseChannel', branchConfig['update_channel'])
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -931,15 +936,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            useBetaChannel=releaseConfig['useBetaChannel'],
             stageUsername=branchConfig['stage_username'],
             stageSshKey=branchConfig['stage_ssh_key'],
             ausUser=releaseConfig['ausUser'],
             ausSshKey=releaseConfig['ausSshKey'],
-            ausHost=branchConfig['aus2_host'],
+            ausHost=releaseConfig['ausHost'],
             ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
+            releaseChannel=releaseChannel,
             # We disable this on staging, because we don't have a CVS mirror to
             # commit to
             commitPatcherConfig=releaseConfig['commitPatcherConfig'],
@@ -1170,12 +1175,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            useBetaChannel=releaseConfig['useBetaChannel'],
             stageUsername=branchConfig['stage_username'],
             stageSshKey=branchConfig['stage_ssh_key'],
             ausUser=releaseConfig['ausUser'],
             ausSshKey=releaseConfig['ausSshKey'],
-            ausHost=branchConfig['aus2_host'],
+            ausHost=releaseConfig['ausHost'],
             ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
