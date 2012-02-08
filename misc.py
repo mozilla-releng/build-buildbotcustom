@@ -1172,13 +1172,8 @@ def generateBranchObjects(config, name, secrets=None):
             triggeredSchedulers=None
             if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
                 mobile_l10n_scheduler_name = '%s-%s-l10n' % (name, platform)
-                builder_env = platform_env.copy()
-                builder_env.update({
-                    'BUILDBOT_CONFIGS': '%s%s' % (config['hgurl'],
-                                                  config['config_repo_path']),
-                    'CLOBBERER_URL': config['base_clobber_url'],
-                })
                 mobile_l10n_builders = []
+                builder_env = platform_env.copy()
                 for n in range(1, int(pf['l10n_chunks']) + 1):
                     builddir='%s-%s-l10n_%s' % (name, platform, str(n))
                     builderName = "%s l10n nightly %s/%s" % \
@@ -1186,12 +1181,12 @@ def generateBranchObjects(config, name, secrets=None):
                     mobile_l10n_builders.append(builderName)
                     factory = ScriptFactory(
                         scriptRepo='%s%s' % (config['hgurl'],
-                                              config['build_tools_repo_path']),
-                        interpreter='bash',
-                        scriptName='scripts/l10n/nightly_mobile_repacks.sh',
-                        extra_args=[platform, stage_platform,
-                                    getRealpath('localconfig.py'),
-                                    str(pf['l10n_chunks']), str(n)]
+                                             config['mozharness_repo_path']),
+                        scriptName='scripts/mobile_l10n.py',
+                        extra_args=['--cfg',
+                                    'single_locale/%s_%s.py' % (name, platform),
+                                    '--total-chunks', str(pf['l10n_chunks']),
+                                    '--this-chunk', str(n)]
                     )
                     slavebuilddir = reallyShort(builddir)
                     branchObjects['builders'].append({
