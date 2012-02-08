@@ -5374,7 +5374,7 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                        '--update-type=major']
         for platform in sorted(self.verifyConfigs.keys()):
             bumpCommand.extend(['--platform', platform])
-        if self.seBetaChannelForRelease:
+        if self.useBetaChannelForRelease:
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
