@@ -910,6 +910,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
+        releaseChannel = releaseConfig.get('releaseChannel', branchConfig['update_channel'])
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -931,7 +932,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            useBetaChannel=releaseConfig['useBetaChannel'],
             stageUsername=branchConfig['stage_username'],
             stageSshKey=branchConfig['stage_ssh_key'],
             ausUser=releaseConfig['ausUser'],
@@ -940,6 +940,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
+            releaseChannel=releaseChannel,
             # We disable this on staging, because we don't have a CVS mirror to
             # commit to
             commitPatcherConfig=releaseConfig['commitPatcherConfig'],
@@ -1170,7 +1171,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            useBetaChannel=releaseConfig['useBetaChannel'],
             stageUsername=branchConfig['stage_username'],
             stageSshKey=branchConfig['stage_ssh_key'],
             ausUser=releaseConfig['ausUser'],
