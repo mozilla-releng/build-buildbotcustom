@@ -7587,7 +7587,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.customTalos is None and not self.remoteTests:
             if self.talos_from_source_code:
                 self.addStep(DownloadFile(
-                    url="https://hg.mozilla.org/build/tools/raw-file/default/scripts/talos/talos_from_code.py",
+                    url=WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py"),
                     workdir=self.workdirBase,
                     haltOnFailure=True,
                     wget_args=['--progress=dot:mega', '--no-check-certificate']
