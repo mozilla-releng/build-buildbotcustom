@@ -69,6 +69,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     tools_repo = '%s%s' % (branchConfig['hgurl'], tools_repo_path)
     config_repo = '%s%s' % (branchConfig['hgurl'],
                              branchConfig['config_repo_path'])
+    mozharness_repo_path = releaseConfig.get('mozharness_repo_path',
+                                             branchConfig['mozharness_repo_path'])
+    mozharness_repo = '%s%s' % (branchConfig['hgurl'], mozharness_repo_path)
 
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
@@ -380,39 +383,74 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 }
             })
 
+    dummy_tag_builders=[]
     if not releaseConfig.get('skip_tag'):
         pf = branchConfig['platforms']['linux']
         tag_env = builder_env.copy()
         if pf['env'].get('HG_SHARE_BASE_DIR', None):
             tag_env['HG_SHARE_BASE_DIR'] = pf['env']['HG_SHARE_BASE_DIR']
 
-        tag_factory = ScriptFactory(
+        # Other includes mozharness, required for Mobile Builds
+        tag_source_factory = ScriptFactory(
             scriptRepo=tools_repo,
             scriptName='scripts/release/tagging.sh',
+            extra_data={"tag_args": "--tag-source --tag-other"},
         )
 
         builders.append({
-            'name': builderPrefix('%s_tag' % releaseConfig['productName']),
+            'name': builderPrefix('%s_tag_source' % releaseConfig['productName']),
             'slavenames': pf['slaves'] + \
             branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
-            'builddir': builderPrefix('%s_tag' % releaseConfig['productName']),
+            'builddir': builderPrefix('%s_tag_source' % releaseConfig['productName']),
             'slavebuilddir': reallyShort(
-                builderPrefix('%s_tag' % releaseConfig['productName'])),
-            'factory': tag_factory,
+                builderPrefix('%s_tag_source' % releaseConfig['productName'])),
+            'factory': tag_source_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': tag_env,
             'properties': {
                 'builddir': builderPrefix(
-                    '%s_tag' % releaseConfig['productName']),
+                    '%s_tag_source' % releaseConfig['productName']),
                 'slavebuilddir': reallyShort(
-                    builderPrefix('%s_tag' % releaseConfig['productName'])),
+                    builderPrefix('%s_tag_source' % releaseConfig['productName'])),
                 'release_config': releaseConfigFile,
             }
         })
+
+        if len(releaseConfig['l10nPlatforms']) > 0:
+            tag_l10n_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                scriptName='scripts/release/tagging.sh',
+                extra_data={"tag_args": "--tag-l10n"},
+            )
+
+            builders.append({
+                'name': builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
+                'slavenames': pf['slaves'] + \
+                branchConfig['platforms']['linux64']['slaves'],
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
+                'slavebuilddir': reallyShort(
+                    builderPrefix('%s_tag_l10n' % releaseConfig['productName'])),
+                'factory': tag_l10n_factory,
+                'nextSlave': _nextFastReservedSlave,
+                'env': tag_env,
+                'properties': {
+                    'builddir': builderPrefix(
+                        '%s_tag_l10n' % releaseConfig['productName']),
+                    'slavebuilddir': reallyShort(
+                        builderPrefix('%s_tag_l10n' % releaseConfig['productName'])),
+                    'release_config': releaseConfigFile,
+                }
+            })
+        else:
+            dummy_tag_builders.append("l10n")
     else:
+        dummy_tag_builders.extend(["source","l10n"])
+    for dummy in dummy_tag_builders:
         builders.append(makeDummyBuilder(
-            name=builderPrefix('%s_tag' % releaseConfig['productName']),
+            name=builderPrefix('%s_tag_%s' %
+                                    (releaseConfig['productName'], dummy)),
             slaves=all_slaves,
             category=builderPrefix(''),
             ))
@@ -428,6 +466,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             repoPath=sourceRepoInfo['path'],
             productName=releaseConfig['productName'],
             version=releaseConfig['version'],
+            appVersion=releaseConfig['appVersion'],
             baseTag=releaseConfig['baseTag'],
             stagingServer=branchConfig['stage_server'],
             stageUsername=branchConfig['stage_username'],
@@ -471,6 +510,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 repoPath=sourceRepoInfo['path'],
                 productName='xulrunner',
                 version=releaseConfig['version'],
+                appVersion=releaseConfig['appVersion'],
                 baseTag=releaseConfig['baseTag'],
                 stagingServer=branchConfig['stage_server'],
                 stageUsername=branchConfig['stage_username_xulrunner'],
@@ -532,10 +572,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platform_env = pf['env'].copy()
             if 'update_channel' in branchConfig:
                 platform_env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
-            if platform in releaseConfig['l10nPlatforms']:
-                triggeredSchedulers = [builderPrefix('%s_repack' % platform)]
-            else:
-                triggeredSchedulers = None
             multiLocaleConfig = releaseConfig.get(
                 'mozharness_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
@@ -569,6 +605,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildSpace=10,
                 productName=releaseConfig['productName'],
                 version=releaseConfig['version'],
+                appVersion=releaseConfig['appVersion'],
                 buildNumber=releaseConfig['buildNumber'],
                 oldVersion=releaseConfig['oldVersion'],
                 oldBuildNumber=releaseConfig['oldBuildNumber'],
@@ -578,7 +615,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 unittestBranch=unittestBranch,
                 clobberURL=branchConfig['base_clobber_url'],
                 triggerBuilds=True,
-                triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
                 use_scratchbox=pf.get('use_scratchbox'),
                 android_signing=pf.get('android_signing', False),
@@ -586,7 +622,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                  pf.get('multi_locale', False)),
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
                 compareLocalesRepoPath=branchConfig['compare_locales_repo_path'],
-                mozharnessRepoPath=branchConfig['mozharness_repo_path'],
+                mozharnessRepoPath=mozharness_repo_path,
                 mozharnessTag=releaseTag,
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
@@ -654,11 +690,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             for n, builderName in l10nBuilders(platform).iteritems():
                 if releaseConfig['productName'] == 'fennec':
                     repack_factory = ScriptFactory(
-                        scriptRepo=tools_repo,
-                        interpreter='bash',
-                        scriptName='scripts/l10n/release_mobile_repacks.sh',
-                        extra_args=[platform, branchConfigFile,
-                                    str(l10nChunks), str(n)]
+                        scriptRepo=mozharness_repo,
+                        scriptName='scripts/mobile_l10n.py',
+                        extra_args=['--cfg',
+                                    'single_locale/release_%s_%s.py' % (releaseConfig['sourceRepositories']['mobile']['name'], platform),
+                                    '--total-chunks', str(l10nChunks),
+                                    '--this-chunk', str(n)]
                     )
                 else:
                     extra_args = [platform, branchConfigFile, str(l10nChunks),
@@ -907,6 +944,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
+        releaseChannel = releaseConfig.get('releaseChannel', branchConfig['update_channel'])
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -928,15 +966,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            useBetaChannel=releaseConfig['useBetaChannel'],
             stageUsername=branchConfig['stage_username'],
             stageSshKey=branchConfig['stage_ssh_key'],
             ausUser=releaseConfig['ausUser'],
             ausSshKey=releaseConfig['ausSshKey'],
-            ausHost=branchConfig['aus2_host'],
+            ausHost=releaseConfig['ausHost'],
             ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
+            releaseChannel=releaseChannel,
             # We disable this on staging, because we don't have a CVS mirror to
             # commit to
             commitPatcherConfig=releaseConfig['commitPatcherConfig'],
@@ -1167,12 +1205,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            useBetaChannel=releaseConfig['useBetaChannel'],
             stageUsername=branchConfig['stage_username'],
             stageSshKey=branchConfig['stage_ssh_key'],
             ausUser=releaseConfig['ausUser'],
             ausSshKey=releaseConfig['ausSshKey'],
-            ausHost=branchConfig['aus2_host'],
+            ausHost=releaseConfig['ausHost'],
             ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
@@ -1410,11 +1447,17 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 '%s_repo_setup' % releaseConfig['productName'])],
         )
         schedulers.append(repo_setup_scheduler)
-        tag_scheduler = Dependent(
-            name=builderPrefix('%s_tag' % releaseConfig['productName']),
+        tag_source_scheduler = Dependent(
+            name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
             upstream=repo_setup_scheduler,
             builderNames=[builderPrefix(
-                '%s_tag' % releaseConfig['productName'])],
+                '%s_tag_source' % releaseConfig['productName'])],
+        )
+        tag_l10n_scheduler = Dependent(
+            name=builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
+            upstream=repo_setup_scheduler,
+            builderNames=[builderPrefix(
+                '%s_tag_l10n' % releaseConfig['productName'])],
         )
         if not releaseConfig.get('skip_release_download'):
             release_downloader_scheduler = Scheduler(
@@ -1429,34 +1472,47 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             )
             schedulers.append(release_downloader_scheduler)
     else:
-        tag_scheduler = Dependent(
-            name=builderPrefix('%s_tag' % releaseConfig['productName']),
+        tag_source_scheduler = Dependent(
+            name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
             upstream=reset_schedulers_scheduler,
             builderNames=[builderPrefix(
-                '%s_tag' % releaseConfig['productName'])],
+                '%s_tag_source' % releaseConfig['productName'])],
         )
-    schedulers.append(tag_scheduler)
+        tag_l10n_scheduler = Dependent(
+            name=builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
+            upstream=reset_schedulers_scheduler,
+            builderNames=[builderPrefix(
+                '%s_tag_l10n' % releaseConfig['productName'])],
+        )
+    schedulers.append(tag_source_scheduler)
+    schedulers.append(tag_l10n_scheduler)
 
-    tag_downstream = [builderPrefix('%s_source' % releaseConfig['productName'])]
+    tag_source_downstream = [builderPrefix('%s_source' % releaseConfig['productName'])]
 
     if releaseConfig['buildNumber'] == 1 \
        and not releaseConfig.get('disableBouncerEntries'):
-        tag_downstream.append(builderPrefix('bouncer_submitter'))
+        tag_source_downstream.append(builderPrefix('bouncer_submitter'))
 
         if releaseConfig['doPartnerRepacks']:
-            tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
+            tag_source_downstream.append(builderPrefix('euballot_bouncer_submitter'))
 
     if releaseConfig.get('xulrunnerPlatforms'):
-        tag_downstream.append(builderPrefix('xulrunner_source'))
+        tag_source_downstream.append(builderPrefix('xulrunner_source'))
 
     for platform in releaseConfig['enUSPlatforms']:
-        tag_downstream.append(builderPrefix('%s_build' % platform))
+        tag_source_downstream.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['notifyPlatforms']:
             important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
             l10nBuilderNames = l10nBuilders(platform).values()
-            repack_scheduler = Triggerable(
+            repack_upstream = [
+                builderPrefix('%s_build' % platform),
+                builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
+            ]
+            repack_scheduler = AggregatingScheduler(
                 name=builderPrefix('%s_repack' % platform),
+                branch=builderPrefix('%s_repack' % platform),
+                upstreamBuilders=repack_upstream,
                 builderNames=l10nBuilderNames,
             )
             schedulers.append(repack_scheduler)
@@ -1469,15 +1525,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             schedulers.append(repack_complete_scheduler)
 
     for platform in releaseConfig.get('xulrunnerPlatforms', []):
-        tag_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
+        tag_source_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
 
     DependentID = makePropertiesScheduler(Dependent, [buildIDSchedFunc, buildUIDSchedFunc])
 
     schedulers.append(
         DependentID(
             name=builderPrefix('%s_build' % releaseConfig['productName']),
-            upstream=tag_scheduler,
-            builderNames=tag_downstream,
+            upstream=tag_source_scheduler,
+            builderNames=tag_source_downstream,
         ))
 
     if releaseConfig.get('majorUpdateRepoPath'):

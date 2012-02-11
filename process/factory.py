@@ -2663,7 +2663,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(self, env, version, buildNumber, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
             usePrettyNames=True, enableUpdatePackaging=True, oldVersion=None,
-            oldBuildNumber=None, **kwargs):
+            oldBuildNumber=None, appVersion=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
 
@@ -2688,7 +2688,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         # The latter is only strictly necessary for RCs.
         if usePrettyNames:
             env['MOZ_PKG_PRETTYNAMES'] = '1'
-        env['MOZ_PKG_VERSION'] = version
+        if appVersion is None or self.version != appVersion:
+            env['MOZ_PKG_VERSION'] = version
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
@@ -4408,7 +4409,7 @@ class SingleSourceFactory(ReleaseFactory):
                  stageUsername, stageSshKey, buildNumber, mozconfig,
                  configRepoPath, configSubDir, objdir='',
                  mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
-                 mozconfigBranch="production", **kwargs):
+                 mozconfigBranch="production", appVersion=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.mozconfig = mozconfig
@@ -4438,7 +4439,8 @@ class SingleSourceFactory(ReleaseFactory):
         # created in the expected place.
         self.env['MOZ_OBJDIR'] = self.objdir
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
-        self.env['MOZ_PKG_VERSION'] = version
+        if appVersion is None or version != appVersion:
+            self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
 
         # '-c' is for "release to candidates dir"
@@ -4830,15 +4832,15 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  appName, productName,
                  version, appVersion, baseTag, buildNumber,
                  oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
-                 ftpServer, bouncerServer, stagingServer, useBetaChannel,
+                 ftpServer, bouncerServer, stagingServer,
                  stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
-                 ausServerUrl, hgSshKey, hgUsername, commitPatcherConfig=True,
-                 mozRepoPath=None, oldRepoPath=None, brandName=None,
-                 buildSpace=22, triggerSchedulers=None, releaseNotesUrl=None,
-                 binaryName=None, oldBinaryName=None, testOlderPartials=False,
-                 fakeMacInfoTxt=False, longVersion=None, oldLongVersion=None,
-                 schema=None, useBetaChannelForRelease=False,
-                 useChecksums=False, **kwargs):
+                 ausServerUrl, hgSshKey, hgUsername, releaseChannel='release',
+                 commitPatcherConfig=True, mozRepoPath=None, oldRepoPath=None,
+                 brandName=None, buildSpace=22, triggerSchedulers=None,
+                 releaseNotesUrl=None, binaryName=None, oldBinaryName=None,
+                 testOlderPartials=False, fakeMacInfoTxt=False,
+                 longVersion=None, oldLongVersion=None, schema=None,
+                 useBetaChannelForRelease=False, useChecksums=False, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -4885,7 +4887,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.ftpServer = ftpServer
         self.bouncerServer = bouncerServer
         self.stagingServer = stagingServer
-        self.useBetaChannel = useBetaChannel
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.ausUser = ausUser
@@ -4894,6 +4895,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.ausServerUrl = ausServerUrl
         self.hgSshKey = hgSshKey
         self.hgUsername = hgUsername
+        self.releaseChannel = releaseChannel
         self.commitPatcherConfig = commitPatcherConfig
         self.oldRepoPath = oldRepoPath or kwargs['repoPath']
         self.oldRepository = self.getRepository(self.oldRepoPath)
@@ -4947,11 +4949,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
     def setChannelData(self):
         # This method figures out all the information needed to push snippets
         # to AUS, push test snippets live, and do basic verifications on them.
-        # Test snippets always end up in the same local and remote directories
-        # All of the beta and (if applicable) release channel information
-        # is dependent on the useBetaChannel flag. When false, there is no
-        # release channel, and the beta channel is comprable to 'releasetest'
-        # rather than 'betatest'
+        # Test snippets and whatever channel self.relesaeChannel is always end
+        # up in the same local and remote directories.
+        # When useBetaChannelForRelease is True, we have a 'beta' channel
+        # in addition to whatever the releaseChannel.
         baseSnippetDir = self.getSnippetDir()
         self.dirMap = {
             'aus2.test': '%s-test' % baseSnippetDir,
@@ -4961,19 +4962,22 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.channels = {
             'betatest': { 'dir': 'aus2.test' },
             'releasetest': { 'dir': 'aus2.test' },
-            'beta': {}
-        }
-        if self.useBetaChannel:
-            if self.useBetaChannelForRelease:
-                self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
-                self.channels['beta']['dir'] = 'aus2.beta'
-            self.channels['release'] = {
+            self.releaseChannel: {
                 'dir': 'aus2',
                 'compareTo': 'releasetest',
             }
+        }
+
+        if self.useBetaChannelForRelease:
+            self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
+            self.channels['beta'] = {'dir': 'aus2.beta'}
+
+        # XXX: hack alert
+        if 'esr' in self.version:
+            self.testChannel = 'esrtest'
+            self.channels['esrtest'] = { 'dir': 'aus2.test' }
         else:
-            self.channels['beta']['dir'] = 'aus2'
-            self.channels['beta']['compareTo'] = 'releasetest'
+            self.testChannel = 'betatest'
 
     def setup(self):
         # General setup
@@ -5037,7 +5041,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.extend(['--marname', self.binaryName.lower()])
         if self.oldBinaryName:
             bumpCommand.extend(['--oldmarname', self.oldBinaryName.lower()])
-        if self.useBetaChannel:
+        if self.useBetaChannelForRelease:
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
@@ -5197,7 +5201,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                    '--build-number', self.buildNumber,
                    '--old-build-number', self.oldBuildNumber,
                    '--channel', 'betatest', '--channel', 'releasetest',
-                   '--channel', 'beta',
+                   '--channel', self.releaseChannel,
                    '--stage-server', self.stagingServer,
                    '--old-base-snippet-dir', '.',
                    '--workdir', '.',
@@ -5206,8 +5210,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                    '--verbose']
         for p in (self.verifyConfigs.keys()):
             command.extend(['--platform', p])
-        if self.useBetaChannel:
-            command.extend(['--channel', 'release'])
+        if self.useBetaChannelForRelease:
+            command.extend(['--channel', 'beta'])
         if self.testOlderPartials:
             command.extend(['--generate-partials'])
         self.addStep(ShellCommand(
@@ -5322,7 +5326,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 '-s', self.stagingServer, '-c', verifyConfigPath,
                 '-d', oldCandidatesDir, '-l', 'shipped-locales',
                 '--old-shipped-locales', 'old-shipped-locales',
-                '--pretty-candidates-dir']
+                '--pretty-candidates-dir', '--channel', self.testChannel]
         if self.binaryName:
             bcmd.extend(['--binary-name', self.binaryName])
         if self.oldBinaryName:
@@ -5372,7 +5376,7 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                        '--update-type=major']
         for platform in sorted(self.verifyConfigs.keys()):
             bumpCommand.extend(['--platform', platform])
-        if self.useBetaChannel:
+        if self.useBetaChannelForRelease:
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
             bumpCommand.extend(['-n', self.releaseNotesUrl])
@@ -7586,7 +7590,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.customTalos is None and not self.remoteTests:
             if self.talos_from_source_code:
                 self.addStep(DownloadFile(
-                    url="https://hg.mozilla.org/build/tools/raw-file/default/scripts/talos/talos_from_code.py",
+                    url=WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py"),
                     workdir=self.workdirBase,
                     haltOnFailure=True,
                     wget_args=['--progress=dot:mega', '--no-check-certificate']
