@@ -423,7 +423,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 scriptName='scripts/release/tagging.sh',
                 extra_data={"tag_args": "--tag-l10n"},
             )
-    
+
             builders.append({
                 'name': builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
                 'slavenames': pf['slaves'] + \
@@ -615,7 +615,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 unittestBranch=unittestBranch,
                 clobberURL=branchConfig['base_clobber_url'],
                 triggerBuilds=True,
-                triggeredSchedulers=None,
                 stagePlatform=buildbot2ftp(platform),
                 use_scratchbox=pf.get('use_scratchbox'),
                 android_signing=pf.get('android_signing', False),
