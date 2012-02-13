@@ -50,7 +50,7 @@ from release.info import getRuntimeTag, getReleaseTag
 from mozilla_buildtools.queuedir import QueueDir
 import BuildSlaves
 
-DEFAULT_PARALLELIZATION = 10
+DEFAULT_PARALLELIZATION = 3
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                  releaseConfigFile, sourceRepoKey="mozilla",
