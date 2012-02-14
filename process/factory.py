@@ -234,8 +234,8 @@ def get_signing_cmd(signingServers, python):
         python,
         '%(toolsdir)s/release/signing/signtool.py',
         '--cachedir', '%(basedir)s/signing_cache',
-        '-t', '%(basedir)s/build/token',
-        '-n', '%(basedir)s/build/nonce',
+        '-t', '%(basedir)s/token',
+        '-n', '%(basedir)s/nonce',
         '-c', '%(toolsdir)s/release/signing/host.cert',
     ]
     for ss, user, passwd in signingServers:
@@ -703,8 +703,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         )
 
     def addGetTokenSteps(self):
-        token = "build/token"
-        nonce = "build/nonce"
+        token = "token"
+        nonce = "nonce"
         self.addStep(ShellCommand(
             command=['rm', '-f', nonce],
             workdir='.',
@@ -8315,8 +8315,8 @@ class SigningScriptFactory(ScriptFactory):
     def runScript(self):
 
         if self.enableSigning:
-            token = "build/token"
-            nonce = "build/nonce"
+            token = "token"
+            nonce = "nonce"
             self.addStep(ShellCommand(
                 command=['rm', '-f', nonce],
                 workdir='.',
