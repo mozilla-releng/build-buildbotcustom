@@ -358,12 +358,20 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                  okResults=(SUCCESS,WARNINGS), properties={}):
         BaseScheduler.__init__(self, name, builderNames, properties)
         self.branch = branch
+        assert isinstance(upstreamBuilders, (list, tuple))
         self.upstreamBuilders = upstreamBuilders
         self.reason = "AccumulatingScheduler(%s)" % name
         self.okResults = okResults
+        self.log_prefix = '%s(%s) <id=%s>' % (self.__class__.__name__, name,
+                                              id(self))
 
     def get_initial_state(self, max_changeid):
+        log.msg('%s: get_initial_state()' % self.log_prefix)
+        # Keep initial state of builders in upstreamBuilders
+        # and operate on remainingBuilders to simplify comparison
+        # on reconfig
         return {
+                "upstreamBuilders": self.upstreamBuilders,
                 "remainingBuilders": self.upstreamBuilders,
                 "lastCheck": now(),
                 }
@@ -379,17 +387,20 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         for b in list(state['remainingBuilders']):
             if b not in self.upstreamBuilders:
                 state['remainingBuilders'].remove(b)
-        # Add new upstream builders
+        # Add new upstream builders. New builders shouln't be in
+        # state['upstreamBuilders'] which contains old self.upstreamBuilders.
+        # Since state['upstreamBuilders'] was introduced after
+        # state['remainingBuilders'], it may be absent from the scheduler
+        # database.
         for b in self.upstreamBuilders:
-            if b not in state['remainingBuilders']:
+            if b not in state.get('upstreamBuilders', []) and \
+               b not in state['remainingBuilders']:
                 state['remainingBuilders'].append(b)
-        log.msg('%s <id=%s>: reloaded' % (self.__class__.__name__,
-                                          id(self)))
+        state['upstreamBuilders'] = self.upstreamBuilders
+        log.msg('%s: reloaded' % self.log_prefix)
         if old_state != state:
-            log.msg('%s <id=%s>: old state: %s' % (self.__class__.__name__,
-                                                   id(self), old_state))
-            log.msg('%s <id=%s>: new state: %s' % (self.__class__.__name__,
-                                                   id(self), state))
+            log.msg('%s: old state: %s' % (self.log_prefix, old_state))
+            log.msg('%s: new state: %s' % (self.log_prefix, state))
         self.set_state(t, state)
 
     def trigger(self, ss, set_props=None):
@@ -399,14 +410,13 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
     def _trigger(self, t):
         state = self.get_initial_state(None)
         state['lastReset'] = state['lastCheck']
-        log.msg('%s <id=%s>: reset state: %s' % (self.__class__.__name__,
-                id(self), state))
+        log.msg('%s: reset state: %s' % (self.log_prefix, state))
         self.set_state(t, state)
 
     def run(self):
         if self.working:
-            log.msg('%s <id=%s>: another instance is still running, skipping.' \
-                    % (self.__class__.__name__, id(self)))
+            log.msg('%s: another instance is still running, skipping.' \
+                    % self.log_prefix)
             return
         self.working = True
         d = self.parent.db.runInteraction(self._run)
@@ -458,9 +468,9 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
             # Start a build!
             log.msg(
-                '%s <id=%s>: new buildset: name=%s, branch=%s, ssid=%s, builders: %s' \
-                % (self.__class__.__name__, id(self), self.name,
-                   self.branch, ssid, ', '.join(self.builderNames)))
+                '%s: new buildset: branch=%s, ssid=%s, builders: %s' \
+                % (self.log_prefix, self.branch, ssid,
+                   ', '.join(self.builderNames)))
             self.create_buildset(ssid, "downstream", t)
 
             # Reset the list of builders we're waiting for
