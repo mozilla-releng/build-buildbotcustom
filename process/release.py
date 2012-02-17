@@ -1310,36 +1310,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 }
             })
 
-    if releaseConfig['productName'] == 'fennec':
-        # TODO: remove android_signature_verification related parts when the
-        # verification procedure moved to post singing scripts
-        envJava = builder_env.copy()
-        envJava['PATH'] = '/tools/jdk6/bin:%s' % envJava.get(
-            'PATH', ':'.join(('/opt/local/bin', '/tools/python/bin',
-                              '/tools/buildbot/bin', '/usr/kerberos/bin',
-                              '/usr/local/bin', '/bin', '/usr/bin',
-                              '/home/cltbld/bin')))
-        signature_verification_factory = ScriptFactory(
-            scriptRepo=tools_repo,
-            scriptName='release/signing/verify-android-signature.sh',
-            extra_args=['--tools-dir=scripts/', '--release',
-                        WithProperties('--apk=%(who)s')]
-        )
-        builders.append({
-            'name': builderPrefix('android_signature_verification'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
-            'category': builderPrefix(''),
-            'builddir': builderPrefix('android_verify_sig'),
-            'factory': signature_verification_factory,
-            'env': envJava,
-            'properties': {
-                'builddir': builderPrefix('android_verify_sig'),
-                'slavebuilddir':
-                reallyShort(builderPrefix('android_verify_sig')),
-                },
-        })
-
-
     ##### Change sources and Schedulers
 
     if not releaseConfig.get('enableSigningAtBuildTime', True) and \
@@ -1540,14 +1510,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         schedulers.append(mirror_scheduler2)
 
-    if releaseConfig['productName'] == 'fennec':
-        android_signature_verification_scheduler = Scheduler(
-            name=builderPrefix('android_signature_verification_scheduler'),
-            branch=builderPrefix('android_post_signing'),
-            treeStableTimer=None,
-            builderNames=[builderPrefix('android_signature_verification')],
-        )
-        schedulers.append(android_signature_verification_scheduler)
 
     if releaseConfig.get('enableAutomaticPushToMirrors') and \
         releaseConfig.get('verifyConfigs'):
