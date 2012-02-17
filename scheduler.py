@@ -3,6 +3,7 @@
 # Contributor(s):
 #   Chris AtLee <catlee@mozilla.com>
 
+from threading import Lock
 from twisted.internet import defer, reactor
 from twisted.python import log
 from twisted.internet.task import LoopingCall
@@ -352,12 +353,12 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
     compare_attrs = ('name', 'branch', 'builderNames', 'properties',
                      'upstreamBuilders', 'okResults')
-    working = False
 
     def __init__(self, name, branch, builderNames, upstreamBuilders,
                  okResults=(SUCCESS,WARNINGS), properties={}):
         BaseScheduler.__init__(self, name, builderNames, properties)
         self.branch = branch
+        self.lock = Lock()
         assert isinstance(upstreamBuilders, (list, tuple))
         self.upstreamBuilders = upstreamBuilders
         self.reason = "AccumulatingScheduler(%s)" % name
@@ -408,17 +409,17 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         self.parent.db.runInteractionNow(self._trigger)
 
     def _trigger(self, t):
+        log.msg('%s: _trigger attempting to aquire Lock' % self.log_prefix)
+        self.lock.aquire()
+        log.msg('%s: _trigger aquired Lock' % self.log_prefix)
         state = self.get_initial_state(None)
         state['lastReset'] = state['lastCheck']
         log.msg('%s: reset state: %s' % (self.log_prefix, state))
         self.set_state(t, state)
+        self.lock.release()
+        log.msg('%s: _trigger released Lock' % self.log_prefix)
 
     def run(self):
-        if self.working:
-            log.msg('%s: another instance is still running, skipping.' \
-                    % self.log_prefix)
-            return
-        self.working = True
         d = self.parent.db.runInteraction(self._run)
         return d
 
@@ -440,10 +441,14 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         return t.fetchall()
 
     def _run(self, t):
+        log.msg('%s: _run attempting to aquire Lock' % self.log_prefix)
+        self.lock.aquire()
+        log.msg('%s: _run aquired Lock' % self.log_prefix)
         try:
             self.processRequest(t)
         finally:
-            self.working = False
+            self.lock.release()
+            log.msg('%s: _run released Lock' % self.log_prefix)
 
     def processRequest(self, t):
         db = self.parent.db
