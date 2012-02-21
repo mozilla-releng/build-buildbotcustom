@@ -4437,7 +4437,8 @@ class SingleSourceFactory(ReleaseFactory):
         # created in the expected place.
         self.env['MOZ_OBJDIR'] = self.objdir
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
-        if appVersion is None or version != appVersion:
+        if appVersion is None or version != appVersion or \
+           (self.branchName == 'mozilla-1.9.2' and productName == 'xulrunner'):
             self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
 
