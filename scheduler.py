@@ -409,9 +409,9 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         self.parent.db.runInteractionNow(self._trigger)
 
     def _trigger(self, t):
-        log.msg('%s: _trigger attempting to aquire Lock' % self.log_prefix)
-        self.lock.aquire()
-        log.msg('%s: _trigger aquired Lock' % self.log_prefix)
+        log.msg('%s: _trigger attempting to acquire Lock' % self.log_prefix)
+        self.lock.acquire()
+        log.msg('%s: _trigger acquired Lock' % self.log_prefix)
         state = self.get_initial_state(None)
         state['lastReset'] = state['lastCheck']
         log.msg('%s: reset state: %s' % (self.log_prefix, state))
@@ -441,9 +441,9 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         return t.fetchall()
 
     def _run(self, t):
-        log.msg('%s: _run attempting to aquire Lock' % self.log_prefix)
-        self.lock.aquire()
-        log.msg('%s: _run aquired Lock' % self.log_prefix)
+        log.msg('%s: _run attempting to acquire Lock' % self.log_prefix)
+        self.lock.acquire()
+        log.msg('%s: _run acquired Lock' % self.log_prefix)
         try:
             self.processRequest(t)
         finally:
