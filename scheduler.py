@@ -3,6 +3,7 @@
 # Contributor(s):
 #   Chris AtLee <catlee@mozilla.com>
 
+from threading import Lock
 from twisted.internet import defer, reactor
 from twisted.python import log
 from twisted.internet.task import LoopingCall
@@ -352,18 +353,26 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
     compare_attrs = ('name', 'branch', 'builderNames', 'properties',
                      'upstreamBuilders', 'okResults')
-    working = False
 
     def __init__(self, name, branch, builderNames, upstreamBuilders,
                  okResults=(SUCCESS,WARNINGS), properties={}):
         BaseScheduler.__init__(self, name, builderNames, properties)
         self.branch = branch
+        self.lock = Lock()
+        assert isinstance(upstreamBuilders, (list, tuple))
         self.upstreamBuilders = upstreamBuilders
         self.reason = "AccumulatingScheduler(%s)" % name
         self.okResults = okResults
+        self.log_prefix = '%s(%s) <id=%s>' % (self.__class__.__name__, name,
+                                              id(self))
 
     def get_initial_state(self, max_changeid):
+        log.msg('%s: get_initial_state()' % self.log_prefix)
+        # Keep initial state of builders in upstreamBuilders
+        # and operate on remainingBuilders to simplify comparison
+        # on reconfig
         return {
+                "upstreamBuilders": self.upstreamBuilders,
                 "remainingBuilders": self.upstreamBuilders,
                 "lastCheck": now(),
                 }
@@ -379,17 +388,20 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         for b in list(state['remainingBuilders']):
             if b not in self.upstreamBuilders:
                 state['remainingBuilders'].remove(b)
-        # Add new upstream builders
+        # Add new upstream builders. New builders shouln't be in
+        # state['upstreamBuilders'] which contains old self.upstreamBuilders.
+        # Since state['upstreamBuilders'] was introduced after
+        # state['remainingBuilders'], it may be absent from the scheduler
+        # database.
         for b in self.upstreamBuilders:
-            if b not in state['remainingBuilders']:
+            if b not in state.get('upstreamBuilders', []) and \
+               b not in state['remainingBuilders']:
                 state['remainingBuilders'].append(b)
-        log.msg('%s <id=%s>: reloaded' % (self.__class__.__name__,
-                                          id(self)))
+        state['upstreamBuilders'] = self.upstreamBuilders
+        log.msg('%s: reloaded' % self.log_prefix)
         if old_state != state:
-            log.msg('%s <id=%s>: old state: %s' % (self.__class__.__name__,
-                                                   id(self), old_state))
-            log.msg('%s <id=%s>: new state: %s' % (self.__class__.__name__,
-                                                   id(self), state))
+            log.msg('%s: old state: %s' % (self.log_prefix, old_state))
+            log.msg('%s: new state: %s' % (self.log_prefix, state))
         self.set_state(t, state)
 
     def trigger(self, ss, set_props=None):
@@ -397,18 +409,17 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         self.parent.db.runInteractionNow(self._trigger)
 
     def _trigger(self, t):
+        log.msg('%s: _trigger attempting to acquire Lock' % self.log_prefix)
+        self.lock.acquire()
+        log.msg('%s: _trigger acquired Lock' % self.log_prefix)
         state = self.get_initial_state(None)
         state['lastReset'] = state['lastCheck']
-        log.msg('%s <id=%s>: reset state: %s' % (self.__class__.__name__,
-                id(self), state))
+        log.msg('%s: reset state: %s' % (self.log_prefix, state))
         self.set_state(t, state)
+        self.lock.release()
+        log.msg('%s: _trigger released Lock' % self.log_prefix)
 
     def run(self):
-        if self.working:
-            log.msg('%s <id=%s>: another instance is still running, skipping.' \
-                    % (self.__class__.__name__, id(self)))
-            return
-        self.working = True
         d = self.parent.db.runInteraction(self._run)
         return d
 
@@ -430,10 +441,14 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         return t.fetchall()
 
     def _run(self, t):
+        log.msg('%s: _run attempting to acquire Lock' % self.log_prefix)
+        self.lock.acquire()
+        log.msg('%s: _run acquired Lock' % self.log_prefix)
         try:
             self.processRequest(t)
         finally:
-            self.working = False
+            self.lock.release()
+            log.msg('%s: _run released Lock' % self.log_prefix)
 
     def processRequest(self, t):
         db = self.parent.db
@@ -458,9 +473,9 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
             # Start a build!
             log.msg(
-                '%s <id=%s>: new buildset: name=%s, branch=%s, ssid=%s, builders: %s' \
-                % (self.__class__.__name__, id(self), self.name,
-                   self.branch, ssid, ', '.join(self.builderNames)))
+                '%s: new buildset: branch=%s, ssid=%s, builders: %s' \
+                % (self.log_prefix, self.branch, ssid,
+                   ', '.join(self.builderNames)))
             self.create_buildset(ssid, "downstream", t)
 
             # Reset the list of builders we're waiting for

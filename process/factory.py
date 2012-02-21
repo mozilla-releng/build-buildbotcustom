@@ -8196,11 +8196,12 @@ class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
             extra_data=None, extra_args=None,
             script_timeout=1200, script_maxtime=None, log_eval_func=None,
-            hg_bin='hg'):
+            reboot_command=None, hg_bin='hg'):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
         self.script_maxtime = script_maxtime
+        self.reboot_command = reboot_command
         if scriptName[0] == '/':
             script_path = scriptName
         else:
@@ -8257,6 +8258,7 @@ class ScriptFactory(BuildFactory):
             workdir='scripts'
         ))
         self.runScript()
+        self.reboot()
 
     def runScript(self):
         self.addStep(ShellCommand(
@@ -8279,6 +8281,27 @@ class ScriptFactory(BuildFactory):
             warnOnFailure=False,
             flunkOnFailure=False,
         ))
+
+    def reboot(self):
+        def do_disconnect(cmd):
+            try:
+                if 'SCHEDULED REBOOT' in cmd.logs['stdio'].getText():
+                    return True
+            except:
+                pass
+            return False
+        if self.reboot_command:
+            self.addStep(DisconnectStep(
+                name='reboot',
+                flunkOnFailure=False,
+                warnOnFailure=False,
+                alwaysRun=True,
+                workdir='.',
+                description="reboot",
+                command=self.reboot_command,
+                force_disconnect=do_disconnect,
+                env=self.env,
+            ))
 
 class SigningScriptFactory(ScriptFactory):
 
