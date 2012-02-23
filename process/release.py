@@ -1439,7 +1439,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             schedulers.append(repack_scheduler)
             repack_complete_scheduler = AggregatingScheduler(
                 name=builderPrefix('%s_repack_complete' % platform),
-                branch=builderPrefix('%s_repack_complete' % platform),
+                branch=sourceRepoInfo['path'],
                 upstreamBuilders=l10nBuilderNames,
                 builderNames=[builderPrefix('repack_complete', platform),]
             )
@@ -1523,28 +1523,28 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             updates_upstream_builders = [builderPrefix('signing_done')]
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('%s_signing_done' % releaseConfig['productName']),
-            branch=builderPrefix('%s_signing_done' % releaseConfig['productName']),
+            branch=sourceRepoInfo['path'],
             upstreamBuilders=updates_upstream_builders,
             builderNames=post_signing_builders,
         ))
     if releaseConfig.get('verifyConfigs'):
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('updates_done'),
-            branch=builderPrefix('updates_done'),
+            branch=sourceRepoInfo['path'],
             upstreamBuilders=[builderPrefix('updates')],
             builderNames=post_update_builders,
         ))
     if post_deliverables_builders:
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('%s_deliverables_ready' % releaseConfig['productName']),
-            branch=builderPrefix('%s_deliverables_ready' % releaseConfig['productName']),
+            branch=sourceRepoInfo['path'],
             upstreamBuilders=deliverables_builders,
             builderNames=post_deliverables_builders,
         ))
     if post_antivirus_builders:
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('av_done'),
-            branch=builderPrefix('av_done'),
+            branch=sourceRepoInfo['path'],
             upstreamBuilders=[builderPrefix('antivirus')],
             builderNames=post_antivirus_builders,
         ))
@@ -1556,8 +1556,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             schedulers.append(AggregatingScheduler(
                 name=builderPrefix('%s_l10n_done' % releaseConfig['productName'],
                                    platform),
-                branch=builderPrefix('%s_l10n_done' % releaseConfig['productName'],
-                                     platform),
+                branch=sourceRepoInfo['path'],
                 upstreamBuilders=[builderPrefix('repack_complete', platform)],
                 builderNames=[builderPrefix('partner_repack', platform)],
             ))
@@ -1567,7 +1566,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             upstream_builders.append(builderPrefix('updates'))
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('%s_uptake_check' % releaseConfig['productName']),
-            branch=builderPrefix('%s_uptake_check' % releaseConfig['productName']),
+            branch=sourceRepoInfo['path'],
             upstreamBuilders=upstream_builders,
             builderNames=[builderPrefix('start_uptake_monitoring')]
         ))

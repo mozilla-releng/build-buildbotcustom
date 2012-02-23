@@ -50,7 +50,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-  upload_errors
+  upload_errors, tegra_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -4437,7 +4437,8 @@ class SingleSourceFactory(ReleaseFactory):
         # created in the expected place.
         self.env['MOZ_OBJDIR'] = self.objdir
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
-        if appVersion is None or version != appVersion:
+        if appVersion is None or version != appVersion or \
+           (self.branchName == 'mozilla-1.9.2' and productName == 'xulrunner'):
             self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
 
@@ -7055,14 +7056,23 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/hostutils',
             name='unpack_hostutils',
         ))
-        self.addStep(ShellCommand(
+        self.addStep(SetProperty(
+                name='set_toolsdir',
+                command=['bash', '-c', 'pwd'],
+                property='toolsdir',
+                workdir='/builds/tools',
+        ))
+        self.addStep(RetryingShellCommand(
             name='cleanup device',
             workdir='.',
             description="Cleanup Device",
             command=['python', '/builds/sut_tools/cleanup.py',
                      WithProperties("%(sut_ip)s"),
                     ],
-            haltOnFailure=True)
+            haltOnFailure=True,
+            flunkOnFailure=True,
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+            )
         )
         self.addStep(ShellCommand(
             name='install app on device',
@@ -7409,7 +7419,13 @@ class TalosFactory(RequestSortingBuildFactory):
          env=self.env)
         )
         if self.remoteTests:
-            self.addStep(ShellCommand(
+            self.addStep(SetProperty(
+                    name='set_toolsdir',
+                    command=['bash', '-c', 'pwd'],
+                    property='toolsdir',
+                    workdir='/builds/tools',
+            ))
+            self.addStep(RetryingShellCommand(
                 name='cleanup device',
                 workdir=self.workdirBase,
                 description="Cleanup Device",
@@ -7417,8 +7433,10 @@ class TalosFactory(RequestSortingBuildFactory):
                          WithProperties("%(sut_ip)s"),
                         ],
                 env=self.env,
-                haltOnFailure=True)
-            )
+                haltOnFailure=True,
+                flunkOnFailure=True,
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+            ))
         if not self.remoteTests:
             self.addStep(DownloadFile(
              url=WithProperties("%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase),
