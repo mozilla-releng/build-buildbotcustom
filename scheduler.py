@@ -438,7 +438,11 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         q = db.quoteq(q)
         t.execute(q, tuple(self.upstreamBuilders) + tuple(self.okResults) +
                   (lastCheck,))
-        return t.fetchall()
+        newBuilds = t.fetchall()
+        if newBuilds:
+            log.msg('%s: new builds %s since %s' % (self.log_prefix, newBuilds,
+                                                    lastCheck))
+        return newBuilds
 
     def _run(self, t):
         log.msg('%s: _run attempting to acquire Lock' % self.log_prefix)
@@ -480,6 +484,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
             # Reset the list of builders we're waiting for
             state = self.get_initial_state(None)
+            state['lastCheck'] = n
 
         self.set_state(t, state)
 
