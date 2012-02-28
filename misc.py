@@ -789,7 +789,8 @@ def generateBranchObjects(config, name, secrets=None):
     if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
-                            pollInterval=l10nPollInterval)
+                            pollInterval=l10nPollInterval,
+                            branch=name)
         hg_all_locales_poller.parallelRequests = 1
         branchObjects['change_source'].append(hg_all_locales_poller)
 
@@ -2054,7 +2055,8 @@ def generateCCBranchObjects(config, name, secrets=None):
     if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
                             repositoryIndex = config['l10n_repo_path'],
-                            pollInterval=l10nPollInterval)
+                            pollInterval=l10nPollInterval,
+                            branch=name)
         hg_all_locales_poller.parallelRequests = 1
         branchObjects['change_source'].append(hg_all_locales_poller)
 

@@ -425,13 +425,15 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     parallelRequests = 2
     verboseChilds = False
 
-    def __init__(self, hgURL, repositoryIndex, pollInterval=120):
+    def __init__(self, hgURL, repositoryIndex, pollInterval=120, branch=None):
         """
         @type  repositoryIndex:      string
         @param repositoryIndex:      The URL listing all locale repos
         @type  pollInterval        int
         @param pollInterval        The time (in seconds) between queries for
                                    changes
+        @type  branch:      string
+        @param branch:      Used by caller to uniquely identify this object
         """
 
         BasePoller.__init__(self)
@@ -444,6 +446,7 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
         self.locales = []
         self.pendingLocales = []
         self.activeRequests = 0
+        self.branch = branch
 
     def startService(self):
         self.loop = LoopingCall(self.poll)

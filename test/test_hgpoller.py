@@ -70,7 +70,7 @@ fakeLocalesFile = """/l10n-central/af/
 
 class FakeHgAllLocalesPoller(HgAllLocalesPoller):
     def __init__(self):
-        HgAllLocalesPoller.__init__(self, hgURL='fake', repositoryIndex='fake')
+        HgAllLocalesPoller.__init__(self, hgURL='fake', repositoryIndex='fake', branch='fake')
 
     def pollNextLocale(self):
         pass
