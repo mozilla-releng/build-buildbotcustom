@@ -25,3 +25,7 @@ upload_errors = ((re.compile("Connection timed out"), RETRY),
                  (re.compile("Connection refused"), RETRY),
                  (re.compile("Connection reset by peer"), RETRY),
                 )
+
+tegra_errors = ((re.compile("process killed by signal 9"), RETRY),
+                (re.compile("process killed by signal 15"), RETRY),
+               )
