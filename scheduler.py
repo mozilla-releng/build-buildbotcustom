@@ -3,7 +3,6 @@
 # Contributor(s):
 #   Chris AtLee <catlee@mozilla.com>
 
-from threading import Lock
 from twisted.internet import defer, reactor
 from twisted.python import log
 from twisted.internet.task import LoopingCall
@@ -358,7 +357,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                  okResults=(SUCCESS,WARNINGS), properties={}):
         BaseScheduler.__init__(self, name, builderNames, properties)
         self.branch = branch
-        self.lock = Lock()
+        self.lock = defer.DeferredLock()
         assert isinstance(upstreamBuilders, (list, tuple))
         self.upstreamBuilders = upstreamBuilders
         self.reason = "AccumulatingScheduler(%s)" % name
@@ -406,27 +405,28 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
     def trigger(self, ss, set_props=None):
         """Reset scheduler state"""
-        self.parent.db.runInteractionNow(self._trigger)
+        d = self.lock.acquire()
+        d.addCallback(lambda _: self.parent.db.runInteractionNow(self._trigger))
+        d.addBoth(lambda _: self.lock.release())
 
     def _trigger(self, t):
-        log.msg('%s: _trigger attempting to acquire Lock' % self.log_prefix)
-        self.lock.acquire()
-        log.msg('%s: _trigger acquired Lock' % self.log_prefix)
         state = self.get_initial_state(None)
         state['lastReset'] = state['lastCheck']
         log.msg('%s: reset state: %s' % (self.log_prefix, state))
         self.set_state(t, state)
-        self.lock.release()
-        log.msg('%s: _trigger released Lock' % self.log_prefix)
 
     def run(self):
-        d = self.parent.db.runInteraction(self._run)
+        if self.lock.locked:
+            return
+
+        d = self.lock.acquire()
+        d.addCallback(lambda _: self.parent.db.runInteraction(self._run))
+        d.addBoth(lambda _: self.lock.release())
         return d
 
     def findNewBuilds(self, db, t, lastCheck):
-        q = """SELECT buildername, sourcestampid FROM
-               buildrequests, buildsets WHERE
-               buildrequests.buildsetid = buildsets.id AND
+        q = """SELECT buildername, id, complete_at FROM
+               buildrequests WHERE
                buildername IN %s AND
                buildrequests.complete = 1 AND
                buildrequests.results IN %s AND
@@ -440,34 +440,25 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                   (lastCheck,))
         newBuilds = t.fetchall()
         if newBuilds:
-            log.msg('%s: new builds %s since %s' % (self.log_prefix, newBuilds,
+            log.msg('%s: new builds: %s since %s' % (self.log_prefix, newBuilds,
                                                     lastCheck))
         return newBuilds
 
     def _run(self, t):
-        log.msg('%s: _run attempting to acquire Lock' % self.log_prefix)
-        self.lock.acquire()
-        log.msg('%s: _run acquired Lock' % self.log_prefix)
-        try:
-            self.processRequest(t)
-        finally:
-            self.lock.release()
-            log.msg('%s: _run released Lock' % self.log_prefix)
-
-    def processRequest(self, t):
         db = self.parent.db
         state = self.get_state(t)
         # Check for new builds completed since lastCheck
         lastCheck = state['lastCheck']
         remainingBuilders = state['remainingBuilders']
 
-        n = now()
         newBuilds = self.findNewBuilds(db, t, lastCheck)
-        state['lastCheck'] = n
 
-        for builder, ssid in newBuilds:
+        for builder, brid, complete_at in newBuilds:
+            state['lastCheck'] = max(state['lastCheck'], complete_at)
             if builder in remainingBuilders:
                 remainingBuilders.remove(builder)
+
+        lastCheck = state['lastCheck']
 
         if remainingBuilders:
             state['remainingBuilders'] = remainingBuilders
@@ -484,7 +475,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
             # Reset the list of builders we're waiting for
             state = self.get_initial_state(None)
-            state['lastCheck'] = n
+            state['lastCheck'] = lastCheck
 
         self.set_state(t, state)
 
