@@ -1097,7 +1097,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             schedulerNames.append(builderPrefix('ready-for-rel-test'))
         trigger_uptake_factory.addStep(Trigger(
             schedulerNames=schedulerNames,
-            copy_properties=['script_repo_revision', 'release_config']
+            set_properties={
+                'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
+            },
         ))
         builders.append({
             'name': builderPrefix('start_uptake_monitoring'),
