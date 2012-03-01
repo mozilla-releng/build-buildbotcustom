@@ -50,7 +50,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-  upload_errors
+  upload_errors, tegra_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -6531,9 +6531,9 @@ def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
 
 class MozillaTestFactory(MozillaBuildFactory):
     def __init__(self, platform, productName='firefox',
-                 downloadSymbols=True, downloadTests=False,
-                 posixBinarySuffix='-bin', resetHwClock=False, stackwalk_cgi=None,
-                 **kwargs):
+                 downloadSymbols=True, downloadSymbolsOnDemand=True,
+                 downloadTests=False, posixBinarySuffix='-bin',
+                 resetHwClock=False, **kwargs):
         #Note: the posixBinarySuffix is needed because some products (firefox)
         #use 'firefox-bin' and some (fennec) use 'fennec' for the name of the
         #actual application binary.  This is only applicable to posix-like
@@ -6547,9 +6547,9 @@ class MozillaTestFactory(MozillaBuildFactory):
         else:
             self.posixBinarySuffix = posixBinarySuffix
         self.downloadSymbols = downloadSymbols
+        self.downloadSymbolsOnDemand = downloadSymbolsOnDemand
         self.downloadTests = downloadTests
         self.resetHwClock = resetHwClock
-        self.stackwalk_cgi = stackwalk_cgi
 
         assert self.platform in getSupportedPlatforms()
 
@@ -6561,7 +6561,7 @@ class MozillaTestFactory(MozillaBuildFactory):
 
         self.addCleanupSteps()
         self.addPrepareBuildSteps()
-        if self.downloadSymbols:
+        if self.downloadSymbols or self.downloadSymbolsOnDemand:
             self.addPrepareSymbolsSteps()
         if self.downloadTests:
             self.addPrepareTestsSteps()
@@ -6681,7 +6681,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             else:
                 return parse_sendchange_files(build, include_substr='.crashreporter-symbols.')
 
-        if not self.stackwalk_cgi:
+        if self.downloadSymbols:
             self.addStep(DownloadFile(
                 url_fn=get_symbols_url,
                 filename_property='symbols_filename',
@@ -6695,7 +6695,7 @@ class MozillaTestFactory(MozillaBuildFactory):
                 name='unpack_symbols',
                 workdir='build/symbols'
             ))
-        else:
+        elif self.downloadSymbolsOnDemand:
             self.addStep(SetBuildProperty(
                 property_name='symbols_url',
                 value=get_symbols_url,
@@ -6790,7 +6790,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
     def __init__(self, platform, test_suites, env, productName='firefox',
                  mochitest_leak_threshold=None,
                  crashtest_leak_threshold=None, totalChunks=None,
-                 thisChunk=None, chunkByDir=None, stackwalk_cgi=None,
+                 thisChunk=None, chunkByDir=None,
                  **kwargs):
         platform = platform.split('-')[0]
         self.test_suites = test_suites
@@ -6799,10 +6799,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         self.chunkByDir = chunkByDir
 
         testEnv = MozillaEnvironments['%s-unittest' % platform].copy()
-        if stackwalk_cgi and kwargs.get('downloadSymbols'):
-            testEnv['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
-        else:
-            testEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        testEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
         testEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         testEnv.update(env)
 
@@ -6810,7 +6807,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                                 'crashtest': crashtest_leak_threshold,}
 
         MozillaTestFactory.__init__(self, platform, productName, env=testEnv,
-                                    downloadTests=True, stackwalk_cgi=stackwalk_cgi,
+                                    downloadTests=True,
                                     **kwargs)
 
     def addSetupSteps(self):
@@ -6825,7 +6822,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         if self.platform.startswith('macosx64'):
             self.addStep(resolution_step())
         # Run them!
-        if self.stackwalk_cgi and self.downloadSymbols:
+        if self.downloadSymbolsOnDemand:
             symbols_path = '%(symbols_url)s'
         else:
             symbols_path = 'symbols'
@@ -6989,18 +6986,13 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
 
 class RemoteUnittestFactory(MozillaTestFactory):
     def __init__(self, platform, suites, hostUtils, productName='fennec',
-                 downloadSymbols=False, downloadTests=True,
-                 posixBinarySuffix='', remoteExtras=None,
-                 branchName=None, stackwalk_cgi=None, **kwargs):
+                downloadSymbols=False, downloadTests=True, posixBinarySuffix='',
+                remoteExtras=None, branchName=None, **kwargs):
         self.suites = suites
         self.hostUtils = hostUtils
-        self.stackwalk_cgi = stackwalk_cgi
         self.env = {}
 
-        if stackwalk_cgi and kwargs.get('downloadSymbols'):
-            self.env['MINIDUMP_STACKWALK_CGI'] = stackwalk_cgi
-        else:
-            self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
         self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         if remoteExtras is not None:
@@ -7021,7 +7013,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                     downloadSymbols=downloadSymbols,
                                     downloadTests=downloadTests,
                                     posixBinarySuffix=posixBinarySuffix,
-                                    stackwalk_cgi=stackwalk_cgi,
                                     **kwargs)
 
     def addCleanupSteps(self):
@@ -7063,6 +7054,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
             command=['python', '/builds/sut_tools/cleanup.py',
                      WithProperties("%(sut_ip)s"),
                     ],
+            log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
             haltOnFailure=True)
         )
         self.addStep(ShellCommand(
@@ -7129,7 +7121,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         ))
 
     def addRunTestSteps(self):
-        if self.stackwalk_cgi and self.downloadSymbols:
+        if self.downloadSymbolsOnDemand:
             symbols_path = '%(symbols_url)s'
         else:
             symbols_path = 'symbols'

@@ -25,3 +25,8 @@ upload_errors = ((re.compile("Connection timed out"), RETRY),
                  (re.compile("Connection refused"), RETRY),
                  (re.compile("Connection reset by peer"), RETRY),
                 )
+
+tegra_errors = ((re.compile("process killed by signal"), RETRY),
+                (re.compile("Remote Device Error"), RETRY),
+                (re.compile("devicemanager.DMError"), RETRY),
+               )
