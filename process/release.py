@@ -63,6 +63,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     # config file bumps
     runtimeTag = getRuntimeTag(releaseTag)
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_PARALLELIZATION)
+    releaseChannel = releaseConfig.get('releaseChannel', 'release')
     updateVerifyChunks = releaseConfig.get('updateVerifyChunks', DEFAULT_PARALLELIZATION)
     tools_repo_path = releaseConfig.get('build_tools_repo_path',
                                         branchConfig['build_tools_repo_path'])
@@ -535,8 +536,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         if not releaseConfig.get('skip_build'):
             platform_env = pf['env'].copy()
-            if 'update_channel' in branchConfig:
-                platform_env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
+            platform_env['MOZ_UPDATE_CHANNEL'] = releaseChannel
             if platform in releaseConfig['l10nPlatforms']:
                 triggeredSchedulers = [builderPrefix('%s_repack' % platform)]
             else:
@@ -629,8 +629,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if platform in releaseConfig['l10nPlatforms']:
             env = builder_env.copy()
             env.update(pf['env'])
-            if 'update_channel' in branchConfig:
-                env['MOZ_UPDATE_CHANNEL'] = branchConfig['update_channel']
+            env['MOZ_UPDATE_CHANNEL'] = releaseChannel
 
             if not releaseConfig.get('disableStandaloneRepacks'):
                 extra_args = [platform, branchConfigFile]
@@ -914,7 +913,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
-        releaseChannel = releaseConfig.get('releaseChannel', branchConfig['update_channel'])
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
