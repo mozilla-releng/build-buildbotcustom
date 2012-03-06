@@ -12,6 +12,7 @@ hg_errors = ((re.compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re.compile("abort: .*: no match found!"), RETRY),
              (re.compile("abort: Connection reset by peer"), RETRY),
              (re.compile("transaction abort!"), RETRY),
+             (re.compile("abort: error:"), RETRY),
             )
 purge_error = ((re.compile("Error: unable to free"), RETRY),)
 
@@ -25,8 +26,3 @@ upload_errors = ((re.compile("Connection timed out"), RETRY),
                  (re.compile("Connection refused"), RETRY),
                  (re.compile("Connection reset by peer"), RETRY),
                 )
-
-tegra_errors = ((re.compile("process killed by signal"), RETRY),
-                (re.compile("Remote Device Error"), RETRY),
-                (re.compile("devicemanager.DMError"), RETRY),
-               )
