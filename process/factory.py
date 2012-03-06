@@ -1918,7 +1918,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 haltOnFailure=True
             ))
         baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s' % \
-            (self.stageServer, self.productName, self.platform)
+            (self.stageServer, self.productName, self.complete_platform)
 
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
 
