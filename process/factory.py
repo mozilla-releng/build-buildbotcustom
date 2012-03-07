@@ -1261,6 +1261,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(AliveTest(
           env=leakEnv,
           workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          extraArgs=['-register'],
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        self.addStep(AliveTest(
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        self.addStep(AliveTest(
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
           extraArgs=['--trace-malloc', 'malloc.log',
                      '--shutdown-leaks=sdleak.log'],
           timeout=3600, # 1 hour, because this takes a long time on win32
@@ -1391,20 +1404,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          extraArgs=['-register'],
-          warnOnFailure=True,
-          haltOnFailure=True
-        ))
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          warnOnFailure=True,
-          haltOnFailure=True
-        ))
-
         self.addLeakTestStepsCommon(self.logBaseUrl, leakEnv, True)
 
     def addCheckTestSteps(self):
@@ -1903,23 +1902,11 @@ class TryBuildFactory(MercurialBuildFactory):
         ))
 
     def addLeakTestSteps(self):
-        # we want the same thing run a few times here, with different
-        # extraArgs
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        for args in [['-register'], ['-CreateProfile', 'default'],
-                     ['-P', 'default']]:
-            self.addStep(AliveTest(
-                env=leakEnv,
-                workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                extraArgs=args,
-                warnOnFailure=True,
-                haltOnFailure=True
-            ))
         baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s' % \
             (self.stageServer, self.productName, self.complete_platform)
-
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
 
     def addCodesighsSteps(self):
