@@ -1261,6 +1261,19 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(AliveTest(
           env=leakEnv,
           workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          extraArgs=['-register'],
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        self.addStep(AliveTest(
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
+          warnOnFailure=True,
+          haltOnFailure=True
+          ))
+        self.addStep(AliveTest(
+          env=leakEnv,
+          workdir='build/%s/_leaktest' % self.mozillaObjdir,
           extraArgs=['--trace-malloc', 'malloc.log',
                      '--shutdown-leaks=sdleak.log'],
           timeout=3600, # 1 hour, because this takes a long time on win32
@@ -1391,20 +1404,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          extraArgs=['-register'],
-          warnOnFailure=True,
-          haltOnFailure=True
-        ))
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          warnOnFailure=True,
-          haltOnFailure=True
-        ))
-
         self.addLeakTestStepsCommon(self.logBaseUrl, leakEnv, True)
 
     def addCheckTestSteps(self):
@@ -1903,23 +1902,11 @@ class TryBuildFactory(MercurialBuildFactory):
         ))
 
     def addLeakTestSteps(self):
-        # we want the same thing run a few times here, with different
-        # extraArgs
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        for args in [['-register'], ['-CreateProfile', 'default'],
-                     ['-P', 'default']]:
-            self.addStep(AliveTest(
-                env=leakEnv,
-                workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                extraArgs=args,
-                warnOnFailure=True,
-                haltOnFailure=True
-            ))
         baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s' % \
-            (self.stageServer, self.productName, self.platform)
-
+            (self.stageServer, self.productName, self.complete_platform)
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
 
     def addCodesighsSteps(self):
@@ -7257,6 +7244,11 @@ class TalosFactory(RequestSortingBuildFactory):
             self.ignoreCerts = True
         self.remoteTests = remoteTests
         self.configOptions = configOptions['suites'][:]
+        try:
+            self.suites = self.configOptions[self.configOptions.index("--activeTests")+1]
+        except:
+            # simple-talos does not use --activeTests
+            self.suites = ""
         self.talosCmd = talosCmd
         self.customManifest = customManifest
         self.customTalos = customTalos
@@ -7441,6 +7433,36 @@ class TalosFactory(RequestSortingBuildFactory):
          ignore_certs=self.ignoreCerts,
          name="Download build",
         ))
+        if '--fennecIDs' in self.configOptions:
+            def get_fennec_ids_url(build):
+                url = build.source.changes[-1].files[0]
+                return url[:-len('fennec-XX.0XX.en-US.android-arm.apk')] + "fennec_ids.txt"
+
+            def get_robocop_url(build):
+                url = build.source.changes[-1].files[0]
+                return url[:-len('fennec-XX.0XX.en-US.android-arm.apk')] + "robocop.apk"
+
+            self.addStep(DownloadFile(
+             url_fn=get_fennec_ids_url,
+             url_property="fennec_ids_url",
+             filename_property="fennec_ids_filename",
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+             ignore_certs=self.ignoreCerts,
+             name="download_fennec_ids",
+             description="Download fennec_ids.txt",
+            ))
+
+            self.addStep(DownloadFile(
+             url_fn=get_robocop_url,
+             url_property='robocop_url',
+             filename_property='robocop_filename',
+             workdir=self.workdirBase + "/build",
+             haltOnFailure=True,
+             ignore_certs=self.ignoreCerts,
+             name='download_robocop',
+             description="Download robocop.apk",
+            ))
 
     def addUnpackBuildSteps(self):
         if (self.releaseTester and (self.OS in ('xp', 'vista', 'win7', 'w764'))): 
@@ -7610,35 +7632,32 @@ class TalosFactory(RequestSortingBuildFactory):
              haltOnFailure=True,
             ))
         elif self.remoteTests:
-            self.addStep(ShellCommand(
-             name='copy_talos',
-             command=["cp", "-rv", "/builds/talos-data/talos", "."],
+            self.addStep(DownloadFile(
+             url='http://build.mozilla.org/talos/zips/bug723667.mobile.talos.zip',
+             wget_args=['-O', 'talos.zip'],
              workdir=self.workdirBase,
-             description="copying talos",
              haltOnFailure=True,
-             flunkOnFailure=True,
-             env=self.env)
-            )
-            self.addStep(ShellCommand(
-             name='copy_fennecmark',
-             command=["cp", "-rv", "/builds/talos-data/bench@taras.glek",
-                      "talos/mobile_profile/extensions/"],
+             description="Download talos.zip",
+            ))
+            self.addStep(UnpackFile(
+             filename='talos.zip',
              workdir=self.workdirBase,
-             description="copying fennecmark",
              haltOnFailure=True,
-             flunkOnFailure=True,
-             env=self.env)
-            )
-            self.addStep(ShellCommand(
-             name='copy_pageloader',
-             command=["cp", "-rv", "/builds/talos-data/pageloader@mozilla.org",
-                      "talos/mobile_profile/extensions/"],
-             workdir=self.workdirBase,
-             description="copying pageloader",
-             haltOnFailure=True,
-             flunkOnFailure=True,
-             env=self.env)
-            )
+             description="Unpack talos.zip",
+            ))
+            if self.suites.find('tp4m') != -1:
+                self.addStep(DownloadFile(
+                 url='http://build.mozilla.org/talos/zips/mobile_tp4.zip',
+                 workdir=self.workdirBase + "/talos",
+                 haltOnFailure=True,
+                 description="Download mobile_tp4.zip",
+                ))
+                self.addStep(UnpackFile(
+                 filename='mobile_tp4.zip',
+                 workdir=self.workdirBase + "/talos",
+                 haltOnFailure=True,
+                 description="Unpack mobile_tp4.zip",
+                ))
         else:
             self.addStep(FileDownload(
              mastersrc=self.customTalos,
