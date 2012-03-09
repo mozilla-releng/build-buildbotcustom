@@ -6977,10 +6977,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                 remoteExtras=None, branchName=None, **kwargs):
         self.suites = suites
         self.hostUtils = hostUtils
-        self.env = {}
-
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
-        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         if remoteExtras is not None:
             self.remoteExtras = remoteExtras
@@ -6996,11 +6992,15 @@ class RemoteUnittestFactory(MozillaTestFactory):
             else:
                 self.remoteProcessName = 'org.mozilla.fennec'
 
+        env = {}
+        env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
+
         MozillaTestFactory.__init__(self, platform, productName=productName,
                                     downloadSymbols=downloadSymbols,
                                     downloadTests=downloadTests,
                                     posixBinarySuffix=posixBinarySuffix,
-                                    **kwargs)
+                                    env=env, **kwargs)
 
     def addCleanupSteps(self):
         '''Clean up the relevant places before starting a build'''
