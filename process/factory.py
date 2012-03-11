@@ -50,7 +50,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-  upload_errors
+  upload_errors, talos_hgweb_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -7604,7 +7604,8 @@ class TalosFactory(RequestSortingBuildFactory):
                     url=WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py"),
                     workdir=self.workdirBase,
                     haltOnFailure=True,
-                    wget_args=['--progress=dot:mega', '--no-check-certificate']
+                    wget_args=['--progress=dot:mega', '--no-check-certificate'],
+                    log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
                 ))
                 self.addStep(ShellCommand(
                     name='download files specified in talos.json',
@@ -7613,6 +7614,7 @@ class TalosFactory(RequestSortingBuildFactory):
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
                     haltOnFailure=True,
+                    log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
                 ))
             else:
                 self.addStep(DownloadFile(

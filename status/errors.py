@@ -26,3 +26,7 @@ upload_errors = ((re.compile("Connection timed out"), RETRY),
                  (re.compile("Connection refused"), RETRY),
                  (re.compile("Connection reset by peer"), RETRY),
                 )
+
+talos_hgweb_errors = ((re.compile("ERROR 500: Internal Server Error"), RETRY),
+                      (re.compile("ERROR: We tried to download the talos.json file but something failed"), RETRY),
+                     )
