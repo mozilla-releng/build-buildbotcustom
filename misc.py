@@ -3708,6 +3708,7 @@ def generateJetpackObjects(config, SLAVES):
             relayhost="mail.build.mozilla.org",
             builders=[b['name'] for b in builders],
             logCompression="gzip",
+            errorparser="unittest",
         )
         status = [tbox_mailer]
 
