@@ -5446,7 +5446,9 @@ class UpdateVerifyFactory(ReleaseFactory):
 class ReleaseFinalVerification(ReleaseFactory):
     def __init__(self, verifyConfigs, platforms=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
-        ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
+        if 'repoPath' not in kwargs:
+            kwargs['repoPath'] = 'nothing'
+        ReleaseFactory.__init__(self, **kwargs)
         verifyCommand = ['bash', 'final-verification.sh']
         platforms = platforms or sorted(verifyConfigs.keys())
         for platform in platforms:
@@ -6374,8 +6376,9 @@ class L10nVerifyFactory(ReleaseFactory):
                  platform, verifyDir='verify', linuxExtension='bz2',
                  buildSpace=4, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
-        ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
-                                **kwargs)
+        if 'repoPath' not in kwargs:
+                    kwargs['repoPath'] = 'nothing'
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         verifyDirVersion = 'tools/release/l10n'
         platformFtpDir = getPlatformFtpDir(platform)
