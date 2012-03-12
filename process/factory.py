@@ -50,7 +50,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-  upload_errors
+  upload_errors, talos_hgweb_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -5446,7 +5446,9 @@ class UpdateVerifyFactory(ReleaseFactory):
 class ReleaseFinalVerification(ReleaseFactory):
     def __init__(self, verifyConfigs, platforms=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
-        ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
+        if 'repoPath' not in kwargs:
+            kwargs['repoPath'] = 'nothing'
+        ReleaseFactory.__init__(self, **kwargs)
         verifyCommand = ['bash', 'final-verification.sh']
         platforms = platforms or sorted(verifyConfigs.keys())
         for platform in platforms:
@@ -6374,8 +6376,9 @@ class L10nVerifyFactory(ReleaseFactory):
                  platform, verifyDir='verify', linuxExtension='bz2',
                  buildSpace=4, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
-        ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
-                                **kwargs)
+        if 'repoPath' not in kwargs:
+                    kwargs['repoPath'] = 'nothing'
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         verifyDirVersion = 'tools/release/l10n'
         platformFtpDir = getPlatformFtpDir(platform)
@@ -6977,10 +6980,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                 remoteExtras=None, branchName=None, **kwargs):
         self.suites = suites
         self.hostUtils = hostUtils
-        self.env = {}
-
-        self.env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
-        self.env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
 
         if remoteExtras is not None:
             self.remoteExtras = remoteExtras
@@ -6996,11 +6995,15 @@ class RemoteUnittestFactory(MozillaTestFactory):
             else:
                 self.remoteProcessName = 'org.mozilla.fennec'
 
+        env = {}
+        env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
+        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
+
         MozillaTestFactory.__init__(self, platform, productName=productName,
                                     downloadSymbols=downloadSymbols,
                                     downloadTests=downloadTests,
                                     posixBinarySuffix=posixBinarySuffix,
-                                    **kwargs)
+                                    env=env, **kwargs)
 
     def addCleanupSteps(self):
         '''Clean up the relevant places before starting a build'''
@@ -7604,7 +7607,8 @@ class TalosFactory(RequestSortingBuildFactory):
                     url=WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py"),
                     workdir=self.workdirBase,
                     haltOnFailure=True,
-                    wget_args=['--progress=dot:mega', '--no-check-certificate']
+                    wget_args=['--progress=dot:mega', '--no-check-certificate'],
+                    log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
                 ))
                 self.addStep(ShellCommand(
                     name='download files specified in talos.json',
@@ -7613,6 +7617,7 @@ class TalosFactory(RequestSortingBuildFactory):
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
                     haltOnFailure=True,
+                    log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
                 ))
             else:
                 self.addStep(DownloadFile(

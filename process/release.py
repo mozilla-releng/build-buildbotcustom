@@ -848,6 +848,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 oldBuildNumber=releaseConfig['oldBuildNumber'],
                 clobberURL=branchConfig['base_clobber_url'],
                 platform=platform,
+                repoPath=sourceRepoInfo['path'],
             )
 
             if 'macosx64' in branchConfig['platforms']:
@@ -1122,6 +1123,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             buildToolsRepoPath=tools_repo_path,
             verifyConfigs=releaseConfig['verifyConfigs'],
             clobberURL=branchConfig['base_clobber_url'],
+            repoPath=sourceRepoInfo['path'],
         )
 
         builders.append({
