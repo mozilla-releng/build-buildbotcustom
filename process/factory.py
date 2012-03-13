@@ -7113,7 +7113,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         if self.downloadSymbolsOnDemand:
             symbols_path = '%(symbols_url)s'
         else:
-            symbols_path = 'symbols'
+            symbols_path = '../symbols'
 
         for suite in self.suites:
             name = suite['suite']
