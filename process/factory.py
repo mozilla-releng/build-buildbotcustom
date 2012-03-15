@@ -4511,6 +4511,8 @@ class SingleSourceFactory(ReleaseFactory):
          description=['configure'],
          haltOnFailure=True
         ))
+        if self.enableSigning and self.signingServers:
+            self.addGetTokenSteps()
         self.addStep(ShellCommand(
          name='make_source-package',
          command=['make','source-package'],
@@ -4533,7 +4535,6 @@ class SingleSourceFactory(ReleaseFactory):
         ))
         files = [self.bundleFile, self.sourceTarball]
         if self.enableSigning and self.signingServers:
-            self.addGetTokenSteps()
             # use a copy of files variable to prevent endless loops
             for f in list(files):
                 signingcmd = WithProperties(
