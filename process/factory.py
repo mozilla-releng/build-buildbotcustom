@@ -7021,6 +7021,37 @@ class RemoteUnittestFactory(MozillaTestFactory):
              property='sut_ip'
         ))
         MozillaTestFactory.addInitialSteps(self)
+        self.addStep(RetryingShellCommand(
+         name='get_device_manager_py',
+         description="Download devicemanager.py",
+         command=['wget', '--no-check-certificate',
+                  'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
+         workdir='build',
+         haltOnFailure=True,
+        ))
+        self.addStep(RetryingShellCommand(
+         name='get_device_manager_SUT_py',
+         description="Download devicemanagerSUT.py",
+         command=['wget', '--no-check-certificate',
+                  'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
+         workdir='build',
+         haltOnFailure=True,
+        ))
+        self.addStep(RetryingShellCommand(
+         name='get_updateSUT_py',
+         description="Download updateSUT.py",
+         command=['wget', '--no-check-certificate',
+                  'http://hg.mozilla.org/build/tools/raw-file/b94a850405d4/sut_tools/updateSUT.py'],
+         workdir='build',
+         haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+         name="update_sut_agent",
+         description="Running updateSUT.py",
+         command=['python', 'updateSUT.py', WithProperties("%(sut_ip)s")],
+         workdir='build',
+         haltOnFailure=True,
+        ))
 
     def addSetupSteps(self):
         self.addStep(DownloadFile(
@@ -7302,6 +7333,7 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addPrepareDeviceStep()
         self.addUpdateConfigStep()
         self.addRunTestStep()
+        self.addCleanupSteps()
         self.addRebootStep()
 
     def pythonWithSimpleJson(self, platform):
@@ -7639,11 +7671,59 @@ class TalosFactory(RequestSortingBuildFactory):
             ))
         elif self.remoteTests:
             self.addStep(DownloadFile(
-             url='http://build.mozilla.org/talos/zips/bug723667.mobile.talos.zip',
-             wget_args=['-O', 'talos.zip'],
+             url='http://build.mozilla.org/talos/zips/retry.zip',
+             haltOnFailure=True,
+             ignore_certs=self.ignoreCerts,
+             name='download_retry_zip',
+             workdir=self.workdirBase,
+            ))
+            self.addStep(UnpackFile(
+             filename='retry.zip',
+             haltOnFailure=True,
+             name='unpack_retry_zip',
+             workdir=self.workdirBase,
+            ))
+            self.addStep(SetProperty(
+             name='set_toolsdir',
+             command=['bash', '-c', 'echo `pwd`'],
+             property='toolsdir',
+             workdir=self.workdirBase,
+            ))
+            self.addStep(RetryingShellCommand(
+             name='get_device_manager_py',
+             description="Download devicemanager.py",
+             command=['wget', '--no-check-certificate',
+                      'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
-             description="Download talos.zip",
+            ))
+            self.addStep(RetryingShellCommand(
+             name='get_device_manager_SUT_py',
+             description="Download devicemanagerSUT.py",
+             command=['wget', '--no-check-certificate',
+                      'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+            ))
+            self.addStep(RetryingShellCommand(
+             name='get_updateSUT_py',
+             command=['wget', '--no-check-certificate',
+                      'http://hg.mozilla.org/build/tools/raw-file/b94a850405d4/sut_tools/updateSUT.py'],
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+            ))
+            self.addStep(ShellCommand(
+             name="update_sut_agent",
+             command=['python', 'updateSUT.py', WithProperties("%(sut_ip)s")],
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+            ))
+            self.addStep(RetryingShellCommand(
+             name='get_talos_zip',
+             command=['wget', '-O', 'talos.zip', '--no-check-certificate',
+                      'http://build.mozilla.org/talos/zips/talos.bug732835.zip'],
+             workdir=self.workdirBase,
+             haltOnFailure=True,
             ))
             self.addStep(UnpackFile(
              filename='talos.zip',
