@@ -2312,7 +2312,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'configSubDir': config['config_subdir'],
                 'profiledBuild': per_checkin_build_uses_pgo,
                 'productName': pf['product_name'],
-                'mozconfig': pf['mozconfig_dep'],
+                'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
                 'use_scratchbox': pf.get('use_scratchbox'),
                 'stageServer': config['stage_server'],
