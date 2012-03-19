@@ -352,7 +352,7 @@ class ReftestMixin(object):
                     'reftest/tests/layout/reftests/reftest.list']
         elif suite == 'reftest-no-d2d-d3d':
             return ['--setpref=gfx.direct2d.disabled=true',
-                    '--setpref=layers.accelerate-none=true',
+                    '--setpref=layers.acceleration.disabled=true',
                     'reftest/tests/layout/reftests/reftest.list']
         elif suite == 'opengl-no-accel':
             return ['--setpref=layers.acceleration.force-enabled=disabled',
