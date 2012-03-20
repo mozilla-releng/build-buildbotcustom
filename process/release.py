@@ -905,7 +905,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         builders.append(makeDummyBuilder(
             name=builderPrefix('signing_done'),
             slaves=all_slaves,
-            category=builderPrefix('')
+            category=builderPrefix(''),
+            properties={
+                'platform': platform,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            },
         ))
 
     if releaseConfig.get('enableSigningAtBuildTime', True) and \
@@ -937,6 +941,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     '%s_checksums' % releaseConfig['productName']),
                 'script_repo_revision': releaseTag,
                 'release_config': releaseConfigFile,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+                'platform': None,
             }
         })
         post_deliverables_builders.append(
@@ -1158,6 +1164,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavebuilddir': reallyShort(builderPrefix('st_uptake')),
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
         })
 
@@ -1659,6 +1667,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'builddir': builderPrefix(
                 '%s_reset_schedulers' % releaseConfig['productName']),
             'factory': scheduler_reset_factory,
+            'properties': {
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            },
         })
     else:
         builders.append(makeDummyBuilder(
@@ -1666,6 +1678,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 '%s_reset_schedulers' % releaseConfig['productName']),
             slaves=all_slaves,
             category=builderPrefix(''),
+            properties={
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            },
         ))
 
     # Separate email messages per list. Mailman doesn't try to avoid duplicate
