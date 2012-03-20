@@ -8,7 +8,7 @@ import cPickle
 from email.message import Message
 from email.utils import formatdate
 
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION, RETRY
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION
 
 def getBuild(builder_path, build_number):
     build_path = os.path.join(builder_path, build_number)
@@ -148,10 +148,12 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--from", dest="from_", help="from email address", required=True)
     parser.add_argument("-t", "--to", dest="to", help="to email address", action='append')
     parser.add_argument("--to-author", dest="to_author", help="send mail to build's owner", action="store_true")
+    parser.add_argument("--log-url", dest="log_url", help="url to uploaded log")
     parser.set_defaults(
         to_author=False,
         to=[],
         from_=None,
+        log_url=None
         )
 
     options, args = parser.parse_known_args()
@@ -159,7 +161,11 @@ if __name__ == '__main__':
     if not options.to and not options.to_author:
         parser.error("You must specify --to, or --to-author")
 
-    log_url, exit_code = uploadLog(args)
+    if options.log_url:
+        log_url = options.log_url
+        exit_code = 0
+    else:
+        log_url, exit_code = uploadLog(args)
     print
 
     tm_parser = ArgumentParser()
@@ -202,7 +208,7 @@ if __name__ == '__main__':
                 options.to.append(msgdict['author'])
             msg = formatMessage(msgdict, options.from_, options.to)
             print msg
-    
+
             s = SMTP()
             s.connect()
             s.sendmail(options.from_, options.to, msg.as_string())

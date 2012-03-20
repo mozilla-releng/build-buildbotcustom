@@ -100,12 +100,14 @@ class DummyFactory(BuildFactory):
                 waitForFinish=False,
                 ))
 
-def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None):
+def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None, properties=None):
+    properties = properties or {}
     builder = {
             'name': name,
             'factory': DummyFactory(delay, triggers),
             'builddir': name,
             'slavenames': slaves,
+            'properties': properties,
             }
     if category:
         builder['category'] = category
