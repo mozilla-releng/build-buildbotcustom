@@ -3,7 +3,8 @@
 
 Uploads logs from build to the given host.
 """
-import sys, os, cPickle, gzip, subprocess, time
+import os, cPickle, gzip, subprocess
+from datetime import datetime
 
 from buildbot import util
 from buildbot.status.builder import Results
@@ -36,7 +37,7 @@ def ssh(user, identity, host, remote_cmd, port=22):
         cmd.extend(['-i', identity])
     cmd.extend(['-p', str(port), host, remote_cmd])
 
-    return retry(do_cmd, attempts=retries, sleeptime=retry_sleep, args=(cmd,))
+    return retry(do_cmd, attempts=retries+1, sleeptime=retry_sleep, args=(cmd,))
 
 def scp(user, identity, host, files, remote_dir, port=22):
     cmd = ['scp']
@@ -84,13 +85,16 @@ def isNightly(build):
     except:
         return False
 
-def formatLog(tmpdir, build, builder_suffix=''):
+def formatLog(tmpdir, build, master_name, builder_suffix=''):
     """
     Returns a filename with the contents of the build log
     written to it.
     """
     builder_name = build.builder.name
-    build_name = "%s%s-build%s.txt.gz" % (builder_name, builder_suffix, build_number)
+    if master_name:
+        build_name = "%s%s-%s-build%s.txt.gz" % (builder_name, builder_suffix, master_name, build_number)
+    else:
+        build_name = "%s%s-build%s.txt.gz" % (builder_name, builder_suffix, build_number)
 
     logFile = gzip.GzipFile(os.path.join(tmpdir, build_name), "w")
 
@@ -127,7 +131,7 @@ def formatLog(tmpdir, build, builder_suffix=''):
         if not times or not times[0]:
             elapsed = "not started"
         elif not times[1]:
-            elapsed = "not started"
+            elapsed = "not finished"
         else:
             elapsed = util.formatInterval(times[1] - times[0])
 
@@ -136,7 +140,11 @@ def formatLog(tmpdir, build, builder_suffix=''):
             results = "not started"
 
         shortText = ' '.join(step.getText()) + ' (results: %s, elapsed: %s)' % (results, elapsed)
-        logFile.write("========= Started %s ==========\n" % shortText)
+        if times and times[0]:
+            logFile.write("========= Started %s (at %s) =========\n" % (shortText, datetime.fromtimestamp(times[0])))
+        else:
+            logFile.write("========= Skipped %s =========\n" % shortText)
+            continue
 
         for log in step.getLogs():
             data = log.getTextWithHeaders()
@@ -144,7 +152,10 @@ def formatLog(tmpdir, build, builder_suffix=''):
             if not data.endswith("\n"):
                 logFile.write("\n")
 
-        logFile.write("======== Finished %s ========\n\n" % shortText)
+        if times and times[1]:
+            logFile.write("========= Finished %s (at %s) =========\n\n" % (shortText, datetime.fromtimestamp(times[1])))
+        else:
+            logFile.write("========= Finished %s =========\n\n" % shortText)
     logFile.close()
     return os.path.join(tmpdir, build_name)
 
@@ -163,6 +174,7 @@ if __name__ == "__main__":
             product="firefox",
             retries=retries,
             retry_sleep=retry_sleep,
+            master_name=None,
             )
     parser.add_option("-u", "--user", dest="user", help="upload user name")
     parser.add_option("-i", "--identity", dest="identity", help="ssh identity")
@@ -181,6 +193,7 @@ if __name__ == "__main__":
             help="upload to try build directory")
     parser.add_option("--shadow", dest="shadowbuild", action="store_true",
             help="upload to shadow build directory")
+    parser.add_option("--master-name", dest="master_name")
 
     options, args = parser.parse_args()
 
@@ -204,10 +217,13 @@ if __name__ == "__main__":
         # Format the log into a compressed text file
         build = getBuild(builder_path, build_number)
         if options.l10n:
-            suffix = '-%s' % build.getProperty('locale')
-            logfile = formatLog(local_tmpdir, build, suffix)
+            try:
+                suffix = '-%s' % build.getProperty('locale')
+            except KeyError:
+                suffix = '-unknown'
+            logfile = formatLog(local_tmpdir, build, options.master_name, suffix)
         else:
-            logfile = formatLog(local_tmpdir, build)
+            logfile = formatLog(local_tmpdir, build, options.master_name)
 
         # Now....upload it!
         remote_tmpdir = ssh(user=options.user, identity=options.identity, host=host,
@@ -270,11 +286,6 @@ if __name__ == "__main__":
 
                 else:
                     uploadArgs['upload_dir'] = "%s-%s" % (options.branch, platform)
-                    if buildid is None:
-                        # No build id, so we don't know where to upload this :(
-                        print "No build id for %s/%s, giving up" % (builder_path, build_number)
-                        # Exit cleanly so we don't spam twistd.log with exceptions
-                        sys.exit(0)
 
                     if options.nightly or isNightly(build):
                         uploadArgs['to_dated'] = True
@@ -290,9 +301,12 @@ if __name__ == "__main__":
                     if options.shadowbuild:
                         uploadArgs['to_shadow'] = True
                         uploadArgs['to_tinderbox_dated'] = False
-                    else:
+                    elif buildid:
                         uploadArgs['to_shadow'] = False
                         uploadArgs['to_tinderbox_dated'] = True
+                        uploadArgs['buildid'] = buildid
+                    else:
+                        uploadArgs['to_tinderbox_builds'] = True
 
                 props = build.getProperties()
                 if props.getProperty('got_revision') is not None:

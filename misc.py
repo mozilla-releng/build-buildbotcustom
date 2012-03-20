@@ -39,7 +39,6 @@ reload(buildbotcustom.l10n)
 reload(buildbotcustom.scheduler)
 reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
-reload(buildbotcustom.status.queued_command)
 reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
 reload(build.paths)
@@ -61,10 +60,8 @@ from buildbotcustom.status.generators import buildTryChangeMessage
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
     buildUIDSchedFunc, lastGoodFunc
-from buildbotcustom.status.queued_command import QueuedCommandHandler
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from build.paths import getRealpath
-from mozilla_buildtools.queuedir import QueueDir
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -162,8 +159,7 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
     return test_builders
 
 fastRegexes = []
-nReservedFastSlaves = 0
-nReservedSlowSlaves = 0
+nReservedSlaves = 0
 
 def _partitionSlaves(slaves):
     """Partitions the list of slaves into 'fast' and 'slow' slaves, according
@@ -183,9 +179,18 @@ def _partitionSlaves(slaves):
 
 def _partitionUnreservedSlaves(slaves):
     fast, slow = _partitionSlaves(slaves)
-    return fast[nReservedFastSlaves:], slow[nReservedSlowSlaves:]
+    fast = fast[nReservedSlaves:]
+    reserved_fast = len(fast)
+    # If we don't have enough fast slaves to satisfy us, set aside some slow slaves too
+    # If nReservedSlaves > len(fast), then we need to reserve some slow slaves,
+    # and reserved_slow will be > 0
+    # If nReservedSlaves <= len(fast), then we have enough fast slaves, and
+    # reserved_slow will be 0
+    reserved_slow = max(0, nReservedSlaves-reserved_fast)
+    slow = slow[reserved_slow:]
+    return fast, slow
 
-def _readReservedFile(filename, fast=True):
+def _readReservedFile(filename):
     if not filename or not os.path.exists(filename):
         n = 0
     else:
@@ -204,15 +209,10 @@ def _readReservedFile(filename, fast=True):
             log.err()
             return
 
-    global nReservedSlowSlaves, nReservedFastSlaves
-    if fast:
-        if n != nReservedFastSlaves:
-            log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n, nReservedFastSlaves))
-            nReservedFastSlaves = n
-    else:
-        if n != nReservedSlowSlaves:
-            log.msg("Setting nReservedSlowSlaves to %i (was %i)" % (n, nReservedSlowSlaves))
-            nReservedSlowSlaves = n
+    global nReservedSlaves
+    if n != nReservedSlaves:
+        log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n, nReservedSlaves))
+        nReservedSlaves = n
 
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so
@@ -644,23 +644,6 @@ def generateBranchObjects(config, name, secrets=None):
     if config['enable_weekly_bundle']:
         weeklyBuilders.append('%s hg bundle' % name)
 
-    logUploadCmd = makeLogUploadCommand(name, config, is_try=config.get('enable_try'),
-            is_shadow=bool(name=='shadow-central'), platform_prop='stage_platform',product_prop='product')
-
-    # this comment is for grepping! SubprocessLogHandler
-    branchObjects['status'].append(QueuedCommandHandler(
-        logUploadCmd,
-        QueueDir.getQueue('commands'),
-        builders=builders + unittestBuilders + debugBuilders + periodicPgoBuilders,
-    ))
-
-    if nightlyBuilders:
-        branchObjects['status'].append(QueuedCommandHandler(
-            logUploadCmd + ['--nightly'],
-            QueueDir.getQueue('commands'),
-            builders=nightlyBuilders,
-        ))
-
     # Currently, each branch goes to a different tree
     # If this changes in the future this may have to be
     # moved out of the loop
@@ -751,19 +734,6 @@ def generateBranchObjects(config, name, secrets=None):
             logCompression="gzip",
             builders=l10n_builders,
             binaryURL=l10n_binaryURL
-        ))
-
-        # Log uploads for dep l10n repacks
-        branchObjects['status'].append(QueuedCommandHandler(
-            logUploadCmd + ['--l10n'],
-            QueueDir.getQueue('commands'),
-            builders=[l10nBuilders[b]['l10n_builder'] for b in l10nBuilders],
-        ))
-        # and for nightly repacks
-        branchObjects['status'].append(QueuedCommandHandler(
-            logUploadCmd + ['--l10n', '--nightly'],
-            QueueDir.getQueue('commands'),
-            builders=[l10nNightlyBuilders['%s nightly' % b]['l10n_builder'] for b in l10nBuilders]
         ))
 
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
@@ -873,12 +843,6 @@ def generateBranchObjects(config, name, secrets=None):
                 logCompression="gzip",
                 errorparser="unittest"
             ))
-
-        branchObjects['status'].append(QueuedCommandHandler(
-            logUploadCmd,
-            QueueDir.getQueue('commands'),
-            builders=test_builders,
-        ))
 
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
@@ -1204,6 +1168,7 @@ def generateBranchObjects(config, name, secrets=None):
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                        'stage_platform': stage_platform,
                                        'product': pf['stage_product'],
+                                       'platform': platform,
                                        'slavebuilddir': slavebuilddir},
                         'env': builder_env
                     })
@@ -1655,7 +1620,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'factory': codecoverage_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform))},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)), 'product': 'firefox'},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -1713,7 +1678,7 @@ def generateBranchObjects(config, name, secrets=None):
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
-                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform))},
+                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)), 'product': 'xulrunner'},
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
@@ -1748,7 +1713,11 @@ def generateBranchObjects(config, name, secrets=None):
             'factory': bundle_factory,
             'category': name,
             'nextSlave': _nextSlowSlave,
-            'properties': {'slavebuilddir': reallyShort('%s-bundle' % (name,))}
+            'properties': {'slavebuilddir': reallyShort('%s-bundle' % (name,)),
+                           'branch': name,
+                           'platform': None,
+                           'product': 'firefox',
+                           }
         }
         branchObjects['builders'].append(bundle_builder)
 
@@ -2312,7 +2281,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'configSubDir': config['config_subdir'],
                 'profiledBuild': per_checkin_build_uses_pgo,
                 'productName': pf['product_name'],
-                'mozconfig': pf['mozconfig_dep'],
+                'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
                 'use_scratchbox': pf.get('use_scratchbox'),
                 'stageServer': config['stage_server'],
@@ -3390,18 +3359,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                errorparser="unittest",
                                logCompression="gzip"))
 
-    logUploadCmd = makeLogUploadCommand(branch, branch_config,
-            is_try=bool(branch=='try'),
-            is_shadow=bool(branch=='shadow-central'),
-            platform_prop='stage_platform',
-            product_prop='product')
-
-    branchObjects['status'].append(QueuedCommandHandler(
-        logUploadCmd,
-        QueueDir.getQueue('commands'),
-        builders=all_builders,
-    ))
-
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
                 branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
@@ -3461,7 +3418,7 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
         'slavebuilddir': reallyShort('%s-%s-blocklistupdate' % (branch_name, platform)),
         'factory': blocklistupdate_factory,
         'category': branch_name,
-        'properties': {'branch': branch_name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-blocklistupdate' % (branch_name, platform))},
+        'properties': {'branch': branch_name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-blocklistupdate' % (branch_name, platform)), 'product': 'firefox'},
     }
     return blocklistupdate_builder
 
@@ -3488,6 +3445,11 @@ def generateFuzzingObjects(config, SLAVES):
                    'factory': f,
                    'category': 'idle',
                    'env': env,
+                   'properties': {
+                       'branch': 'idle',
+                       'platform': platform,
+                       'product': 'fuzzing',
+                    },
                   }
         builders.append(builder)
         nomergeBuilders.append(builder)
@@ -3533,7 +3495,7 @@ def generateNanojitObjects(config, SLAVES):
                    'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                    'factory': f,
                    'category': 'idle',
-                   'properties': {'branch': branch},
+                   'properties': {'branch': branch, 'platform': platform, 'product': 'nanojit'},
                   }
         builders.append(builder)
         nomergeBuilders.append(builder)
@@ -3611,7 +3573,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     'factory': f,
                     'category': branch,
                     'env': env,
-                    'properties': {'branch': branch},
+                    'properties': {'branch': branch, 'platform': platform, 'product': 'spidermonkey'},
                     }
             builders.append(builder)
 
@@ -3670,14 +3632,14 @@ def generateJetpackObjects(config, SLAVES):
                         interpreter='python',
                         log_eval_func=rc_eval_func({1: WARNINGS}),
                         )
-    
+
                 builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
                            'builddir': 'jetpack-%s-%s-%s' % (branch, platform, type),
                            'slavebuilddir': 'test',
                            'slavenames': slaves,
                            'factory': f,
                            'category': 'jetpack',
-                           'properties': {'branch': project_branch},
+                           'properties': {'branch': project_branch, 'platform': platform, 'product': 'jetpack'},
                            'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
                           }
                 builders.append(builder)
@@ -3708,6 +3670,7 @@ def generateJetpackObjects(config, SLAVES):
             relayhost="mail.build.mozilla.org",
             builders=[b['name'] for b in builders],
             logCompression="gzip",
+            errorparser="unittest",
         )
         status = [tbox_mailer]
 

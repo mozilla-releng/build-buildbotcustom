@@ -55,13 +55,22 @@ class QueuedCommandHandler(base.StatusReceiverMultiService):
                builder.category not in self.categories:
             return # ignore this build
 
+        core_builder = self.master_status.botmaster.builders[builderName]
+        core_build = core_builder.getBuild(build.number)
+
         if isinstance(self.command, str):
             cmd = [self.command]
         else:
             cmd = self.command[:]
 
         cmd = build.getProperties().render(cmd)
+        cmd.extend(["--master-name", self.master_status.botmaster.master_name])
+        cmd.extend(["--master-incarnation", self.master_status.botmaster.master_incarnation])
+
+        # Cap to the first 100 requests
+        # If we have more than that....too bad
+        requests = [str(r.id) for r in core_build.requests][:100]
         cmd.extend([
-               os.path.join(self.master_status.basedir, builder.basedir),
-               str(build.number)])
+               os.path.join(self.master_status.basedir, builder.basedir, str(build.number)),
+               ] + requests)
         self.queuedir.add(json.dumps(cmd))
