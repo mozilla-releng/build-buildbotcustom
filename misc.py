@@ -159,8 +159,7 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
     return test_builders
 
 fastRegexes = []
-nReservedFastSlaves = 0
-nReservedSlowSlaves = 0
+nReservedSlaves = 0
 
 def _partitionSlaves(slaves):
     """Partitions the list of slaves into 'fast' and 'slow' slaves, according
@@ -180,9 +179,18 @@ def _partitionSlaves(slaves):
 
 def _partitionUnreservedSlaves(slaves):
     fast, slow = _partitionSlaves(slaves)
-    return fast[nReservedFastSlaves:], slow[nReservedSlowSlaves:]
+    fast = fast[nReservedSlaves:]
+    reserved_fast = len(fast)
+    # If we don't have enough fast slaves to satisfy us, set aside some slow slaves too
+    # If nReservedSlaves > len(fast), then we need to reserve some slow slaves,
+    # and reserved_slow will be > 0
+    # If nReservedSlaves <= len(fast), then we have enough fast slaves, and
+    # reserved_slow will be 0
+    reserved_slow = max(0, nReservedSlaves-reserved_fast)
+    slow = slow[reserved_slow:]
+    return fast, slow
 
-def _readReservedFile(filename, fast=True):
+def _readReservedFile(filename):
     if not filename or not os.path.exists(filename):
         n = 0
     else:
@@ -201,15 +209,10 @@ def _readReservedFile(filename, fast=True):
             log.err()
             return
 
-    global nReservedSlowSlaves, nReservedFastSlaves
-    if fast:
-        if n != nReservedFastSlaves:
-            log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n, nReservedFastSlaves))
-            nReservedFastSlaves = n
-    else:
-        if n != nReservedSlowSlaves:
-            log.msg("Setting nReservedSlowSlaves to %i (was %i)" % (n, nReservedSlowSlaves))
-            nReservedSlowSlaves = n
+    global nReservedSlaves
+    if n != nReservedSlaves:
+        log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n, nReservedSlaves))
+        nReservedSlaves = n
 
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so

@@ -9,14 +9,13 @@ from twisted.trial import unittest
 import buildbotcustom.misc
 from buildbotcustom.misc import _nextSlowIdleSlave, _nextL10nSlave,\
         _nextFastSlave, _nextFastReservedSlave, _nextSlowSlave,\
-        setReservedFileName
+        setReservedFileName, _partitionUnreservedSlaves
 
 class TestNextSlaveFuncs(unittest.TestCase):
     def setUp(self):
         # Reset these each time
         buildbotcustom.misc.fastRegexes = ['fast']
-        buildbotcustom.misc.nReservedFastSlaves = 0
-        buildbotcustom.misc.nReservedSlowSlaves = 0
+        buildbotcustom.misc.nReservedSlaves = 0
 
         # Prevent looking for reserved slaves file
         buildbotcustom.misc._checkedReservedSlaveFile = time.time()
@@ -57,7 +56,7 @@ class TestNextSlaveFuncs(unittest.TestCase):
     def test_nextFastReservedSlave_reserved(self):
         """Test that _nextFastReservedSlave returns a fast slave if there's one
         reserved."""
-        buildbotcustom.misc.nReservedFastSlaves = 1
+        buildbotcustom.misc.nReservedSlaves = 1
 
         # Only one fast slave available
         available_slaves = [s for s in self.slaves if s.slave.slavename == 'fast2']
@@ -67,7 +66,7 @@ class TestNextSlaveFuncs(unittest.TestCase):
     def test_nextFastSlave_reserved(self):
         """Test that _nextFastSlave returns None if there's one slave
         reserved."""
-        buildbotcustom.misc.nReservedFastSlaves = 1
+        buildbotcustom.misc.nReservedSlaves = 1
 
         # Only one fast slave available
         available_slaves = [s for s in self.slaves if s.slave.slavename == 'fast2']
@@ -78,11 +77,40 @@ class TestNextSlaveFuncs(unittest.TestCase):
         """Test that _nextFastSlave works if the builder is configured with
         just slow slaves. This handles the case for platforms that don't have a
         fast/slow distinction."""
-        buildbotcustom.misc.nReservedFastSlaves = 1
+        buildbotcustom.misc.nReservedSlaves = 1
         self.builder.slaves = self.slow_slaves
 
         slave = _nextFastSlave(self.builder, self.slow_slaves, only_fast=True)
         self.assert_(slave.slavename.startswith('slow'))
+
+    def test_partitionUnreservedSlaves_allslow_reserved(self):
+        """Test that _partitionUnreservedSlaves works if the builder is
+        configured with just slow slaves and has slave reservations. Some of
+        the slow slaves should be reserved in this case."""
+        buildbotcustom.misc.nReservedSlaves = 2
+        slaves = self.slow_slaves
+        fast, slow = _partitionUnreservedSlaves(slaves)
+
+        self.assert_(len(fast) == 0, [s.slave.slavename for s in fast])
+        self.assert_(len(slow) == 1, [s.slave.slavename for s in slow])
+
+    def test_nextSlowSlave_allslow_allreserved(self):
+        """Test that _nextSlowSlave returns None when all slaves are reserved,
+        and there are only slow slaves."""
+        buildbotcustom.misc.nReservedSlaves = 3
+        self.builder.slaves = self.slow_slaves
+
+        slave = _nextSlowSlave(self.builder, self.slow_slaves)
+        self.assert_(slave is None)
+
+    def test_nextSlave_allslow_allreserved(self):
+        """Test that _nextFastReservedSlave returns None when all slaves are
+        reserved, and there are only slow slaves."""
+        buildbotcustom.misc.nReservedSlaves = 3
+        self.builder.slaves = self.slow_slaves
+
+        slave = _nextFastReservedSlave(self.builder, self.slow_slaves, only_fast=True)
+        self.assert_(slave is not None)
 
     def test_nextSlowSlave(self):
         """Test that _nextSlowSlave returns a slow slave if one is available."""
@@ -133,7 +161,7 @@ class TestNextSlaveFuncs(unittest.TestCase):
         with mock.patch.object(time, 'time') as time_method:
             setReservedFileName(reservedFile.name)
             time_method.return_value = 0
-            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 0)
+            self.assertEquals(buildbotcustom.misc.nReservedSlaves, 0)
 
             # Only one fast slave available, but none are reserved yet
             available_slaves = [s for s in self.slaves if s.slave.slavename == 'fast2']
@@ -150,7 +178,7 @@ class TestNextSlaveFuncs(unittest.TestCase):
 
             # Check that the regular function doesn't get it
             slave = _nextFastSlave(self.builder, available_slaves, only_fast=True)
-            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 1)
+            self.assertEquals(buildbotcustom.misc.nReservedSlaves, 1)
             self.assert_(slave is None)
 
             # But our reserved function now does
@@ -168,13 +196,13 @@ class TestNextSlaveFuncs(unittest.TestCase):
         with mock.patch.object(time, 'time') as time_method:
             setReservedFileName(reservedFile.name)
             time_method.return_value = 61
-            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 0)
+            self.assertEquals(buildbotcustom.misc.nReservedSlaves, 0)
 
             # Only one fast slave available, but all are reserved yet
             available_slaves = [s for s in self.slaves if s.slave.slavename == 'fast2']
             slave = _nextFastSlave(self.builder, available_slaves)
             self.assert_(slave is None)
-            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 5)
+            self.assertEquals(buildbotcustom.misc.nReservedSlaves, 5)
 
             # Empty out reserved slaves file
             reservedFile.seek(0)
@@ -188,5 +216,5 @@ class TestNextSlaveFuncs(unittest.TestCase):
 
             # Check that the regular function gets it
             slave = _nextFastSlave(self.builder, available_slaves, only_fast=True)
-            self.assertEquals(buildbotcustom.misc.nReservedFastSlaves, 0)
+            self.assertEquals(buildbotcustom.misc.nReservedSlaves, 0)
             self.assert_(slave.slave.slavename == 'fast2')
