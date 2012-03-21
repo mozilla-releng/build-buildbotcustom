@@ -959,7 +959,8 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--http-port', WithProperties('%(http_port)s'),
                         '--ssl-port', WithProperties('%(ssl_port)s'),
                         '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
-                        '--enable-privilege'
+                        '--enable-privilege',
+                        '--ignore-window-size'
                        ]
         if cmdOptions:
           self.command.extend(cmdOptions)
