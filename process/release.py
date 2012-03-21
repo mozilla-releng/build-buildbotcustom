@@ -422,7 +422,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             name=builderPrefix('%s_tag' % releaseConfig['productName']),
             slaves=all_slaves,
             category=builderPrefix(''),
-            ))
+            properties={
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            },
+        ))
 
     if not releaseConfig.get('skip_source'):
         pf = branchConfig['platforms']['linux']
