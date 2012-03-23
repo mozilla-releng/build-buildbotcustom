@@ -167,6 +167,11 @@ class PostRunner(object):
         else:
             retval['product'] = None
 
+        # fennec builds are called 'fennec' by buildbot, but are 'mobile' as
+        # far as post_upload.py is concerned.
+        if retval['product'] == 'fennec':
+            retval['product'] = 'mobile'
+
         if props.getProperty('branch') is not None:
             retval['branch'] = props['branch']
         else:
