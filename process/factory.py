@@ -2906,6 +2906,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             ))
 
 class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
+
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         uploadEnv = self.env.copy()
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
@@ -2919,6 +2920,9 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
                                        '-v %s ' % self.version + \
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
+        if self.signingServers and self.enableSigning:
+            uploadEnv['POST_UPLOAD_CMD'] += ' --signed'
+
         def get_url(rc, stdout, stderr):
             for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
                 if m.endswith("crashreporter-symbols.zip"):
