@@ -7727,7 +7727,7 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(RetryingShellCommand(
              name='get_talos_zip',
              command=['wget', '-O', 'talos.zip', '--no-check-certificate',
-                      'http://build.mozilla.org/talos/zips/talos.bug732835.zip'],
+                      'http://build.mozilla.org/talos/zips/talos.bug738685.c08bb14e71cd.zip'],
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
