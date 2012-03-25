@@ -3660,25 +3660,10 @@ def generateJetpackObjects(config, SLAVES):
             builderNames=[b['name'] for b in builders],
             )
 
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-            errorparser="unittest",
-        )
-        status = [tbox_mailer]
-
     return {
             'builders': builders,
             'change_source': [poller],
             'schedulers': [scheduler],
-            'status': status,
             }
 
 def generateProjectObjects(project, config, SLAVES):
