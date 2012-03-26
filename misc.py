@@ -3644,7 +3644,7 @@ def generateJetpackObjects(config, SLAVES):
                         extra_args=("-p", platform, "-t", jetpackTarball, "-b", branch,
                                    "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
                         interpreter='python',
-                        log_eval_func=rc_eval_func({1: WARNINGS}),
+                        log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE, 4: EXCEPTION, 5: RETRY}),
                         )
 
                 builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
