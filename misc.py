@@ -940,6 +940,8 @@ def generateBranchObjects(config, name, secrets=None):
             # Platform already has the -debug suffix
             unittestBranch = "%s-%s-unittest" % (name, platform)
             tinderboxBuildsDir = "%s-%s" % (name, platform)
+        elif 'b2g' in platform:
+            uploadPackages = pf.get('uploadPackages', False)
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
@@ -951,6 +953,8 @@ def generateBranchObjects(config, name, secrets=None):
         packageTests = pf.get('packageTests', packageTests)
 
         if platform.find('win') > -1:
+            codesighs = False
+        if 'b2g' in platform:
             codesighs = False
 
         doBuildAnalysis = pf.get('enable_build_analysis', False)
@@ -1008,7 +1012,9 @@ def generateBranchObjects(config, name, secrets=None):
                 'productName': pf['product_name'],
                 'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
-                'use_scratchbox': pf.get('use_scratchbox'),
+                'use_mock': pf.get('use_mock'),
+                'mock_target': pf.get('mock_target'),
+                'mock_packages': pf.get('mock_packages'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
                 'stageGroup': config['stage_group'],
@@ -1033,6 +1039,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'clobberTime': clobberTime,
                 'buildsBeforeReboot': pf['builds_before_reboot'],
                 'talosMasters': talosMasters,
+                'enablePackaging': pf.get('enable_packaging', True),
                 'packageTests': packageTests,
                 'unittestMasters': pf.get('unittest_masters', config['unittest_masters']),
                 'unittestBranch': per_checkin_unittest_branch,
@@ -1047,6 +1054,8 @@ def generateBranchObjects(config, name, secrets=None):
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
+                'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
+                'tooltool_url_list': pf.get('tooltool_url_list', []),
             }
             factory_kwargs.update(extra_args)
 
@@ -1259,7 +1268,9 @@ def generateBranchObjects(config, name, secrets=None):
                 productName=pf['product_name'],
                 mozconfig=pf['mozconfig'],
                 srcMozconfig=pf.get('src_mozconfig'),
-                use_scratchbox=pf.get('use_scratchbox'),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
@@ -1285,6 +1296,7 @@ def generateBranchObjects(config, name, secrets=None):
                 clobberTime=clobberTime,
                 buildsBeforeReboot=pf['builds_before_reboot'],
                 talosMasters=talosMasters,
+                enablePackaging=pf.get('enable_packaging', True),
                 packageTests=packageTests,
                 unittestMasters=pf.get('unittest_masters', config['unittest_masters']),
                 unittestBranch=nightlyUnittestBranch,
@@ -1301,6 +1313,8 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 mozillaDir=config.get('mozilla_dir', None),
+                tooltool_manifest_src = pf.get('tooltool_manifest_src', None),
+                tooltool_url_list = pf.get('tooltool_url_list', []),
                 **nightly_kwargs
             )
 
@@ -2283,7 +2297,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'productName': pf['product_name'],
                 'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
-                'use_scratchbox': pf.get('use_scratchbox'),
+                'use_mock': pf.get('use_mock'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
                 'stageGroup': config['stage_group'],
@@ -2534,7 +2548,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 productName=pf['product_name'],
                 mozconfig=pf['mozconfig'],
                 srcMozconfig=pf.get('src_mozconfig'),
-                use_scratchbox=pf.get('use_scratchbox'),
+                use_mock=pf.get('use_mock'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],

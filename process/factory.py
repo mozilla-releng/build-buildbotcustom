@@ -55,9 +55,9 @@ from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
-  SetBuildProperty, DisconnectStep, OutputStep, ScratchboxCommand, \
+  SetBuildProperty, DisconnectStep, OutputStep, MockCommand, \
   RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps, \
-  RetryingScratchboxProperty
+  RetryingMockProperty, MockInit, MockInstall
 from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
   SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
@@ -485,12 +485,12 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
                 command.extend(["-n", i])
 
             # These are the base_dirs that get passed to purge_builds.py.
-            # The scratchbox dir is only present on linux slaves, but since
+            # The mock dir is only present on linux slaves, but since
             # not all classes that inherit from MozillaBuildFactory provide
             # a platform property we can use for limiting the base_dirs, it
-            # is easier to include scratchbox by default and simply have
+            # is easier to include mock by default and simply have
             # purge_builds.py skip the dir when it isn't present.
-            command.extend(["..","/scratchbox/users/cltbld/home/cltbld/build"])
+            command.extend(["..","/mock/users/cltbld/home/cltbld/build"])
 
             def parse_purge_builds(rc, stdout, stderr):
                 properties = {}
@@ -725,8 +725,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
 class MercurialBuildFactory(MozillaBuildFactory):
     def __init__(self, objdir, platform, configRepoPath, configSubDir,
                  profiledBuild, mozconfig, srcMozconfig=None,
-                 use_scratchbox=False, productName=None,
-                 scratchbox_target='FREMANTLE_ARMEL', android_signing=False,
+                 use_mock=False, productName=None,
+                 mock_target='mozilla-f16-x86_64', android_signing=False,
                  buildRevision=None, stageServer=None, stageUsername=None,
                  stageGroup=None, stageSshKey=None, stageBasePath=None,
                  stageProduct=None, post_upload_include_platform=False,
@@ -753,6 +753,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
                  mozharnessMultiOptions=None,
+                 mock_packages=[],
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=[],
+                 tooltool_script='/tools/tooltool.py',
+                 enablePackaging=True,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -803,6 +809,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.createPartial = createPartial
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
+        self.enablePackaging = enablePackaging
         self.packageTests = packageTests
         self.enable_ccache = enable_ccache
         if self.enable_ccache:
@@ -810,13 +817,20 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
-        self.use_scratchbox = use_scratchbox
-        self.scratchbox_target = scratchbox_target
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
         self.android_signing = android_signing
         self.post_upload_include_platform = post_upload_include_platform
         self.useSharedCheckouts = useSharedCheckouts
         self.testPrettyNames = testPrettyNames
         self.l10nCheckTest = l10nCheckTest
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list
+        self.tooltool_script = tooltool_script
+        self.tooltool_bootstrap = tooltool_bootstrap
+
+        assert len(tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -909,14 +923,22 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 property='toolsdir',
                 workdir='tools'
             ))
-        if self.use_scratchbox:
-            self.addStep(ScratchboxCommand(
-                command=["sb-conf", "select", self.scratchbox_target],
-                name='set_target',
-                env=self.env,
-                sb=True,
+        if self.use_mock:
+            self.addStep(MockInit(
+                target=self.mock_target,
+            ))
+            # This is needed for the builds to start
+            self.addStep(MockCommand(
+                command=WithProperties("mkdir -p %(basedir)s" + "/%s" % self.baseWorkDir),
+                target=self.mock_target,
+                mock=True,
                 workdir='/',
             ))
+            if self.mock_packages:
+                self.addStep(MockInstall(
+                    target=self.mock_target,
+                    packages=self.mock_packages,
+                ))
 
         if self.enable_ccache:
             self.addStep(ShellCommand(command=['ccache', '-z'],
@@ -949,6 +971,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
+        if self.enablePackaging or self.uploadPackages:
+            self.addPackageSteps()
         if self.uploadPackages:
             self.addUploadSteps()
         if self.testPrettyNames:
@@ -1159,6 +1183,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
          name='cat_mozconfig',
          command=['cat', '.mozconfig'],
         ))
+        if self.tooltool_manifest_src:
+            self.addStep(RetryingShellCommand(
+                name='fetch_tooltool_resources',
+                command=['python', self.tooltool_script, '--url', self.tooltool_url_list[0], 
+                         '-m', self.tooltool_manifest_src, 'fetch']))
+            self.addStep(ShellCommand(
+                name='tooltool_bootstrap',
+                command=['bash', self.tooltool_bootstrap]))
+
 
     def addDoBuildSteps(self):
         workdir=WithProperties('%(basedir)s/build')
@@ -1178,18 +1211,24 @@ class MercurialBuildFactory(MozillaBuildFactory):
         command = ['make', '-f', 'client.mk', bldtgt,
                    WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
 
+        # XXX Hack! 
+        bldenv=self.env.copy()
+        if 'b2g' in self.platform:
+            bldenv['gonk'] = WithProperties('%(basedir)s/build/gonk-toolchain')
+
         if self.profiledBuild:
             command.append('MOZ_PGO=1')
-        self.addStep(ScratchboxCommand(
+        self.addStep(MockCommand(
          name='compile',
          command=command,
          description=['compile'],
-         env=self.env,
+         env=bldenv,
          haltOnFailure=True,
          timeout=10800,
          # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose
          # the root cause of the linker time out.
-         sb=self.use_scratchbox,
+         mock=self.use_mock,
+         target=self.mock_target,
          workdir=workdir,
         ))
 
@@ -1517,7 +1556,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 warnOnFailure=True,
             ))
 
-    def addUploadSteps(self, pkgArgs=None, pkgTestArgs=None):
+    def addPackageSteps(self, pkgArgs=None, pkgTestArgs=None):
         pkgArgs = pkgArgs or []
         pkgTestArgs = pkgTestArgs or []
 
@@ -1537,49 +1576,43 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if 'rpm' in self.platform_variation:
             pkgArgs.append("MOZ_PKG_FORMAT=RPM")
         if self.packageSDK:
-            self.addStep(ScratchboxCommand(
+            self.addStep(MockCommand(
              name='make_sdk',
              command=['make', '-f', 'client.mk', 'sdk'],
              env=pkg_env,
              workdir=workdir,
-             sb=self.use_scratchbox,
+             mock=self.use_mock,
+             target=self.mock_target,
              haltOnFailure=True,
             ))
         if self.packageTests:
-            self.addStep(ScratchboxCommand(
+            self.addStep(MockCommand(
              name='make_pkg_tests',
              command=['make', 'package-tests'] + pkgTestArgs,
              env=pkg_env,
              workdir=objdir,
-             sb=self.use_scratchbox,
+             mock=self.use_mock,
+             target=self.mock_target,
              haltOnFailure=True,
             ))
-        self.addStep(ScratchboxCommand(
+        self.addStep(MockCommand(
             name='make_pkg',
             command=['make', 'package'] + pkgArgs,
             env=pkg_env,
             workdir=objdir,
-            sb=self.use_scratchbox,
+            mock=self.use_mock,
+            target=self.mock_target,
             haltOnFailure=True
         ))
+
         # Get package details
-        packageFilename = self.getPackageFilename(self.platform,
+        self.packageFilename = self.getPackageFilename(self.platform,
                                                   self.platform_variation)
-        if packageFilename and 'rpm' not in self.platform_variation:
-            self.addFilePropertiesSteps(filename=packageFilename,
+        if self.packageFilename and 'rpm' not in self.platform_variation:
+            self.addFilePropertiesSteps(filename=self.packageFilename,
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
                                         haltOnFailure=True)
-        # Maemo special cases
-        if 'maemo' in self.complete_platform:
-            self.addStep(ScratchboxCommand(
-                name='make_deb',
-                command=['make','deb'] + pkgArgs,
-                env=pkg_env,
-                workdir=WithProperties('%(basedir)s/build/' + self.objdir),
-                sb=self.use_scratchbox,
-                haltOnFailure=True,
-            ))
         # Windows special cases
         if self.platform.startswith("win") and \
            'mobile' not in self.complete_platform and \
@@ -1622,7 +1655,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 workdir='.',
                 name='get_app_version',
             ))
+        self.pkg_env = pkg_env
 
+    def addUploadSteps(self):
         if self.multiLocale:
             self.doUpload(postUploadBuildDir='en-US')
             cmd = ['python', 'mozharness/%s' % self.multiLocaleScript,
@@ -1633,12 +1668,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(ShellCommand(
                 name='mozharness_multilocale',
                 command=cmd,
-                env=pkg_env,
+                env=self.pkg_env,
                 workdir='.',
                 haltOnFailure=True,
             ))
             # We need to set packageFilename to the multi apk
-            self.addFilePropertiesSteps(filename=packageFilename,
+            self.addFilePropertiesSteps(filename=self.packageFilename,
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
                                         haltOnFailure=True)
@@ -1654,11 +1689,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                        '/tools/codesighs')
         if self.platform.startswith('win'):
             codesighs_dir = 'build/%s/tools/codesighs' % self.mozillaObjdir
-        self.addStep(ScratchboxCommand(
+        self.addStep(MockCommand(
          name='make_codesighs',
          command=['make'],
          workdir=codesighs_dir,
-         sb=self.use_scratchbox,
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
 
         cmd = ['/bin/bash', '-c', 
@@ -1784,12 +1820,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(ScratchboxCommand(
+        self.addStep(MockCommand(
          name='make_buildsymbols',
          command=['make', 'buildsymbols'],
          env=self.env,
          workdir=objdir,
-         sb=self.use_scratchbox,
+         mock=self.use_mock,
+         target=self.mock_target,
          haltOnFailure=True,
          timeout=60*60,
         ))
@@ -1798,12 +1835,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(ScratchboxCommand(
+        self.addStep(MockCommand(
          name='make_uploadsymbols',
          command=['make', 'uploadsymbols'],
          env=self.env,
          workdir=objdir,
-         sb=self.use_scratchbox,
+         mock=self.use_mock,
+         target=self.mock_target,
          haltOnFailure=True,
          timeout=2400, # 40 minutes
         ))
@@ -1981,11 +2019,12 @@ class TryBuildFactory(MercurialBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(RetryingScratchboxProperty(
+        self.addStep(RetryingMockProperty(
              command=['make', 'upload'],
              env=uploadEnv,
              workdir=objdir,
-             sb=self.use_scratchbox,
+             mock=self.use_mock,
+             target=self.mock_target,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
              description=["upload"],
@@ -2554,7 +2593,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             objdir = WithProperties('%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
             if self.platform.startswith('win'):
                 objdir = '%s/%s' % (self.baseWorkDir, self.objdir)
-            self.addStep(RetryingScratchboxProperty(
+            self.addStep(RetryingMockProperty(
                 name='make_upload',
                 command=['make', 'upload'] + upload_vars,
                 env=uploadEnv,
@@ -2562,7 +2601,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 extract_fn = parse_make_upload,
                 haltOnFailure=True,
                 description=['make', 'upload'],
-                sb=self.use_scratchbox,
+                mock=self.use_mock,
+                target=self.mock_target,
                 timeout=40*60, # 40 minutes
                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
                 locks=[upload_lock.access('counting')],
@@ -2841,7 +2881,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(RetryingScratchboxProperty(
+        self.addStep(RetryingMockProperty(
          name='make_upload',
          command=['make', 'upload'] + upload_vars,
          env=uploadEnv,
@@ -2851,7 +2891,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          description=['upload'],
          timeout=60*60, # 60 minutes
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
-         sb=self.use_scratchbox,
+         target=self.mock_target,
+         mock=self.use_mock,
         ))
 
         if self.productName == 'fennec' and not uploadMulti:
@@ -2906,7 +2947,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             ))
 
 class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
-
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         uploadEnv = self.env.copy()
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
@@ -2920,9 +2960,6 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
                                        '-v %s ' % self.version + \
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
-        if self.signingServers and self.enableSigning:
-            uploadEnv['POST_UPLOAD_CMD'] += ' --signed'
-
         def get_url(rc, stdout, stderr):
             for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
                 if m.endswith("crashreporter-symbols.zip"):
@@ -3115,7 +3152,7 @@ class BaseRepackFactory(MozillaBuildFactory):
 
     def processCommand(self, **kwargs):
         '''This function is overriden by MaemoNightlyRepackFactory to
-        adjust the command and workdir approprietaly for scratchbox
+        adjust the command and workdir approprietaly for mock
         '''
         return kwargs
     

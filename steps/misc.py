@@ -36,7 +36,7 @@ import re
 from buildbot.process.buildstep import LoggedRemoteCommand, BuildStep
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import FAILURE, SUCCESS, worst_status
-from buildbot.status.builder import STDOUT, STDERR #ScratchboxProperty
+from buildbot.status.builder import STDOUT, STDERR #MockProperty
 
 from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand, \
   addRetryEvaluateCommand, RetryingShellCommand
@@ -96,7 +96,29 @@ class InterruptableDeferred(Deferred):
             self.errback(DefaultException(reason))
 
 
-class ScratchboxCommand(ShellCommand):
+class MockInit(ShellCommand):
+
+    name = "mock-init"
+    def __init__(self, target, **kwargs):
+        kwargs['command'] = "mock_mozilla -r %s --init" % target
+        self.super_class = ShellCommand
+        self.super_class.__init__(self,**kwargs)
+        self.target = target
+        self.description=['mock-tgt', target]
+        self.addFactoryArguments(target=target)
+
+class MockInstall(ShellCommand):
+
+    name = "mock-install"
+    def __init__(self, target, packages, **kwargs):
+        kwargs['command'] = "mock_mozilla -r %s --install %s" % (target, ' '.join(packages))
+        self.super_class = ShellCommand
+        self.super_class.__init__(self,**kwargs)
+        self.target = target
+        self.description=['mock-install'] + packages
+        self.addFactoryArguments(target=target, packages=packages)
+
+class MockCommand(ShellCommand):
     #Note: this class doesn't deal with all WithProperties invocations.
     #in particular, it only deals with the WithProperties('format string')
     #case
@@ -107,20 +129,22 @@ class ScratchboxCommand(ShellCommand):
     #   -doesn't currently set properties
     #   -magic function should be implemented as a mixin or something
 
-    def __init__(self, sb=False, sb_login='/scratchbox/moz_scratchbox',
-                 sb_workdir_mutator=lambda x: x, sb_args=['-p', '-k'],
+    def __init__(self, mock=False, mock_login='mock_mozilla', target=None,
+                 mock_workdir_mutator=lambda x: x, mock_args=['--unpriv'],
                  **kwargs):
         self.super_class = ShellCommand
         self.super_class.__init__(self,**kwargs)
-        self.sb = sb
-        self.sb_login = sb_login
-        self.sb_workdir_mutator = sb_workdir_mutator
-        self.sb_args = sb_args
+        self.mock = mock
+        self.mock_login = mock_login
+        self.mock_workdir_mutator = mock_workdir_mutator
+        self.mock_args = mock_args
+        self.target = target
         assert 'workdir' in kwargs.keys(), "You *must* specify workdir"
-        self.addFactoryArguments(sb=sb,
-                                 sb_login=sb_login,
-                                 sb_workdir_mutator=sb_workdir_mutator,
-                                 sb_args=sb_args,
+        self.addFactoryArguments(mock=mock,
+                                 mock_login=mock_login,
+                                 mock_workdir_mutator=mock_workdir_mutator,
+                                 mock_args=mock_args,
+                                 target=target,
                                 )
 
     def magic(self):
@@ -144,19 +168,32 @@ class ScratchboxCommand(ShellCommand):
             string_command = self.command.fmtstring
         else:
             string_command = self.command
-        sb_workdir = self.sb_workdir_mutator(self.remote_kwargs['workdir'])
+        mock_workdir = self.mock_workdir_mutator(self.remote_kwargs['workdir'])
 
         #If the workdir is a WithProperties instance, we need to get the format
         #string and wrap it in another WithProperties
-        if issubclass(sb_workdir.__class__, WithProperties):
+        if issubclass(mock_workdir.__class__, WithProperties):
             use_with_properties = True
-            sb_workdir = sb_workdir.fmtstring
+            mock_workdir = mock_workdir.fmtstring
 
-        assert ' ' not in sb_workdir, 'scratchbox cannot deal with spaces in workdir'
+        assert ' ' not in mock_workdir, 'mock cannot deal with spaces in workdir'
+        assert self.target, 'must set a target'
 
-        full_command = r'%s %s -d %s %s' % (self.sb_login,
-                                                ' '.join(self.sb_args),
-                                                sb_workdir,
+        if self.remote_kwargs.has_key('env'):
+            pre_render_env = self.remote_kwargs['env']
+            properties = self.build.getProperties()
+            rendered_env = properties.render(pre_render_env)
+            environment = ' '.join([r'%s=\"%s\"' % (k,rendered_env[k]) \
+                                    for k in rendered_env.keys()])
+        else:
+            environment = ''
+
+        full_command = r'%s -r %s %s --cwd %s --shell "/usr/bin/env %s %s"' % (
+                                                self.mock_login,
+                                                self.target,
+                                                ' '.join(self.mock_args),
+                                                mock_workdir,
+                                                environment,
                                                 string_command)
 
         if use_with_properties:
@@ -166,14 +203,14 @@ class ScratchboxCommand(ShellCommand):
 
 
     def start(self):
-        if self.sb:
+        if self.mock:
             self.magic()
         self.super_class.start(self)
 
-class ScratchboxProperty(ScratchboxCommand):
+class MockProperty(MockCommand):
     # This class could be implemented cleaner by implementing
-    # the scratchbox logic differently.  Patches accepted
-    name = "scratchbox-setproperty"
+    # the mock logic differently.  Patches accepted
+    name = "mock-setproperty"
 
     def __init__(self, property=None, extract_fn=None, strip=True, **kwargs):
         self.property = property
@@ -183,7 +220,7 @@ class ScratchboxProperty(ScratchboxCommand):
         assert (property is not None) ^ (extract_fn is not None), \
                 "Exactly one of property and extract_fn must be set"
 
-        self.super_class = ScratchboxCommand
+        self.super_class = MockCommand
         self.super_class.__init__(self, **kwargs)
 
         self.addFactoryArguments(property=self.property)
@@ -197,7 +234,7 @@ class ScratchboxProperty(ScratchboxCommand):
             result = cmd.logs['stdio'].getText()
             if self.strip: result = result.strip()
             propname = self.build.getProperties().render(self.property)
-            self.setProperty(propname, result, "ScratchboxProperty Step")
+            self.setProperty(propname, result, "MockProperty Step")
             self.property_changes[propname] = result
         else:
             log = cmd.logs['stdio']
@@ -205,7 +242,7 @@ class ScratchboxProperty(ScratchboxCommand):
                     ''.join(log.getChunks([STDOUT], onlyText=True)),
                     ''.join(log.getChunks([STDERR], onlyText=True)))
             for k,v in new_props.items():
-                self.setProperty(k, v, "ScratchboxProperty Step")
+                self.setProperty(k, v, "MockProperty Step")
             self.property_changes = new_props
 
     def createSummary(self, log):
@@ -218,7 +255,7 @@ class ScratchboxProperty(ScratchboxCommand):
         else:
             return [ "no change" ]
 
-RetryingScratchboxProperty = addRetryEvaluateCommand(ScratchboxProperty)
+RetryingMockProperty = addRetryEvaluateCommand(MockProperty)
 
 class CreateDir(ShellCommand):
     name = "create dir"

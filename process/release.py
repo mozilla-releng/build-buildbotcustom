@@ -614,7 +614,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 triggerBuilds=True,
                 triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
-                use_scratchbox=pf.get('use_scratchbox'),
+                use_mock=pf.get('use_mock'),
                 android_signing=pf.get('android_signing', False),
                 multiLocale=bool(releaseConfig.get('enableMultiLocale', False) and
                                  pf.get('multi_locale', False)),
