@@ -870,15 +870,17 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
         if superResult != SUCCESS:
-            return superResult
+            return worst_status(superResult, WARNINGS)
 
-        # Most likely if you get a jetpack harness error, you'll actually get
-        # a python traceback.  So in lieu of better logging, we'll look for that
-        if re.search(r"^Traceback", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return WARNINGS
-
-        return SUCCESS
+        return worst_status(superResult, SUCCESS)
 
 
 class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeout):

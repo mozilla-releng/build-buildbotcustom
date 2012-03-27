@@ -33,8 +33,7 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, ReleaseFinalVerification, L10nVerifyFactory, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
-  TuxedoEntrySubmitterFactory, makeDummyBuilder, get_signing_cmd, \
-  SigningScriptFactory
+  TuxedoEntrySubmitterFactory, makeDummyBuilder, SigningScriptFactory
 from buildbotcustom.changes.ftppoller import UrlPoller
 from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
@@ -290,6 +289,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     post_signing_builders = []
     post_update_builders = []
     deliverables_builders = []
+    xr_deliverables_builders = []
     post_deliverables_builders = []
     post_antivirus_builders = []
 
@@ -353,7 +353,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     '%s_repo_setup' % releaseConfig['productName']),
                 slaves=all_slaves,
                 category=builderPrefix(''),
-                ))
+                properties={
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                    },
+            ))
 
         if not releaseConfig.get('skip_release_download'):
             release_downloader_factory = ScriptFactory(
@@ -498,7 +502,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
                 signingServers=signingServers,
-                enableSigning=False,
+                enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
             )
 
             builders.append({
@@ -512,23 +516,33 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                'env': builder_env,
                'properties': {
                    'slavebuilddir': reallyShort(builderPrefix('xulrunner_source')),
-                  'platform': None,
-                  'branch': 'release-%s' % sourceRepoInfo['name'],
-                  'product': 'xulrunner',
-                   }
+                   'platform': None,
+                   'branch': 'release-%s' % sourceRepoInfo['name'],
+                   'product': 'xulrunner',
+               }
             })
+            xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('%s_source' % releaseConfig['productName']),
             slaves=all_slaves,
             category=builderPrefix(''),
+            properties={
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+                },
             ))
         if releaseConfig.get('xulrunnerPlatforms'):
             builders.append(makeDummyBuilder(
                 name=builderPrefix('xulrunner_source'),
                 slaves=all_slaves,
                 category=builderPrefix(''),
+                properties={
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                    },
                 ))
+            xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
 
     for platform in releaseConfig['enUSPlatforms']:
         # shorthand
@@ -600,7 +614,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 triggerBuilds=True,
                 triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
-                use_scratchbox=pf.get('use_scratchbox'),
+                use_mock=pf.get('use_mock'),
                 android_signing=pf.get('android_signing', False),
                 multiLocale=bool(releaseConfig.get('enableMultiLocale', False) and
                                  pf.get('multi_locale', False)),
@@ -639,7 +653,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 name=builderPrefix('%s_build' % platform),
                 slaves=all_slaves,
                 category=builderPrefix(''),
-                ))
+                properties={
+                    'platform': platform,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                    },
+            ))
         updates_upstream_builders.append(builderPrefix('%s_build' % platform))
         deliverables_builders.append(builderPrefix('%s_build' % platform))
 
@@ -789,7 +807,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildNumber=releaseConfig['buildNumber'],
                 clobberURL=branchConfig['base_clobber_url'],
                 packageSDK=True,
-                enableSigning=False,
+                signingServers=signingServers,
+                enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
@@ -810,7 +829,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 name=builderPrefix('xulrunner_%s_build' % platform),
                 slaves=all_slaves,
                 category=builderPrefix(''),
-                ))
+                properties={
+                    'platform': platform,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                    },
+            ))
+        xr_deliverables_builders.append(
+            builderPrefix('xulrunner_%s_build' % platform))
 
     if releaseConfig['doPartnerRepacks']:
         for platform in releaseConfig.get('partnerRepackPlatforms',
@@ -927,7 +952,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptRepo=tools_repo,
             interpreter='bash',
             scriptName='scripts/release/generate-sums.sh',
-            extra_args=[branchConfigFile],
+            extra_args=[branchConfigFile, '--create-contrib-dirs'],
         )
         builders.append({
             'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
@@ -951,6 +976,36 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         })
         post_deliverables_builders.append(
             builderPrefix('%s_checksums' % releaseConfig['productName']))
+        if releaseConfig.get('xulrunnerPlatforms'):
+            xr_checksums_factory = SigningScriptFactory(
+                signingServers=signingServers,
+                env=env,
+                scriptRepo=tools_repo,
+                interpreter='bash',
+                scriptName='scripts/release/generate-sums.sh',
+                extra_args=[
+                    branchConfigFile, '--product', 'xulrunner',
+                    '--ssh-user', branchConfig['stage_username_xulrunner'],
+                    '--ssh-key', branchConfig['stage_ssh_xulrunner_key'],
+                    ],
+            )
+            builders.append({
+                'name': builderPrefix('xulrunner_checksums'),
+                'slavenames': branchConfig['platforms']['linux']['slaves'] + \
+                    branchConfig['platforms']['linux64']['slaves'],
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('xulrunner_checksums'),
+                'slavebuilddir': reallyShort(builderPrefix('xulrunner_checksums')),
+                'factory': xr_checksums_factory,
+                'env': builder_env,
+                'properties': {
+                    'slavebuilddir': builderPrefix('xulrunner_checksums'),
+                    'script_repo_revision': releaseTag,
+                    'release_config': releaseConfigFile,
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                }
+            })
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
@@ -1025,7 +1080,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         builders.append(makeDummyBuilder(
             name=builderPrefix('updates'),
             slaves=all_slaves,
-            category=builderPrefix('')
+            category=builderPrefix(''),
+            properties={
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+                },
         ))
         post_signing_builders.append(builderPrefix('updates'))
         important_builders.append(builderPrefix('updates'))
@@ -1070,9 +1129,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if not releaseConfig.get('disablePermissionCheck'):
         check_permissions_factory = ScriptFactory(
             scriptRepo=tools_repo,
-            extra_args=[branchConfigFile, 'permissions'],
             script_timeout=3*60*60,
             scriptName='scripts/release/push-to-mirrors.sh',
+            extra_args=[branchConfigFile, 'permissions',
+                        '--extra-excludes=*.zip',
+                        '--extra-excludes=*.zip.asc'],
             log_eval_func=lambda c, s: regex_log_evaluator(
                 c, s, permission_check_error),
         )
@@ -1097,9 +1158,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if not releaseConfig.get('disableVirusCheck'):
         antivirus_factory = ScriptFactory(
             scriptRepo=tools_repo,
-            extra_args=[branchConfigFile, 'antivirus'],
             script_timeout=3*60*60,
             scriptName='scripts/release/push-to-mirrors.sh',
+            extra_args=[branchConfigFile, 'antivirus',
+                       '--extra-excludes=*.zip',
+                       '--extra-excludes=*.zip.asc'],
         )
 
         builders.append({
@@ -1122,9 +1185,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if not releaseConfig.get('disablePushToMirrors'):
         push_to_mirrors_factory = ScriptFactory(
             scriptRepo=tools_repo,
-            extra_args=[branchConfigFile, 'push'],
             script_timeout=3*60*60,
             scriptName='scripts/release/push-to-mirrors.sh',
+            extra_args=[branchConfigFile, 'push',
+                       '--extra-excludes=*.zip',
+                       '--extra-excludes=*.zip.asc'],
         )
 
         builders.append({
@@ -1143,6 +1208,34 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
         })
+        if releaseConfig.get('xulrunnerPlatforms'):
+            xr_push_to_mirrors_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                scriptName='scripts/release/push-to-mirrors.sh',
+                extra_args=[
+                    branchConfigFile, 'push',
+                    '--product', 'xulrunner',
+                    '--ssh-user', branchConfig['stage_username_xulrunner'],
+                    '--ssh-key', branchConfig['stage_ssh_xulrunner_key']
+                    ],
+                script_timeout=3*60*60,
+            )
+            builders.append({
+                'name': builderPrefix('xulrunner_push_to_mirrors'),
+                'slavenames': unix_slaves,
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('xulrunner_push_to_mirrors'),
+                'slavebuilddir': reallyShort(builderPrefix('xr_psh_mrrrs')),
+                'factory': xr_push_to_mirrors_factory,
+                'env': builder_env,
+                'properties': {
+                    'slavebuilddir': reallyShort(builderPrefix('xr_psh_mrrrs')),
+                    'release_config': releaseConfigFile,
+                    'script_repo_revision': releaseTag,
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                    },
+            })
 
     if not releaseConfig.get('disableBouncerEntries'):
         trigger_uptake_factory = BuildFactory()
@@ -1623,6 +1716,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             upstreamBuilders=deliverables_builders,
             builderNames=post_deliverables_builders,
         ))
+    if releaseConfig.get('xulrunnerPlatforms') and \
+        releaseConfig.get('enableSigningAtBuildTime', True):
+        if xr_deliverables_builders:
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('xulrunner_deliverables_ready'),
+                branch=sourceRepoInfo['path'],
+                upstreamBuilders=xr_deliverables_builders,
+                builderNames=[builderPrefix('xulrunner_checksums')],
+            ))
+        if not releaseConfig.get('disablePushToMirrors'):
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('xulrunner_push_to_mirrors'),
+                branch=sourceRepoInfo['path'],
+                upstreamBuilders=[builderPrefix('xulrunner_checksums')],
+                builderNames=[builderPrefix('xulrunner_push_to_mirrors')],
+            ))
     if post_antivirus_builders:
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('av_done'),

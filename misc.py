@@ -940,6 +940,8 @@ def generateBranchObjects(config, name, secrets=None):
             # Platform already has the -debug suffix
             unittestBranch = "%s-%s-unittest" % (name, platform)
             tinderboxBuildsDir = "%s-%s" % (name, platform)
+        elif 'b2g' in platform:
+            uploadPackages = pf.get('uploadPackages', False)
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
@@ -951,6 +953,8 @@ def generateBranchObjects(config, name, secrets=None):
         packageTests = pf.get('packageTests', packageTests)
 
         if platform.find('win') > -1:
+            codesighs = False
+        if 'b2g' in platform:
             codesighs = False
 
         doBuildAnalysis = pf.get('enable_build_analysis', False)
@@ -1008,7 +1012,9 @@ def generateBranchObjects(config, name, secrets=None):
                 'productName': pf['product_name'],
                 'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
-                'use_scratchbox': pf.get('use_scratchbox'),
+                'use_mock': pf.get('use_mock'),
+                'mock_target': pf.get('mock_target'),
+                'mock_packages': pf.get('mock_packages'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
                 'stageGroup': config['stage_group'],
@@ -1033,6 +1039,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'clobberTime': clobberTime,
                 'buildsBeforeReboot': pf['builds_before_reboot'],
                 'talosMasters': talosMasters,
+                'enablePackaging': pf.get('enable_packaging', True),
                 'packageTests': packageTests,
                 'unittestMasters': pf.get('unittest_masters', config['unittest_masters']),
                 'unittestBranch': per_checkin_unittest_branch,
@@ -1047,6 +1054,8 @@ def generateBranchObjects(config, name, secrets=None):
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
+                'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
+                'tooltool_url_list': pf.get('tooltool_url_list', []),
             }
             factory_kwargs.update(extra_args)
 
@@ -1259,7 +1268,9 @@ def generateBranchObjects(config, name, secrets=None):
                 productName=pf['product_name'],
                 mozconfig=pf['mozconfig'],
                 srcMozconfig=pf.get('src_mozconfig'),
-                use_scratchbox=pf.get('use_scratchbox'),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
@@ -1280,11 +1291,14 @@ def generateBranchObjects(config, name, secrets=None):
                 ausSshKey=config['aus2_ssh_key'],
                 ausHost=config['aus2_host'],
                 hashType=config['hash_type'],
+                balrog_api_root=config['balrog_api_root'],
+                balrog_credentials_file=config['balrog_credentials_file'],
                 buildSpace=buildSpace,
                 clobberURL=config['base_clobber_url'],
                 clobberTime=clobberTime,
                 buildsBeforeReboot=pf['builds_before_reboot'],
                 talosMasters=talosMasters,
+                enablePackaging=pf.get('enable_packaging', True),
                 packageTests=packageTests,
                 unittestMasters=pf.get('unittest_masters', config['unittest_masters']),
                 unittestBranch=nightlyUnittestBranch,
@@ -1301,6 +1315,8 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 mozillaDir=config.get('mozilla_dir', None),
+                tooltool_manifest_src = pf.get('tooltool_manifest_src', None),
+                tooltool_url_list = pf.get('tooltool_url_list', []),
                 **nightly_kwargs
             )
 
@@ -1350,6 +1366,8 @@ def generateBranchObjects(config, name, secrets=None):
                         ausUser=config['aus2_user'],
                         ausSshKey=config['aus2_ssh_key'],
                         ausHost=config['aus2_host'],
+                        balrog_api_root=config['balrog_api_root'],
+                        balrog_credentials_file=config['balrog_credentials_file'],
                         hashType=config['hash_type'],
                         stageServer=config['stage_server'],
                         stageUsername=config['stage_username'],
@@ -2283,7 +2301,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'productName': pf['product_name'],
                 'mozconfig': pf['mozconfig'],
                 'srcMozconfig': pf.get('src_mozconfig'),
-                'use_scratchbox': pf.get('use_scratchbox'),
+                'use_mock': pf.get('use_mock'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
                 'stageGroup': config['stage_group'],
@@ -2534,7 +2552,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 productName=pf['product_name'],
                 mozconfig=pf['mozconfig'],
                 srcMozconfig=pf.get('src_mozconfig'),
-                use_scratchbox=pf.get('use_scratchbox'),
+                use_mock=pf.get('use_mock'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
@@ -3630,7 +3648,7 @@ def generateJetpackObjects(config, SLAVES):
                         extra_args=("-p", platform, "-t", jetpackTarball, "-b", branch,
                                    "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
                         interpreter='python',
-                        log_eval_func=rc_eval_func({1: WARNINGS}),
+                        log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE, 4: EXCEPTION, 5: RETRY}),
                         )
 
                 builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
@@ -3660,25 +3678,10 @@ def generateJetpackObjects(config, SLAVES):
             builderNames=[b['name'] for b in builders],
             )
 
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-            errorparser="unittest",
-        )
-        status = [tbox_mailer]
-
     return {
             'builders': builders,
             'change_source': [poller],
             'schedulers': [scheduler],
-            'status': status,
             }
 
 def generateProjectObjects(project, config, SLAVES):
