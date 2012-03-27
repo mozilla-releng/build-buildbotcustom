@@ -717,6 +717,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         interpreter='bash',
                         scriptName='scripts/l10n/release_repacks.sh',
                         extra_args=extra_args,
+                        script_timeout=2400,
                     )
 
                 builddir = builderPrefix('%s_repack' % platform) + \
