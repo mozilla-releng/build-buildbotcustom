@@ -1849,10 +1849,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 '--verbose',
             ]
             if self.balrog_credentials_file:
-                cmd.extend(['--credentials-file', target_file_name])
                 credentialsFile = os.path.join(os.getcwd(),
                                                self.balrog_credentials_file)
                 target_file_name = os.path.basename(credentialsFile)
+                cmd.extend(['--credentials-file', target_file_name])
                 self.addStep(FileDownload(
                     mastersrc=credentialsFile,
                     slavedest=target_file_name,
