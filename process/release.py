@@ -1716,21 +1716,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             upstreamBuilders=deliverables_builders,
             builderNames=post_deliverables_builders,
         ))
-    if xr_deliverables_builders:
-        schedulers.append(AggregatingScheduler(
-            name=builderPrefix('xulrunner_deliverables_ready'),
-            branch=sourceRepoInfo['path'],
-            upstreamBuilders=xr_deliverables_builders,
-            builderNames=[builderPrefix('xulrunner_checksums')],
-        ))
-    if not releaseConfig.get('disablePushToMirrors') and \
-        releaseConfig.get('xulrunnerPlatforms'):
-        schedulers.append(AggregatingScheduler(
-            name=builderPrefix('xulrunner_push_to_mirrors'),
-            branch=sourceRepoInfo['path'],
-            upstreamBuilders=[builderPrefix('xulrunner_checksums')],
-            builderNames=[builderPrefix('xulrunner_push_to_mirrors')],
-        ))
+    if releaseConfig.get('xulrunnerPlatforms') and \
+        releaseConfig.get('enableSigningAtBuildTime', True):
+        if xr_deliverables_builders:
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('xulrunner_deliverables_ready'),
+                branch=sourceRepoInfo['path'],
+                upstreamBuilders=xr_deliverables_builders,
+                builderNames=[builderPrefix('xulrunner_checksums')],
+            ))
+        if not releaseConfig.get('disablePushToMirrors'):
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('xulrunner_push_to_mirrors'),
+                branch=sourceRepoInfo['path'],
+                upstreamBuilders=[builderPrefix('xulrunner_checksums')],
+                builderNames=[builderPrefix('xulrunner_push_to_mirrors')],
+            ))
     if post_antivirus_builders:
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('av_done'),
