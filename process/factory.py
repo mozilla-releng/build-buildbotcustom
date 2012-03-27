@@ -201,7 +201,7 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm))",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar))",
                         "\n".join([stdout, stderr]), re.M):
         if 'devel' in m and m.endswith('.rpm'):
             retval['develRpmUrl'] = m
@@ -219,6 +219,10 @@ def parse_make_upload(rc, stdout, stderr):
             retval['robocopApkUrl'] = m
         elif 'jsshell-' in m and m.endswith('.zip'):
             retval['jsshellUrl'] = m
+        elif m.endswith('.complete.mar'):
+            retval['completeMarUrl'] = m
+        elif m.endswith('.mar') and '.partial.' in m:
+            retval['partialMarUrl'] = m
         else:
             retval['packageUrl'] = m
     return retval
@@ -387,7 +391,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
             branchName=None, baseWorkDir='build', hashType='sha512',
             baseMirrorUrls=None, baseBundleUrls=None, signingServers=None,
-            enableSigning=True, env={}, **kwargs):
+            enableSigning=True, env={}, balrog_api_root=None,
+            balrog_credentials_file=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -407,6 +412,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         self.signingServers = signingServers
         self.enableSigning = enableSigning
         self.env = env.copy()
+        self.balrog_api_root = balrog_api_root
+        self.balrog_credentials_file = balrog_credentials_file
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -438,6 +445,12 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             name='set_basedir',
             command=['bash', '-c', 'pwd'],
             property='basedir',
+            workdir='.',
+        ))
+        self.addStep(SetProperty(
+            name='set_hashType',
+            command=['echo', self.hashType],
+            property='hashType',
             workdir='.',
         ))
         # We need the basename of the current working dir so we can
@@ -1655,6 +1668,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 workdir='.',
                 name='get_app_version',
             ))
+            self.addStep(SetProperty(
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                         'App', 'Name'],
+                property='appName',
+                workdir='.',
+                name='get_app_name',
+            ))
         self.pkg_env = pkg_env
 
     def addUploadSteps(self):
@@ -1811,10 +1832,44 @@ class MercurialBuildFactory(MozillaBuildFactory):
              description=['upload', 'complete', 'snippet'],
              haltOnFailure=True,
         ))
- 
+
+    def addSubmitBalrogUpdates(self):
+        if self.balrog_api_root:
+            self.addStep(JSONPropertiesDownload(
+                name='download_balrog_props',
+                slavedest='buildprops_balrog.json',
+                workdir='.',
+                flunkOnFailure=False,
+            ))
+            cmd = [
+                self.env.get('PYTHON26', 'python'),
+                WithProperties('%(toolsdir)s/scripts/updates/balrog-client.py'),
+                '--build-properties', 'buildprops_balrog.json',
+                '--api-root', self.balrog_api_root,
+                '--verbose',
+            ]
+            if self.balrog_credentials_file:
+                cmd.extend(['--credentials-file', target_file_name])
+                credentialsFile = os.path.join(os.getcwd(),
+                                               self.balrog_credentials_file)
+                target_file_name = os.path.basename(credentialsFile)
+                self.addStep(FileDownload(
+                    mastersrc=credentialsFile,
+                    slavedest=target_file_name,
+                    workdir='.',
+                    flunkOnFailure=False,
+                ))
+            self.addStep(RetryingShellCommand(
+                name='submit_balrog_updates',
+                command=cmd,
+                workdir='.',
+                flunkOnFailure=False,
+            ))
+
     def addUpdateSteps(self):
         self.addCreateSnippetsSteps()
         self.addUploadSnippetsSteps()
+        self.addSubmitBalrogUpdates()
 
     def addBuildSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
@@ -2598,7 +2653,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 command=['make', 'upload'] + upload_vars,
                 env=uploadEnv,
                 workdir=objdir,
-                extract_fn = parse_make_upload,
+                extract_fn=parse_make_upload,
                 haltOnFailure=True,
                 description=['make', 'upload'],
                 mock=self.use_mock,
@@ -3254,7 +3309,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tinderboxPrint('buildnumber',WithProperties('%(buildnumber)s'))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
-        self.addStep(RetryingShellCommand(
+        self.addStep(RetryingSetProperty(
          name='make_upload',
          command=['make', 'upload', WithProperties('AB_CD=%(locale)s')],
          env=self.uploadEnv,
@@ -3264,6 +3319,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          flunkOnFailure=True,
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
          locks=[upload_lock.access('counting')],
+         extract_fn=parse_make_upload,
         ))
 
     def getSources(self):
@@ -3597,6 +3653,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             NightlyBuildFactory.addCreateSnippetsSteps(self,
                                                        milestone_extra='-l10n')
             NightlyBuildFactory.addUploadSnippetsSteps(self)
+            NightlyBuildFactory.addSubmitBalrogUpdates(self)
 
     def getPreviousBuildUploadDir(self):
         if self.createPartial:
@@ -3740,6 +3797,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                          'App', 'Version'],
                 property='appVersion',
                 name='get_app_version',
+                workdir=self.absMozillaSrcDir,
+            ))
+            self.addStep(SetProperty(
+                command=['python', 'config/printconfigsetting.py',
+                         WithProperties('%(inipath)s'),
+                         'App', 'Name'],
+                property='appName',
+                name='get_app_name',
                 workdir=self.absMozillaSrcDir,
             ))
             self.addFilePropertiesSteps(filename='*.complete.mar',
@@ -5734,12 +5799,12 @@ class UnittestBuildFactory(MozillaBuildFactory):
                     product=self.productName,
                     to_tinderbox_dated=True,
                     )
-            self.addStep(SetProperty(
+            self.addStep(RetryingSetProperty(
              name='make_upload',
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = parse_make_upload,
+             extract_fn=parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
              timeout=60*60, # 60 minutes
@@ -5856,11 +5921,11 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
                     to_try=True,
                     )
 
-            self.addStep(SetProperty(
+            self.addStep(RetryingSetProperty(
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = parse_make_upload,
+             extract_fn=parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
@@ -6099,12 +6164,12 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                     product=self.productName,
                     to_tinderbox_dated=True,
                     )
-            self.addStep(SetProperty(
+            self.addStep(RetryingSetProperty(
              name='make_upload',
              command=['make', 'upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
-             extract_fn = parse_make_upload,
+             extract_fn=parse_make_upload,
              haltOnFailure=True,
              description=['upload'],
              timeout=60*60, # 60 minutes
