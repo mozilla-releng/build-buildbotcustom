@@ -7379,11 +7379,20 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addCleanupSteps()
         self.addRebootStep()
 
-    def pythonWithSimpleJson(self, platform):
+    def pythonWithJson(self, platform):
+        '''
+        Return path to a python version that eithers has "simplejson" or
+        it is 2.6 or higher (which includes the json module)
+        '''
         if (platform in ("fedora", "fedora64", "leopard", "snowleopard", "lion")):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
+        elif (platform.find("android") > -1):
+            # path in the foopies
+            return "/opt/local/bin/python"
+        else:
+            raise ValueError("No valid platform was passed: %s" % platform)
 
     def _propertyIsSet(self, step, prop):
         return step.build.getProperties().has_key(prop)
@@ -7688,7 +7697,7 @@ class TalosFactory(RequestSortingBuildFactory):
                 ))
                 self.addStep(ShellCommand(
                     name='download files specified in talos.json',
-                    command=[self.pythonWithSimpleJson(self.OS), 'talos_from_code.py', \
+                    command=[self.pythonWithJson(self.OS), 'talos_from_code.py', \
                             '--talos-json-url', \
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
@@ -7762,11 +7771,23 @@ class TalosFactory(RequestSortingBuildFactory):
              haltOnFailure=True,
             ))
             self.addStep(RetryingShellCommand(
-             name='get_talos_zip',
-             command=['wget', '-O', 'talos.zip', '--no-check-certificate',
-                      'http://build.mozilla.org/talos/zips/talos.bug738685.c08bb14e71cd.zip'],
+             name='get_talos_from_code_py',
+             description="Downloading talos_from_code.py",
+             command=['wget', '--no-check-certificate',
+                      WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py")],
              workdir=self.workdirBase,
              haltOnFailure=True,
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
+            ))
+            self.addStep(RetryingShellCommand(
+             name='run_talos_from_code_py',
+             description="Running talos_from_code.py",
+             command=[self.pythonWithJson(self.OS), 'talos_from_code.py', \
+                     '--talos-json-url', \
+                     WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+             log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
             ))
             self.addStep(UnpackFile(
              filename='talos.zip',
