@@ -570,9 +570,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             else:
                 triggeredSchedulers = None
             multiLocaleConfig = releaseConfig.get(
-                'mozharness_config', {}).get('platforms', {}).get(platform)
+                'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
-                'mozharness_config', {}).get('multilocaleOptions')
+                'multilocale_config', {}).get('multilocaleOptions')
             enableUpdatePackaging = bool(releaseConfig.get('verifyConfigs',
                                                       {}).get(platform))
             build_factory = ReleaseBuildFactory(
@@ -717,6 +717,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         interpreter='bash',
                         scriptName='scripts/l10n/release_repacks.sh',
                         extra_args=extra_args,
+                        script_timeout=2400,
                     )
 
                 builddir = builderPrefix('%s_repack' % platform) + \
@@ -840,36 +841,40 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if releaseConfig['doPartnerRepacks']:
         for platform in releaseConfig.get('partnerRepackPlatforms',
                                           releaseConfig['l10nPlatforms']):
-            repack_params = dict(
-                hgHost=branchConfig['hghost'],
-                repoPath=sourceRepoInfo['path'],
-                buildToolsRepoPath=tools_repo_path,
-                productName=releaseConfig['productName'],
-                version=releaseConfig['version'],
-                buildNumber=releaseConfig['buildNumber'],
-                partnersRepoPath=releaseConfig['partnersRepoPath'],
-                partnersRepoRevision=releaseTag,
-                platformList=[platform],
-                stagingServer=releaseConfig['stagingServer'],
-                stageUsername=branchConfig['stage_username'],
-                stageSshKey=branchConfig['stage_ssh_key'],
-                signingServers=signingServers,
-                enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
-            )
-
-            if 'macosx64' in branchConfig['platforms']:
-                slaves = branchConfig['platforms']['macosx64']['slaves']
-            else:
-                slaves = branchConfig['platforms']['macosx']['slaves']
-
-            if releaseConfig['productName'] == 'fennec':
-                repack_params['productName'] = 'mobile'
-                repack_params['platformList'] = [buildbot2ftp(platform)]
-                repack_params['nightlyDir'] = 'candidates'
-                repack_params['packageDmg'] = False
+            slaves = None
+            partner_repack_factory = None
+            if releaseConfig.get('partnerRepackConfig', {}).get('use_mozharness'):
                 slaves = branchConfig['platforms']['linux']['slaves']
+                mh_cfg = releaseConfig['partnerRepackConfig']['platforms'][platform]
+                extra_args = mh_cfg.get('extra_args', ['--cfg', mh_cfg['config_file']])
+                partner_repack_factory = ScriptFactory(
+                    scriptRepo=mozharness_repo,
+                    scriptName=mh_cfg['script'],
+                    extra_args=extra_args,
+                )
+            else:
+                repack_params = dict(
+                    hgHost=branchConfig['hghost'],
+                    repoPath=sourceRepoInfo['path'],
+                    buildToolsRepoPath=tools_repo_path,
+                    productName=releaseConfig['productName'],
+                    version=releaseConfig['version'],
+                    buildNumber=releaseConfig['buildNumber'],
+                    partnersRepoPath=releaseConfig['partnersRepoPath'],
+                    partnersRepoRevision=releaseTag,
+                    platformList=[platform],
+                    stagingServer=releaseConfig['stagingServer'],
+                    stageUsername=branchConfig['stage_username'],
+                    stageSshKey=branchConfig['stage_ssh_key'],
+                    signingServers=signingServers,
+                    enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+                )
+                if 'macosx64' in branchConfig['platforms']:
+                    slaves = branchConfig['platforms']['macosx64']['slaves']
+                else:
+                    slaves = branchConfig['platforms']['macosx']['slaves']
 
-            partner_repack_factory = PartnerRepackFactory(**repack_params)
+                partner_repack_factory = PartnerRepackFactory(**repack_params)
 
             builders.append({
                 'name': builderPrefix('partner_repack', platform),
