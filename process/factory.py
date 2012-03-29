@@ -7839,25 +7839,34 @@ class TalosFactory(RequestSortingBuildFactory):
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
-            self.addStep(RetryingShellCommand(
-             name='get_talos_from_code_py',
-             description="Downloading talos_from_code.py",
-             command=['wget', '--no-check-certificate',
-                      WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py")],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
-             log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
-            ))
-            self.addStep(RetryingShellCommand(
-             name='run_talos_from_code_py',
-             description="Running talos_from_code.py",
-             command=[self.pythonWithJson(self.OS), 'talos_from_code.py', \
-                     '--talos-json-url', \
-                     WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
-             log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
-            ))
+            if self.talos_from_source_code:
+                self.addStep(RetryingShellCommand(
+                 name='get_talos_from_code_py',
+                 description="Downloading talos_from_code.py",
+                 command=['wget', '--no-check-certificate',
+                          WithProperties("%(repo_path)s/raw-file/%(revision)s/testing/talos/talos_from_code.py")],
+                 workdir=self.workdirBase,
+                 haltOnFailure=True,
+                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
+                ))
+                self.addStep(RetryingShellCommand(
+                 name='run_talos_from_code_py',
+                 description="Running talos_from_code.py",
+                 command=[self.pythonWithJson(self.OS), 'talos_from_code.py', \
+                         '--talos-json-url', \
+                         WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
+                 workdir=self.workdirBase,
+                 haltOnFailure=True,
+                 log_eval_func=lambda c,s: regex_log_evaluator(c, s, talos_hgweb_errors),
+                ))
+            else:
+                self.addStep(RetryingShellCommand(
+                 name='get_talos_zip',
+                 command=['wget', '-O', 'talos.zip', '--no-check-certificate',
+                          'http://build.mozilla.org/talos/zips/talos.mobile.old.zip'],
+                 workdir=self.workdirBase,
+                 haltOnFailure=True,
+                ))
             self.addStep(UnpackFile(
              filename='talos.zip',
              workdir=self.workdirBase,
