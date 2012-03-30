@@ -696,11 +696,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             for n, builderName in l10nBuilders(platform).iteritems():
                 if releaseConfig['productName'] == 'fennec':
-                    extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
                     repack_factory = ScriptFactory(
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/mobile_l10n.py',
-                        extra_args=extra_args,
+                        extra_args=['--cfg',
+                                    'single_locale/release_%s_%s.py' % (releaseConfig['sourceRepositories']['mobile']['name'], platform),
+                                    '--total-chunks', str(l10nChunks),
+                                    '--this-chunk', str(n)]
                     )
                 else:
                     extra_args = [platform, branchConfigFile, str(l10nChunks),
