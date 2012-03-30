@@ -7153,7 +7153,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
          name='get_updateSUT_py',
          description="Download updateSUT.py",
          command=['wget', '--no-check-certificate',
-                  'http://hg.mozilla.org/build/tools/raw-file/b94a850405d4/sut_tools/updateSUT.py'],
+                  'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
          workdir='build',
          haltOnFailure=True,
         ))
@@ -7829,7 +7829,7 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(RetryingShellCommand(
              name='get_updateSUT_py',
              command=['wget', '--no-check-certificate',
-                      'http://hg.mozilla.org/build/tools/raw-file/b94a850405d4/sut_tools/updateSUT.py'],
+                      'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
