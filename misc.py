@@ -912,6 +912,10 @@ def generateBranchObjects(config, name, secrets=None):
     for platform in enabled_platforms:
         # shorthand
         pf = config['platforms'][platform]
+        # This is the key of SLAVES that specifies which slaves to use for l10n
+        # repacks.  Useful when we want to use a different SLAVES key than this
+        # scope's platform variable
+        l10n_slaves_key = pf.get('l10n_slaves_key', platform.split('-')[0])
 
         # The stage platform needs to be used by the factory __init__ methods
         # as well as the log handler status target.  Instead of repurposing the
@@ -1386,7 +1390,7 @@ def generateBranchObjects(config, name, secrets=None):
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
-                        'slavenames': config['l10n_slaves'][platform],
+                        'slavenames': config['l10n_slaves'][l10n_slaves_key],
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
                         'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),
                         'factory': mozilla2_l10n_nightly_factory,
@@ -1507,7 +1511,7 @@ def generateBranchObjects(config, name, secrets=None):
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
-                'slavenames': config['l10n_slaves'][platform],
+                'slavenames': config['l10n_slaves'][l10n_slaves_key],
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
                 'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform)),
                 'factory': mozilla2_l10n_dep_factory,

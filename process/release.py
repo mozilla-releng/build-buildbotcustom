@@ -696,13 +696,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             for n, builderName in l10nBuilders(platform).iteritems():
                 if releaseConfig['productName'] == 'fennec':
+                    extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
                     repack_factory = ScriptFactory(
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/mobile_l10n.py',
-                        extra_args=['--cfg',
-                                    'single_locale/release_%s_%s.py' % (releaseConfig['sourceRepositories']['mobile']['name'], platform),
-                                    '--total-chunks', str(l10nChunks),
-                                    '--this-chunk', str(n)]
+                        extra_args=extra_args,
                     )
                 else:
                     extra_args = [platform, branchConfigFile, str(l10nChunks),
@@ -853,6 +851,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     extra_args=extra_args,
                 )
             else:
+                pr_pf = branchConfig['platforms']['macosx64']
+                slaves = pr_pf['slaves']
                 repack_params = dict(
                     hgHost=branchConfig['hghost'],
                     repoPath=sourceRepoInfo['path'],
@@ -868,12 +868,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     stageSshKey=branchConfig['stage_ssh_key'],
                     signingServers=signingServers,
                     enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+                    env=pr_pf['env'],
                 )
-                if 'macosx64' in branchConfig['platforms']:
-                    slaves = branchConfig['platforms']['macosx64']['slaves']
-                else:
-                    slaves = branchConfig['platforms']['macosx']['slaves']
-
                 partner_repack_factory = PartnerRepackFactory(**repack_params)
 
             builders.append({
