@@ -851,6 +851,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     extra_args=extra_args,
                 )
             else:
+                pr_pf = branchConfig['platforms']['macosx64']
+                slaves = pr_pf['slaves']
                 repack_params = dict(
                     hgHost=branchConfig['hghost'],
                     repoPath=sourceRepoInfo['path'],
@@ -866,12 +868,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     stageSshKey=branchConfig['stage_ssh_key'],
                     signingServers=signingServers,
                     enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+                    env=pr_pf['env'],
                 )
-                if 'macosx64' in branchConfig['platforms']:
-                    slaves = branchConfig['platforms']['macosx64']['slaves']
-                else:
-                    slaves = branchConfig['platforms']['macosx']['slaves']
-
                 partner_repack_factory = PartnerRepackFactory(**repack_params)
 
             builders.append({

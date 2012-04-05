@@ -8293,23 +8293,14 @@ class PartnerRepackFactory(ReleaseFactory):
             description=['remove', 'partners', 'repo'],
             workdir=self.baseWorkDir,
         ))
-        self.addStep(MercurialCloneCommand(
-            name='clone_partners_repo',
-            command=['hg', 'clone',
-                     'http://%s/%s' % (self.hgHost,
-                                          self.partnersRepoPath),
-                     self.partnersRepackDir
-                    ],
-            description=['clone', 'partners', 'repo'],
+        self.addStep(self.makeHgtoolStep(
+            name='clone_partner_repacks',
+            repo_url='http://%s/%s' % (self.hgHost, self.partnersRepoPath),
+            wc=self.partnersRepackDir,
             workdir=self.baseWorkDir,
-            haltOnFailure=True
-        ))
-        self.addStep(ShellCommand(
-            name='update_partners_repo',
-            command=['hg', 'update', '-C', '-r', self.partnersRepoRevision],
-            description=['update', 'partners', 'repo'],
-            workdir=self.partnersRepackDir,
-            haltOnFailure=True            
+            rev=self.partnersRepoRevision,
+            env=self.env,
+            use_properties=False,
         ))
         if self.packageDmg:
             self.addStep(ShellCommand(
