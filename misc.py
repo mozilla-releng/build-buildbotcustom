@@ -1001,6 +1001,11 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             per_checkin_unittest_branch = unittestBranch
 
+        if config.get('mozilla_dir'):
+            extra_args['mozillaDir'] = config['mozilla_dir']
+        if config.get('leak_target'):
+            extra_args['leakTarget'] = config['leak_target']
+
         # Some platforms shouldn't do dep builds (i.e. RPM)
         if pf.get('enable_dep', True):
             factory_kwargs = {
@@ -1060,6 +1065,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozillaDir': config.get('mozilla_dir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': pf.get('tooltool_url_list', []),
+                'runAliveTests': pf.get('run_alive_tests', True),
             }
             factory_kwargs.update(extra_args)
 
@@ -1069,11 +1075,13 @@ def generateBranchObjects(config, name, secrets=None):
                 factory_kwargs['profiledBuild'] = False
 
             mozilla2_dep_factory = factory_class(**factory_kwargs)
+            #eg. TB Linux comm-central build
+            #    TB Linux comm-central leak test build
             mozilla2_dep_builder = {
                 'name': '%s build' % pf['base_name'],
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_dep_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
@@ -1083,7 +1091,7 @@ def generateBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir' : reallyShort('%s-%s' % (name, platform))},
+                               'slavebuilddir' : reallyShort('%s-%s' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -1100,7 +1108,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'name': '%s pgo-build' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir':  '%s-%s-pgo' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
                     'category': name,
                     'nextSlave': _nextFastSlave,
@@ -1108,7 +1116,7 @@ def generateBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform + '-pgo',
                                'product': pf['stage_product'],
-                               'slavebuilddir' : reallyShort('%s-%s-pgo' % (name, platform))},
+                               'slavebuilddir' : reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(pgo_builder)
 
@@ -1168,7 +1176,7 @@ def generateBranchObjects(config, name, secrets=None):
                                     '--total-chunks', str(pf['l10n_chunks']),
                                     '--this-chunk', str(n)]
                     )
-                    slavebuilddir = reallyShort(builddir)
+                    slavebuilddir = reallyShort(builddir, pf['stage_product'])
                     branchObjects['builders'].append({
                         'name': builderName,
                         'slavenames': pf.get('slaves'),
@@ -1324,11 +1332,12 @@ def generateBranchObjects(config, name, secrets=None):
                 **nightly_kwargs
             )
 
+            #eg. TB Linux comm-aurora nightly
             mozilla2_nightly_builder = {
                 'name': nightly_builder,
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-nightly' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
@@ -1337,7 +1346,7 @@ def generateBranchObjects(config, name, secrets=None):
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
                                'nightly_build': True,
-                               'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
+                               'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -1384,15 +1393,17 @@ def generateBranchObjects(config, name, secrets=None):
                         buildSpace=l10nSpace,
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
+                        mozillaDir=config.get('mozilla_dir', None),
                         signingServers=secrets.get(pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                     )
+                    # eg. Thunderbird comm-aurora linux l10n nightly
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
                         'slavenames': config['l10n_slaves'][l10n_slaves_key],
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
-                        'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),
+                        'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
@@ -1400,7 +1411,7 @@ def generateBranchObjects(config, name, secrets=None):
                                        'platform': platform,
                                        'product': pf['stage_product'],
                                        'stage_platform': stage_platform,
-                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),},
+                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
@@ -1445,7 +1456,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'name': '%s shark' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-shark' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform), pf['stage_product']),
                     'factory': mozilla2_shark_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
@@ -1453,7 +1464,7 @@ def generateBranchObjects(config, name, secrets=None):
                                    'platform': platform,
                                    'stage_platform': stage_platform,
                                    'product': pf['stage_product'],
-                                   'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
+                                   'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
             if config['enable_valgrind'] and \
@@ -1468,7 +1479,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'name': '%s valgrind' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-valgrind' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform), pf['stage_product']),
                     'factory': mozilla2_valgrind_factory,
                     'category': name,
                     'env': valgrind_env,
@@ -1477,9 +1488,21 @@ def generateBranchObjects(config, name, secrets=None):
                                    'platform': platform,
                                    'stage_platform': stage_platform,
                                    'product': pf['stage_product'],
-                                   'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform))},
+                                   'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(mozilla2_valgrind_builder)
+
+            dep_kwargs = {}
+            if config.get('call_client_py', False):
+                dep_kwargs['callClientPy'] = True
+                dep_kwargs['clientPyConfig'] = {
+                     'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
+                     'cvsroot':             config.get('cvsroot', ''),
+                     'inspector_repo_path': config.get('inspector_repo_path', ''),
+                     'moz_repo_path':       config.get('moz_repo_path', ''),
+                     'skip_blank_repos':    config.get('skip_blank_repos', False),
+                     'venkman_repo_path':   config.get('venkman_repo_path', ''),
+                }
 
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
@@ -1492,6 +1515,7 @@ def generateBranchObjects(config, name, secrets=None):
                 project=pf['product_name'],
                 appName=pf['app_name'],
                 enUSBinaryURL=config['enUS_binaryURL'],
+                mozillaDir=config.get('mozilla_dir', None),
                 nightly=False,
                 l10nDatedDirs=config['l10nDatedDirs'],
                 stageServer=config['stage_server'],
@@ -1508,20 +1532,25 @@ def generateBranchObjects(config, name, secrets=None):
                 signingServers=secrets.get(pf.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                **dep_kwargs
             )
+            # eg. Thunderbird comm-central linux l10n dep
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
                 'slavenames': config['l10n_slaves'][l10n_slaves_key],
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
+            if config.get('mozilla_dir'):
+                extra_args['mozillaDir'] = config['mozilla_dir']
+
                                'product': pf['stage_product'],
-                               'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
+                               'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -1566,7 +1595,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'name': '%s unit test' % pf['base_name'],
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-unittest' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform), pf['stage_product']),
                 'factory': unittest_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
@@ -1574,7 +1603,7 @@ def generateBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform))},
+                               'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -1638,11 +1667,11 @@ def generateBranchObjects(config, name, secrets=None):
                     'name': '%s code coverage' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-codecoverage' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform), pf['stage_product']),
                     'factory': codecoverage_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)), 'product': 'firefox'},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -1696,7 +1725,7 @@ def generateBranchObjects(config, name, secrets=None):
                  'name': '%s xulrunner' % pf['base_name'],
                  'slavenames': pf['slaves'],
                  'builddir': '%s-%s-xulrunner' % (name, platform),
-                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)),
+                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
@@ -2357,7 +2386,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'name': '%s build' % pf['base_name'],
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_dep_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
@@ -2367,7 +2396,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir' : reallyShort('%s-%s' % (name, platform))},
+                               'slavebuilddir' : reallyShort('%s-%s' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -2384,7 +2413,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                     'name': '%s pgo-build' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir':  '%s-%s-pgo' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
                     'category': name,
                     'nextSlave': _nextFastSlave,
@@ -2392,7 +2421,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform + '-pgo',
                                'product': pf['stage_product'],
-                               'slavebuilddir' : reallyShort('%s-%s-pgo' % (name, platform))},
+                               'slavebuilddir' : reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(pgo_builder)
 
@@ -2452,7 +2481,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                     '--total-chunks', str(pf['l10n_chunks']),
                                     '--this-chunk', str(n)]
                     )
-                    slavebuilddir = reallyShort(builddir)
+                    slavebuilddir = reallyShort(builddir, pf['stage_product'])
                     branchObjects['builders'].append({
                         'name': builderName,
                         'slavenames': pf.get('slaves'),
@@ -2605,7 +2634,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'name': nightly_builder,
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-nightly' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
                 'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
@@ -2614,7 +2643,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
                                'nightly_build': True,
-                               'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform))},
+                               'slavebuilddir': reallyShort('%s-%s-nightly' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_nightly_builder)
 
@@ -2669,7 +2698,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
                         'slavenames': config['l10n_slaves'][platform],
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
-                        'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),
+                        'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextL10nSlave(),
@@ -2677,7 +2706,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                        'platform': platform,
                                        'product': pf['stage_product'],
                                        'stage_platform': stage_platform,
-                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform)),},
+                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),},
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
@@ -2724,7 +2753,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                     'name': '%s shark' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-shark' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform), pf['stage_product']),
                     'factory': mozilla2_shark_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
@@ -2732,7 +2761,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                    'platform': platform,
                                    'stage_platform': stage_platform,
                                    'product': pf['stage_product'],
-                                   'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform))},
+                                   'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(mozilla2_shark_builder)
             if config['enable_valgrind'] and \
@@ -2747,7 +2776,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                     'name': '%s valgrind' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-valgrind' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform), pf['stage_product']),
                     'factory': mozilla2_valgrind_factory,
                     'category': name,
                     'env': valgrind_env,
@@ -2756,7 +2785,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                    'platform': platform,
                                    'stage_platform': stage_platform,
                                    'product': pf['stage_product'],
-                                   'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform))},
+                                   'slavebuilddir': reallyShort('%s-%s-valgrind' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(mozilla2_valgrind_builder)
 
@@ -2794,7 +2823,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
                 'slavenames': config['l10n_slaves'][platform],
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextL10nSlave(),
@@ -2802,7 +2831,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform))},
+                               'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -2855,7 +2884,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'name': '%s unit test' % pf['base_name'],
                 'slavenames': pf['slaves'],
                 'builddir': '%s-%s-unittest' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform)),
+                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform), pf['stage_product']),
                 'factory': unittest_factory,
                 'category': name,
                 'nextSlave': _nextFastSlave,
@@ -2863,7 +2892,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform))},
+                               'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(unittest_builder)
 
@@ -2927,11 +2956,11 @@ def generateCCBranchObjects(config, name, secrets=None):
                     'name': '%s code coverage' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s-%s-codecoverage' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform)),
+                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform), pf['stage_product']),
                     'factory': codecoverage_factory,
                     'category': name,
                     'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform))},
+                    'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(codecoverage_builder)
 
@@ -2985,11 +3014,11 @@ def generateCCBranchObjects(config, name, secrets=None):
                  'name': '%s xulrunner' % pf['base_name'],
                  'slavenames': pf['slaves'],
                  'builddir': '%s-%s-xulrunner' % (name, platform),
-                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)),
+                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
                  'factory': mozilla2_xulrunner_factory,
                  'category': name,
                  'nextSlave': _nextSlowSlave,
-                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform))},
+                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product'])},
              }
              branchObjects['builders'].append(mozilla2_xulrunner_builder)
 

@@ -745,7 +745,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  stageProduct=None, post_upload_include_platform=False,
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
-                 ausHost=None, nightly=False, leakTest=False,
+                 ausHost=None, nightly=False, leakTest=False, leakTarget=None,
                  checkTest=False, valgrindCheck=False, codesighs=True,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
@@ -772,6 +772,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  tooltool_url_list=[],
                  tooltool_script='/tools/tooltool.py',
                  enablePackaging=True,
+                 runAliveTests=True,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -809,6 +810,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.ausHost = ausHost
         self.nightly = nightly
         self.leakTest = leakTest
+        self.leakTarget = leakTarget
         self.checkTest = checkTest
         self.valgrindCheck = valgrindCheck
         self.codesighs = codesighs
@@ -842,6 +844,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.tooltool_url_list = tooltool_url_list
         self.tooltool_script = tooltool_script
         self.tooltool_bootstrap = tooltool_bootstrap
+        self.runAliveTests = runAliveTests
 
         assert len(tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1159,6 +1162,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          name='tinderboxprint_changeset',
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
+
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",
@@ -1312,28 +1316,38 @@ class MercurialBuildFactory(MozillaBuildFactory):
         * leakEnv Environment used for running firefox.
         * graphAndUpload Used to prevent the try jobs from doing talos graph
           posts and uploading logs."""
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          extraArgs=['-register'],
-          warnOnFailure=True,
-          haltOnFailure=True
-          ))
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          warnOnFailure=True,
-          haltOnFailure=True
-          ))
-        self.addStep(AliveTest(
-          env=leakEnv,
-          workdir='build/%s/_leaktest' % self.mozillaObjdir,
-          extraArgs=['--trace-malloc', 'malloc.log',
-                     '--shutdown-leaks=sdleak.log'],
-          timeout=3600, # 1 hour, because this takes a long time on win32
-          warnOnFailure=True,
-          haltOnFailure=True
-          ))
+
+        if self.leakTarget:
+            self.addStep(ShellCommand(
+                name='make_%s' % self.leakTarget,
+                env=leakEnv,
+                workdir='build/%s' % self.objdir,
+                command=['make', self.leakTarget],
+            ))
+
+        if self.runAliveTests:
+            self.addStep(AliveTest(
+              env=leakEnv,
+              workdir='build/%s/_leaktest' % self.mozillaObjdir,
+              extraArgs=['-register'],
+              warnOnFailure=True,
+              haltOnFailure=True
+              ))
+            self.addStep(AliveTest(
+              env=leakEnv,
+              workdir='build/%s/_leaktest' % self.mozillaObjdir,
+              warnOnFailure=True,
+              haltOnFailure=True
+              ))
+            self.addStep(AliveTest(
+              env=leakEnv,
+              workdir='build/%s/_leaktest' % self.mozillaObjdir,
+              extraArgs=['--trace-malloc', 'malloc.log',
+                         '--shutdown-leaks=sdleak.log'],
+              timeout=3600, # 1 hour, because this takes a long time on win32
+              warnOnFailure=True,
+              haltOnFailure=True
+              ))
 
         # Download and unpack the old versions of malloc.log and sdleak.tree
         cmd = ['bash', '-c', 
@@ -1347,18 +1361,22 @@ class MercurialBuildFactory(MozillaBuildFactory):
             command=cmd,
         ))
 
+        logdir = "%s/_leaktest" % self.mozillaObjdir
+        if self.stageProduct == 'thunderbird':
+            logdir = self.objdir
+
         self.addStep(ShellCommand(
           name='mv_malloc_log',
           env=self.env,
           command=['mv',
-                   '%s/_leaktest/malloc.log' % self.mozillaObjdir,
+                   '%s/malloc.log' % logdir,
                    '../malloc.log'],
           ))
         self.addStep(ShellCommand(
           name='mv_sdleak_log',
           env=self.env,
           command=['mv',
-                   '%s/_leaktest/sdleak.log' % self.mozillaObjdir,
+                   '%s/sdleak.log' % logdir,
                    '../sdleak.log'],
           ))
         self.addStep(CompareLeakLogs(
@@ -3091,7 +3109,10 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
                  mergeLocales=True, mozconfigBranch="production",
-                 testPrettyNames=False, **kwargs):
+                 testPrettyNames=False,
+                 callClientPy=False,
+                 clientPyConfig=None,
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.platform = platform
@@ -3110,6 +3131,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.mozconfig = mozconfig
         self.mozconfigBranch = mozconfigBranch
         self.testPrettyNames = testPrettyNames
+        self.callClientPy = callClientPy
+        self.clientPyConfig = clientPyConfig
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -3348,6 +3371,50 @@ class BaseRepackFactory(MozillaBuildFactory):
                 mirrors=[],
                 )
         self.addStep(step)
+
+        if self.callClientPy:
+            self.addClientPySteps()
+
+    def addClientPySteps(self):
+        c = self.clientPyConfig
+    
+        # build up the checkout command with all options
+        skipBlankRepos = c.get('skip_blank_repos', False)
+        co_command = ['python', 'client.py', 'checkout']
+        if c.get('moz_repo_path'):
+            co_command.append('--mozilla-repo=%s' % self.getRepository(c.get('moz_repo_path')))
+        if c.get('inspector_repo_path'):
+            co_command.append('--inspector-repo=%s' % self.getRepository(c.get('inspector_repo_path')))
+        elif skipBlankRepos:
+            co_command.append('--skip-inspector')
+        if c.get('venkman_repo_path'):
+            co_command.append('--venkman-repo=%s' % self.getRepository(c.get('venkman_repo_path')))
+        elif skipBlankRepos:
+            co_command.append('--skip-venkman')
+        if c.get('chatzilla_repo_path'):
+            co_command.append('--chatzilla-repo=%s' % self.getRepository(c.get('chatzilla_repo_path')))
+        elif skipBlankRepos:
+            co_command.append('--skip-chatzilla')
+        if c.get('cvsroot'):
+            co_command.append('--cvsroot=%s' % c.get('cvsroot'))
+
+        buildRevision = c.get('buildRevision', None)
+        if buildRevision:
+            co_command.append('--comm-rev=%s' % buildRevision)
+            co_command.append('--mozilla-rev=%s' % buildRevision)
+            co_command.append('--inspector-rev=%s' % buildRevision)
+            co_command.append('--venkman-rev=%s' % buildRevision)
+            co_command.append('--chatzilla-rev=%s' % buildRevision)
+
+        # execute the checkout
+        self.addStep(ShellCommand,
+         command=co_command,
+         description=['running', 'client.py', 'checkout'],
+         descriptionDone=['client.py', 'checkout'],
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
+         timeout=60*60 # 1 hour
+        )
 
     def updateEnUS(self):
         '''Update the en-US source files to the revision used by
