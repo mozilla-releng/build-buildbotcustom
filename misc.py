@@ -1485,6 +1485,18 @@ def generateBranchObjects(config, name, secrets=None):
                 }
                 branchObjects['builders'].append(mozilla2_valgrind_builder)
 
+            dep_kwargs = {}
+            if config.get('call_client_py', False):
+                dep_kwargs['callClientPy'] = True
+                dep_kwargs['clientPyConfig'] = {
+                     'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
+                     'cvsroot':             config.get('cvsroot', ''),
+                     'inspector_repo_path': config.get('inspector_repo_path', ''),
+                     'moz_repo_path':       config.get('moz_repo_path', ''),
+                     'skip_blank_repos':    config.get('skip_blank_repos', False),
+                     'venkman_repo_path':   config.get('venkman_repo_path', ''),
+                }
+
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:

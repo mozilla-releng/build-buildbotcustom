@@ -3091,7 +3091,10 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mozconfig=None, configRepoPath=None, configSubDir=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
                  mergeLocales=True, mozconfigBranch="production",
-                 testPrettyNames=False, **kwargs):
+                 testPrettyNames=False,
+                 callClientPy=False,
+                 clientPyConfig=None,
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.platform = platform
@@ -3110,6 +3113,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.mozconfig = mozconfig
         self.mozconfigBranch = mozconfigBranch
         self.testPrettyNames = testPrettyNames
+        self.callClientPy = callClientPy
+        self.clientPyConfig = clientPyConfig
 
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -3348,6 +3353,50 @@ class BaseRepackFactory(MozillaBuildFactory):
                 mirrors=[],
                 )
         self.addStep(step)
+
+        if self.callClientPy:
+            self.addClientPySteps()
+
+    def addClientPySteps(self):
+        c = self.clientPyConfig
+    
+        # build up the checkout command with all options
+        skipBlankRepos = c.get('skip_blank_repos', False)
+        co_command = ['python', 'client.py', 'checkout']
+        if c.get('moz_repo_path'):
+            co_command.append('--mozilla-repo=%s' % self.getRepository(c.get('moz_repo_path')))
+        if c.get('inspector_repo_path'):
+            co_command.append('--inspector-repo=%s' % self.getRepository(c.get('inspector_repo_path')))
+        elif skipBlankRepos:
+            co_command.append('--skip-inspector')
+        if c.get('venkman_repo_path'):
+            co_command.append('--venkman-repo=%s' % self.getRepository(c.get('venkman_repo_path')))
+        elif skipBlankRepos:
+            co_command.append('--skip-venkman')
+        if c.get('chatzilla_repo_path'):
+            co_command.append('--chatzilla-repo=%s' % self.getRepository(c.get('chatzilla_repo_path')))
+        elif skipBlankRepos:
+            co_command.append('--skip-chatzilla')
+        if c.get('cvsroot'):
+            co_command.append('--cvsroot=%s' % c.get('cvsroot'))
+
+        buildRevision = c.get('buildRevision', None)
+        if buildRevision:
+            co_command.append('--comm-rev=%s' % buildRevision)
+            co_command.append('--mozilla-rev=%s' % buildRevision)
+            co_command.append('--inspector-rev=%s' % buildRevision)
+            co_command.append('--venkman-rev=%s' % buildRevision)
+            co_command.append('--chatzilla-rev=%s' % buildRevision)
+
+        # execute the checkout
+        self.addStep(ShellCommand,
+         command=co_command,
+         description=['running', 'client.py', 'checkout'],
+         descriptionDone=['client.py', 'checkout'],
+         haltOnFailure=True,
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
+         timeout=60*60 # 1 hour
+        )
 
     def updateEnUS(self):
         '''Update the en-US source files to the revision used by
