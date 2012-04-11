@@ -1001,6 +1001,11 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             per_checkin_unittest_branch = unittestBranch
 
+        if config.get('mozilla_dir'):
+            extra_args['mozillaDir'] = config['mozilla_dir']
+        if config.get('leak_target'):
+            extra_args['leakTarget'] = config['leak_target']
+
         # Some platforms shouldn't do dep builds (i.e. RPM)
         if pf.get('enable_dep', True):
             factory_kwargs = {
@@ -1060,6 +1065,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozillaDir': config.get('mozilla_dir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': pf.get('tooltool_url_list', []),
+                'runAliveTests': pf.get('run_alive_tests', True),
             }
             factory_kwargs.update(extra_args)
 
@@ -1387,6 +1393,7 @@ def generateBranchObjects(config, name, secrets=None):
                         buildSpace=l10nSpace,
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
+                        mozillaDir=config.get('mozilla_dir', None),
                         signingServers=secrets.get(pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
@@ -1508,6 +1515,8 @@ def generateBranchObjects(config, name, secrets=None):
                 project=pf['product_name'],
                 appName=pf['app_name'],
                 enUSBinaryURL=config['enUS_binaryURL'],
+                mozillaDir=config.get('mozilla_dir', None),
+                **dep_kwargs
                 nightly=False,
                 l10nDatedDirs=config['l10nDatedDirs'],
                 stageServer=config['stage_server'],
@@ -1537,6 +1546,9 @@ def generateBranchObjects(config, name, secrets=None):
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
+            if config.get('mozilla_dir'):
+                extra_args['mozillaDir'] = config['mozilla_dir']
+
                                'product': pf['stage_product'],
                                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform), pf['stage_product'])},
             }
