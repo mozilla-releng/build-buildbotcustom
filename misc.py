@@ -1516,7 +1516,6 @@ def generateBranchObjects(config, name, secrets=None):
                 appName=pf['app_name'],
                 enUSBinaryURL=config['enUS_binaryURL'],
                 mozillaDir=config.get('mozilla_dir', None),
-                **dep_kwargs
                 nightly=False,
                 l10nDatedDirs=config['l10nDatedDirs'],
                 stageServer=config['stage_server'],
@@ -1533,6 +1532,7 @@ def generateBranchObjects(config, name, secrets=None):
                 signingServers=secrets.get(pf.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
             mozilla2_l10n_dep_builder = {
