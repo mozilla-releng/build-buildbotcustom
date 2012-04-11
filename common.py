@@ -31,11 +31,7 @@ def genBuildUID():
     """Return a unique build uid"""
     return uuid.uuid4().hex
 
-def reallyShort(name, product=None):
-    prefix = ''
-    if product == 'thunderbird':
-        prefix = 'tb-'
-
+def reallyShort(name):
     mappings = {
         'mozilla': 'm',
         'central': 'cen',
@@ -94,5 +90,5 @@ def reallyShort(name, product=None):
                 new_words.append(mappings[word])
         else:
             new_words.append(word)
-    return prefix + '-'.join(new_words)
+    return '-'.join(new_words)
 
