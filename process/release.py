@@ -853,6 +853,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform)),
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'product': 'xulrunner',
                 }
             })
         else:
@@ -863,7 +864,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 properties={
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
-                    },
+                    'product': 'xulrunner',
+                },
             ))
         xr_deliverables_builders.append(
             builderPrefix('xulrunner_%s_build' % platform))
