@@ -1546,9 +1546,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
-            if config.get('mozilla_dir'):
-                extra_args['mozillaDir'] = config['mozilla_dir']
-
                                'product': pf['stage_product'],
                                'slavebuilddir': reallyShort('%s-%s-l10n-dep' % (name, platform), pf['stage_product'])},
             }
@@ -1565,6 +1562,9 @@ def generateBranchObjects(config, name, secrets=None):
                 extra_args['branchName'] = name
             else:
                 factory_class = UnittestBuildFactory
+
+            if config.get('mozilla_dir'):
+                extra_args['mozillaDir'] = config['mozilla_dir']
 
             unittest_factory = factory_class(
                 env=pf.get('unittest-env', {}),
