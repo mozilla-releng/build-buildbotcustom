@@ -7203,7 +7203,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_device_manager_py',
          description="Download devicemanager.py",
-         command=['wget', '--no-check-certificate',
+         command=['wget', '--no-check-certificate', '-O', 'devicemanager.py',
                   'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
          workdir='build',
          haltOnFailure=True,
@@ -7211,7 +7211,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_device_manager_SUT_py',
          description="Download devicemanagerSUT.py",
-         command=['wget', '--no-check-certificate',
+         command=['wget', '--no-check-certificate', '-O', 'devicemanagerSUT.py',
                   'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
          workdir='build',
          haltOnFailure=True,
@@ -7219,7 +7219,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_updateSUT_py',
          description="Download updateSUT.py",
-         command=['wget', '--no-check-certificate',
+         command=['wget', '--no-check-certificate', '-O', 'updateSUT.py'
                   'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
          workdir='build',
          haltOnFailure=True,
@@ -7880,7 +7880,7 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(RetryingShellCommand(
              name='get_device_manager_py',
              description="Download devicemanager.py",
-             command=['wget', '--no-check-certificate',
+             command=['wget', '--no-check-certificate', '-O', 'devicemanager.py',
                       'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
@@ -7888,14 +7888,14 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(RetryingShellCommand(
              name='get_device_manager_SUT_py',
              description="Download devicemanagerSUT.py",
-             command=['wget', '--no-check-certificate',
+             command=['wget', '--no-check-certificate', '-O', 'devicemanagerSUT.py',
                       'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
             self.addStep(RetryingShellCommand(
              name='get_updateSUT_py',
-             command=['wget', '--no-check-certificate',
+             command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
                       'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
