@@ -7219,7 +7219,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_updateSUT_py',
          description="Download updateSUT.py",
-         command=['wget', '--no-check-certificate', '-O', 'updateSUT.py'
+         command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
                   'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
          workdir='build',
          haltOnFailure=True,
