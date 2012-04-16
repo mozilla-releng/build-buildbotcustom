@@ -8401,6 +8401,8 @@ class PartnerRepackFactory(ReleaseFactory):
             command=[self.python, './partner-repacks.py',
                      '--version', str(self.version),
                      '--build-number', str(self.buildNumber),
+                     '--repo', self.repoPath,
+                     '--hgroot', 'http://%s' % self.hgHost,
                      '--staging-server', self.stagingServer,
                      '--dmg-extract-script',
                      WithProperties('%(toolsdir)s/release/common/unpack-diskimage.sh'),
