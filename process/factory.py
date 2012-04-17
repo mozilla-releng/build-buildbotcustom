@@ -7112,44 +7112,91 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  maxTime=2*60*60, # Two Hours
                 ))
             elif suite == 'mozmill':
+                MOZMILL_VIRTUALENV_DIR = os.path.join('..', 'mozmill-virtualenv')
+                mozmill_env = self.env.copy()
+                mozmill_env['MOZMILL_NO_VNC'] = "1"
+                mozmill_env['NO_EM_RESTART'] = "0"
+                mozmill_env['MOZMILL_RICH_FAILURES'] = "1"
 
-                # Unpack the tests
+                # Workaround for Mozrunner bug 575863.
+                if 'LD_LIBRARY_PATH' in mozmill_env:
+                    mozmill_env['LD_LIBRARY_PATH'] = WithProperties("../%(exedir)s")
+
+                # Find the application app bundle, workaround for mozmill on OS X
+                #XXX
+                self.brandName = "Shredder"
+                if self.platform.startswith('macosx'):
+                    self.addStep(SetProperty(
+                        name='Find executable .app',
+                        command=['bash', '-c', WithProperties('echo %(exedir)s | cut -d/ -f1-2') ],
+                        property='exepath',
+                        workdir='.',
+                    ))
                 self.addStep(UnpackTest(
                  filename=WithProperties('%(tests_filename)s'),
                  testtype='mozmill',
                  haltOnFailure=True,
-                 name='unpack mochitest tests',
+                 name='unpack mozmill tests',
                  ))
-
-                # install mozmill into its virtualenv
                 self.addStep(ShellCommand(
-                    name='install mozmill',
-                    command=['python',
-                             'mozmill/installmozmill.py'],
-                    flunkOnFailure=True,
-                    haltOnFailure=True,
-                    ))
+                  name='install plugins',
+                  command=['sh', '-c', WithProperties('if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi && cp -R bin/plugins/* %(exedir)s/plugins/')],
+                  haltOnFailure=True,
+                  ))
 
-                # run the mozmill tests
-                self.addStep(unittest_steps.MozillaPackagedMozmillTests(
-                    name="run_mozmill",
-                    tests_dir='tests/firefox',
-                    binary='../%(exepath)s',
-                    platform=self.platform,
-                    workdir='build/mozmill',
-                    timeout=10*60,
-                    flunkOnFailure=True
-                    ))
-                self.addStep(unittest_steps.MozillaPackagedMozmillTests(
-                    name="run_mozmill_restart",
-                    tests_dir='tests/firefox/restartTests',
-                    binary='../%(exepath)s',
-                    platform=self.platform,
-                    restart=True,
-                    workdir='build/mozmill',
-                    timeout=5*60,
-                    flunkOnFailure=True
-                    ))
+                # Older comm-central branches use a centrally-installed
+                # MozMill. We figure this out by seeing if installmozmill.py is
+                # present.
+                self.addStep(SetProperty(
+                  name='check mozmill virtualenv setup',
+                  property='mozmillVirtualenvSetup',
+                  command=['bash', '-c', 'test -e installmozmill.py && ls installmozmill.py'],
+                  workdir='build/mozmill/resources',
+                  flunkOnFailure=False,
+                  haltOnFailure=False,
+                  warnOnFailure=False
+                ))
+                def isVirtualenvSetup(step):
+                    return (step.build.getProperties().has_key("mozmillVirtualenvSetup") and
+                            len(step.build.getProperty("mozmillVirtualenvSetup")) > 0)
+
+                # We want to use system python on non-Windows
+                virtualenv_python = 'python' if self.platform.startswith('win') else '/usr/bin/python'
+
+                self.addStep(ShellCommand(
+                  name='setup virtualenv',
+                  command=[virtualenv_python, 'resources/installmozmill.py',
+                           MOZMILL_VIRTUALENV_DIR],
+                  doStepIf=isVirtualenvSetup,
+                  flunkOnFailure=True,
+                  haltOnFailure=True,
+                  workdir='build/mozmill'
+                  ))
+                bindir = 'Scripts' if self.platform.startswith('win') else 'bin'
+
+                # PYTHONHOME overrides virtualenv install directories, so get rid of it
+                mozmill_virtualenv_env = mozmill_env.copy()
+                mozmill_virtualenv_env['PYTHONHOME'] = None
+
+                mozmillpython = os.path.join(MOZMILL_VIRTUALENV_DIR, bindir, 'python')
+                self.addStep(unittest_steps.MozillaCheck,
+                  test_name="mozmill virtualenv",
+                  warnOnWarnings=True,
+                  command = ['bash', '-c', WithProperties(mozmillpython + ' runtestlist.py --binary=../%(exepath)s --symbols-path=../symbols --list=mozmilltests.list')],
+                  doStepIf=isVirtualenvSetup,
+                  env=mozmill_virtualenv_env,
+                  workdir='build/mozmill',
+                )
+                # ... and add another step for older branches, run if the above isn't
+                self.addStep(unittest_steps.MozillaCheck,
+                  test_name="mozmill legacy",
+                  warnOnWarnings=True,
+                  command=['python', 'runtestlist.py', WithProperties('--binary=../%(exepath)s') ,'--symbols-path=../symbols','--list=mozmilltests.list'],
+                  doStepIf=lambda step: not isVirtualenvSetup(step),
+                  env=mozmill_env,
+                  workdir='build/mozmill',
+                )
+
         if self.platform.startswith('macosx64'):
             self.addStep(resolution_step())
 
@@ -7203,7 +7250,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_device_manager_py',
          description="Download devicemanager.py",
-         command=['wget', '--no-check-certificate',
+         command=['wget', '--no-check-certificate', '-O', 'devicemanager.py',
                   'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
          workdir='build',
          haltOnFailure=True,
@@ -7211,7 +7258,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_device_manager_SUT_py',
          description="Download devicemanagerSUT.py",
-         command=['wget', '--no-check-certificate',
+         command=['wget', '--no-check-certificate', '-O', 'devicemanagerSUT.py',
                   'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
          workdir='build',
          haltOnFailure=True,
@@ -7219,7 +7266,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         self.addStep(RetryingShellCommand(
          name='get_updateSUT_py',
          description="Download updateSUT.py",
-         command=['wget', '--no-check-certificate',
+         command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
                   'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
          workdir='build',
          haltOnFailure=True,
@@ -7880,7 +7927,7 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(RetryingShellCommand(
              name='get_device_manager_py',
              description="Download devicemanager.py",
-             command=['wget', '--no-check-certificate',
+             command=['wget', '--no-check-certificate', '-O', 'devicemanager.py',
                       'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
@@ -7888,14 +7935,14 @@ class TalosFactory(RequestSortingBuildFactory):
             self.addStep(RetryingShellCommand(
              name='get_device_manager_SUT_py',
              description="Download devicemanagerSUT.py",
-             command=['wget', '--no-check-certificate',
+             command=['wget', '--no-check-certificate', '-O', 'devicemanagerSUT.py',
                       'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
             self.addStep(RetryingShellCommand(
              name='get_updateSUT_py',
-             command=['wget', '--no-check-certificate',
+             command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
                       'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
@@ -8401,6 +8448,8 @@ class PartnerRepackFactory(ReleaseFactory):
             command=[self.python, './partner-repacks.py',
                      '--version', str(self.version),
                      '--build-number', str(self.buildNumber),
+                     '--repo', self.repoPath,
+                     '--hgroot', 'http://%s' % self.hgHost,
                      '--staging-server', self.stagingServer,
                      '--dmg-extract-script',
                      WithProperties('%(toolsdir)s/release/common/unpack-diskimage.sh'),
