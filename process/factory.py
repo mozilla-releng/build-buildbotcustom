@@ -1639,7 +1639,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         # Get package details
         self.packageFilename = self.getPackageFilename(self.platform,
                                                   self.platform_variation)
-        if self.packageFilename and 'rpm' not in self.platform_variation:
+        if self.packageFilename and 'rpm' not in self.platform_variation and self.productName != 'xulrunner':
             self.addFilePropertiesSteps(filename=self.packageFilename,
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
@@ -4581,8 +4581,6 @@ class SingleSourceFactory(ReleaseFactory):
         self.configSubDir=configSubDir
         self.mozconfigBranch = mozconfigBranch
         self.releaseTag = '%s_RELEASE' % (baseTag)
-        self.bundleFile = 'source/%s-%s.bundle' % (productName, version)
-        self.sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName, version)
 
         self.origSrcDir = self.branchName
 
@@ -4614,39 +4612,19 @@ class SingleSourceFactory(ReleaseFactory):
         if productName == 'fennec':
             postUploadCmd = 'post_upload.py -p mobile --nightly-dir candidates -v %s -n %s -c' % \
                           (version, buildNumber)
-        uploadEnv = {'UPLOAD_HOST': stagingServer,
-                     'UPLOAD_USER': stageUsername,
-                     'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
-                     'UPLOAD_TO_TEMP': '1',
-                     'POST_UPLOAD_CMD': postUploadCmd}
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': stagingServer,
+                          'UPLOAD_USER': stageUsername,
+                          'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
+                          'UPLOAD_TO_TEMP': '1',
+                          'POST_UPLOAD_CMD': postUploadCmd})
 
-        self.addStep(ShellCommand(
-         name='rm_srcdir',
-         command=['rm', '-rf', 'source'],
-         workdir='.',
-         haltOnFailure=True
-        ))
-        self.addStep(ShellCommand(
-         name='make_srcdir',
-         command=['mkdir', 'source'],
-         workdir='.',
-         haltOnFailure=True
-        ))
-        self.addStep(MercurialCloneCommand(
-         name='hg_clone',
-         command=['hg', 'clone', self.repository, self.branchName],
-         workdir='.',
-         description=['clone %s' % self.branchName],
-         haltOnFailure=True,
-         timeout=30*60 # 30 minutes
-        ))
         # This will get us to the version we're building the release with
-        self.addStep(ShellCommand(
-         name='hg_update',
-         command=['hg', 'up', '-C', '-r', self.releaseTag],
-         workdir=self.mozillaSrcDir,
-         description=['update to', self.releaseTag],
-         haltOnFailure=True
+        self.addStep(self.makeHgtoolStep(
+            workdir='.',
+            wc=self.mozillaSrcDir,
+            rev=self.releaseTag,
+            use_properties=False,
         ))
         # ...And this will get us the tags so people can do things like
         # 'hg up -r FIREFOX_3_1b1_RELEASE' with the bundle
@@ -4664,23 +4642,6 @@ class SingleSourceFactory(ReleaseFactory):
          workdir=self.mozillaSrcDir,
          haltOnFailure=True
         ))
-        self.addStep(ShellCommand(
-         name='create_bundle',
-         command=['hg', '-R', self.branchName, 'bundle', '--base', 'null',
-                  '-r', WithProperties('%(revision)s'),
-                  self.bundleFile],
-         workdir='.',
-         description=['create bundle'],
-         haltOnFailure=True,
-         timeout=30*60 # 30 minutes
-        ))
-        self.addStep(ShellCommand(
-         name='delete_metadata',
-         command=['rm', '-rf', '.hg'],
-         workdir=self.mozillaSrcDir,
-         description=['delete metadata'],
-         haltOnFailure=True
-        ))
         self.addConfigSteps(workdir=self.mozillaSrcDir)
         self.addStep(ShellCommand(
          name='configure',
@@ -4693,47 +4654,21 @@ class SingleSourceFactory(ReleaseFactory):
         if self.enableSigning and self.signingServers:
             self.addGetTokenSteps()
         self.addStep(ShellCommand(
-         name='make_source-package',
-         command=['make','source-package'],
-         workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
-         env=self.env,
-         description=['make source-package'],
-         haltOnFailure=True,
-         timeout=30*60 # 30 minutes
+            name='make_source-package',
+            command=['make','source-package', 'hg-bundle',
+                     WithProperties('HG_BUNDLE_REVISION=%(revision)s')],
+            workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
+            env=self.env,
+            description=['make source-package'],
+            haltOnFailure=True,
+            timeout=30*60 # 30 minutes
         ))
-        self.addStep(ShellCommand(
-         name='mv_source-package',
-         command=['mv','%s/%s/%s' % (self.branchName,
-                                     self.distDir,
-                                     self.sourceTarball),
-                  self.sourceTarball],
-         workdir=".",
-         env=self.env,
-         description=['mv source-package'],
-         haltOnFailure=True
-        ))
-        files = [self.bundleFile, self.sourceTarball]
-        if self.enableSigning and self.signingServers:
-            # use a copy of files variable to prevent endless loops
-            for f in list(files):
-                signingcmd = WithProperties(
-                    '%s --formats gpg "%s"' % (self.signing_command, f))
-                self.addStep(ShellCommand(
-                    name='sign_file',
-                    command=signingcmd,
-                    workdir='.',
-                    env=self.env,
-                    description=['sign', f],
-                    haltOnFailure=True,
-                ))
-                files.append('%s.asc' % f)
         self.addStep(RetryingShellCommand(
-         name='upload_files',
-         command=['python', '%s/build/upload.py' % self.branchName,
-                  '--base-path', '.'] + files,
-         workdir='.',
-         env=uploadEnv,
-         description=['upload files'],
+            name='upload_files',
+            command=['make','source-upload', 'UPLOAD_HG_BUNDLE=1'],
+            workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
+            env=uploadEnv,
+            description=['upload files'],
         ))
 
     def addConfigSteps(self, workdir='build'):
