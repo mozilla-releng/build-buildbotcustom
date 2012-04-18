@@ -3782,18 +3782,37 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      command=['make', 'ident'],
                      haltOnFailure=True,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
-                     extract_fn=identToProperties('fx_revision')
+                     extract_fn=identToProperties()
         ))
-        self.addStep(ShellCommand(
-                     name='update_enUS_revision',
-                     command=['hg', 'update', '-C', '-r',
-                              WithProperties('%(fx_revision)s')],
-                     haltOnFailure=True,
-                     workdir='build/' + self.origSrcDir))
+        if self.clientPyConfig:
+            self.addStep(ShellCommand,
+                         name='update_comm_enUS_revision',
+                         command=['hg', 'update', '-C', '-r',
+                                  WithProperties('%(comm_revision)s')],
+                         haltOnFailure=True,
+                         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir))
+            self.addStep(ShellCommand,
+                         name='update_mozilla_enUS_revision',
+                         command=['hg', 'update', '-C', '-r',
+                                  WithProperties('%(moz_revision)s')],
+                         haltOnFailure=True,
+                         workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir))
+        else:
+            self.addStep(ShellCommand(
+                         name='update_enUS_revision',
+                         command=['hg', 'update', '-C', '-r',
+                                  WithProperties('%(fx_revision)s')],
+                         haltOnFailure=True,
+                         workdir='build/' + self.origSrcDir))
 
     def tinderboxPrintRevisions(self):
-        self.tinderboxPrint('fx_revision',WithProperties('%(fx_revision)s'))
-        self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
+        if self.clientPyConfig:
+            self.tinderboxPrint('comm_revision',WithProperties('%(comm_revision)s'))
+            self.tinderboxPrint('moz_revision',WithProperties('%(moz_revision)s'))
+            self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
+        else:
+            self.tinderboxPrint('fx_revision',WithProperties('%(fx_revision)s'))
+            self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
 
     def makePartialTools(self):
         # Build the tools we need for update-packaging, specifically bsdiff.
