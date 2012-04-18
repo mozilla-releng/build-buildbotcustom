@@ -201,7 +201,7 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar))",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar))$",
                         "\n".join([stdout, stderr]), re.M):
         if 'devel' in m and m.endswith('.rpm'):
             retval['develRpmUrl'] = m
