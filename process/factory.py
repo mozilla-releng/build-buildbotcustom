@@ -5390,10 +5390,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             if localDir.endswith('test'):
                 self.addStep(RetryingShellCommand(
                  name='backupsnip',
-                 command=['bash', '-c',
-                          'ssh -t -l %s ' %  self.ausUser +
-                          '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
-                          '~/bin/backupsnip %s' % remoteDir],
+                 command=['ssh', '-t', '-l', self.ausUser,
+                          '-oIdentityFile=~/.ssh/%s' % self.ausSshKey,
+                          self.ausHost, '~/bin/backupsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
                  description=['backupsnip'],
                  haltOnFailure=True
