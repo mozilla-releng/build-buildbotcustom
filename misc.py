@@ -3074,7 +3074,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             "%s is not an understood PGO strategy" % branch_config['pgo_strategy']
 
     buildBranch = branch_config['build_branch']
-    talosCmd = branch_config['talos_command']
 
     for platform, platform_config in PLATFORMS.items():
         if platform_config.get('is_mobile', False):
@@ -3142,7 +3141,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "branch": branch,
                         "talosBranch": opt_talos_branch,
                         "configOptions": talosConfig,
-                        "talosCmd": talosCmd,
+                        "talosCmd": branch_config['talos_command'],
                         "fetchSymbols": branch_config['fetch_symbols'] and
                           platform_config[slave_platform].get('download_symbols',True),
                         "talos_from_source_code": branch_config.get('talos_from_source_code', False)
