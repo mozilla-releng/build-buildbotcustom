@@ -1362,7 +1362,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
         logdir = "%s/_leaktest" % self.mozillaObjdir
-        if self.stageProduct == 'thunderbird':
+        if 'thunderbird' in self.stageProduct:
             logdir = self.objdir
 
         self.addStep(ShellCommand(

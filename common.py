@@ -33,7 +33,7 @@ def genBuildUID():
 
 def reallyShort(name, product=None):
     prefix = ''
-    if product == 'thunderbird':
+    if product != None and 'thunderbird' in product:
         prefix = 'tb-'
 
     mappings = {
