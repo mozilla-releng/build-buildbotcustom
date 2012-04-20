@@ -201,7 +201,7 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar))",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar))$",
                         "\n".join([stdout, stderr]), re.M):
         if 'devel' in m and m.endswith('.rpm'):
             retval['develRpmUrl'] = m
@@ -1362,7 +1362,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
 
         logdir = "%s/_leaktest" % self.mozillaObjdir
-        if self.stageProduct == 'thunderbird':
+        if 'thunderbird' in self.stageProduct:
             logdir = self.objdir
 
         self.addStep(ShellCommand(
@@ -5390,10 +5390,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             if localDir.endswith('test'):
                 self.addStep(RetryingShellCommand(
                  name='backupsnip',
-                 command=['bash', '-c',
-                          'ssh -t -l %s ' %  self.ausUser +
-                          '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
-                          '~/bin/backupsnip %s' % remoteDir],
+                 command=['ssh', '-t', '-l', self.ausUser,
+                          '-oIdentityFile=~/.ssh/%s' % self.ausSshKey,
+                          self.ausHost, '~/bin/backupsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
                  description=['backupsnip'],
                  haltOnFailure=True

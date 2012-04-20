@@ -1356,6 +1356,17 @@ def generateBranchObjects(config, name, secrets=None):
                     # and this will disable it for now. We will fix this in bug 518359.
                     objdir = ''
                     mozconfig = None
+                    l10n_kwargs = {}
+                    if config.get('call_client_py', False):
+                        l10n_kwargs['callClientPy'] = True
+                        l10n_kwargs['clientPyConfig'] = {
+                             'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
+                             'cvsroot':             config.get('cvsroot', ''),
+                             'inspector_repo_path': config.get('inspector_repo_path', ''),
+                             'moz_repo_path':       config.get('moz_repo_path', ''),
+                             'skip_blank_repos':    config.get('skip_blank_repos', False),
+                             'venkman_repo_path':   config.get('venkman_repo_path', ''),
+                        }
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=platform_env,
@@ -1397,6 +1408,7 @@ def generateBranchObjects(config, name, secrets=None):
                         signingServers=secrets.get(pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                        **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
                     mozilla2_l10n_nightly_builder = {
@@ -1492,6 +1504,9 @@ def generateBranchObjects(config, name, secrets=None):
                 }
                 branchObjects['builders'].append(mozilla2_valgrind_builder)
 
+        # We still want l10n_dep builds if nightlies are off
+        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
+           config['enable_l10n_onchange']:
             dep_kwargs = {}
             if config.get('call_client_py', False):
                 dep_kwargs['callClientPy'] = True
@@ -1503,10 +1518,6 @@ def generateBranchObjects(config, name, secrets=None):
                      'skip_blank_repos':    config.get('skip_blank_repos', False),
                      'venkman_repo_path':   config.get('venkman_repo_path', ''),
                 }
-
-        # We still want l10n_dep builds if nightlies are off
-        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-           config['enable_l10n_onchange']:
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
                 platform=platform,
