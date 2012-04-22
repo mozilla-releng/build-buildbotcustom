@@ -4680,7 +4680,7 @@ class SingleSourceFactory(ReleaseFactory):
             env=self.env,
             description=['make source-package'],
             haltOnFailure=True,
-            timeout=30*60 # 30 minutes
+            timeout=45*60 # 45 minutes
         ))
         self.addStep(RetryingShellCommand(
             name='upload_files',
