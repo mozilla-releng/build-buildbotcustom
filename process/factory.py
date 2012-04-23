@@ -4680,7 +4680,7 @@ class SingleSourceFactory(ReleaseFactory):
             env=self.env,
             description=['make source-package'],
             haltOnFailure=True,
-            timeout=30*60 # 30 minutes
+            timeout=45*60 # 45 minutes
         ))
         self.addStep(RetryingShellCommand(
             name='upload_files',
@@ -5399,10 +5399,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                 ))
                 self.addStep(RetryingShellCommand(
                  name='pushsnip',
-                 command=['bash', '-c',
-                          'ssh -t -l %s ' %  self.ausUser +
-                          '-i ~/.ssh/%s %s ' % (self.ausSshKey,self.ausHost) +
-                          '~/bin/pushsnip %s' % remoteDir],
+                 command=['ssh', '-t', '-l', self.ausUser,
+                          '-oIdentityFile=~/.ssh/%s' % self.ausSshKey,
+                          self.ausHost, '~/bin/pushsnip %s' % remoteDir],
                  timeout=7200, # 2 hours
                  description=['pushsnip'],
                  haltOnFailure=True
