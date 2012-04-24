@@ -8486,8 +8486,9 @@ def extractProperties(rv, stdout, stderr):
     props = {}
     stdout = stdout.strip()
     for l in filter(None, stdout.split('\n')):
-        e = filter(None, l.split(':'))
-        props[e[0]] = e[1].strip()
+        e = filter(None, l.split(':', 1))
+        if len(e) == 2:
+            props[e[0]] = e[1].strip()
     return props
 
 class ScriptFactory(BuildFactory):
