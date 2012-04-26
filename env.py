@@ -77,7 +77,8 @@ MozillaEnvironments['linux-unittest'] = {
     "NO_FAIL_ON_TEST_ERRORS": '1',
     "CCACHE_DIR": '/builds/ccache',
     "CCACHE_UMASK": '002',
-    "MOZ_HIDE_RESULTS_TABLE": '1'
+    "MOZ_HIDE_RESULTS_TABLE": '1',
+    "MOZ_NODE_PATH": "/home/cltbld/bin/node.exe"
 }
 
 MozillaEnvironments['linux64-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
