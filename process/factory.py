@@ -1204,7 +1204,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(RetryingShellCommand(
                 name='fetch_tooltool_resources',
                 command=['python', self.tooltool_script, '--url', self.tooltool_url_list[0], 
-                         '-m', self.tooltool_manifest_src, 'fetch']))
+                         '--overwrite', '-m', self.tooltool_manifest_src, 'fetch']))
             self.addStep(ShellCommand(
                 name='tooltool_bootstrap',
                 command=['bash', self.tooltool_bootstrap]))
