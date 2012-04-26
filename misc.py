@@ -3605,6 +3605,9 @@ def generateSpiderMonkeyObjects(config, SLAVES):
         if 'win' in platform:
             slaves = SLAVES[base_platform]
             interpreter = 'bash'
+        elif 'lion' in platform:
+            slaves = SLAVES['macosx64-lion']
+            interpreter = None
         elif 'arm' in platform:
             slaves = SLAVES['linux']
             interpreter = ['/scratchbox/moz_scratchbox', '-d',
