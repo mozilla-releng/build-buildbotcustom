@@ -602,6 +602,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if not releaseConfig.get('skip_build'):
             platform_env = pf['env'].copy()
             platform_env['MOZ_UPDATE_CHANNEL'] = releaseChannel
+            platform_env['COMM_REV']           = releaseTag
+            platform_env['MOZILLA_REV']        = releaseTag
             multiLocaleConfig = releaseConfig.get(
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
