@@ -1614,7 +1614,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             l10nBuilderNames = l10nBuilders(platform).values()
             repack_scheduler = Triggerable(
                 name=builderPrefix('%s_repack' % platform),
-                branch=sourceRepoInfo['path'],
                 builderNames=l10nBuilderNames,
             )
             schedulers.append(repack_scheduler)
