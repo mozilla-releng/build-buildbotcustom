@@ -1953,6 +1953,10 @@ class TryBuildFactory(MercurialBuildFactory):
 
         self.tinderboxBuildsDir = tinderboxBuildsDir
 
+        self.codeSighsReferenceRepo = 'mozilla-central'
+        if 'thunderbird' in kwargs['stageProduct']:
+            self.codeSighsReferenceRepo = 'comm-central'
+
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
@@ -2018,8 +2022,8 @@ class TryBuildFactory(MercurialBuildFactory):
         leakEnv = self.env.copy()
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s' % \
-            (self.stageServer, self.productName, self.complete_platform)
+        baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/%s-%s' % \
+            (self.stageServer, self.productName, self.codeSighsReferenceRepo, self.complete_platform)
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
 
     def addCodesighsSteps(self):
@@ -2031,8 +2035,8 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(RetryingShellCommand(
          name='get_codesize_log',
          command=['wget', '-O', 'codesize-auto-old.log',
-         'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/codesize-auto.log' % \
-           (self.stageServer, self.productName, self.platform)],
+         'http://%s/pub/mozilla.org/%s/tinderbox-builds/%s-%s/codesize-auto.log' % \
+           (self.stageServer, self.productName, self.codeSighsReferenceRepo, self.platform)],
          workdir='.',
          env=self.env
         ))
