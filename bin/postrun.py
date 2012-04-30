@@ -64,7 +64,7 @@ class PostRunner(object):
             upload_args.append("--release")
             upload_args.append("%s/%s" % (info.get('version'), info.get('build_number')))
 
-        if branch == 'try':
+        if 'try' in branch:
             upload_args.append("--try")
         elif branch == 'shadow-central':
             upload_args.append("--shadow")
