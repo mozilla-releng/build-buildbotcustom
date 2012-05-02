@@ -69,6 +69,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mozharness_repo_path = releaseConfig.get('mozharness_repo_path',
                                              branchConfig['mozharness_repo_path'])
     mozharness_repo = '%s%s' % (branchConfig['hgurl'], mozharness_repo_path)
+    clobberer_url = releaseConfig.get('base_clobber_url', branchConfig['base_clobber_url'])
 
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
@@ -299,7 +300,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                       branchConfig['config_repo_path']),
         'BUILDBOTCUSTOM': '%s%s' % (branchConfig['hgurl'],
                                     branchConfig['buildbotcustom_repo_path']),
-        'CLOBBERER_URL': branchConfig['base_clobber_url']
+        'CLOBBERER_URL': clobberer_url,
     }
 
     if releaseConfig.get('enable_repo_setup'):
@@ -324,7 +325,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 username=releaseConfig['hgUsername'],
                 sshKey=releaseConfig['hgSshKey'],
                 repositories=clone_repositories,
-                clobberURL=branchConfig['base_clobber_url'],
+                clobberURL=clobberer_url,
                 userRepoRoot=releaseConfig['userRepoRoot'],
             )
 
@@ -450,7 +451,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             stageSshKey=branchConfig['stage_ssh_key'],
             buildNumber=releaseConfig['buildNumber'],
             autoconfDirs=['.', 'js/src'],
-            clobberURL=branchConfig['base_clobber_url'],
+            clobberURL=clobberer_url,
             mozconfig=mozconfig,
             configRepoPath=branchConfig['config_repo_path'],
             configSubDir=branchConfig['config_subdir'],
@@ -497,7 +498,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageSshKey=branchConfig['stage_ssh_xulrunner_key'],
                 buildNumber=releaseConfig['buildNumber'],
                 autoconfDirs=['.', 'js/src'],
-                clobberURL=branchConfig['base_clobber_url'],
+                clobberURL=clobberer_url,
                 mozconfig=mozconfig,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
@@ -612,7 +613,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 packageTests=packageTests,
                 unittestMasters=unittestMasters,
                 unittestBranch=unittestBranch,
-                clobberURL=branchConfig['base_clobber_url'],
+                clobberURL=clobberer_url,
                 triggerBuilds=True,
                 triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
@@ -806,7 +807,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 productName='xulrunner',
                 version=releaseConfig['version'],
                 buildNumber=releaseConfig['buildNumber'],
-                clobberURL=branchConfig['base_clobber_url'],
+                clobberURL=clobberer_url,
                 packageSDK=True,
                 signingServers=signingServers,
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
@@ -907,7 +908,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildNumber=releaseConfig['buildNumber'],
                 oldVersion=releaseConfig['oldVersion'],
                 oldBuildNumber=releaseConfig['oldBuildNumber'],
-                clobberURL=branchConfig['base_clobber_url'],
+                clobberURL=clobberer_url,
                 platform=platform,
                 repoPath=sourceRepoInfo['path'],
             )
@@ -1047,7 +1048,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             # We disable this on staging, because we don't have a CVS mirror to
             # commit to
             commitPatcherConfig=releaseConfig['commitPatcherConfig'],
-            clobberURL=branchConfig['base_clobber_url'],
+            clobberURL=clobberer_url,
             oldRepoPath=sourceRepoInfo['path'],
             releaseNotesUrl=releaseConfig['releaseNotesUrl'],
             binaryName=releaseConfig['binaryName'],
@@ -1277,7 +1278,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platforms=[platform],
             buildToolsRepoPath=tools_repo_path,
             verifyConfigs=releaseConfig['verifyConfigs'],
-            clobberURL=branchConfig['base_clobber_url'],
+            clobberURL=clobberer_url,
             repoPath=sourceRepoInfo['path'],
         )
 
@@ -1355,7 +1356,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             # We disable this on staging, because we don't have a CVS mirror to
             # commit to
             commitPatcherConfig=releaseConfig['commitPatcherConfig'],
-            clobberURL=branchConfig['base_clobber_url'],
+            clobberURL=clobberer_url,
             oldRepoPath=sourceRepoInfo['path'],
             triggerSchedulers=[builderPrefix('major_update_verify')],
             releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
