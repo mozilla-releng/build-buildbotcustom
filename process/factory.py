@@ -1323,6 +1323,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 env=leakEnv,
                 workdir='build/%s' % self.objdir,
                 command=['make', self.leakTarget],
+                warnOnFailure=True,
+                haltOnFailure=True,
             ))
 
         if self.runAliveTests:
