@@ -170,10 +170,10 @@ if __name__ == '__main__':
 
     tm_parser = ArgumentParser()
     tm_parser.add_argument("-e", "--all-emails", dest="all_emails", help="request all emails", action="store_true")
-    tm_parser.add_argument("-n", "--no-emails", dest="silence", help="request no emails at all", action="store_true")
+    tm_parser.add_argument("-f", "--failure-emails", dest="failure", help="request failure emails only", action="store_true")
     tm_parser.set_defaults(
         all_emails=False,
-        silence=False,
+        failure=False,
         )
 
     builder_path, build_number = args[-2:]
@@ -188,29 +188,26 @@ if __name__ == '__main__':
 
     # Let's check the results to see if we need the message
     result = build.getResults()
-    # if silence, never make the message
+    # default is silence, never create a message
+    # if failure, send failure emails only
     # if all emails, alway make the message
-    # else default is failures only
     msgdict = None
     # Generate the message
-    if tm_options.silence:
-        print "No email going out for this result: %s (silence=%s)" % (result, tm_options.silence)
-    else:
-        if tm_options.all_emails:
+    if tm_options.all_emails:
+        msgdict = makeTryMessage(build, log_url)
+    elif tm_options.failure:
+        if result != SUCCESS:
             msgdict = makeTryMessage(build, log_url)
-        else:
-            if result != SUCCESS:
-                msgdict = makeTryMessage(build, log_url)
 
-        # Send it!
-        if msgdict != None:
-            if options.to_author:
-                options.to.append(msgdict['author'])
-            msg = formatMessage(msgdict, options.from_, options.to)
-            print msg
+    # Send it!
+    if msgdict != None:
+        if options.to_author:
+            options.to.append(msgdict['author'])
+        msg = formatMessage(msgdict, options.from_, options.to)
+        print msg
 
-            s = SMTP()
-            s.connect()
-            s.sendmail(options.from_, options.to, msg.as_string())
+        s = SMTP()
+        s.connect()
+        s.sendmail(options.from_, options.to, msg.as_string())
 
     sys.exit(exit_code)
