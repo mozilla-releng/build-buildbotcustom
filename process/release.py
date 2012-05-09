@@ -75,6 +75,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     unix_slaves = []
     all_slaves = []
     for p in branchConfig['platforms']:
+        if p == 'b2g':
+            continue
         platform_slaves = branchConfig['platforms'][p].get('slaves', [])
         all_slaves.extend(platform_slaves)
         if 'win' not in p:
