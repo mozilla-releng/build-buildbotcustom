@@ -963,6 +963,9 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--pidfile', WithProperties('%(basedir)s/../remotereftest.pid'),
                         '--enable-privilege'
                        ]
+        if suite == 'jsreftest' or suite == 'crashtest':
+            self.command.append('--ignore-window-size')
+
         if cmdOptions:
           self.command.extend(cmdOptions)
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
