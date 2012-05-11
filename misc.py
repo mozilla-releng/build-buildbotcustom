@@ -3534,10 +3534,6 @@ def generateNanojitObjects(config, SLAVES):
             slaves = SLAVES[platform]
             nanojit_script = 'scripts/nanojit/nanojit.sh'
             interpreter = 'bash'
-        elif 'arm' in platform:
-            slaves = SLAVES['linux']
-            nanojit_script = '/builds/slave/nanojit-arm/scripts/scripts/nanojit/nanojit.sh'
-            interpreter = ['/scratchbox/moz_scratchbox', '-d', '/builds/slave/nanojit-arm']
         else:
             slaves = SLAVES[platform]
             nanojit_script = 'scripts/nanojit/nanojit.sh'
@@ -3608,10 +3604,6 @@ def generateSpiderMonkeyObjects(config, SLAVES):
         elif 'lion' in platform:
             slaves = SLAVES['macosx64-lion']
             interpreter = None
-        elif 'arm' in platform:
-            slaves = SLAVES['linux']
-            interpreter = ['/scratchbox/moz_scratchbox', '-d',
-                    '/builds/slave/%s' % reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant))]
         else:
             slaves = SLAVES[base_platform]
             interpreter = None
