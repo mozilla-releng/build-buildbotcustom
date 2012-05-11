@@ -31,7 +31,7 @@ from buildbotcustom.misc import get_l10n_repositories, \
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
-  ReleaseUpdatesFactory, ReleaseFinalVerification, L10nVerifyFactory, \
+  ReleaseUpdatesFactory, ReleaseFinalVerification, \
   PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder, SigningScriptFactory
 from buildbotcustom.changes.ftppoller import UrlPoller
@@ -897,45 +897,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             })
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
-
-    if not releaseConfig.get('disableL10nVerification'):
-        for platform in releaseConfig['l10nPlatforms']:
-            l10n_verification_factory = L10nVerifyFactory(
-                hgHost=branchConfig['hghost'],
-                buildToolsRepoPath=tools_repo_path,
-                cvsroot=releaseConfig['cvsroot'],
-                stagingServer=releaseConfig['stagingServer'],
-                productName=releaseConfig['productName'],
-                version=releaseConfig['version'],
-                buildNumber=releaseConfig['buildNumber'],
-                oldVersion=releaseConfig['oldVersion'],
-                oldBuildNumber=releaseConfig['oldBuildNumber'],
-                clobberURL=clobberer_url,
-                platform=platform,
-                repoPath=sourceRepoInfo['path'],
-            )
-
-            if 'macosx64' in branchConfig['platforms']:
-                slaves = branchConfig['platforms']['macosx64']['slaves']
-            else:
-                slaves = branchConfig['platforms']['macosx']['slaves']
-            builders.append({
-                'name': builderPrefix('l10n_verification', platform),
-                'slavenames': slaves,
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('l10n_verification', platform),
-                'slavebuilddir': reallyShort(builderPrefix('l10n_verification', platform), releaseConfig['productName']),
-                'factory': l10n_verification_factory,
-                'nextSlave': _nextFastReservedSlave,
-                'env': builder_env,
-                'properties': {
-                    'slavebuilddir':reallyShort(builderPrefix('l10n_verification', platform), releaseConfig['productName']),
-                    'platform': platform,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                }
-            })
-            post_signing_builders.append(
-                builderPrefix('l10n_verification', platform))
 
     if not releaseConfig.get('enableSigningAtBuildTime', True) and \
        releaseConfig['productName'] == 'firefox':

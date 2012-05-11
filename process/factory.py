@@ -58,8 +58,7 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   SetBuildProperty, DisconnectStep, OutputStep, MockCommand, \
   RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps, \
   RetryingMockProperty, MockInit, MockInstall
-from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
-  SnippetComparison
+from buildbotcustom.steps.release import UpdateVerify, SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -6507,136 +6506,6 @@ class CodeCoverageFactory(UnittestBuildFactory):
              workdir="build/%s" % self.objdir,
              timeout=timeout,
             ))
-
-class L10nVerifyFactory(ReleaseFactory):
-    def __init__(self, cvsroot, stagingServer, productName, version,
-                 buildNumber, oldVersion, oldBuildNumber,
-                 platform, verifyDir='verify', linuxExtension='bz2',
-                 buildSpace=4, **kwargs):
-        # MozillaBuildFactory needs the 'repoPath' argument, but we don't
-        if 'repoPath' not in kwargs:
-                    kwargs['repoPath'] = 'nothing'
-        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
-
-        verifyDirVersion = 'tools/release/l10n'
-        platformFtpDir = getPlatformFtpDir(platform)
-
-        # Remove existing verify dir
-        self.addStep(ShellCommand(
-         name='rm_verify_dir',
-         description=['remove', 'verify', 'dir'],
-         descriptionDone=['removed', 'verify', 'dir'],
-         command=['rm', '-rf', verifyDir],
-         workdir='.',
-         haltOnFailure=True,
-        ))
-
-        self.addStep(ShellCommand(
-         name='mkdir_verify',
-         description=['(re)create', 'verify', 'dir'],
-         descriptionDone=['(re)created', 'verify', 'dir'],
-         command=['bash', '-c', 'mkdir -p ' + verifyDirVersion],
-         workdir='.',
-         haltOnFailure=True,
-        ))
-
-        # Download current release
-        self.addStep(RetryingShellCommand(
-         name='download_current_release',
-         description=['download', 'current', 'release'],
-         descriptionDone=['downloaded', 'current', 'release'],
-         command=['rsync',
-                  '-Lav',
-                  '-e', 'ssh',
-                  '--exclude=*.asc',
-                  '--exclude=*.checksums',
-                  '--exclude=source',
-                  '--exclude=xpi',
-                  '--exclude=unsigned',
-                  '--exclude=update',
-                  '--exclude=*.crashreporter-symbols.zip',
-                  '--exclude=*.zip',
-                  '--exclude=*.tests.tar.bz2',
-                  '--exclude=*.txt',
-                  '--exclude=logs',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
-                   (stagingServer, productName, version, str(buildNumber),
-                    platformFtpDir),
-                  '%s-%s-build%s/' % (productName,
-                                      version,
-                                      str(buildNumber))
-                  ],
-         workdir=verifyDirVersion,
-         haltOnFailure=True,
-         timeout=60*60
-        ))
-
-        # Download previous release
-        self.addStep(RetryingShellCommand(
-         name='download_previous_release',
-         description=['download', 'previous', 'release'],
-         descriptionDone =['downloaded', 'previous', 'release'],
-         command=['rsync',
-                  '-Lav',
-                  '-e', 'ssh',
-                  '--exclude=*.asc',
-                  '--exclude=*.checksums',
-                  '--exclude=source',
-                  '--exclude=xpi',
-                  '--exclude=unsigned',
-                  '--exclude=update',
-                  '--exclude=*.crashreporter-symbols.zip',
-                  '--exclude=*.zip',
-                  '--exclude=*.tests.tar.bz2',
-                  '--exclude=*.txt',
-                  '--exclude=logs',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
-                   (stagingServer,
-                    productName,
-                    oldVersion,
-                    str(oldBuildNumber),
-                    platformFtpDir),
-                  '%s-%s-build%s/' % (productName,
-                                      oldVersion,
-                                      str(oldBuildNumber))
-                  ],
-         workdir=verifyDirVersion,
-         haltOnFailure=True,
-         timeout=60*60
-        ))
-
-        currentProduct = '%s-%s-build%s' % (productName,
-                                            version,
-                                            str(buildNumber))
-        previousProduct = '%s-%s-build%s' % (productName,
-                                             oldVersion,
-                                             str(oldBuildNumber))
-
-        for product in [currentProduct, previousProduct]:
-            self.addStep(ShellCommand(
-                         name='recreate_product_dir',
-                         description=['(re)create', 'product', 'dir'],
-                         descriptionDone=['(re)created', 'product', 'dir'],
-                         command=['bash', '-c', 'mkdir -p %s/%s' % (verifyDirVersion, product)],
-                         workdir='.',
-                         haltOnFailure=True,
-            ))
-            self.addStep(ShellCommand(
-                         name='verify_l10n',
-                         description=['verify', 'l10n', product],
-                         descriptionDone=['verified', 'l10n', product],
-                         command=["bash", "-c",
-                                  "./verify_l10n.sh %s %s" % (product,
-                                                              platformFtpDir)],
-                         workdir=verifyDirVersion,
-                         haltOnFailure=True,
-            ))
-
-        self.addStep(L10nVerifyMetaDiff(
-                     currentProduct=currentProduct,
-                     previousProduct=previousProduct,
-                     workdir=verifyDirVersion,
-        ))
 
 
 def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
