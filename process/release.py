@@ -547,6 +547,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 ))
             xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
 
+    mozillaDir = None
+    if 'mozilla_dir' in releaseConfig:
+        mozillaDir = releaseConfig['mozilla_dir']
+
     for platform in releaseConfig['enUSPlatforms']:
         # shorthand
         pf = branchConfig['platforms'][platform]
@@ -636,6 +640,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 signingServers=signingServers,
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                 createPartial=releaseConfig.get('enablePartialMarsAtBuildTime', True),
+                mozillaDir=mozillaDir,
             )
 
             builders.append({
