@@ -7091,10 +7091,18 @@ class RemoteUnittestFactory(MozillaTestFactory):
          haltOnFailure=True,
         ))
         self.addStep(RetryingShellCommand(
+         name='get_sut_lib_py',
+         description="Download sut_lib.py",
+         command=['wget', '--no-check-certificate', '-O', 'sut_lib.py',
+                  'http://hg.mozilla.org/build/tools/raw-file/5e8bc65670cc/sut_tools/sut_lib.py'],
+         workdir='build',
+         haltOnFailure=True,
+        ))
+        self.addStep(RetryingShellCommand(
          name='get_updateSUT_py',
          description="Download updateSUT.py",
          command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
-                  'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
+                  'http://hg.mozilla.org/build/tools/raw-file/16fc4f354b44/sut_tools/updateSUT.py'],
          workdir='build',
          haltOnFailure=True,
         ))
@@ -7768,9 +7776,17 @@ class TalosFactory(RequestSortingBuildFactory):
              haltOnFailure=True,
             ))
             self.addStep(RetryingShellCommand(
+             name='get_sut_lib_py',
+             description="Download sut_lib.py",
+             command=['wget', '--no-check-certificate', '-O', 'sut_lib.py',
+                      'http://hg.mozilla.org/build/tools/raw-file/5e8bc65670cc/sut_tools/sut_lib.py'],
+             workdir=self.workdirBase,
+             haltOnFailure=True,
+            ))
+            self.addStep(RetryingShellCommand(
              name='get_updateSUT_py',
              command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
-                      'http://hg.mozilla.org/build/tools/raw-file/eba35f2aeabd/sut_tools/updateSUT.py'],
+                      'http://hg.mozilla.org/build/tools/raw-file/16fc4f354b44/sut_tools/updateSUT.py'],
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
