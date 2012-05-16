@@ -768,7 +768,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  mock_packages=[],
                  tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh",
-                 tooltool_url_list=[],
+                 tooltool_url_list=None,
                  tooltool_script='/tools/tooltool.py',
                  enablePackaging=True,
                  runAliveTests=True,
@@ -840,12 +840,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.testPrettyNames = testPrettyNames
         self.l10nCheckTest = l10nCheckTest
         self.tooltool_manifest_src = tooltool_manifest_src
-        self.tooltool_url_list = tooltool_url_list
+        self.tooltool_url_list = tooltool_url_list or []
         self.tooltool_script = tooltool_script
         self.tooltool_bootstrap = tooltool_bootstrap
         self.runAliveTests = runAliveTests
 
-        assert len(tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
+        assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -1202,11 +1202,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.tooltool_manifest_src:
             self.addStep(RetryingShellCommand(
                 name='fetch_tooltool_resources',
-                command=['python', self.tooltool_script, '--url', self.tooltool_url_list[0], 
+                command=[self.tooltool_script, '--url', self.tooltool_url_list[0],
                          '--overwrite', '-m', self.tooltool_manifest_src, 'fetch']))
             self.addStep(ShellCommand(
                 name='tooltool_bootstrap',
-                command=['bash', self.tooltool_bootstrap]))
+                command=['bash', '-c',
+                         'if [ -e "%s" ]; then bash "%s"; fi' % \
+                         (self.tooltool_bootstrap, self.tooltool_bootstrap)]
+            ))
 
 
     def addDoBuildSteps(self):
