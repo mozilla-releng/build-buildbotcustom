@@ -8414,7 +8414,14 @@ class ScriptFactory(BuildFactory):
             property_name='master',
             value=lambda b: b.builder.botmaster.parent.buildbotURL
         ))
-        self.env = {'PROPERTIES_FILE': 'buildprops.json'}
+        self.addStep(SetProperty(
+            name='get_basedir',
+            property='basedir',
+            command=['bash', '-c', 'pwd'],
+            workdir='.',
+            haltOnFailure=True,
+        ))
+        self.env = {'PROPERTIES_FILE': WithProperties('%(basedir)s/buildprops.json')}
         self.addStep(JSONPropertiesDownload(
             name="download_props",
             slavedest="buildprops.json",
@@ -8427,7 +8434,7 @@ class ScriptFactory(BuildFactory):
                 slavedest="data.json",
                 workdir="."
             ))
-            self.env['EXTRA_DATA'] = 'data.json'
+            self.env['EXTRA_DATA'] = WithProperties('%(basedir)s/data.json')
         self.addStep(ShellCommand(
             name="clobber_properties",
             command=['rm', '-rf', 'properties'],
