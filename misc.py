@@ -1069,7 +1069,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
-                'tooltool_url_list': pf.get('tooltool_url_list', []),
+                'tooltool_url_list': config.get('tooltool_url_list', []),
                 'runAliveTests': pf.get('run_alive_tests', True),
             }
             factory_kwargs.update(extra_args)
@@ -1326,8 +1326,8 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 mozillaDir=config.get('mozilla_dir', None),
-                tooltool_manifest_src = pf.get('tooltool_manifest_src', None),
-                tooltool_url_list = pf.get('tooltool_url_list', []),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=config.get('tooltool_url_list', []),
                 **nightly_kwargs
             )
 
