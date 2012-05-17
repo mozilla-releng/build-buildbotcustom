@@ -675,6 +675,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             env = builder_env.copy()
             env.update(pf['env'])
             env['MOZ_UPDATE_CHANNEL'] = releaseChannel
+            env['COMM_REV']           = releaseTag
+            env['MOZILLA_REV']        = releaseTag
 
             if not releaseConfig.get('disableStandaloneRepacks'):
                 extra_args = [platform, branchConfigFile]
