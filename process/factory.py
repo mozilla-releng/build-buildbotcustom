@@ -2890,7 +2890,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         ))
         self.UPLOAD_EXTRA_FILES.append('%s/%s' % (update_dir, partial_mar_name))
         if self.enableSigning and self.signingServers:
-            partial_mar_path = '"%s/dist/%s/%s"' % \
+            partial_mar_path = '%s/dist/%s/%s' % \
                 (self.absMozillaObjDir, update_dir, partial_mar_name)
             cmd = '%s -f gpg -f mar "%s"' % (self.signing_command,
                                              partial_mar_path)
