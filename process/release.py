@@ -713,10 +713,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args=extra_args,
                     )
                 else:
-                    extra_args = [platform, branchConfigFile, str(l10nChunks),
-                                  str(n)]
+                    generatePartials = "noPartials"
                     if releaseConfig.get('enablePartialMarsAtBuildTime', True):
-                        extra_args.append('generatePartials')
+                        generatePartials = 'generatePartials'
+                    extra_args = [platform, branchConfigFile, str(l10nChunks),
+                                  str(n), generatePartials, branchConfig['stage_ssh_key'], branchConfig['stage_server'],
+                                  branchConfig['stage_username'], branchConfig['hghost'],
+                                  branchConfig['compare_locales_repo_path']]
                     repack_factory = SigningScriptFactory(
                         signingServers=signingServers,
                         env=env,
