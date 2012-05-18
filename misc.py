@@ -1103,10 +1103,13 @@ def generateBranchObjects(config, name, secrets=None):
                 pgo_kwargs['profiledBuild'] = True
                 pgo_kwargs['stagePlatform'] += '-pgo'
                 pgo_kwargs['unittestBranch'] = pgoUnittestBranch
+                if 'pgo_platform' in pf:
+                    slaves = config['platforms'][pf['pgo_platform']]['slaves']
+                    pgo_kwargs['env'] = config['platforms'][pf['pgo_platform']]['env']
                 pgo_factory = factory_class(**pgo_kwargs)
                 pgo_builder = {
                     'name': '%s pgo-build' % pf['base_name'],
-                    'slavenames': pf.get('pgo_slaves', pf['slaves']),
+                    'slavenames': slaves,
                     'builddir':  '%s-%s-pgo' % (name, platform),
                     'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
