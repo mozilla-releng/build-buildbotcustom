@@ -1157,8 +1157,17 @@ def generateBranchObjects(config, name, secrets=None):
             nightly_builder = '%s nightly' % pf['base_name']
 
             platform_env = pf['env'].copy()
+            # We may need a seperate dict for pgo builds
+            if platform in config['pgo_platforms'] and 'pgo_platform' in pf:
+                nightly_env = config['platforms'][pf['pgo_platform']]['env'].copy()
+            else:
+                nightly_env = platform_env.copy()
+
+            nightly_env['IS_NIGHTLY'] = "yes"
+
             if 'update_channel' in config and config.get('create_snippet'):
                 platform_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
+                nightly_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
 
             triggeredSchedulers=None
             if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
@@ -1268,9 +1277,6 @@ def generateBranchObjects(config, name, secrets=None):
             else:
                 nightlyUnittestBranch = unittestBranch
                 nightly_pgo = False
-
-            nightly_env=platform_env.copy()
-            nightly_env['IS_NIGHTLY'] = "yes"
 
             mozilla2_nightly_factory = NightlyBuildFactory(
                 env=nightly_env,
