@@ -1269,8 +1269,11 @@ def generateBranchObjects(config, name, secrets=None):
                 nightlyUnittestBranch = unittestBranch
                 nightly_pgo = False
 
+            nightly_env=platform_env.copy()
+            nightly_env['IS_NIGHTLY'] = "yes"
+
             mozilla2_nightly_factory = NightlyBuildFactory(
-                env=platform_env,
+                env=nightly_env,
                 objdir=pf['platform_objdir'],
                 platform=platform,
                 hgHost=config['hghost'],
