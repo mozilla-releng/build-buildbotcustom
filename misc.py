@@ -1103,10 +1103,13 @@ def generateBranchObjects(config, name, secrets=None):
                 pgo_kwargs['profiledBuild'] = True
                 pgo_kwargs['stagePlatform'] += '-pgo'
                 pgo_kwargs['unittestBranch'] = pgoUnittestBranch
+                if 'pgo_platform' in pf:
+                    slaves = config['platforms'][pf['pgo_platform']]['slaves']
+                    pgo_kwargs['env'] = config['platforms'][pf['pgo_platform']]['env']
                 pgo_factory = factory_class(**pgo_kwargs)
                 pgo_builder = {
                     'name': '%s pgo-build' % pf['base_name'],
-                    'slavenames': pf.get('pgo_slaves', pf['slaves']),
+                    'slavenames': slaves,
                     'builddir':  '%s-%s-pgo' % (name, platform),
                     'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
@@ -1154,8 +1157,17 @@ def generateBranchObjects(config, name, secrets=None):
             nightly_builder = '%s nightly' % pf['base_name']
 
             platform_env = pf['env'].copy()
+            # We may need a seperate dict for pgo builds
+            if platform in config['pgo_platforms'] and 'pgo_platform' in pf:
+                nightly_env = config['platforms'][pf['pgo_platform']]['env'].copy()
+            else:
+                nightly_env = platform_env.copy()
+
+            nightly_env['IS_NIGHTLY'] = "yes"
+
             if 'update_channel' in config and config.get('create_snippet'):
                 platform_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
+                nightly_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
 
             triggeredSchedulers=None
             if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
@@ -1267,7 +1279,7 @@ def generateBranchObjects(config, name, secrets=None):
                 nightly_pgo = False
 
             mozilla2_nightly_factory = NightlyBuildFactory(
-                env=platform_env,
+                env=nightly_env,
                 objdir=pf['platform_objdir'],
                 platform=platform,
                 hgHost=config['hghost'],
