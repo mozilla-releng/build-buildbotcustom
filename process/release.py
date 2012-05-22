@@ -988,6 +988,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if releaseConfig.get('verifyConfigs') and \
        not releaseConfig.get('skip_updates'):
+        try:
+            moz_repo_path = releaseConfig['sourceRepositories']['mozilla']['path']
+        except KeyError:
+            moz_repo_path = sourceRepoInfo['path']
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -1033,6 +1037,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', False),
             signingServers=signingServers,
             useChecksums=releaseConfig.get('enablePartialMarsAtBuildTime', True),
+            mozRepoPath=moz_repo_path,
         )
 
         builders.append({
@@ -1112,7 +1117,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptName='scripts/release/push-to-mirrors.sh',
             extra_args=[branchConfigFile, 'permissions',
                         '--extra-excludes=*.zip',
-                        '--extra-excludes=*.zip.asc'],
+                        '--extra-excludes=*.zip.asc',
+                        '--ssh-user', branchConfig['stage_username'],
+                        '--ssh-key', branchConfig['stage_ssh_key'],
+                        ],
             log_eval_func=lambda c, s: regex_log_evaluator(
                 c, s, permission_check_error),
         )
@@ -1141,7 +1149,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptName='scripts/release/push-to-mirrors.sh',
             extra_args=[branchConfigFile, 'antivirus',
                        '--extra-excludes=*.zip',
-                       '--extra-excludes=*.zip.asc'],
+                       '--extra-excludes=*.zip.asc',
+                       '--ssh-user', branchConfig['stage_username'],
+                       '--ssh-key', branchConfig['stage_ssh_key'],
+                       ],
         )
 
         builders.append({
@@ -1168,7 +1179,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptName='scripts/release/push-to-mirrors.sh',
             extra_args=[branchConfigFile, 'push',
                        '--extra-excludes=*.zip',
-                       '--extra-excludes=*.zip.asc'],
+                       '--extra-excludes=*.zip.asc',
+                       '--ssh-user', branchConfig['stage_username'],
+                       '--ssh-key', branchConfig['stage_ssh_key'],
+                       ],
         )
 
         builders.append({
