@@ -542,7 +542,7 @@ def generateBranchObjects(config, name, secrets=None):
     l10nPollInterval = config.get('l10nPollInterval', 5*60)
 
     # We only understand a couple PGO strategies
-    assert config['pgo_strategy'] in ('per-checkin', 'periodic', None), \
+    assert config['pgo_strategy'] in ('per-checkin', 'periodic', 'try', None), \
             "%s is not an understood PGO strategy" % config['pgo_strategy']
 
     # This section is to make it easier to disable certain products.
@@ -601,8 +601,10 @@ def generateBranchObjects(config, name, secrets=None):
             do_nightly = False
 
         # Check if platform as a PGO builder
-        if config['pgo_strategy'] == 'periodic' and platform in config['pgo_platforms']:
+        if config['pgo_strategy'] in ('periodic',) and platform in config['pgo_platforms']:
             periodicPgoBuilders.append('%s pgo-build' % pf['base_name'])
+        elif config['pgo_strategy'] in ('try',) and platform in config['pgo_platforms']:
+            builders.append('%s pgo-build' % pf['base_name'])
 
         if do_nightly:
             builder = '%s nightly' % base_name
@@ -988,7 +990,7 @@ def generateBranchObjects(config, name, secrets=None):
         # For the 'per-checkin' pgo strategy, we want PGO
         # enabled on what would be 'opt' builds.
         if platform in config['pgo_platforms']:
-            if config['pgo_strategy'] == 'periodic' or config['pgo_strategy'] == None:
+            if config['pgo_strategy'] in ('periodic', 'try') or config['pgo_strategy'] == None:
                 per_checkin_build_uses_pgo = False
             elif config['pgo_strategy'] == 'per-checkin':
                 per_checkin_build_uses_pgo = True
@@ -1098,7 +1100,7 @@ def generateBranchObjects(config, name, secrets=None):
             # We have some platforms which need to be built every X hours with PGO.
             # These builds are as close to regular dep builds as we can make them, 
             # other than PGO
-            if config['pgo_strategy'] == 'periodic' and platform in config['pgo_platforms']:
+            if config['pgo_strategy'] in ('periodic', 'try') and platform in config['pgo_platforms']:
                 pgo_kwargs = factory_kwargs.copy()
                 pgo_kwargs['profiledBuild'] = True
                 pgo_kwargs['stagePlatform'] += '-pgo'
@@ -3093,7 +3095,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     prettyNames = {}
 
     # We only understand a couple PGO strategies
-    assert branch_config['pgo_strategy'] in ('per-checkin', 'periodic', None), \
+    assert branch_config['pgo_strategy'] in ('per-checkin', 'periodic', 'try', None), \
             "%s is not an understood PGO strategy" % branch_config['pgo_strategy']
 
     buildBranch = branch_config['build_branch']
