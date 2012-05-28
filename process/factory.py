@@ -8444,6 +8444,7 @@ class ScriptFactory(BuildFactory):
             name="clobber_scripts",
             command=['rm', '-rf', 'scripts'],
             workdir=".",
+            haltOnFailure=True,
         ))
         self.addStep(ShellCommand(
             name="clone_scripts",
