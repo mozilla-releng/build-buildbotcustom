@@ -84,9 +84,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     unix_slaves = [x for x in set(unix_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
-    signedPlatforms = ()
+    manuallySignedPlatforms = ()
     if not releaseConfig.get('enableSigningAtBuildTime', True):
-        signedPlatforms = releaseConfig.get('signedPlatforms', ('win32',))
+        manuallySignedPlatforms = releaseConfig.get('manuallySignedPlatforms',
+                                                    ('win32',))
     if secrets is None:
         secrets = {}
     signingServers = secrets.get('release-signing')
@@ -169,7 +170,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platformDir = buildbot2ftp(bare_platform)
             if 'xulrunner' in platform:
                 platformDir = ''
-            if bare_platform in signedPlatforms:
+            if bare_platform in manuallySignedPlatforms:
                 platformDir = 'unsigned/%s' % platformDir
                 isPlatformUnsigned = True
             ftpURL = '/'.join([
@@ -281,6 +282,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     def majorUpdateVerifyBuilders(platform):
         return parallelizeBuilders("major_update_verify", platform,
                                    updateVerifyChunks)
+
+    def hasPlatformSubstring(platforms, substring):
+        if isinstance(platforms, basestring):
+            platforms = (platforms,)
+        return bool([p for p in platform if substring in p])
 
     builders = []
     test_builders = []
@@ -707,7 +713,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 })
 
             for n, builderName in l10nBuilders(platform).iteritems():
-                if releaseConfig['productName'] == 'fennec':
+                if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
                     repack_factory = ScriptFactory(
                         scriptRepo=mozharness_repo,
@@ -908,20 +914,19 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
 
-    if not releaseConfig.get('enableSigningAtBuildTime', True) and \
-       releaseConfig['productName'] == 'firefox':
+    if 'win32' in manuallySignedPlatforms:
         builders.append(makeDummyBuilder(
             name=builderPrefix('signing_done'),
             slaves=all_slaves,
             category=builderPrefix(''),
             properties={
-                'platform': platform,
+                'platform': 'win32',
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             },
         ))
 
     if releaseConfig.get('enableSigningAtBuildTime', True) and \
-           releaseConfig['productName'] == 'firefox':
+       releaseConfig.get('autoGenerateChecksums', True):
         pf = branchConfig['platforms']['linux']
         env = builder_env.copy()
         env.update(pf['env'])
@@ -931,7 +936,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptRepo=tools_repo,
             interpreter='bash',
             scriptName='scripts/release/generate-sums.sh',
-            extra_args=[branchConfigFile, '--create-contrib-dirs'],
+            extra_args=[
+                branchConfigFile, '--product', releaseConfig['productName'],
+                '--ssh-user', branchConfig['stage_username'],
+                '--ssh-key', branchConfig['stage_ssh_key'],
+            ],
         )
         builders.append({
             'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
@@ -1480,10 +1489,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     ##### Change sources and Schedulers
 
-    if not releaseConfig.get('enableSigningAtBuildTime', True) and \
-       releaseConfig['productName'] == 'firefox':
+    if 'win32' in manuallySignedPlatforms:
         change_source.append(UrlPoller(
-            branch=builderPrefix("post_signing"),
+            branch=builderPrefix('post_signing'),
             url='%s/win32_signing_build%s.log' % (
                 makeCandidatesDir(
                     releaseConfig['productName'],
@@ -1503,8 +1511,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         schedulers.append(signing_done_scheduler)
         important_builders.append(builderPrefix('signing_done'))
 
-    if releaseConfig['productName'] == 'fennec':
-        for platform in releaseConfig.get('signedPlatforms', ()):
+    if hasPlatformSubstring(manuallySignedPlatforms, 'android'):
+        for platform in manuallySignedPlatforms:
             locale = 'en-US'
             candidatesDir = makeCandidatesDir(
                 releaseConfig['productName'],
@@ -1686,8 +1694,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             post_antivirus_builders.append(builderPrefix('push_to_mirrors'))
 
-    if releaseConfig['productName'] == 'firefox':
-        if not releaseConfig.get('enableSigningAtBuildTime', True):
+    if not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
+        if 'win32' in manuallySignedPlatforms:
             updates_upstream_builders = [builderPrefix('signing_done')]
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('%s_signing_done' % releaseConfig['productName']),
@@ -1733,7 +1741,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderNames=post_antivirus_builders,
         ))
     if releaseConfig['doPartnerRepacks'] and \
-        releaseConfig['productName'] == 'firefox':
+       not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         # TODO: revisit this once we have android partner repacks
         for platform in releaseConfig.get('partnerRepackPlatforms',
                                           releaseConfig['l10nPlatforms']):
@@ -1808,7 +1816,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 changeContainsProduct(c, releaseConfig['productName'])
             ))
     for recipient in releaseConfig['AllRecipients']:
-        if releaseConfig['productName'] == 'fennec':
+        if hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
             #send a message when android signing is complete
             status.append(ChangeNotifier(
                     fromaddr="release@mozilla.com",
