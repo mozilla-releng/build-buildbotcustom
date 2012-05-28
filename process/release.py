@@ -945,6 +945,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 branchConfigFile, '--product', releaseConfig['productName'],
                 '--ssh-user', branchConfig['stage_username'],
                 '--ssh-key', branchConfig['stage_ssh_key'],
+                '--create-contrib-dirs',
             ],
         )
         builders.append({
