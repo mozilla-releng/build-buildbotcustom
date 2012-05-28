@@ -90,9 +90,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                                     ('win32',))
     if secrets is None:
         secrets = {}
-    signingServers = secrets.get('release-signing')
-    if releaseConfig.get('enableSigningAtBuildTime', True):
-        assert signingServers, 'Please provide a valid list of signing servers'
+    def getSigningServers(platform):
+        if 'macosx' in platform:
+            signingServers = secrets.get('mac-release-signing')
+        else:
+            signingServers = secrets.get('release-signing')
+        if releaseConfig.get('enableSigningAtBuildTime', True):
+            assert signingServers, 'Please provide a valid list of signing servers'
+        return signingServers
 
     def builderPrefix(s, platform=None):
         if platform:
@@ -463,7 +468,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mozconfig=mozconfig,
             configRepoPath=branchConfig['config_repo_path'],
             configSubDir=branchConfig['config_subdir'],
-            signingServers=signingServers,
+            signingServers=getSigningServers('linux'),
             enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
         )
 
@@ -510,7 +515,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mozconfig=mozconfig,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
-                signingServers=signingServers,
+                signingServers=getSigningServers('linux'),
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
             )
 
@@ -643,7 +648,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 usePrettyNames=releaseConfig.get('usePrettyNames', True),
                 enableUpdatePackaging=enableUpdatePackaging,
                 mozconfigBranch=releaseTag,
-                signingServers=signingServers,
+                signingServers=getSigningServers(platform),
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                 createPartial=releaseConfig.get('enablePartialMarsAtBuildTime', True),
                 mozillaDir=mozillaDir,
@@ -689,7 +694,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                     extra_args.append('generatePartials')
                 standalone_factory = SigningScriptFactory(
-                    signingServers=signingServers,
+                    signingServers=getSigningServers(platform),
                     env=env,
                     enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                     scriptRepo=tools_repo,
@@ -729,7 +734,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                   branchConfig['stage_username'], branchConfig['hghost'],
                                   branchConfig['compare_locales_repo_path']]
                     repack_factory = SigningScriptFactory(
-                        signingServers=signingServers,
+                        signingServers=getSigningServers(platform),
                         env=env,
                         enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                         scriptRepo=tools_repo,
@@ -827,7 +832,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 buildNumber=releaseConfig['buildNumber'],
                 clobberURL=clobberer_url,
                 packageSDK=True,
-                signingServers=signingServers,
+                signingServers=getSigningServers(platform),
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
             )
             builders.append({
@@ -889,7 +894,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     stagingServer=releaseConfig['stagingServer'],
                     stageUsername=branchConfig['stage_username'],
                     stageSshKey=branchConfig['stage_ssh_key'],
-                    signingServers=signingServers,
+                    signingServers=getSigningServers(platform),
                     enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                     env=pr_pf['env'],
                 )
@@ -931,7 +936,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         env = builder_env.copy()
         env.update(pf['env'])
         checksums_factory = SigningScriptFactory(
-            signingServers=signingServers,
+            signingServers=getSigningServers('linux'),
             env=env,
             scriptRepo=tools_repo,
             interpreter='bash',
@@ -966,7 +971,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderPrefix('%s_checksums' % releaseConfig['productName']))
         if releaseConfig.get('xulrunnerPlatforms'):
             xr_checksums_factory = SigningScriptFactory(
-                signingServers=signingServers,
+                signingServers=getSigningServers('linux'),
                 env=env,
                 scriptRepo=tools_repo,
                 interpreter='bash',
@@ -1044,7 +1049,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             oldLongVersion=releaseConfig.get('oldLongVersion', None),
             schema=releaseConfig.get('snippetSchema', None),
             useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', False),
-            signingServers=signingServers,
+            signingServers=getSigningServers('linux'),
             useChecksums=releaseConfig.get('enablePartialMarsAtBuildTime', True),
             mozRepoPath=moz_repo_path,
         )
