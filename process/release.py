@@ -291,7 +291,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     def hasPlatformSubstring(platforms, substring):
         if isinstance(platforms, basestring):
             platforms = (platforms,)
-        return bool([p for p in platform if substring in p])
+        return bool([p for p in platforms if substring in p])
 
     builders = []
     test_builders = []
