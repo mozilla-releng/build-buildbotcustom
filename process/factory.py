@@ -8389,12 +8389,16 @@ class ScriptFactory(BuildFactory):
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
             extra_data=None, extra_args=None,
             script_timeout=1200, script_maxtime=None, log_eval_func=None,
-            reboot_command=None, hg_bin='hg'):
+            reboot_command=None, hg_bin='hg', platform=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
         self.script_maxtime = script_maxtime
         self.reboot_command = reboot_command
+        self.platform = platform
+        self.get_basedir_cmd = ['bash', '-c', 'pwd']
+        if platform and 'win' in platform:
+            self.get_basedir_cmd = ['cmd', '/C', 'pwd']
         if scriptName[0] == '/':
             script_path = scriptName
         else:
@@ -8417,7 +8421,7 @@ class ScriptFactory(BuildFactory):
         self.addStep(SetProperty(
             name='get_basedir',
             property='basedir',
-            command=['bash', '-c', 'pwd'],
+            command=self.get_basedir_cmd,
             workdir='.',
             haltOnFailure=True,
         ))
@@ -8473,9 +8477,14 @@ class ScriptFactory(BuildFactory):
             haltOnFailure=True,
             warnOnWarnings=True))
 
+        cmd = ['bash', '-c', 'for file in `ls -1`; do cat $file; done']
+        if self.platform and 'win' in self.platform:
+            # note: prefixing 'type' command with '@' to suppress extraneous output
+            self.get_basedir_cmd = ['cmd', '/C', 'for', '%f', 'in', '(*)', 'do', '@type', '%f']
+        
         self.addStep(SetProperty(
             name='set_script_properties',
-            command=['bash', '-c', 'for file in `ls -1`; do cat $file; done'],
+            command=cmd,
             workdir='properties',
             extract_fn=extractProperties,
             alwaysRun=True,
@@ -8534,13 +8543,13 @@ class SigningScriptFactory(ScriptFactory):
             # toolsdir, basedir
             self.addStep(SetProperty(
                 name='set_toolsdir',
-                command=['bash', '-c', 'pwd'],
+                command=self.get_basedir_cmd,
                 property='toolsdir',
                 workdir='scripts',
             ))
             self.addStep(SetProperty(
                 name='set_basedir',
-                command=['bash', '-c', 'pwd'],
+                command=self.get_basedir_cmd,
                 property='basedir',
                 workdir='.',
             ))
