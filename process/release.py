@@ -691,15 +691,23 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             if not releaseConfig.get('disableStandaloneRepacks'):
                 extra_args = [platform, branchConfigFile]
+                extra_args.extend([
+                    '--stage-ssh-key', branchConfig['stage_ssh_key'],
+                    '--stage-server', branchConfig['stage_server'],
+                    '--stage-username', branchConfig['stage_username'],
+                    '--hghost', branchConfig['hghost'],
+                    '--compare-locales-repo-path',
+                    branchConfig['compare_locales_repo_path']
+                ])
                 if releaseConfig.get('enablePartialMarsAtBuildTime', True):
-                    extra_args.append('generatePartials')
+                    extra_args.append('--generate-partials')
                 standalone_factory = SigningScriptFactory(
                     signingServers=getSigningServers(platform),
                     env=env,
                     enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                     scriptRepo=tools_repo,
                     interpreter='bash',
-                    scriptName='scripts/l10n/standalone_repacks.sh',
+                    scriptName='scripts/l10n/release_repacks.sh',
                     extra_args=extra_args,
                 )
                 builders.append({
@@ -712,6 +720,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'env': env,
                     'properties': {
                         'builddir': builderPrefix("standalone_repack", platform),
+                        'slavebuilddir': reallyShort(builderPrefix(
+                            "standalone_repack", platform)),
                         'platform': platform,
                         'branch': 'release-%s' % sourceRepoInfo['name'],
                     }
@@ -726,13 +736,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args=extra_args,
                     )
                 else:
-                    generatePartials = "noPartials"
+                    extra_args = [platform, branchConfigFile]
+                    extra_args.extend([
+                        '--chunks', str(l10nChunks), '--this-chunk', str(n),
+                        '--stage-ssh-key', branchConfig['stage_ssh_key'],
+                        '--stage-server', branchConfig['stage_server'],
+                        '--stage-username', branchConfig['stage_username'],
+                        '--hghost', branchConfig['hghost'],
+                        '--compare-locales-repo-path',
+                        branchConfig['compare_locales_repo_path']
+                    ])
                     if releaseConfig.get('enablePartialMarsAtBuildTime', True):
-                        generatePartials = 'generatePartials'
-                    extra_args = [platform, branchConfigFile, str(l10nChunks),
-                                  str(n), generatePartials, branchConfig['stage_ssh_key'], branchConfig['stage_server'],
-                                  branchConfig['stage_username'], branchConfig['hghost'],
-                                  branchConfig['compare_locales_repo_path']]
+                        extra_args.append('--generate-partials')
                     repack_factory = SigningScriptFactory(
                         signingServers=getSigningServers(platform),
                         env=env,
