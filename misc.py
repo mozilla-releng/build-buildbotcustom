@@ -418,6 +418,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             extra_args=suites.get('extra_args', []),
             script_maxtime=suites.get('script_maxtime', 1200),
             reboot_command=suites.get('reboot_command'),
+            platform=platform,
             log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
              (re.compile('# TBPL WARNING #'), WARNINGS),
              (re.compile('# TBPL FAILURE #'), FAILURE),
