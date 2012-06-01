@@ -449,8 +449,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if not releaseConfig.get('skip_source'):
         pf = branchConfig['platforms']['linux']
         mozconfig = 'linux/%s/release' % sourceRepoInfo['name']
+        platform_env = pf['env'].copy()
+        platform_env['COMM_REV']    = releaseTag
+        platform_env['MOZILLA_REV'] = releaseTag
         source_factory = SingleSourceFactory(
-            env=pf['env'],
+            env=platform_env,
             objdir=pf['platform_objdir'],
             hgHost=branchConfig['hghost'],
             buildToolsRepoPath=tools_repo_path,
