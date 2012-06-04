@@ -7137,9 +7137,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
             name='cleanup device',
             workdir='.',
             description="Cleanup Device",
-            command=['python', '/builds/sut_tools/cleanup.py',
-                     WithProperties("%(sut_ip)s"),
-                    ],
+            command=['python', '/builds/sut_tools/cleanup.py'],
             haltOnFailure=True)
         )
         self.addStep(ShellCommand(
@@ -7506,9 +7504,7 @@ class TalosFactory(RequestSortingBuildFactory):
                 name='cleanup device',
                 workdir=self.workdirBase,
                 description="Cleanup Device",
-                command=['python', '/builds/sut_tools/cleanup.py',
-                         WithProperties("%(sut_ip)s"),
-                        ],
+                command=['python', '/builds/sut_tools/cleanup.py'],
                 env=self.env,
                 haltOnFailure=True)
             )
