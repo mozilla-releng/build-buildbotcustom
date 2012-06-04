@@ -314,3 +314,31 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
                 rev = later_rev
         return SourceStamp(branch=scheduler.branch, revision=rev)
     return ssFunc
+
+def lastRevFunc(branch, triggerBuildIfNoChanges=True):
+    """Returns a function that returns the latest revision on branch."""
+    def ssFunc(scheduler, t):
+        #### NOTE: called in a thread!
+        db = scheduler.parent.db
+
+        c = lastChange(db, t, branch)
+        if not c:
+            return None
+
+        rev = c.revision
+        log.msg("lastChange returned %s" % (rev))
+
+        # Find the last revision our scheduler's builders have built.  This can
+        # include forced builds.
+        last_built_rev = getLastBuiltRevision(db, t, branch,
+                scheduler.builderNames)
+        log.msg("lastBuiltRevision was %s" % last_built_rev)
+
+        if last_built_rev is not None:
+            # Make sure that rev is newer than the last revision we built.
+            later_rev = getLatestRev(db, t, branch, rev, last_built_rev)
+            if later_rev == last_built_rev and not triggerBuildIfNoChanges:
+                log.msg("lastGoodRev: Skipping %s since we've already built it" % rev)
+                return None
+        return SourceStamp(branch=scheduler.branch, revision=rev)
+    return ssFunc
