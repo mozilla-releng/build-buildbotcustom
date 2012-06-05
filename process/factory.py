@@ -7996,7 +7996,8 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addStep(talos_steps.MozillaRunPerfTests(
          warnOnWarnings=True,
          workdir=os.path.join(self.workdirBase, "talos/"),
-         timeout=21600,
+         timeout=3600,
+         maxTime=10800,
          haltOnFailure=False,
          command=self.talosCmd,
          env=self.env)
