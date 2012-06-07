@@ -7541,11 +7541,11 @@ class TalosFactory(RequestSortingBuildFactory):
         if '--fennecIDs' in self.configOptions:
             def get_fennec_ids_url(build):
                 url = build.source.changes[-1].files[0]
-                return url[:-len('fennec-XX.0XX.en-US.android-arm.apk')] + "fennec_ids.txt"
+                return url.rsplit("/", 1)[0] + "/fennec_ids.txt"
 
             def get_robocop_url(build):
                 url = build.source.changes[-1].files[0]
-                return url[:-len('fennec-XX.0XX.en-US.android-arm.apk')] + "robocop.apk"
+                return url.rsplit("/", 1)[0] + "/robocop.apk"
 
             self.addStep(DownloadFile(
              url_fn=get_fennec_ids_url,
