@@ -713,9 +713,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptName='scripts/l10n/release_repacks.sh',
                     extra_args=extra_args,
                 )
+                l10n_slaves_key = pf.get('l10n_slaves_key', platform)
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
-                    'slavenames': branchConfig['l10n_slaves'][platform],
+                    'slavenames': branchConfig['l10n_slaves'][l10n_slaves_key],
                     'category': builderPrefix(''),
                     'builddir': builderPrefix("standalone_repack", platform),
                     'factory': standalone_factory,
@@ -764,9 +765,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
                 builddir = builderPrefix('%s_repack' % platform) + \
                                          '_' + str(n)
+
+                l10n_slaves_key = pf.get('l10n_slaves_key', platform)
                 builders.append({
                     'name': builderName,
-                    'slavenames': branchConfig['l10n_slaves'][platform],
+                    'slavenames': branchConfig['l10n_slaves'][l10n_slaves_key],
                     'category': builderPrefix(''),
                     'builddir': builddir,
                     'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
