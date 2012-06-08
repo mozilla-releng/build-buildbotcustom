@@ -6817,6 +6817,18 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 command=['xset', 's', 'reset'],
                 env=self.env,
             ))
+        if self.platform.startswith('win32'):
+            self.addStep(ShellCommand(
+                name='run mouse & screen adjustment script',
+                command=['C:\\mozilla-build\\python25\\python.exe',
+          	  WithProperties('%(toolsdir)s/scripts/support/mouse_and_screen_resolution.py'),
+          	  '--configuration-url',
+          	  WithProperties("http://%s/%s" % (self.hgHost, self.repoPath) + \
+                                 "/raw-file/%(revision)s/testing/machine-configuration.json")],
+                flunkOnFailure=True,
+                haltOnFailure=True,
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, global_errors),
+            ))
 
     def addRunTestSteps(self):
         if self.platform.startswith('macosx64'):
