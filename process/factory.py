@@ -387,11 +387,11 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
     ignore_dirs = [ 'info', 'rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
-            clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
-            branchName=None, baseWorkDir='build', hashType='sha512',
-            baseMirrorUrls=None, baseBundleUrls=None, signingServers=None,
-            enableSigning=True, env={}, balrog_api_root=None,
-            balrog_credentials_file=None, **kwargs):
+                 clobberURL=None, clobberBranch=None, clobberTime=None,
+                 buildsBeforeReboot=None, branchName=None, baseWorkDir='build',
+                 hashType='sha512', baseMirrorUrls=None, baseBundleUrls=None,
+                 signingServers=None, enableSigning=True, env={},
+                 balrog_api_root=None, balrog_credentials_file=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -419,6 +419,10 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
           self.branchName = branchName
         else:
           self.branchName = self.getRepoName(self.repository)
+        if not clobberBranch:
+            self.clobberBranch = self.branchName
+        else:
+            self.clobberBranch = clobberBranch
 
         if self.signingServers and self.enableSigning:
             self.signing_command = get_signing_cmd(
@@ -483,7 +487,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         if self.clobberURL is not None:
             self.addStep(MozillaClobberer(
              name='checking_clobber_times',
-             branch=self.branchName,
+             branch=self.clobberBranch,
              clobber_url=self.clobberURL,
              clobberer_path=WithProperties('%(builddir)s/tools/clobberer/clobberer.py'),
              clobberTime=self.clobberTime
@@ -6816,6 +6820,18 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 name='disable_screensaver',
                 command=['xset', 's', 'reset'],
                 env=self.env,
+            ))
+        if self.platform.startswith('win32'):
+            self.addStep(ShellCommand(
+                name='run mouse & screen adjustment script',
+                command=['C:\\mozilla-build\\python25\\python.exe',
+          	  WithProperties('%(toolsdir)s/scripts/support/mouse_and_screen_resolution.py'),
+          	  '--configuration-url',
+          	  WithProperties("http://%s/%s" % (self.hgHost, self.repoPath) + \
+                                 "/raw-file/%(revision)s/testing/machine-configuration.json")],
+                flunkOnFailure=True,
+                haltOnFailure=True,
+                log_eval_func=lambda c,s: regex_log_evaluator(c, s, global_errors),
             ))
 
     def addRunTestSteps(self):
