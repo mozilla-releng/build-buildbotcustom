@@ -1448,10 +1448,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                   workdir='.',
                   command=['/bin/bash', '-c',
                            'perl '
-                           'build%s/tools/rb/fix-%s-stack.pl '
+                           'build%s/tools/rb/fix_stack_using_bpsyms.py '
                            'sdleak.tree.raw '
-                           '> sdleak.tree' % (self.mozillaDir,
-                                              self.platform.replace("64", "")),
+                           '> sdleak.tree' % self.mozillaDir,
                            ],
                   warnOnFailure=True,
                   haltOnFailure=True
