@@ -1448,10 +1448,9 @@ class MercurialBuildFactory(MozillaBuildFactory):
                   workdir='.',
                   command=['/bin/bash', '-c',
                            'perl '
-                           'build%s/tools/rb/fix-%s-stack.pl '
+                           'build%s/tools/rb/fix_stack_using_bpsyms.py '
                            'sdleak.tree.raw '
-                           '> sdleak.tree' % (self.mozillaDir,
-                                              self.platform.replace("64", "")),
+                           '> sdleak.tree' % self.mozillaDir,
                            ],
                   warnOnFailure=True,
                   haltOnFailure=True
@@ -8493,8 +8492,8 @@ class ScriptFactory(BuildFactory):
         cmd = ['bash', '-c', 'for file in `ls -1`; do cat $file; done']
         if self.platform and 'win' in self.platform:
             # note: prefixing 'type' command with '@' to suppress extraneous output
-            self.get_basedir_cmd = ['cmd', '/C', 'for', '%f', 'in', '(*)', 'do', '@type', '%f']
-        
+            cmd = ['cmd', '/C', 'for', '%f', 'in', '(*)', 'do', '@type', '%f']
+
         self.addStep(SetProperty(
             name='set_script_properties',
             command=cmd,

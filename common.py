@@ -38,6 +38,7 @@ def reallyShort(name, product=None):
 
     mappings = {
         'mozilla': 'm',
+        'comm': 'c',
         'central': 'cen',
         '1.9.1': '191',
         '1.9.2': '192',
