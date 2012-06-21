@@ -577,7 +577,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         return '%s://%s/%s' % (proto, hgHost, repoPath)
 
     def getPackageFilename(self, platform, platform_variation):
-        if 'android' in self.complete_platform:
+        if 'android-armv6' in self.complete_platform:
+            packageFilename = '*arm-armv6.apk'
+        elif 'android' in self.complete_platform:
             packageFilename = '*arm.apk' #the arm.apk is to avoid
                                          #unsigned/unaligned apks
         elif 'maemo' in self.complete_platform:
