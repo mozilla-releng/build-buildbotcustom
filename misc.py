@@ -785,8 +785,13 @@ def generateBranchObjects(config, name, secrets=None):
     nomergeBuilders.extend(periodicPgoBuilders) # these should never, ever merge
     extra_args['treeStableTimer'] = None
 
+    if 'product_prefix' in config:
+        scheduler_name_prefix = "%s_%s" % (config['product_prefix'], name)
+    else:
+        scheduler_name_prefix = name
+
     branchObjects['schedulers'].append(scheduler_class(
-        name=name,
+        name=scheduler_name_prefix,
         branch=config['repo_path'],
         builderNames=builders + unittestBuilders + debugBuilders,
         fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']) and shouldBuild(c),
@@ -860,7 +865,7 @@ def generateBranchObjects(config, name, secrets=None):
                 SpecificNightly,
                 [buildIDSchedFunc, buildUIDSchedFunc])(
                     ssFunc=goodFunc,
-                    name="%s nightly" % name,
+                    name="%s nightly" % scheduler_name_prefix,
                     branch=config['repo_path'],
                     # bug 482123 - keep the minute to avoid problems with DST
                     # changes
@@ -874,7 +879,7 @@ def generateBranchObjects(config, name, secrets=None):
                             SpecificNightly,
                             [buildIDSchedFunc, buildUIDSchedFunc])(
                             ssFunc=lastRevFunc(config['repo_path'], triggerBuildIfNoChanges=False),
-                            name="%s pgo" % name,
+                            name="%s pgo" % scheduler_name_prefix,
                             branch=config['repo_path'],
                             builderNames=periodicPgoBuilders,
                             hour=range(0,24,config['periodic_pgo_interval']),
@@ -895,14 +900,15 @@ def generateBranchObjects(config, name, secrets=None):
                                    localesURL=config.get('localesURL', None)
                                   ))
 
-    weekly_scheduler = Nightly(
-            name='weekly-%s' % name,
-            branch=config['repo_path'],
-            dayOfWeek=5, # Saturday
-            hour=[3], minute=[02],
-            builderNames=coverageBuilders + weeklyBuilders,
-            )
-    branchObjects['schedulers'].append(weekly_scheduler)
+    if coverageBuilders or weeklyBuilders:
+        weekly_scheduler = Nightly(
+                name='weekly-%s' % scheduler_name_prefix,
+                branch=config['repo_path'],
+                dayOfWeek=5, # Saturday
+                hour=[3], minute=[02],
+                builderNames=coverageBuilders + weeklyBuilders,
+                )
+        branchObjects['schedulers'].append(weekly_scheduler)
 
     # We iterate throught the platforms a second time, so we need
     # to ensure that disabled platforms aren't configured the second time
@@ -926,10 +932,10 @@ def generateBranchObjects(config, name, secrets=None):
         # on the needed builders
         stage_platform = pf.get('stage_platform', platform)
 
-        uploadPackages = True
+        uploadPackages = pf.get('uploadPackages', True)
         uploadSymbols = False
         packageTests = False
-        talosMasters = pf['talos_masters']
+        talosMasters = pf.get('talos_masters', [])
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         # Generate the PGO branch even if it isn't on for dep builds
         # because we will still use it for nightlies... maybe
@@ -947,8 +953,6 @@ def generateBranchObjects(config, name, secrets=None):
             # Platform already has the -debug suffix
             unittestBranch = "%s-%s-unittest" % (name, platform)
             tinderboxBuildsDir = "%s-%s" % (name, platform)
-        elif 'b2g' in platform:
-            uploadPackages = pf.get('uploadPackages', False)
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
@@ -2248,7 +2252,7 @@ def generateCCBranchObjects(config, name, secrets=None):
         uploadPackages = True
         uploadSymbols = False
         packageTests = False
-        talosMasters = pf['talos_masters']
+        talosMasters = pf.get('talos_masters', [])
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
         # Generate the PGO branch even if it isn't on for dep builds
         # because we will still use it for nightlies... maybe

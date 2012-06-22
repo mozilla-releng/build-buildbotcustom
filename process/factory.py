@@ -894,7 +894,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         else:
                 self.platform_variation = []
 
-        assert self.platform in getSupportedPlatforms()
+        assert self.platform in getSupportedPlatforms(), "%s not in %s" % (self.platform, getSupportedPlatforms())
 
         if self.graphServer is not None:
             self.tbPrint = False
