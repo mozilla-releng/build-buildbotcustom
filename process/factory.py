@@ -7094,42 +7094,10 @@ class RemoteUnittestFactory(MozillaTestFactory):
              property='sut_ip'
         ))
         MozillaTestFactory.addInitialSteps(self)
-        self.addStep(RetryingShellCommand(
-         name='get_device_manager_py',
-         description="Download devicemanager.py",
-         command=['wget', '--no-check-certificate', '-O', 'devicemanager.py',
-                  'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
-         workdir='build',
-         haltOnFailure=True,
-        ))
-        self.addStep(RetryingShellCommand(
-         name='get_device_manager_SUT_py',
-         description="Download devicemanagerSUT.py",
-         command=['wget', '--no-check-certificate', '-O', 'devicemanagerSUT.py',
-                  'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
-         workdir='build',
-         haltOnFailure=True,
-        ))
-        self.addStep(RetryingShellCommand(
-         name='get_sut_lib_py',
-         description="Download sut_lib.py",
-         command=['wget', '--no-check-certificate', '-O', 'sut_lib.py',
-                  'http://hg.mozilla.org/build/tools/raw-file/5e8bc65670cc/sut_tools/sut_lib.py'],
-         workdir='build',
-         haltOnFailure=True,
-        ))
-        self.addStep(RetryingShellCommand(
-         name='get_updateSUT_py',
-         description="Download updateSUT.py",
-         command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
-                  'http://hg.mozilla.org/build/tools/raw-file/16fc4f354b44/sut_tools/updateSUT.py'],
-         workdir='build',
-         haltOnFailure=True,
-        ))
         self.addStep(ShellCommand(
-         name="update_sut_agent",
-         description="Running updateSUT.py",
-         command=['python', 'updateSUT.py', WithProperties("%(sut_ip)s")],
+         name="verify_tegra_state",
+         description="Running verify.py",
+         command=['python', '/builds/sut_tools/verify.py'],
          workdir='build',
          haltOnFailure=True,
         ))
@@ -7150,13 +7118,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/hostutils',
             name='unpack_hostutils',
         ))
-        self.addStep(ShellCommand(
-            name='cleanup device',
-            workdir='.',
-            description="Cleanup Device",
-            command=['python', '/builds/sut_tools/cleanup.py'],
-            haltOnFailure=True)
-        )
         self.addStep(ShellCommand(
             name='install app on device',
             workdir='.',
@@ -7518,13 +7479,12 @@ class TalosFactory(RequestSortingBuildFactory):
         )
         if self.remoteTests:
             self.addStep(ShellCommand(
-                name='cleanup device',
-                workdir=self.workdirBase,
-                description="Cleanup Device",
-                command=['python', '/builds/sut_tools/cleanup.py'],
-                env=self.env,
-                haltOnFailure=True)
-            )
+             name="verify_tegra_state",
+             description="Running verify.py",
+             command=['python', '/builds/sut_tools/verify.py'],
+             workdir='build',
+             haltOnFailure=True,
+            ))
         if not self.remoteTests:
             self.addStep(DownloadFile(
              url=WithProperties("%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase),
@@ -7774,43 +7734,6 @@ class TalosFactory(RequestSortingBuildFactory):
              command=['bash', '-c', 'echo `pwd`'],
              property='toolsdir',
              workdir=self.workdirBase,
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_device_manager_py',
-             description="Download devicemanager.py",
-             command=['wget', '--no-check-certificate', '-O', 'devicemanager.py',
-                      'http://hg.mozilla.org/build/talos/raw-file/2f75acc0f8f2/talos/devicemanager.py'],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_device_manager_SUT_py',
-             description="Download devicemanagerSUT.py",
-             command=['wget', '--no-check-certificate', '-O', 'devicemanagerSUT.py',
-                      'http://hg.mozilla.org/build/talos/raw-file/6e5f5cadd9e9/talos/devicemanagerSUT.py'],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_sut_lib_py',
-             description="Download sut_lib.py",
-             command=['wget', '--no-check-certificate', '-O', 'sut_lib.py',
-                      'http://hg.mozilla.org/build/tools/raw-file/5e8bc65670cc/sut_tools/sut_lib.py'],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
-            ))
-            self.addStep(RetryingShellCommand(
-             name='get_updateSUT_py',
-             command=['wget', '--no-check-certificate', '-O', 'updateSUT.py',
-                      'http://hg.mozilla.org/build/tools/raw-file/16fc4f354b44/sut_tools/updateSUT.py'],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
-            ))
-            self.addStep(ShellCommand(
-             name="update_sut_agent",
-             command=['python', 'updateSUT.py', WithProperties("%(sut_ip)s")],
-             workdir=self.workdirBase,
-             haltOnFailure=True,
             ))
             if self.talos_from_source_code:
                 self.addStep(RetryingShellCommand(
