@@ -7,7 +7,7 @@ def getCodesighsPlatforms():
 def getSupportedPlatforms():
     return ('linux', 'linuxqt','linux64',
             'win32', 'macosx', 'macosx64',
-            'win64', 'android', 'b2g',
+            'win64', 'android',
             'gb_armv7a_gecko',)
 
 def getPlatformFtpDir(platform):

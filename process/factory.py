@@ -1236,18 +1236,13 @@ class MercurialBuildFactory(MozillaBuildFactory):
         command = ['make', '-f', 'client.mk', bldtgt,
                    WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
 
-        # XXX Hack! 
-        bldenv=self.env.copy()
-        if 'b2g' in self.platform:
-            bldenv['gonk'] = WithProperties('%(basedir)s/build/gonk-toolchain')
-
         if self.profiledBuild:
             command.append('MOZ_PGO=1')
         self.addStep(MockCommand(
          name='compile',
          command=command,
          description=['compile'],
-         env=bldenv,
+         env=self.env,
          haltOnFailure=True,
          timeout=10800,
          # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose

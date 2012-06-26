@@ -1041,7 +1041,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'stageProduct': pf['stage_product'],
                 'graphServer': config['graph_server'],
                 'graphSelector': config['graph_selector'],
-                'graphBranch': config.get('graph_branch', config['tinderbox_tree']),
+                'graphBranch': config.get('graph_branch', config.get('tinderbox_tree', None)),
                 'doBuildAnalysis': doBuildAnalysis,
                 'baseName': pf['base_name'],
                 'leakTest': leakTest,
