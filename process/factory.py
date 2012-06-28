@@ -6761,7 +6761,7 @@ class MozillaTestFactory(MozillaBuildFactory):
                 flunkOnFailure=False,
                 warnOnFailure=False,
                 haltOnFailure=False,
-                workdir='/Users/cltbld',
+                workdir='~',
                 command=['bash', '-c', 'rm -rf Library/Saved\ Application\ State/*.savedState']
             ))
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
@@ -6784,7 +6784,7 @@ def resolution_step():
         flunkOnFailure=False,
         warnOnFailure=False,
         haltOnFailure=False,
-        workdir='/Users/cltbld',
+        workdir='~',
         command=['bash', '-c', 'screenresolution get && screenresolution list && system_profiler SPDisplaysDataType']
     )
 
@@ -7819,7 +7819,7 @@ class TalosFactory(RequestSortingBuildFactory):
                 flunkOnFailure=False,
                 warnOnFailure=False,
                 haltOnFailure=False,
-                workdir='/Users/cltbld',
+                workdir='~',
                 command=['bash', '-c', 'rm -rf Library/Saved\ Application\ State/*.savedState']
             ))
         def do_disconnect(cmd):
