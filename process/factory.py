@@ -1206,6 +1206,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['cat', '.mozconfig'],
         ))
         if self.tooltool_manifest_src:
+            self.addStep(ShellCommand(
+                name='cat_tooltool_manifest',
+                command=['cat', self.tooltool_manifest_src],
+            ))
             self.addStep(RetryingShellCommand(
                 name='fetch_tooltool_resources',
                 command=[self.tooltool_script, '--url', self.tooltool_url_list[0],
@@ -1213,7 +1217,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(ShellCommand(
                 name='tooltool_bootstrap',
                 command=['bash', '-c',
-                         'if [ -e "%s" ]; then bash "%s"; fi' % \
+                         'if [ -e "%s" ]; then bash -xe "%s"; fi' % \
                          (self.tooltool_bootstrap, self.tooltool_bootstrap)]
             ))
 
