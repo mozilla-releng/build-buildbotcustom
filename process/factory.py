@@ -321,11 +321,14 @@ def getPlatformMinidumpPath(platform):
     platform_minidump_path = {
         'linux': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linuxqt': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+        'linux32_gecko': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
+        'win32_gecko': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
+        'macosx64_gecko': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Android uses OSX because the Foopies are OSX.
         'linux-android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
@@ -778,6 +781,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  tooltool_script='/tools/tooltool.py',
                  enablePackaging=True,
                  runAliveTests=True,
+                 enableInstaller=False,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -830,6 +834,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
         self.enablePackaging = enablePackaging
+        self.enableInstaller = enableInstaller
         self.packageTests = packageTests
         self.enable_ccache = enable_ccache
         if self.enable_ccache:
@@ -1206,6 +1211,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
          command=['cat', '.mozconfig'],
         ))
         if self.tooltool_manifest_src:
+            self.addStep(ShellCommand(
+                name='cat_tooltool_manifest',
+                command=['cat', self.tooltool_manifest_src],
+            ))
             self.addStep(RetryingShellCommand(
                 name='fetch_tooltool_resources',
                 command=[self.tooltool_script, '--url', self.tooltool_url_list[0],
@@ -1213,7 +1222,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(ShellCommand(
                 name='tooltool_bootstrap',
                 command=['bash', '-c',
-                         'if [ -e "%s" ]; then bash "%s"; fi' % \
+                         'if [ -e "%s" ]; then bash -xe "%s"; fi' % \
                          (self.tooltool_bootstrap, self.tooltool_bootstrap)]
             ))
 
@@ -1558,7 +1567,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              warnOnFailure=False,
             ))
         pkg_targets = ['package']
-        if 'win' in self.platform:
+        if self.enableInstaller:
             pkg_targets.append('installer')
         for t in pkg_targets:
             self.addStep(ShellCommand(
@@ -1649,9 +1658,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
-        if self.platform.startswith("win") and \
-           'mobile' not in self.complete_platform and \
-           self.productName != 'xulrunner':
+        if self.enableInstaller and self.productName != 'xulrunner':
             self.addStep(ShellCommand(
                 name='make_installer',
                 command=['make', 'installer'] + pkgArgs,
