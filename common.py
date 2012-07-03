@@ -8,7 +8,8 @@ def getSupportedPlatforms():
     return ('linux', 'linuxqt','linux64',
             'win32', 'macosx', 'macosx64',
             'win64', 'android',
-            'gb_armv7a_gecko',)
+            'gb_armv7a_gecko', 'linux32_gecko',
+            'macosx64_gecko', 'win32_gecko')
 
 def getPlatformFtpDir(platform):
     platform_ftp_map = {
