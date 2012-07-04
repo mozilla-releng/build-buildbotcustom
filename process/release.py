@@ -659,6 +659,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                 createPartial=releaseConfig.get('enablePartialMarsAtBuildTime', True),
                 mozillaDir=mozillaDir,
+                enableInstaller=pf.get('enable_installer', False),
             )
 
             builders.append({
