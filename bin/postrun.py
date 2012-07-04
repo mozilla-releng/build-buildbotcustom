@@ -260,8 +260,6 @@ class PostRunner(object):
     def processBuild(self, options, build_path, request_ids):
         build = self.getBuild(build_path)
         info = self.getBuildInfo(build)
-        if info['product'] == "fuzzing":
-            return
         if not options.log_url:
             log.info("uploading log")
             log_url = self.uploadLog(build)
