@@ -47,10 +47,9 @@ reload(mozilla_buildtools.queuedir)
 from buildbotcustom.common import reallyShort
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
-  NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
-  UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
-  CCNightlyRepackFactory, CCUnittestBuildFactory, TryBuildFactory, \
-  TryUnittestBuildFactory, ScriptFactory, rc_eval_func
+  NightlyRepackFactory, UnittestPackagedBuildFactory, TalosFactory, \
+  CCNightlyBuildFactory, CCNightlyRepackFactory, CCUnittestBuildFactory, \
+  TryBuildFactory, ScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import RemoteUnittestFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly
@@ -622,14 +621,6 @@ def generateBranchObjects(config, name, secrets=None):
             if config['enable_valgrind'] and \
                platform in config['valgrind_platforms']:
                 nightlyBuilders.append('%s valgrind' % base_name)
-        # Regular unittest builds
-        if pf.get('enable_unittests'):
-            unittestBuilders.append('%s unit test' % base_name)
-            test_builders = []
-            for suites_name, suites in config['unittest_suites']:
-                test_builders.extend(generateTestBuilderNames('%s test' % base_name, suites_name, suites))
-                unittestPrettyNames[platform] = '%s test' % base_name
-            triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         # Optimized unittest builds
         if pf.get('enable_opt_unittests'):
             test_builders = []
@@ -637,8 +628,6 @@ def generateBranchObjects(config, name, secrets=None):
                 unittestPrettyNames[platform] = '%s opt test' % base_name
                 test_builders.extend(generateTestBuilderNames('%s opt test' % base_name, suites_name, suites))
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
-        if config['enable_codecoverage'] and platform in ('linux',):
-            coverageBuilders.append('%s code coverage' % base_name)
         if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
@@ -1561,62 +1550,6 @@ def generateBranchObjects(config, name, secrets=None):
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
-        if pf.get('enable_unittests'):
-            runA11y = True
-            if platform.startswith('macosx'):
-                runA11y = config['enable_mac_a11y']
-
-            extra_args = {}
-            if config.get('enable_try'):
-                factory_class = TryUnittestBuildFactory
-                extra_args['branchName'] = name
-            else:
-                factory_class = UnittestBuildFactory
-
-            if config.get('mozilla_dir'):
-                extra_args['mozillaDir'] = config['mozilla_dir']
-
-            unittest_factory = factory_class(
-                env=pf.get('unittest-env', {}),
-                platform=platform,
-                productName=pf['product_name'],
-                config_repo_path=config['config_repo_path'],
-                config_dir=config['config_subdir'],
-                objdir=config['objdir_unittests'],
-                hgHost=config['hghost'],
-                repoPath=config['repo_path'],
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                buildSpace=config['unittest_build_space'],
-                clobberURL=config['base_clobber_url'],
-                clobberTime=clobberTime,
-                buildsBeforeReboot=pf['builds_before_reboot'],
-                run_a11y=runA11y,
-                mochitest_leak_threshold=mochitestLeakThreshold,
-                crashtest_leak_threshold=crashtestLeakThreshold,
-                stageServer=config['stage_server'],
-                stageUsername=config['stage_username'],
-                stageSshKey=config['stage_ssh_key'],
-                unittestMasters=config['unittest_masters'],
-                unittestBranch="%s-%s-unittest" % (name, platform),
-                uploadPackages=True,
-                **extra_args
-            )
-            unittest_builder = {
-                'name': '%s unit test' % pf['base_name'],
-                'slavenames': pf['slaves'],
-                'builddir': '%s-%s-unittest' % (name, platform),
-                'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform), pf['stage_product']),
-                'factory': unittest_factory,
-                'category': name,
-                'nextSlave': _nextFastSlave,
-                'properties': {'branch': name,
-                               'platform': platform,
-                               'stage_platform': stage_platform,
-                               'product': pf['stage_product'],
-                               'slavebuilddir': reallyShort('%s-%s-unittest' % (name, platform), pf['stage_product'])},
-            }
-            branchObjects['builders'].append(unittest_builder)
-
         for suites_name, suites in config['unittest_suites']:
             runA11y = True
             if platform.startswith('macosx'):
@@ -1627,14 +1560,6 @@ def generateBranchObjects(config, name, secrets=None):
             if not runA11y and 'mochitest-a11y' in suites:
                 suites = suites[:]
                 suites.remove('mochitest-a11y')
-
-            if pf.get('enable_unittests'):
-                branchObjects['builders'].extend(generateTestBuilder(
-                    config, name, platform, "%s test" % pf['base_name'],
-                    "%s-%s-unittest" % (name, platform),
-                    suites_name, suites, mochitestLeakThreshold,
-                    crashtestLeakThreshold, stagePlatform=stage_platform,
-                    stageProduct=pf['stage_product']))
 
             # Remove mochitest-a11y from other types of builds, since they're not
             # built with a11y enabled
@@ -1650,40 +1575,6 @@ def generateBranchObjects(config, name, secrets=None):
                     suites_name, suites, mochitestLeakThreshold,
                     crashtestLeakThreshold, stagePlatform=stage_platform,
                     stageProduct=pf['stage_product']))
-
-        if config['enable_codecoverage']:
-            # We only do code coverage builds on linux right now
-            if platform == 'linux':
-                codecoverage_factory = CodeCoverageFactory(
-                    platform=platform,
-                    productName=pf['product_name'],
-                    config_repo_path=config['config_repo_path'],
-                    config_dir=config['config_subdir'],
-                    objdir=config['objdir_unittests'],
-                    hgHost=config['hghost'],
-                    repoPath=config['repo_path'],
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    buildSpace=7,
-                    clobberURL=config['base_clobber_url'],
-                    clobberTime=clobberTime,
-                    buildsBeforeReboot=pf['builds_before_reboot'],
-                    mochitest_leak_threshold=mochitestLeakThreshold,
-                    crashtest_leak_threshold=crashtestLeakThreshold,
-                    stageServer=config['stage_server'],
-                    stageUsername=config['stage_username'],
-                    stageSshKey=config['stage_ssh_key'],
-                )
-                codecoverage_builder = {
-                    'name': '%s code coverage' % pf['base_name'],
-                    'slavenames': pf['slaves'],
-                    'builddir': '%s-%s-codecoverage' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform), pf['stage_product']),
-                    'factory': codecoverage_factory,
-                    'category': name,
-                    'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name, 'product': pf['stage_product'], 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-codecoverage' % (name, platform), pf['stage_product'])},
-                }
-                branchObjects['builders'].append(codecoverage_builder)
 
         if config.get('enable_blocklist_update', False):
             if platform == 'linux':
