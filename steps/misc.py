@@ -97,7 +97,7 @@ class InterruptableDeferred(Deferred):
 
 
 class MockInit(ShellCommand):
-
+    haltOnFailure=True
     name = "mock-init"
     def __init__(self, target, **kwargs):
         kwargs['command'] = "mock_mozilla -r %s --init" % target
@@ -108,7 +108,7 @@ class MockInit(ShellCommand):
         self.addFactoryArguments(target=target)
 
 class MockInstall(ShellCommand):
-
+    haltOnFailure=True
     name = "mock-install"
     def __init__(self, target, packages, **kwargs):
         kwargs['command'] = "mock_mozilla -r %s --install %s" % (target, ' '.join(packages))

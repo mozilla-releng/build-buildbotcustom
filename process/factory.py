@@ -953,6 +953,18 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addStep(MockInit(
                 target=self.mock_target,
             ))
+            # XXX: Hardcoding these directories here sucks.
+            self.addStep(ShellCommand(
+                command=['mock_mozilla', '-r', self.mock_target, '--copyin', '/home/cltbld/.ssh', '/home/mock_mozilla/.ssh'],
+                haltOnFailure=True
+            ))
+            self.addStep(MockCommand(
+                command='chown -R mock_mozilla /home/mock_mozilla/.ssh',
+                target=self.mock_target,
+                mock=True,
+                workdir='/',
+                mock_args=[],
+            ))
             # This is needed for the builds to start
             self.addStep(MockCommand(
                 command=WithProperties("mkdir -p %(basedir)s" + "/%s" % self.baseWorkDir),
