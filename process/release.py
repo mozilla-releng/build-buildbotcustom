@@ -987,8 +987,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'factory': checksums_factory,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': builderPrefix(
-                    '%s_checksums' % releaseConfig['productName']),
+                'slavebuilddir': reallyShort(builderPrefix(
+                    '%s_checksums' % releaseConfig['productName'])),
                 'script_repo_revision': releaseTag,
                 'release_config': releaseConfigFile,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
@@ -1020,7 +1020,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'factory': xr_checksums_factory,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': builderPrefix('xulrunner_checksums'),
+                    'slavebuilddir': reallyShort(
+                        builderPrefix('xulrunner_checksums')),
                     'script_repo_revision': releaseTag,
                     'release_config': releaseConfigFile,
                     'platform': None,
