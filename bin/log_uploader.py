@@ -5,6 +5,7 @@ Uploads logs from build to the given host.
 """
 import os, cPickle, gzip, subprocess
 from datetime import datetime
+import time
 
 from buildbot import util
 from buildbot.status.builder import Results
@@ -74,9 +75,20 @@ def getAuthor(build):
 
 def getBuildId(build):
     try:
-        return build.getProperty('buildid')
+        buildid = build.getProperty('buildid')
     except:
         return None
+
+    # Validate as a timestamp
+    try:
+        time.strptime(buildid, "%Y%m%d%H%M%S")
+    except ValueError:
+        # Use "now"
+        now = time.strftime("%Y%m%d%H%M%S")
+        print "%s isn't a valid build id, using %s instead" % (buildid, now)
+        buildid = now
+
+    return buildid
 
 def isNightly(build):
     try:
