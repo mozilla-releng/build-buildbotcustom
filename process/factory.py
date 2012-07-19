@@ -50,7 +50,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-  upload_errors, talos_hgweb_errors
+  upload_errors, talos_hgweb_errors, tegra_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -6843,6 +6843,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          timeout=2400,
                          app=self.remoteProcessName,
                          env=self.env,
+                         log_eval_func=lambda c,s: regex_log_evaluator(c, s,
+                          global_errors + tegra_errors),
                         ))
                 else:
                     totalChunks = suite.get('totalChunks', None)
@@ -6857,6 +6859,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                      env=self.env,
                      totalChunks=totalChunks,
                      thisChunk=thisChunk,
+                     log_eval_func=lambda c,s: regex_log_evaluator(c, s,
+                      global_errors + tegra_errors),
                     ))
             elif name.startswith('reftest') or name == 'crashtest':
                 totalChunks = suite.get('totalChunks', None)
@@ -6878,6 +6882,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  app=self.remoteProcessName,
                  env=self.env,
                  cmdOptions=self.remoteExtras.get('cmdOptions'),
+                 log_eval_func=lambda c,s: regex_log_evaluator(c, s,
+                     global_errors + tegra_errors),
                 ))
             elif name == 'jsreftest':
                 totalChunks = suite.get('totalChunks', None)
@@ -6898,6 +6904,8 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  app=self.remoteProcessName,
                  env=self.env,
                  cmdOptions=self.remoteExtras.get('cmdOptions'),
+                 log_eval_func=lambda c,s: regex_log_evaluator(c, s,
+                     global_errors + tegra_errors),
                 ))
 
     def addTearDownSteps(self):
