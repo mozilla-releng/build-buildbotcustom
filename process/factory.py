@@ -1224,18 +1224,15 @@ class MercurialBuildFactory(MozillaBuildFactory):
         ))
         if self.tooltool_manifest_src:
             self.addStep(ShellCommand(
-                name='cat_tooltool_manifest',
-                command=['cat', self.tooltool_manifest_src],
-            ))
-            self.addStep(RetryingShellCommand(
-                name='fetch_tooltool_resources',
-                command=[self.tooltool_script, '--url', self.tooltool_url_list[0],
-                         '--overwrite', '-m', self.tooltool_manifest_src, 'fetch']))
-            self.addStep(ShellCommand(
-                name='tooltool_bootstrap',
-                command=['bash', '-c',
-                         'if [ -e "%s" ]; then bash -xe "%s"; fi' % \
-                         (self.tooltool_bootstrap, self.tooltool_bootstrap)]
+                name='run_tooltool',
+                command=[
+                    WithProperties('%(toolsdir)s/scripts/tooltool/fetch_and_unpack.sh'),
+                    self.tooltool_manifest_src,
+                    self.tooltool_url_list[0],
+                    self.tooltool_script,
+                    self.tooltool_bootstrap
+                ],
+                haltOnFailure=True,
             ))
 
 
