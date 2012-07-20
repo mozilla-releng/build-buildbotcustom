@@ -13,7 +13,7 @@ import buildbotcustom.try_parser
 reload(buildbotcustom.try_parser)
 
 from buildbotcustom.try_parser import TryParser
-from buildbotcustom.common import genBuildID, genBuildUID
+from buildbotcustom.common import genBuildID, genBuildUID, incrementBuildID
 
 from buildbot.process.properties import Properties
 from buildbot.util import json
@@ -83,13 +83,14 @@ def buildIDSchedFunc(sched, t, ssid):
     state = sched.get_state(t)
 
     # Get the last buildid we scheduled from the database
-    lastid = state.get('last_buildid', 0)
+    lastid = state.get('last_buildid', '19700101000000')
 
-    newid = genBuildID()
+    incrementedid = incrementBuildID(lastid)
+    nowid = genBuildID()
 
-    # Our new buildid will be the highest of the last buildid+1 or the buildid
-    # based on the current date
-    newid = str(max(int(newid), int(lastid)+1))
+    # Our new buildid will be the highest of the last buildid incremented or
+    # the buildid based on the current date
+    newid = str(max(int(nowid), int(incrementedid)))
 
     # Save it in the scheduler's state so we don't generate the same one again.
     state['last_buildid'] = newid

@@ -250,15 +250,16 @@ class BaseHgPoller(BasePoller):
         return str(url)
 
     def dataFailed(self, res):
-        if hasattr(res.value, 'status') and res.value.status == '500' and \
-                'unknown revision' in res.value.response:
-            # Indicates that the revision can't be found.  The repo has most
-            # likely been reset.  Forget about our lastChangeset, and set
-            # emptyRepo to True so we can trigger builds for new changes there
-            if self.verbose:
-                log.msg("%s has been reset" % self.baseURL)
-            self.lastChangeset = None
-            self.emptyRepo = True
+        # XXX: disabled for bug 774862
+        #if hasattr(res.value, 'status') and res.value.status == '500' and \
+                #'unknown revision' in res.value.response:
+            ## Indicates that the revision can't be found.  The repo has most
+            ## likely been reset.  Forget about our lastChangeset, and set
+            ## emptyRepo to True so we can trigger builds for new changes there
+            #if self.verbose:
+                #log.msg("%s has been reset" % self.baseURL)
+            #self.lastChangeset = None
+            #self.emptyRepo = True
         return self.super_class.dataFailed(self, res)
 
     def processData(self, query):

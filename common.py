@@ -33,6 +33,11 @@ def genBuildUID():
     """Return a unique build uid"""
     return uuid.uuid4().hex
 
+def incrementBuildID(buildID):
+    """Add 1 second to a buildID, handling rollovers to next minute/hour/etc"""
+    epoch = time.mktime(time.strptime(buildID, "%Y%m%d%H%M%S"))
+    return genBuildID(epoch+1)
+
 def reallyShort(name, product=None):
     prefix = ''
     if product != None and 'thunderbird' in product:

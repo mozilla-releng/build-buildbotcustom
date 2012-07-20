@@ -37,22 +37,30 @@ class TestPropFuncs(unittest.TestCase):
     def test_buildIDSchedFunc(self):
         import time
         with mock.patch.object(time, 'time') as time_method:
-            time_method.return_value = 10
+            time_method.return_value = 58
 
             self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(10)))
+            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(58)))
 
             # Running this again at the same time should increment our buildid by 1
             self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(11)))
+            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(59)))
+
+            # Running this again at the same time should increment our buildid by 1
+            # and cross the minute boundary properly
+            self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
+            state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
+            self.assertEquals(state['last_buildid'][-3:], '100')
+            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(60)))
 
             # If time happens to go backwards, our buildid shouldn't
             time_method.return_value = 8
             self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(12)))
+            self.assertEquals(state['last_buildid'][-3:], '101')
+            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(61)))
 
     def test_buildUIDSchedFunc(self):
         import uuid
