@@ -1792,7 +1792,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
          workdir=objdir,
          sb=self.use_scratchbox,
          haltOnFailure=True,
-         timeout=60*60,
+         timeout=60*60*3,
         ))
 
     def addUploadSymbolsStep(self):
