@@ -2908,7 +2908,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if self.enableSigning and self.signingServers:
             partial_mar_path = '%s/dist/%s/%s' % \
                 (self.absMozillaObjDir, update_dir, partial_mar_name)
-            cmd = '%s -f gpg -f mar "%s"' % (self.signing_command,
+            cmd = '%s -f mar -f gpg "%s"' % (self.signing_command,
                                              partial_mar_path)
             self.addStep(ShellCommand(
                 name='sign_partial_mar',
