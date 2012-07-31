@@ -3722,7 +3722,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         if l10nNightlyUpdate and self.nightly:
             env.update({'MOZ_MAKE_COMPLETE_MAR': '1', 
                         'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL})
-            self.extraConfigureArgs += ['--enable-update-packaging']
+            if not '--enable-update-packaging' in self.extraConfigureArgs:
+                self.extraConfigureArgs += ['--enable-update-packaging']
 
 
         BaseRepackFactory.__init__(self, env=env, **kwargs)
