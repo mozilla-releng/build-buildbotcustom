@@ -3597,6 +3597,51 @@ def generateJetpackObjects(config, SLAVES):
             'schedulers': [scheduler],
             }
 
+def generateDXRObjects(config, SLAVES):
+    builders = []
+    branch = os.path.basename(config['repo_path'])
+
+    platform = config['platform']
+    slaves = SLAVES[platform]
+    script = 'scripts/dxr/dxr.sh'
+
+    f = ScriptFactory(
+            config['scripts_repo'],
+            script,
+            log_eval_func=rc_eval_func({1: WARNINGS}),
+            script_timeout=3600,
+            )
+
+    builder = {'name': 'dxr-%s' % branch,
+                'env': config['env'],
+                'builddir': 'dxr-%s' % branch,
+                'slavenames': slaves,
+                'factory': f,
+                'category': 'idle',
+                'properties': {
+                    'branch': branch,
+                    'platform': platform,
+                    'product': 'dxr',
+                    'upload_host': config['upload_host'],
+                    'upload_user': config['upload_user'],
+                    'upload_sshkey': config['upload_sshkey'],
+                },
+              }
+    builders.append(builder)
+
+    # Set up scheduler
+    scheduler = Nightly(
+            name="dxr-%s" % branch,
+            branch=config['repo_path'],
+            hour=[3], minute=[05],
+            builderNames=[b['name'] for b in builders],
+            )
+
+    return {
+            'builders': builders,
+            'schedulers': [scheduler],
+            }
+
 def generateProjectObjects(project, config, SLAVES):
     builders = []
     schedulers = []
@@ -3628,6 +3673,11 @@ def generateProjectObjects(project, config, SLAVES):
     elif project.startswith('spidermonkey'):
         spiderMonkeyObjects = generateSpiderMonkeyObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
+
+    # DXR
+    elif project.startswith('dxr'):
+        dxrObjects = generateDXRObjects(config, SLAVES)
+        buildObjects = mergeBuildObjects(buildObjects, dxrObjects)
 
     return buildObjects
 
