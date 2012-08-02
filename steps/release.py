@@ -6,19 +6,6 @@ from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, worst_status
 from buildbotcustom.steps.base import ShellCommand
 from buildbotcustom.steps.misc import TinderboxShellCommand
 
-class UpdateVerify(ShellCommand):
-    def __init__(self, **kwargs):
-        self.super_class = ShellCommand
-        self.super_class.__init__(self, **kwargs)
-
-    def evaluateCommand(self, cmd):
-        worst = self.super_class.evaluateCommand(self, cmd)
-        for line in cmd.logs['stdio'].getText().split("\n"):
-            if line.startswith('FAIL'):
-                worst = worst_status(worst, FAILURE)
-        return worst
-
-
 class SnippetComparison(ShellCommand):
     # Alphas/Betas are WARN'ed about in a releasetest vs release comparison
     # because they were shipped on the 'beta' channel, which means patcher

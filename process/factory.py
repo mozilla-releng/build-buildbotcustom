@@ -22,7 +22,6 @@ import buildbotcustom.steps.misc
 import buildbotcustom.steps.release
 import buildbotcustom.steps.source
 import buildbotcustom.steps.test
-import buildbotcustom.steps.transfer
 import buildbotcustom.steps.updates
 import buildbotcustom.steps.talos
 import buildbotcustom.steps.unittest
@@ -39,7 +38,6 @@ reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.release)
 reload(buildbotcustom.steps.source)
 reload(buildbotcustom.steps.test)
-reload(buildbotcustom.steps.transfer)
 reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.talos)
 reload(buildbotcustom.steps.unittest)
@@ -54,11 +52,11 @@ from buildbotcustom.status.errors import purge_error, global_errors, \
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
   Trigger, RetryingShellCommand, RetryingSetProperty
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
-  GetBuildID, MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
+  MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, DisconnectStep, OutputStep, MockCommand, \
   RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps, \
   RetryingMockProperty, MockInit, MockInstall
-from buildbotcustom.steps.release import UpdateVerify, SnippetComparison
+from buildbotcustom.steps.release import SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, \
   CompareLeakLogs, Codesighs, GraphServerPost
@@ -4556,21 +4554,6 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                                             self.buildNumber)
 
 
-class UpdateVerifyFactory(ReleaseFactory):
-    def __init__(self, verifyConfig, buildSpace=.3, useOldUpdater=False,
-                 **kwargs):
-        ReleaseFactory.__init__(self, repoPath='nothing',
-                                buildSpace=buildSpace, **kwargs)
-        command=['bash', 'verify.sh', '-c', verifyConfig]
-        if useOldUpdater:
-            command.append('--old-updater')
-        self.addStep(UpdateVerify(
-         command=command,
-         workdir='tools/release/updates',
-         description=['./verify.sh', verifyConfig]
-        ))
-
-
 class ReleaseFinalVerification(ReleaseFactory):
     def __init__(self, verifyConfigs, platforms=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
@@ -6193,66 +6176,6 @@ class RuntimeTalosFactory(TalosFactory):
              doStepIf=lambda step, n=n: self._propertyIsSet(step, 'talosAddon%d' % n)
             ))
             n += 1
-
-class TryTalosFactory(TalosFactory):
-    def addDownloadBuildStep(self):
-        def get_url(build):
-            url = build.source.changes[-1].files[0]
-            return url
-        self.addStep(DownloadFile(
-         url_fn=get_url,
-         url_property="fileURL",
-         filename_property="filename",
-         workdir=self.workdirBase,
-         name="Download build",
-         ignore_certs=True,
-        ))
-
-        def make_tinderbox_header(build):
-            identifier = build.getProperty("filename").rsplit('-', 1)[0]
-            # Grab the submitter out of the dir name. CVS and Mercurial builds
-            # are a little different, so we need to try fairly hard to find
-            # the e-mail address.
-            dir = os.path.basename(os.path.dirname(build.getProperty("fileURL")))
-            who = ''
-            for section in dir.split('-'):
-                if '@' in section:
-                    who = section
-                    break
-            msg =  'TinderboxPrint: %s\n' % who
-            msg += 'TinderboxPrint: %s\n' % identifier
-            return msg
-        self.addStep(OutputStep(data=make_tinderbox_header, log='header', name='echo_id'))
-
-    def addDownloadSymbolsStep(self):
-        def get_symbols_url(build):
-            suffixes = ('.tar.bz2', '.dmg', '.zip')
-            buildURL = build.getProperty('fileURL')
-
-            for suffix in suffixes:
-                if buildURL.endswith(suffix):
-                    return buildURL[:-len(suffix)] + '.crashreporter-symbols.zip'
-
-        self.addStep(DownloadFile(
-         url_fn=get_symbols_url,
-         filename_property="symbolsFile",
-         workdir=self.workdirBase,
-         name="Download symbols",
-         ignore_certs=True,
-         haltOnFailure=False,
-         flunkOnFailure=False,
-        ))
-        self.addStep(ShellCommand(
-         command=['mkdir', 'symbols'],
-         workdir=self.workdirBase,
-        ))
-        self.addStep(UnpackFile(
-         filename=WithProperties("../%(symbolsFile)s"),
-         workdir="%s/symbols" % self.workdirBase,
-         name="Unpack symbols",
-         haltOnFailure=False,
-         flunkOnFailure=False,
-        ))
 
 
 class PartnerRepackFactory(ReleaseFactory):
