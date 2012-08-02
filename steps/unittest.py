@@ -750,6 +750,7 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
             bin_extension = ".exe"
         script = " && ".join(["if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi",
                   "cp bin/xpcshell" + bin_extension + " %(exedir)s",
+                  "cp bin/ssltunnel" + bin_extension + " %(exedir)s",
                   "cp -R bin/components/* %(exedir)s/components/",
                   "cp -R bin/plugins/* %(exedir)s/plugins/",
                   "python -u xpcshell/runxpcshelltests.py"])

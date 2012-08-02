@@ -3722,7 +3722,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         if l10nNightlyUpdate and self.nightly:
             env.update({'MOZ_MAKE_COMPLETE_MAR': '1', 
                         'DOWNLOAD_BASE_URL': '%s/nightly' % self.downloadBaseURL})
-            self.extraConfigureArgs += ['--enable-update-packaging']
+            if not '--enable-update-packaging' in self.extraConfigureArgs:
+                self.extraConfigureArgs += ['--enable-update-packaging']
 
 
         BaseRepackFactory.__init__(self, env=env, **kwargs)
@@ -6927,7 +6928,7 @@ class TalosFactory(RequestSortingBuildFactory):
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pagesets=[],
             remoteTests=False, productName="firefox", remoteExtras=None,
-            talosAddOns=[], addonTester=False, releaseTester=False,
+            talosAddOns=[], releaseTester=False,
             talosBranch=None, branch=None, talos_from_source_code=False):
 
         BuildFactory.__init__(self)
@@ -6959,7 +6960,6 @@ class TalosFactory(RequestSortingBuildFactory):
         self.talosAddOns = talosAddOns[:]
         self.exepath = None
         self.env = MozillaEnvironments[envName]
-        self.addonTester = addonTester
         self.releaseTester = releaseTester
         self.productName = productName
         self.remoteExtras = remoteExtras
@@ -6989,8 +6989,6 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addGetBuildInfoStep()
         if fetchSymbols:
             self.addDownloadSymbolsStep()
-        if self.addonTester:
-            self.addDownloadExtensionStep()
         self.addSetupSteps()
         self.addPluginInstallSteps()
         self.addPagesetInstallSteps()
@@ -7502,29 +7500,6 @@ class TalosFactory(RequestSortingBuildFactory):
          name="Unpack symbols",
         ))
 
-    def addDownloadExtensionStep(self):
-        def get_addon_url(build):
-            import urlparse
-            import urllib
-            base_url = 'https://addons.mozilla.org/'
-            addon_url = build.getProperty('addonUrl')
-            #addon_url may be encoded, also we want to ensure that http%3A// becomes http://
-            parsed_url = urlparse.urlsplit(urllib.unquote_plus(addon_url).replace('%3A', ':'))
-            if parsed_url[1]: #there is a netloc, this is already a full path to a given addon
-              return urlparse.urlunsplit(parsed_url)
-            else:
-              return urlparse.urljoin(base_url, addon_url)
-
-        self.addStep(DownloadFile(
-         url_fn=get_addon_url,
-         workdir=os.path.join(self.workdirBase, "talos"),
-         name="Download extension",
-         ignore_certs=True,
-         wget_args=['-O', TalosFactory.extName],
-         doStepIf=lambda step: self._propertyIsSet(step, 'addonUrl'),
-         haltOnFailure=True,
-        ))
-
     def addPrepareDeviceStep(self):
         self.addStep(ShellCommand(
             name='install app on device',
@@ -7550,7 +7525,6 @@ class TalosFactory(RequestSortingBuildFactory):
          addOptions=self.configOptions,
          env=self.env,
          extName=TalosFactory.extName,
-         addonTester=self.addonTester,
          useSymbols=self.fetchSymbols,
          remoteExtras=self.remoteExtras,
          remoteProcessName=self.remoteProcessName)
@@ -7628,7 +7602,7 @@ class TalosFactory(RequestSortingBuildFactory):
 
 class RuntimeTalosFactory(TalosFactory):
     def __init__(self, configOptions=None, plugins=None, pagesets=None,
-                 supportUrlBase=None, talosAddOns=None, addonTester=True,
+                 supportUrlBase=None, talosAddOns=None,
                  *args, **kwargs):
         if not configOptions:
             # TalosFactory/MozillaUpdateConfig require this format for this variable
@@ -7647,7 +7621,7 @@ class RuntimeTalosFactory(TalosFactory):
         TalosFactory.__init__(self, *args, configOptions=configOptions,
                               plugins=plugins, pagesets=pagesets,
                               supportUrlBase=supportUrlBase,
-                              talosAddOns=talosAddOns, addonTester=addonTester,
+                              talosAddOns=talosAddOns,
                               **kwargs)
 
     def addInfoSteps(self):

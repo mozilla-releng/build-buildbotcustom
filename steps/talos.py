@@ -9,7 +9,7 @@ class MozillaUpdateConfig(ShellCommand):
     name = "Update config"
 
     def __init__(self, branch, branchName, executablePath,
-            addOptions=None, useSymbols=False, addonTester=False,
+            addOptions=None, useSymbols=False,
             remoteTests=False, extName=None, remoteExtras=None,
             remoteProcessName=None, **kwargs):
 
@@ -31,7 +31,6 @@ class MozillaUpdateConfig(ShellCommand):
         self.exePath = executablePath
         self.useSymbols = useSymbols
         self.extName = extName
-        self.addonTester = addonTester
         self.remoteTests = remoteTests
 
         self.super_class = ShellCommand
@@ -40,7 +39,7 @@ class MozillaUpdateConfig(ShellCommand):
         self.addFactoryArguments(branch=branch, addOptions=addOptions,
                 branchName=branchName, executablePath=executablePath,
                 remoteTests=remoteTests, useSymbols=useSymbols,
-                extName=extName, addonTester=addonTester,
+                extName=extName,
                 remoteExtras=self.remoteExtras,
                 remoteProcessName=remoteProcessName)
 
@@ -53,14 +52,6 @@ class MozillaUpdateConfig(ShellCommand):
         # Property doesn't exist, that's fine
         except KeyError:
             pass
-
-        #if we are an addonTester then the addonName/addonUrl build property should be set
-        #  if it's not set this will throw a key error and the run will go red - which should be the expected result
-        if self.addonTester:
-            addon_id = os.path.basename(self.build.getProperty('addonUrl')) #eg /en-US/firefox/downloads/latest/10900
-            if not addon_id.isdigit(): #eg http://ftp.mozilla.org/pub/mozilla.org/addons/92382/ie_tab_2__ff_3.6+_-2.12.21.1-fx.xpi
-                addon_id = (self.getProperty('addonUrl')).split('/')[-2]
-            self.addOptions += ['--addonID', addon_id, '--extension', self.extName]
 
         if self.useSymbols:
             self.addOptions += ['--symbolsPath', '../symbols']
