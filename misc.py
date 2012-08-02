@@ -3524,6 +3524,9 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             builders.append(builder)
 
     def isImportant(change):
+        if not shouldBuild(change):
+            return False
+
         for f in change.files:
             if f.startswith("js/src"):
                 return True
