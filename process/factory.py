@@ -331,6 +331,8 @@ def getPlatformMinidumpPath(platform):
         'linux-android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'android-xul': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+        # Pandas will run on Linux Foopies.
+        'android-armv6': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         }
     return platform_minidump_path[platform]
 
