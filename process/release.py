@@ -660,6 +660,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 createPartial=releaseConfig.get('enablePartialMarsAtBuildTime', True),
                 mozillaDir=mozillaDir,
                 enableInstaller=pf.get('enable_installer', False),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=branchConfig.get('tooltool_url_list', []),
             )
 
             builders.append({
@@ -861,6 +863,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 packageSDK=True,
                 signingServers=getSigningServers(platform),
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=branchConfig.get('tooltool_url_list', []),
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
