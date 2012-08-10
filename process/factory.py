@@ -5176,7 +5176,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                 downloadSymbols=False, downloadTests=True, posixBinarySuffix='',
                 remoteExtras=None, branchName=None, **kwargs):
         self.suites = suites
-        self.hostUtils = hostUtils
+        self.hostUtils = WithProperties(hostUtils)
 
         if remoteExtras is not None:
             self.remoteExtras = remoteExtras
@@ -5223,6 +5223,11 @@ class RemoteUnittestFactory(MozillaTestFactory):
          command=['python', '/builds/sut_tools/verify.py'],
          workdir='build',
          haltOnFailure=True,
+        ))
+        self.addStep(SetProperty(
+            name="GetFoopyPlatform",
+            command=['bash', '-c', 'uname -s'],
+            property='foopy_type'
         ))
 
     def addSetupSteps(self):
@@ -5515,7 +5520,7 @@ class TalosFactory(RequestSortingBuildFactory):
             return "C:\\mozilla-build\\python25\\python.exe"
         elif (platform.find("android") > -1):
             # path in the foopies
-            return "/opt/local/bin/python"
+            return "/usr/local/bin/python2.6"
         else:
             raise ValueError("No valid platform was passed: %s" % platform)
 
