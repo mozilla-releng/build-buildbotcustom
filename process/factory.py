@@ -1107,7 +1107,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
              timeout=60*60 # 1 hour
             ))
         pkg_patterns = []
-        for product in ('firefox-', 'fennec', 'seamonkey'):
+        for product in ('firefox-', 'fennec', 'seamonkey', 'thunderbird'):
             pkg_patterns.append('%s/dist/%s*' % (self.mozillaObjdir,
                                                   product))
 
