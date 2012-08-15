@@ -956,10 +956,18 @@ class MercurialBuildFactory(MozillaBuildFactory):
             # XXX: Hardcoding these directories here sucks.
             self.addStep(ShellCommand(
                 command=['mock_mozilla', '-r', self.mock_target, '--copyin', '/home/cltbld/.ssh', '/home/mock_mozilla/.ssh'],
-                haltOnFailure=True
+                haltOnFailure=True,
+            ))
+            self.addStep(ShellCommand(
+                command=['mock_mozilla', '-r', self.mock_target, '--copyin', '/home/cltbld/.android', '/builds/.android'],
+                haltOnFailure=True,
+            ))
+            self.addStep(ShellCommand(
+                command=['mock_mozilla', '-r', self.mock_target, '--copyin', '/home/cltbld/.mozpass.cfg', '/builds/.mozpass.cfg'],
+                haltOnFailure=True,
             ))
             self.addStep(MockCommand(
-                command='chown -R mock_mozilla /home/mock_mozilla/.ssh',
+                command='chown -R mock_mozilla /home/mock_mozilla/.ssh /builds/.mozpass.cfg /builds/.android',
                 target=self.mock_target,
                 mock=True,
                 workdir='/',
@@ -1724,12 +1732,14 @@ class MercurialBuildFactory(MozillaBuildFactory):
             if self.multiLocaleMerge:
                 cmd.append('--merge-locales')
             cmd.extend(self.mozharnessMultiOptions)
-            self.addStep(ShellCommand(
+            self.addStep(MockCommand(
                 name='mozharness_multilocale',
                 command=cmd,
                 env=self.pkg_env,
-                workdir='.',
+                workdir=WithProperties('%(basedir)s'),
                 haltOnFailure=True,
+                mock=self.use_mock,
+                target=self.mock_target,
             ))
             # We need to set packageFilename to the multi apk
             self.addFilePropertiesSteps(filename=self.packageFilename,
@@ -2148,6 +2158,7 @@ class TryBuildFactory(MercurialBuildFactory):
              user=WithProperties('%(who)s'),
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
+             env=self.env,
             ))
         for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
@@ -2162,6 +2173,7 @@ class TryBuildFactory(MercurialBuildFactory):
              user=WithProperties('%(who)s'),
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
+             env=self.env,
             ))
 
 
@@ -2597,6 +2609,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  user="sendchange",
                  comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
+                 env=self.env,
                 ))
 
             files = [WithProperties('%(packageUrl)s')]
@@ -2615,6 +2628,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                  user="sendchange-unittest",
                  comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
+                 env=self.env,
                 ))
 
 
