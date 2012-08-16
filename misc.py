@@ -1692,6 +1692,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     buildBranch = branch_config['build_branch']
 
     for platform, platform_config in PLATFORMS.items():
+        if branch_config.has_key('platforms') and \
+           branch_config['platforms'].has_key(platform) and \
+           not branch_config['platforms'][platform].get('enable_talos', True):
+            continue
+        
         if platform_config.get('is_mobile', False):
             branchName = branch_config['mobile_branch_name']
             tinderboxTree = branch_config['mobile_tinderbox_tree']
