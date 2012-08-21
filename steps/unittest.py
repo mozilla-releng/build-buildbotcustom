@@ -32,10 +32,6 @@ from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, HEADER, worst_st
 
 from buildbotcustom.steps.base import ShellCommand
 
-cvsCoLog = "cvsco.log"
-tboxClobberCvsCoLog = "tbox-CLOBBER-cvsco.log"
-buildbotClobberCvsCoLog = "buildbot-CLOBBER-cvsco.log"
-
 def emphasizeFailureText(text):
     return '<em class="testfail">%s</em>' % text
 

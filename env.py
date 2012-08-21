@@ -72,7 +72,6 @@ MozillaEnvironments['win32-ref-platform'] = {
 
 MozillaEnvironments['linux-unittest'] = {
     "MOZ_NO_REMOTE": '1',
-    "CVS_RSH": 'ssh',
     "DISPLAY": ':2',
     "NO_FAIL_ON_TEST_ERRORS": '1',
     "CCACHE_DIR": '/builds/ccache',
@@ -89,7 +88,6 @@ MozillaEnvironments['macosx-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
-    "CVS_RSH": 'ssh',
     "NO_FAIL_ON_TEST_ERRORS": '1',
     "MOZ_HIDE_RESULTS_TABLE": '1'
 }
@@ -108,7 +106,6 @@ MozillaEnvironments['win32-unittest'] = {
     "MOZILLABUILDDRIVE": 'C:',
     "MOZILLABUILDPATH": '\\mozilla-build\\',
     "MOZ_TOOLS": 'D:\\mozilla-build\\moztools',
-    "CVS_RSH": 'ssh',
     "NO_FAIL_ON_TEST_ERRORS": '1',
     "VSINSTALLDIR": 'D:\\msvs8',
     "VCINSTALLDIR": 'D:\\msvs8\\VC',
@@ -127,7 +124,6 @@ MozillaEnvironments['win64-unittest'] = {
     "NO_EM_RESTART": '1',
     "MOZ_CRASHREPORTER_NO_REPORT": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
-    "CVS_RSH": 'ssh',
     "NO_FAIL_ON_TEST_ERRORS": '1',
     "MOZ_HIDE_RESULTS_TABLE": '1'
 }

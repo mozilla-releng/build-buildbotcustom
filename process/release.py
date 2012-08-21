@@ -8,7 +8,6 @@ from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
-from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import Results
 from buildbot.process.factory import BuildFactory
 
@@ -32,7 +31,7 @@ from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
   ReleaseUpdatesFactory, ReleaseFinalVerification, \
-  PartnerRepackFactory, MajorUpdateFactory, XulrunnerReleaseBuildFactory, \
+  PartnerRepackFactory, XulrunnerReleaseBuildFactory, \
   TuxedoEntrySubmitterFactory, makeDummyBuilder, SigningScriptFactory
 from buildbotcustom.changes.ftppoller import UrlPoller
 from release.platforms import buildbot2ftp
@@ -630,8 +629,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 version=releaseConfig['version'],
                 appVersion=releaseConfig['appVersion'],
                 buildNumber=releaseConfig['buildNumber'],
-                oldVersion=releaseConfig['oldVersion'],
-                oldBuildNumber=releaseConfig['oldBuildNumber'],
+                partialUpdates=releaseConfig.get('partialUpdates', {}),
                 talosMasters=talosMasters,
                 packageTests=packageTests,
                 unittestMasters=unittestMasters,
@@ -863,6 +861,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 packageSDK=True,
                 signingServers=getSigningServers(platform),
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+                partialUpdates=releaseConfig.get('partialUpdates', {}),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
             )
@@ -1043,8 +1042,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
             buildToolsRepoPath=tools_repo_path,
-            cvsroot=releaseConfig['cvsroot'],
-            patcherToolsTag=releaseConfig['patcherToolsTag'],
+            configRepoPath=branchConfig['config_repo_path'],
             patcherConfig=releaseConfig['patcherConfig'],
             verifyConfigs=releaseConfig['verifyConfigs'],
             appName=releaseConfig['appName'],
@@ -1053,10 +1051,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             appVersion=releaseConfig['appVersion'],
             baseTag=releaseConfig['baseTag'],
             buildNumber=releaseConfig['buildNumber'],
-            oldVersion=releaseConfig['oldVersion'],
-            oldAppVersion=releaseConfig['oldAppVersion'],
-            oldBaseTag=releaseConfig['oldBaseTag'],
-            oldBuildNumber=releaseConfig['oldBuildNumber'],
+            partialUpdates=releaseConfig.get('partialUpdates', {}),
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
@@ -1069,28 +1064,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
             releaseChannel=releaseChannel,
-            # We disable this on staging, because we don't have a CVS mirror to
-            # commit to
-            commitPatcherConfig=releaseConfig['commitPatcherConfig'],
             clobberURL=clobberer_url,
             clobberBranch='release-%s' % sourceRepoInfo['name'],
-            oldRepoPath=sourceRepoInfo['path'],
             releaseNotesUrl=releaseConfig['releaseNotesUrl'],
-            binaryName=releaseConfig['binaryName'],
-            oldBinaryName=releaseConfig['oldBinaryName'],
             testOlderPartials=releaseConfig['testOlderPartials'],
             longVersion=releaseConfig.get('longVersion', None),
-            oldLongVersion=releaseConfig.get('oldLongVersion', None),
             schema=releaseConfig.get('snippetSchema', None),
             useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', False),
             signingServers=getSigningServers('linux'),
             useChecksums=releaseConfig.get('enablePartialMarsAtBuildTime', True),
             mozRepoPath=moz_repo_path,
+            python=branchConfig['platforms']['linux']['env']['PYTHON26'],
         )
 
         builders.append({
             'name': builderPrefix('updates'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
+            'slavenames': branchConfig['platforms']['linux']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
@@ -1101,6 +1090,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
                 'platform': platform,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                'release_config': releaseConfigFile,
             }
         })
         post_signing_builders.append(builderPrefix('updates'))
@@ -1358,104 +1348,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ))
         important_builders.append(builderPrefix('ready_for_release'))
 
-    if releaseConfig.get('majorUpdateRepoPath'):
-        # Not attached to any Scheduler
-        major_update_factory = MajorUpdateFactory(
-            hgHost=branchConfig['hghost'],
-            repoPath=releaseConfig['majorUpdateRepoPath'],
-            buildToolsRepoPath=tools_repo_path,
-            cvsroot=releaseConfig['cvsroot'],
-            patcherToolsTag=releaseConfig['majorPatcherToolsTag'],
-            patcherConfig=releaseConfig['majorUpdatePatcherConfig'],
-            verifyConfigs=releaseConfig['majorUpdateVerifyConfigs'],
-            appName=releaseConfig['appName'],
-            productName=releaseConfig['productName'],
-            version=releaseConfig['majorUpdateToVersion'],
-            appVersion=releaseConfig['majorUpdateAppVersion'],
-            baseTag=releaseConfig['majorUpdateBaseTag'],
-            buildNumber=releaseConfig['majorUpdateBuildNumber'],
-            oldVersion=releaseConfig['version'],
-            oldAppVersion=releaseConfig['appVersion'],
-            oldBaseTag=releaseConfig['baseTag'],
-            oldBuildNumber=releaseConfig['buildNumber'],
-            ftpServer=releaseConfig['ftpServer'],
-            bouncerServer=releaseConfig['bouncerServer'],
-            stagingServer=releaseConfig['stagingServer'],
-            stageUsername=branchConfig['stage_username'],
-            stageSshKey=branchConfig['stage_ssh_key'],
-            ausUser=releaseConfig['ausUser'],
-            ausSshKey=releaseConfig['ausSshKey'],
-            ausHost=releaseConfig['ausHost'],
-            ausServerUrl=releaseConfig['ausServerUrl'],
-            hgSshKey=releaseConfig['hgSshKey'],
-            hgUsername=releaseConfig['hgUsername'],
-            # We disable this on staging, because we don't have a CVS mirror to
-            # commit to
-            commitPatcherConfig=releaseConfig['commitPatcherConfig'],
-            clobberURL=clobberer_url,
-            clobberBranch='release-%s' % sourceRepoInfo['name'],
-            oldRepoPath=sourceRepoInfo['path'],
-            triggerSchedulers=[builderPrefix('major_update_verify')],
-            releaseNotesUrl=releaseConfig['majorUpdateReleaseNotesUrl'],
-            fakeMacInfoTxt=releaseConfig['majorFakeMacInfoTxt'],
-            schema=releaseConfig.get('majorSnippetSchema', None),
-            useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', True),
-        )
-
-        builders.append({
-            'name': builderPrefix('major_update'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] + branchConfig['platforms']['linux64']['slaves'],
-            'category': builderPrefix(''),
-            'builddir': builderPrefix('major_update'),
-            'slavebuilddir': reallyShort(builderPrefix('mu'), releaseConfig['productName']),
-            'factory': major_update_factory,
-            'nextSlave': _nextFastReservedSlave,
-            'env': builder_env,
-            'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('mu'), releaseConfig['productName']),
-                'platform': None,
-                'branch': 'release-%s' % sourceRepoInfo['name'],
-            }
-        })
-        important_builders.append(builderPrefix('major_update'))
-
-        for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
-            for n, builderName in majorUpdateVerifyBuilders(platform).iteritems():
-                muv_factory = ScriptFactory(
-                    scriptRepo=tools_repo,
-                    interpreter='bash',
-                    scriptName='scripts/release/updates/chunked-verify.sh',
-                    extra_args=[platform, 'majorUpdateVerifyConfigs',
-                                str(updateVerifyChunks), str(n)],
-                    log_eval_func=lambda c, s: regex_log_evaluator(c, s, update_verify_error)
-                )
-
-                builddir = builderPrefix('%s_major_update_verify' % platform) + \
-                                        '_' + str(n)
-                env = builder_env.copy()
-                env.update(branchConfig['platforms'][platform]['env'])
-                mu_runtimeTag = getRuntimeTag(getReleaseTag(
-                    releaseConfig['majorUpdateBaseTag']))
-
-                builders.append({
-                    'name': builderName,
-                    'slavenames': branchConfig['platforms'][platform]['slaves'],
-                    'category': builderPrefix(''),
-                    'builddir': builddir,
-                    'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
-                    'factory': muv_factory,
-                    'nextSlave': _nextFastReservedSlave,
-                    'env': env,
-                    'properties': {'builddir': builddir,
-                                   'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
-                                   'script_repo_revision': mu_runtimeTag,
-                                   'release_tag': releaseTag,
-                                   'release_config': releaseConfigFile,
-                                   'platform': platform,
-                                   'branch': 'release-%s' % sourceRepoInfo['name'],
-                                  },
-                })
-
     if not releaseConfig.get('disableBouncerEntries'):
         bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
             baseTag=releaseConfig['baseTag'],
@@ -1468,7 +1360,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             enUSPlatforms=releaseConfig['enUSPlatforms'],
             l10nPlatforms=releaseConfig['l10nPlatforms'],
             extraPlatforms=releaseConfig.get('extraBouncerPlatforms'),
-            oldVersion=releaseConfig['oldVersion'],
+            partialUpdates=releaseConfig.get('partialUpdates', {}),
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
             buildToolsRepoPath=tools_repo_path,
@@ -1504,7 +1396,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 tuxedoServerUrl=releaseConfig['tuxedoServerUrl'],
                 enUSPlatforms=('win32-EUballot',),
                 l10nPlatforms=None, # not needed
-                oldVersion=None, # no updates
+                partialUpdates=releaseConfig.get('partialUpdates', {}),
                 hgHost=branchConfig['hghost'],
                 repoPath=sourceRepoInfo['path'],
                 buildToolsRepoPath=tools_repo_path,
