@@ -45,7 +45,7 @@ from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
 import BuildSlaves
 
-DEFAULT_PARALLELIZATION = 3
+DEFAULT_PARALLELIZATION = 6
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                  releaseConfigFile, sourceRepoKey="mozilla",
