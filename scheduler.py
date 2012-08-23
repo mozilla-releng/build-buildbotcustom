@@ -315,7 +315,7 @@ class TriggerBouncerCheck(Triggerable):
             bouncerProductName=bouncerProductName,
             version=self.release_config.get('version'),
             platforms=self.release_config.get('enUSPlatforms'),
-            oldVersion=self.release_config.get('oldVersion'),
+            partialVersions=self.release_config.get('partialUpdates').keys(),
             checkMARs=self.checkMARs,
             username=self.username,
             password=self.password)
