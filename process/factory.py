@@ -3567,7 +3567,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='make_bsdiff',
             command=['sh', '-c',
                      'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
-                     'make tier_base; make -C config;' +
+                     'make tier_base; make tier_nspr; make -C config;' +
                      'make -C modules/libmar; make -C modules/libbz2;' +
                      'make -C other-licenses/bsdiff;'
                      'fi'],
@@ -3587,6 +3587,13 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
          command=['make', 'tier_base'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_base'],
+         haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+         name='make_tier_nspr',
+         command=['make', 'tier_nspr'],
+         workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
+         description=['make tier_nspr'],
          haltOnFailure=True
         ))
         if self.l10nNightlyUpdate:
