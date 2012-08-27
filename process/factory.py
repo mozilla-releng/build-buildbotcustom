@@ -4074,6 +4074,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                        '--output', 'tools/release/updates/' + cfg,
                        '--release-config-file', WithProperties('%(release_config)s'),
                        '-b', self.getRepository(self.configRepoPath),
+                       '--channel', self.testChannel,
                        '-t', releaseTag]
             self.addStep(ShellCommand(
              name='bump_verify_configs',
