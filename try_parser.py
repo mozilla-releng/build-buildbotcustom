@@ -162,8 +162,6 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         # ugly
         user_platforms = []
         for user_platform in options.user_platforms.split(','):
-            if user_platform in ('android-r7', 'linux-android'):
-                user_platform = 'android'
             user_platforms.append(user_platform)
         options.user_platforms = user_platforms
 
