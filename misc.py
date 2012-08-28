@@ -977,6 +977,10 @@ def generateBranchObjects(config, name, secrets=None):
             factory_class = NightlyBuildFactory
             uploadSymbols = False
 
+        if pf.get('enable_pymake'):
+            extra_args['makeCmd'] = ['python',
+                                     WithProperties("%(basedir)s\build\build\pymake\make.py")]
+
         stageBasePath = '%s/%s' % (config['stage_base_path'],
                                        pf['stage_product'])
 
@@ -1240,6 +1244,10 @@ def generateBranchObjects(config, name, secrets=None):
             nightly_kwargs = {}
             nightly_kwargs.update(multiargs)
             nightly_kwargs.update(ausargs)
+
+            if pf.get('enable_pymake'):
+                nightly_kwargs['makeCmd'] = ['python',
+                                             WithProperties("%(basedir)s/build/build/pymake/make.py")]
 
             # We make the assumption that *all* nightly builds
             # are to be done with PGO.  This is to ensure that all
@@ -2101,6 +2109,11 @@ def generateFuzzingObjects(config, SLAVES):
             interpreter='bash',
             script_timeout=1500,
             script_maxtime=1800,
+            reboot_command=['python',
+                            'scripts/buildfarm/maintenance/count_and_reboot.py',
+                            '-f', './reboot_count.txt',
+                            '-n', '0',
+                            '-z'],
             )
     for platform in config['platforms']:
         env = MozillaEnvironments.get("%s-unittest" % platform, {}).copy()
