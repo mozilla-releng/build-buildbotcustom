@@ -3115,6 +3115,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                   self.extraConfigureArgs,
          description='configure',
          descriptionDone='configure done',
+         env=self.env,
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )))
