@@ -979,7 +979,7 @@ def generateBranchObjects(config, name, secrets=None):
 
         if pf.get('enable_pymake'):
             extra_args['makeCmd'] = ['python',
-                                     WithProperties("%(basedir)s\build\build\pymake\make.py")]
+                                     WithProperties("%(basedir)s/build/build/pymake/make.py")]
 
         stageBasePath = '%s/%s' % (config['stage_base_path'],
                                        pf['stage_product'])
