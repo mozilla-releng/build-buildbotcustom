@@ -2175,7 +2175,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         updateEnv['MBSDIFF'] = mbsdiff
         self.addStep(ShellCommand(
             name='rm_unpack_dirs',
-            command=['rm', '-rf', 'current', 'previous'],
+            command=['rm', '-rf', 'current', 'current.work', 'previous'],
             env=updateEnv,
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
@@ -2622,7 +2622,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
 
         self.addStep(ShellCommand(
             name='rm_current_unpack_dir',
-            command=['rm', '-rf', 'current'],
+            command=['rm', '-rf', 'current', 'current.work'],
             env=updateEnv,
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
@@ -3478,6 +3478,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                                        milestone_extra='-l10n')
             NightlyBuildFactory.addUploadSnippetsSteps(self)
             NightlyBuildFactory.addSubmitBalrogUpdates(self)
+
+        if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
+            self.addPeriodicRebootSteps()
 
     def getPreviousBuildUploadDir(self):
         if self.createPartial:

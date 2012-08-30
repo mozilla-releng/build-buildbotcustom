@@ -1402,6 +1402,7 @@ def generateBranchObjects(config, name, secrets=None):
                         signingServers=secrets.get(pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                        buildsBeforeReboot=pf.get('builds_before_reboot',0),
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -1534,6 +1535,7 @@ def generateBranchObjects(config, name, secrets=None):
                 signingServers=secrets.get(pf.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                buildsBeforeReboot=pf.get('builds_before_reboot',0),
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
