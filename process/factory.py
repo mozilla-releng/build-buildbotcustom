@@ -1449,6 +1449,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
+         makeCmd=self.makeCmd,
          warnOnWarnings=True,
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.

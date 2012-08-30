@@ -387,20 +387,20 @@ class ShellCommandReportTimeout(ShellCommand):
 class MozillaCheck(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, **kwargs):
+    def __init__(self, test_name, makeCmd=["make"], **kwargs):
         self.name = test_name
         if test_name == "check":
             # Target executing recursively in all (sub)directories.
             # "-k: Keep going when some targets can't be made."
-            self.command = ["make", "-k", test_name]
+            self.command = makeCmd + ["-k", test_name]
         else:
             # Target calling a python script.
-            self.command = ["make", test_name]
+            self.command = makeCmd + [test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
-        self.addFactoryArguments(test_name=test_name)
+        self.addFactoryArguments(test_name=test_name, makeCmd=makeCmd)
 
     def createSummary(self, log):
         if 'xpcshell' in self.name:
