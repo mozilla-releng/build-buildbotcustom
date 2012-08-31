@@ -64,7 +64,7 @@ class PostRunner(object):
             upload_args.append("--release")
             upload_args.append("%s/%s" % (info.get('version'), info.get('build_number')))
 
-        if 'try' in branch:
+        if branch and 'try' in branch:
             upload_args.append("--try")
         elif branch == 'shadow-central':
             upload_args.append("--shadow")
@@ -103,8 +103,8 @@ class PostRunner(object):
     def mailResults(self, build, log_url):
         my_dir = os.path.abspath(os.path.dirname(__file__))
         cmd = [sys.executable, "%s/try_mailer.py" % my_dir,
-                "--log-url", log_url,
-              ]
+               "--log-url", log_url,
+               ]
 
         cmd.extend(['-f', self.config.get('mail_notifier_sender', 'tryserver@build.mozilla.org')])
         if self.config.get('mail_real_author'):
@@ -137,6 +137,7 @@ class PostRunner(object):
             raise ValueError("Couldn't find %s" % build_path)
 
         builder_path = os.path.dirname(build_path)
+
         class FakeBuilder:
             basedir = builder_path
             name = os.path.basename(builder_path)
@@ -248,14 +249,30 @@ class PostRunner(object):
                 bid = schedulerdb.execute(
                         sa.text('select id from builds where brid=:brid and number=:number'),
                         brid=i, number=build.number
-                        ).fetchone()[0]
-                log.debug("bid for %s is %s", i, bid)
-                model.schedulerdb_requests.insert().execute(
-                        status_build_id=db_build.id,
-                        scheduler_request_id=i,
-                        scheduler_build_id=bid,
-                        )
+                        ).fetchone()
+                if bid is not None:
+                    bid = bid[0]
+                    log.debug("bid for %s is %s", i, bid)
+                    model.schedulerdb_requests.insert().execute(
+                            status_build_id=db_build.id,
+                            scheduler_request_id=i,
+                            scheduler_build_id=bid,
+                            )
+        log.debug("build id is %s", db_build.id)
         return db_build.id
+
+    def getRequestTimes(self, request_ids):
+        """Returns a dictionary of request_id => submitted_at (as an epoch
+        time)"""
+        schedulerdb = sa.create_engine(self.config['schedulerdb.url'])
+        retval = {}
+        for i in request_ids:
+            submitted_at = schedulerdb.execute("select submitted_at from buildrequests where id=:brid",
+                    brid=i,
+                    ).fetchone()
+            if submitted_at is not None:
+                retval[i] = submitted_at[0]
+        return retval
 
     def processBuild(self, options, build_path, request_ids):
         build = self.getBuild(build_path)
@@ -275,8 +292,10 @@ class PostRunner(object):
             log_url = options.log_url
             if log_url == 'null':
                 log_url = None
+            log.debug("adding properties")
             build.properties.setProperty('log_url', log_url, 'postrun.py')
             build.properties.setProperty('request_ids', [int(i) for i in request_ids], 'postrun.py')
+            build.properties.setProperty('request_times', self.getRequestTimes(request_ids), 'postrun.py')
             build_id = self.updateStatusDB(build, request_ids)
 
             cmd = [sys.executable] + sys.argv + ["--statusdb-id", str(build_id)]
