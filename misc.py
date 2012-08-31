@@ -1921,7 +1921,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if not merge:
                                 nomergeBuilders.extend(test_builders)
                             extra_args = {}
-                            if config.get('enable_try'):
+                            if branch_config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
                                 extra_args['numberOfBuildsToTrigger'] = 1
@@ -1943,7 +1943,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if not merge:
                                 nomergeBuilders.extend(pgo_builders)
                             extra_args = {}
-                            if config.get('enable_try'):
+                            if branch_config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
                                 extra_args['numberOfBuildsToTrigger'] = 1
