@@ -1970,7 +1970,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     name='tests-%s-%s-talos-x%s' % (branch, platform, tests)
                     extra_args['numberOfBuildsToTrigger'] = tests
 
-                if config.get('enable_try'):
+                if branch_config.get('enable_try'):
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
                     extra_args['prettyNames'] = prettyNames
@@ -1996,7 +1996,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     name='tests-%s-%s-pgo-talos-x%s' % (branch, platform, tests)
                     extra_args['numberOfBuildsToTrigger'] = tests
 
-                if config.get('enable_try'):
+                if branch_config.get('enable_try'):
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
                     extra_args['prettyNames'] = prettyNames
