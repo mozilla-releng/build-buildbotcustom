@@ -307,6 +307,7 @@ class PostRunner(object):
             build.properties.setProperty('log_url', log_url, 'postrun.py')
             build.properties.setProperty('statusdb_id', build_id, 'postrun.py')
             build.properties.setProperty('request_ids', [int(i) for i in request_ids], 'postrun.py')
+            build.properties.setProperty('request_times', self.getRequestTimes(request_ids), 'postrun.py')
             self.writePulseMessage(options, build, build_id)
 
 def main():
