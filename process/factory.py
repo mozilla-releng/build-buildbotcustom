@@ -3168,6 +3168,9 @@ class BaseRepackFactory(MozillaBuildFactory):
                 )
         self.addStep(step)
 
+        mirrors=[]
+        if self.baseMirrorUrls:
+            mirrors = [WithProperties(url + "/" + self.l10nRepoPath + "/%(locale)s") for url in self.baseMirrorUrls]
         step = self.makeHgtoolStep(
                 name='get_locale_src',
                 rev=WithProperties("%(l10n_revision)s"),
@@ -3176,7 +3179,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                 workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
                 locks=[hg_l10n_lock.access('counting')],
                 use_properties=False,
-                mirrors=[],
+                mirrors=mirrors,
                 )
         self.addStep(step)
 
