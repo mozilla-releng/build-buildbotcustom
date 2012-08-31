@@ -1921,7 +1921,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if not merge:
                                 nomergeBuilders.extend(test_builders)
                             extra_args = {}
-                            if branch == "try":
+                            if config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
                                 extra_args['numberOfBuildsToTrigger'] = 1
@@ -1943,7 +1943,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if not merge:
                                 nomergeBuilders.extend(pgo_builders)
                             extra_args = {}
-                            if branch == "try":
+                            if config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
                                 extra_args['numberOfBuildsToTrigger'] = 1
@@ -1970,7 +1970,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     name='tests-%s-%s-talos-x%s' % (branch, platform, tests)
                     extra_args['numberOfBuildsToTrigger'] = tests
 
-                if branch == "try":
+                if config.get('enable_try'):
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
                     extra_args['prettyNames'] = prettyNames
@@ -1996,7 +1996,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     name='tests-%s-%s-pgo-talos-x%s' % (branch, platform, tests)
                     extra_args['numberOfBuildsToTrigger'] = tests
 
-                if branch == "try":
+                if config.get('enable_try'):
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
                     extra_args['prettyNames'] = prettyNames
