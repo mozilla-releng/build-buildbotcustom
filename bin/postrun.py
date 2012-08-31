@@ -267,7 +267,7 @@ class PostRunner(object):
         schedulerdb = sa.create_engine(self.config['schedulerdb.url'])
         retval = {}
         for i in request_ids:
-            submitted_at = schedulerdb.execute("select submitted_at from buildrequests where id=:brid",
+            submitted_at = schedulerdb.execute(sa.text("select submitted_at from buildrequests where id=:brid"),
                     brid=i,
                     ).fetchone()
             if submitted_at is not None:
