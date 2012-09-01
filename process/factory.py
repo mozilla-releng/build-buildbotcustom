@@ -2270,6 +2270,15 @@ class NightlyBuildFactory(MercurialBuildFactory):
             workdir='.',
             haltOnFailure=True,
         ))
+        for dir in ['current', 'previous']:
+            self.addStep(ShellCommand(
+                    name='remove pgc files (%s)' % dir,
+                    command="find . -name \*.pgc -print -delete",
+                    env=updateEnv,
+                    workdir="%s/%s" % (self.absMozillaObjDir, dir),
+                    flunkOnFailure=False,
+                    haltOnFailure=False,
+            ))
         # Generate the partial patch from the two unpacked complete mars.
         partialMarCommand=self.makeCmd + ['-C',
                            'tools/update-packaging', 'partial-patch',
@@ -2686,6 +2695,15 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 workdir='%s/previous' % self.absMozillaObjDir,
                 haltOnFailure=True,
             ))
+            for dir in ['current', 'previous']:
+                self.addStep(ShellCommand(
+                    name='remove pgc files (%s)' % dir,
+                    command="find . -name \*.pgc -print -delete",
+                    env=updateEnv,
+                    workdir="%s/%s" % (self.absMozillaObjDir, dir),
+                    flunkOnFailure=False,
+                    haltOnFailure=False,
+                ))
             self.addStep(ShellCommand(
                 name='make_partial_mar',
                 description=self.makeCmd + ['partial', 'mar'],
