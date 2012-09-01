@@ -2270,6 +2270,15 @@ class NightlyBuildFactory(MercurialBuildFactory):
             workdir='.',
             haltOnFailure=True,
         ))
+        for dir in ['current', 'previous']:
+            self.addStep(ShellCommand(
+                    name='remove pgc files (%s)' % dir,
+                    command="find . -name \*.pgc -print -delete",
+                    env=updateEnv,
+                    workdir="%s/%s" % (self.absMozillaObjDir, dir),
+                    flunkOnFailure=False,
+                    haltOnFailure=False,
+            ))
         # Generate the partial patch from the two unpacked complete mars.
         partialMarCommand=self.makeCmd + ['-C',
                            'tools/update-packaging', 'partial-patch',
@@ -2686,6 +2695,15 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 workdir='%s/previous' % self.absMozillaObjDir,
                 haltOnFailure=True,
             ))
+            for dir in ['current', 'previous']:
+                self.addStep(ShellCommand(
+                    name='remove pgc files (%s)' % dir,
+                    command="find . -name \*.pgc -print -delete",
+                    env=updateEnv,
+                    workdir="%s/%s" % (self.absMozillaObjDir, dir),
+                    flunkOnFailure=False,
+                    haltOnFailure=False,
+                ))
             self.addStep(ShellCommand(
                 name='make_partial_mar',
                 description=self.makeCmd + ['partial', 'mar'],
@@ -3168,6 +3186,9 @@ class BaseRepackFactory(MozillaBuildFactory):
                 )
         self.addStep(step)
 
+        mirrors=[]
+        if self.baseMirrorUrls:
+            mirrors = [WithProperties(url + "/" + self.l10nRepoPath + "/%(locale)s") for url in self.baseMirrorUrls]
         step = self.makeHgtoolStep(
                 name='get_locale_src',
                 rev=WithProperties("%(l10n_revision)s"),
@@ -3176,7 +3197,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                 workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
                 locks=[hg_l10n_lock.access('counting')],
                 use_properties=False,
-                mirrors=[],
+                mirrors=mirrors,
                 )
         self.addStep(step)
 
