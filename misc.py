@@ -347,6 +347,9 @@ nomergeBuilders = []
 def mergeRequests(builder, req1, req2):
     if builder.name in nomergeBuilders:
         return False
+    if 'Self-serve' in req1.reason or 'Self-serve' in req2.reason:
+        # A build was explicitly requested on this revision, so don't coalesce it
+        return False
     return req1.canBeMergedWith(req2)
 
 def mergeBuildObjects(d1, d2):
