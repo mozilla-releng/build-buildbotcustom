@@ -1083,6 +1083,8 @@ def generateBranchObjects(config, name, secrets=None):
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
+                'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
+                'tooltool_url_list': config.get('tooltool_url_list', []),
             }
             factory_kwargs.update(extra_args)
 
@@ -1336,6 +1338,8 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 mozillaDir=config.get('mozilla_dir', None),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=config.get('tooltool_url_list', []),
                 **nightly_kwargs
             )
 
@@ -1704,6 +1708,8 @@ def generateBranchObjects(config, name, secrets=None):
                  buildsBeforeReboot=pf['builds_before_reboot'],
                  packageSDK=True,
                  signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                 tooltool_url_list=config.get('tooltool_url_list', []),
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],
@@ -2352,6 +2358,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'branchName': name,
+                'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
+                'tooltool_url_list': config.get('tooltool_url_list', []),
             }
             factory_kwargs.update(extra_args)
 
@@ -2606,6 +2614,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 branchName=name,
+                'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
+                'tooltool_url_list': config.get('tooltool_url_list', []),
                 **nightly_kwargs
             )
 
@@ -2988,6 +2998,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                  buildsBeforeReboot=pf['builds_before_reboot'],
                  packageSDK=True,
                  signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
+                'tooltool_url_list': config.get('tooltool_url_list', []),
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],

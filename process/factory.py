@@ -753,6 +753,10 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
                  mozharnessMultiOptions=None,
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=None,
+                 tooltool_script='/tools/tooltool.py',
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -817,6 +821,12 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.useSharedCheckouts = useSharedCheckouts
         self.testPrettyNames = testPrettyNames
         self.l10nCheckTest = l10nCheckTest
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list or []
+        self.tooltool_script = tooltool_script
+        self.tooltool_bootstrap = tooltool_bootstrap
+
+        assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
@@ -1159,6 +1169,18 @@ class MercurialBuildFactory(MozillaBuildFactory):
          name='cat_mozconfig',
          command=['cat', '.mozconfig'],
         ))
+        if self.tooltool_manifest_src:
+          self.addStep(ShellCommand(
+            name='run_tooltool',
+            command=[
+                 WithProperties('%(toolsdir)s/scripts/tooltool/fetch_and_unpack.sh'),
+                 self.tooltool_manifest_src,
+                 self.tooltool_url_list[0],
+                 self.tooltool_script,
+                 self.tooltool_bootstrap
+            ],
+            haltOnFailure=True,
+          ))
 
     def addDoBuildSteps(self):
         workdir=WithProperties('%(basedir)s/build')
