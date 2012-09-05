@@ -59,7 +59,8 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
                       platformBuilders.extend([custom_builder])
     return platformBuilders
 
-def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, prettyNames, unittestPrettyNames):
+def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, buildbotBranch,
+                    prettyNames, unittestPrettyNames):
     testBuilders = []
     builder_test_platforms = []
     # for all possible suites, add in the builderNames for that platform
@@ -76,12 +77,12 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, pretty
                           # checking for list type so this is only run for test_master builders where slave_platforms are used
                           if type(prettyNames[platform])==type(list()):
                             for slave_platform in prettyNames[platform]:
-                                custom_builder = "%s try %s %s %s" % (slave_platform, buildType, testType, test)
+                                custom_builder = "%s %s %s %s %s" % (slave_platform, buildbotBranch, buildType, testType, test)
                                 # have to check that custom_builder is not already present
                                 if custom_builder in (builderNames) and custom_builder not in testBuilders:
                                     testBuilders.extend([custom_builder])
                           else:
-                              custom_builder = "%s try %s %s %s" % (prettyNames[platform], buildType, testType, test)
+                              custom_builder = "%s %s %s %s %s" % (prettyNames[platform], buildbotBranch, buildType, testType, test)
                                # have to check that custom_builder is not already present
                               if custom_builder in (builderNames) and custom_builder not in testBuilders:
                                   testBuilders.extend([custom_builder])
@@ -101,13 +102,14 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, pretty
               if platform in prettyNames.keys():
                 for test in tests:
                     for slave_platform in prettyNames[platform]:
-                        custom_builder = "%s try %s %s" % (slave_platform, testType, test)
+                        custom_builder = "%s %s %s %s" % (slave_platform, buildbotBranch, testType, test)
                         if custom_builder in (builderNames) and custom_builder not in testBuilders:
                             testBuilders.extend([custom_builder])
 
     return testBuilders
 
-def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None):
+def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
+              buildbotBranch='try'):
 
     parser = argparse.ArgumentParser(description='Pass in a commit message and a list \
                                      and tryParse populates the list with the builderNames\
@@ -186,13 +188,13 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         if options.test != 'none' and unittestSuites:
             # get test builders for test_master first
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
-                                      builderNames, options.build, prettyNames, None))
+                                      builderNames, options.build, buildbotBranch, prettyNames, None))
             # then add any builder_master test builders
             if unittestPrettyNames:
                 customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
-                                      builderNames, options.build, {}, unittestPrettyNames))
+                                      builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
         if options.talos != 'none' and talosSuites is not None:
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, builderNames, 
-                                      options.build, prettyNames, None))
+                                      options.build, buildbotBranch, prettyNames, None))
 
     return customBuilderNames
