@@ -768,6 +768,7 @@ def generateBranchObjects(config, name, secrets=None):
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
         extra_args['prettyNames'] = prettyNames
+        extra_args['buildbotBranch'] = name
     else:
         scheduler_class = makePropertiesScheduler(Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
@@ -821,6 +822,7 @@ def generateBranchObjects(config, name, secrets=None):
             extra_args['prettyNames'] = prettyNames
             extra_args['unittestSuites'] = unittestSuites
             extra_args['unittestPrettyNames'] = unittestPrettyNames
+            extra_args['buildbotBranch'] = name
         else:
             scheduler_class = Scheduler
         branchObjects['schedulers'].append(scheduler_class(
@@ -1930,6 +1932,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 extra_args['numberOfBuildsToTrigger'] = 1
                                 extra_args['prettyNames'] = prettyNames
                                 extra_args['unittestSuites'] = unittestSuites
+                                extra_args['buildbotBranch'] = branch
                             else:
                                 scheduler_class = Scheduler
                             branchObjects['schedulers'].append(scheduler_class(
@@ -1952,6 +1955,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 extra_args['numberOfBuildsToTrigger'] = 1
                                 extra_args['prettyNames'] = prettyNames
                                 extra_args['unittestSuites'] = unittestSuites
+                                extra_args['buildbotBranch'] = branch
                             else:
                                 scheduler_class = Scheduler
                             branchObjects['schedulers'].append(scheduler_class(
@@ -1979,6 +1983,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     extra_args['prettyNames'] = prettyNames
                     extra_args['talosSuites'] = SUITES.keys()
                     extra_args['numberOfBuildsToTrigger'] = tests
+                    extra_args['buildbotBranch'] = branch
 
                 s = scheduler_class(
                         name=name,
@@ -2005,6 +2010,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     extra_args['prettyNames'] = prettyNames
                     extra_args['talosSuites'] = SUITES.keys()
                     extra_args['numberOfBuildsToTrigger'] = tests
+                    extra_args['buildbotBranch'] = branch
 
                 s = scheduler_class(
                         name=name,

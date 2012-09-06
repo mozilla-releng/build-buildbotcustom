@@ -42,7 +42,7 @@ def tryChooser(s, all_changes):
             log.msg("No comments, passing empty string which will result in default set")
             comments = ""
         customBuilders = TryParser(comments, s.builderNames, s.prettyNames, s.unittestPrettyNames,
-                          s.unittestSuites, s.talosSuites)
+                          s.unittestSuites, s.talosSuites, s.buildbotBranch)
         buildersPerChange[c] = customBuilders
 
     def parseDataError(failure, c):

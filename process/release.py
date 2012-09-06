@@ -1394,7 +1394,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 tuxedoServerUrl=releaseConfig['tuxedoServerUrl'],
                 enUSPlatforms=('win32-EUballot',),
                 l10nPlatforms=None, # not needed
-                partialUpdates=releaseConfig.get('partialUpdates', {}),
+                partialUpdates={}, # no updates
                 hgHost=branchConfig['hghost'],
                 repoPath=sourceRepoInfo['path'],
                 buildToolsRepoPath=tools_repo_path,
