@@ -61,6 +61,11 @@ def makeTryMessage(build, log_url):
         else:
             raise ValueError("I don't know who did this build")
 
+    branch = props['branch']
+    tree = "Try"
+    if 'comm' in branch:
+       tree = "ThunderbirdTry" 
+
     if 'got_revision' in props:
         revision = props['got_revision'][:12]
     elif 'revision' in props:
@@ -76,23 +81,23 @@ def makeTryMessage(build, log_url):
     result = build.getResults()
 
     if result == SUCCESS:
-        subject = "Try submission %(revision)s" % locals()
+        subject = "%(tree)s submission %(revision)s" % locals()
         result_msg = "was successfully completed"
     elif result == WARNINGS:
-        subject = "Try submission %(revision)s - warnings" % locals()
+        subject = "%(tree)s submission %(revision)s - warnings" % locals()
         result_msg = "completed with warnings"
     elif result == EXCEPTION:
-        subject = "Try submission %(revision)s - errors" % locals()
+        subject = "%(tree)s submission %(revision)s - errors" % locals()
         result_msg = "hit a buildbot exception"
     elif result == FAILURE:
-        subject = "Try submission %(revision)s - errors" % locals()
+        subject = "%(tree)s submission %(revision)s - errors" % locals()
         result_msg = "failed to complete"
     else:
-        subject = "Try submission %(revision)s - errors" % locals()
+        subject = "%(tree)s submission %(revision)s - errors" % locals()
         result_msg = "had unknown problem (%s)" % result
 
     text = """\
-Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n\n""" % locals()
+Your %(tree)s Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n\n""" % locals()
 
     if 'packageUrl' in props:
         url = props['packageUrl'].replace('://stage', '://ftp')
@@ -112,12 +117,12 @@ Your Try Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder)s.\n
         log_url = log_url.replace('://stage', '://ftp')
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n" % locals()
     else:
-        text += "Please check <a href=\"https://tbpl.mozilla.org/?tree=Try&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
+        text += "Please check <a href=\"https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
 
     text = re.sub("\n", "<br>\n", text)
 
-    headers = {"In-Reply-To": "<try-%(revision)s>" % locals(),
-                "References": "<try-%(revision)s>" % locals(),
+    headers = {"In-Reply-To": "<%(branch)s-%(revision)s>" % locals(),
+                "References": "<%(branch)s-%(revision)s>" % locals(),
               }
 
     return dict(
