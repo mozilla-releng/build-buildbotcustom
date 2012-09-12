@@ -2090,6 +2090,8 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
         extra_args.extend(['-k', config['hg_ssh_key']])
     if config['blocklist_update_on_closed_tree'] is True:
         extra_args.extend(['-c'])
+    if config['blocklist_update_set_approval'] is True:
+        extra_args.extend(['-a'])
     blocklistupdate_factory = ScriptFactory(
         "%s%s" % (config['hgurl'],
         config['build_tools_repo_path']),
