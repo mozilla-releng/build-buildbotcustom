@@ -1746,7 +1746,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 changeIsImportant=lambda c: \
                 changeContainsProduct(c, releaseConfig['productName'])
             ))
-    for recipient in releaseConfig['AllRecipients']:
+    for recipient in releaseConfig['ImportantRecipients']:
         if hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
             #send a message when android signing is complete
             status.append(ChangeNotifier(

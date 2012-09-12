@@ -5004,7 +5004,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         # name. (The suite name must include 'robocop', as that data
         # driven feature is used to append the robocop options to a
         # command line.)
-        if self.platform == "android" and 'robocop' in self.suites[0]['suite']:
+        if "android" in self.platform and 'robocop' in self.suites[0]['suite']:
             self.addStep(DownloadFile(
                 url_fn=get_robocop_url,
                 filename_property='robocop_filename',
@@ -5409,7 +5409,7 @@ class TalosFactory(RequestSortingBuildFactory):
              command=[WithProperties('%(filename)s'), WithProperties('/INI=%(workdir_pwd)s\\firefoxInstallConfig.ini')],
              env=self.env)
             )
-        elif self.OS in ('tegra_android',):
+        elif self.OS in ('tegra_android','tegra_android-armv6'):
             self.addStep(UnpackFile(
              filename=WithProperties("../%(filename)s"),
              workdir="%s/%s" % (self.workdirBase, self.productName),
@@ -5447,7 +5447,7 @@ class TalosFactory(RequestSortingBuildFactory):
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
             ))
-        elif self.OS in ('tegra_android',):
+        elif self.OS in ('tegra_android','tegra_android-armv6'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
@@ -5641,7 +5641,9 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             #32 bit (includes mac browsers)
-            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android', 'leopard', 'snowleopard', 'leopard-o', 'lion', 'mountainlion'):
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android', \
+                           'tegra_android-armv6', 'leopard', 'snowleopard', \
+                           'leopard-o', 'lion', 'mountainlion'):
                 self.addStep(DownloadFile(
                  url=WithProperties("%s/%s" % (self.supportUrlBase, self.plugins['32'])),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
