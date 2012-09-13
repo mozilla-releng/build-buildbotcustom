@@ -259,6 +259,7 @@ def getPlatformMinidumpPath(platform):
         'macosx64_gecko': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Android uses OSX because the Foopies are OSX.
         'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
+        'android-noion': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Pandas will run on Linux Foopies.
         'android-armv6': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         }
@@ -5409,7 +5410,7 @@ class TalosFactory(RequestSortingBuildFactory):
              command=[WithProperties('%(filename)s'), WithProperties('/INI=%(workdir_pwd)s\\firefoxInstallConfig.ini')],
              env=self.env)
             )
-        elif self.OS in ('tegra_android','tegra_android-armv6'):
+        elif self.OS.startswith('tegra_android'):
             self.addStep(UnpackFile(
              filename=WithProperties("../%(filename)s"),
              workdir="%s/%s" % (self.workdirBase, self.productName),
@@ -5447,7 +5448,7 @@ class TalosFactory(RequestSortingBuildFactory):
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
             ))
-        elif self.OS in ('tegra_android','tegra_android-armv6'):
+        elif self.OS.startswith('tegra_android'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
@@ -5641,9 +5642,10 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             #32 bit (includes mac browsers)
-            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android', \
-                           'tegra_android-armv6', 'leopard', 'snowleopard', \
-                           'leopard-o', 'lion', 'mountainlion'):
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android',
+                           'tegra_android-armv6', 'tegra_android-noion',
+                           'leopard', 'snowleopard', 'leopard-o', 'lion',
+                           'mountainlion'):
                 self.addStep(DownloadFile(
                  url=WithProperties("%s/%s" % (self.supportUrlBase, self.plugins['32'])),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
