@@ -343,6 +343,20 @@ def _nextSlowIdleSlave(nReserved):
         return sorted(slow, _recentSort(builder))[-1]
     return _nextslave
 
+# XXX Bug 790698 hack for no android reftests on new tegras
+# Purge with fire when this is no longer needed
+def _nextOldTegra():
+    def _nextSlave(builder, available_slaves):
+        old = []
+        for s in available_slaves:
+            number = s.slave.slavename.replace('tegra-', '')
+            if int(number) < 286:
+                old.append(s)
+        if old:
+            return sorted(old, _recentSort(builder))[-1]
+        return None
+    return _nextSlave
+
 nomergeBuilders = []
 def mergeRequests(builder, req1, req2):
     if builder.name in nomergeBuilders:
@@ -405,6 +419,10 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'category': category,
             'properties': properties,
         }
+        # XXX Bug 790698 hack for no android reftests on new tegras
+        # Purge with fire when this is no longer needed
+        if 'reftest' in suites_name:
+            builder['nextSlave'] = _nextOldTegra()
         builders.append(builder)
     elif mozharness:
         # suites is a dict!
@@ -2090,6 +2108,8 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
         extra_args.extend(['-k', config['hg_ssh_key']])
     if config['blocklist_update_on_closed_tree'] is True:
         extra_args.extend(['-c'])
+    if config['blocklist_update_set_approval'] is True:
+        extra_args.extend(['-a'])
     blocklistupdate_factory = ScriptFactory(
         "%s%s" % (config['hgurl'],
         config['build_tools_repo_path']),

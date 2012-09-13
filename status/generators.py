@@ -7,7 +7,7 @@ def buildTryChangeMessage(change, packageDir):
     branch = change.branch
     tree = "Try"
     if 'comm' in branch:
-        tree = "ThunderbirdTry"
+        tree = "Thunderbird-Try"
     packageDir = packageDir % locals()
     msgdict = {"type": "plain"}
     msgdict['subject'] = "%(tree)s submission %(revision)s" % locals()

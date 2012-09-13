@@ -64,7 +64,7 @@ def makeTryMessage(build, log_url):
     branch = props['branch']
     tree = "Try"
     if 'comm' in branch:
-       tree = "ThunderbirdTry" 
+       tree = "Thunderbird-Try" 
 
     if 'got_revision' in props:
         revision = props['got_revision'][:12]
