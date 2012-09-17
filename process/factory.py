@@ -4933,6 +4933,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
          command=['python', '/builds/sut_tools/verify.py'],
          workdir='build',
          haltOnFailure=True,
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
         ))
         self.addStep(SetProperty(
             name="GetFoopyPlatform",

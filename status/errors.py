@@ -32,4 +32,6 @@ talos_hgweb_errors = ((re.compile("ERROR 500: Internal Server Error"), RETRY),
                       (re.compile("ERROR: We tried to download the talos.json file but something failed"), RETRY),
                      )
 
-tegra_errors = ((re.compile("Automation error: Error"), FAILURE),)
+tegra_errors = ((re.compile("Automation error: Error receiving data from socket"), FAILURE),
+                (re.compile("Unable to ping tegra after 5 attempts"), RETRY),
+               )
