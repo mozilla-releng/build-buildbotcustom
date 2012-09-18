@@ -259,7 +259,6 @@ def getPlatformMinidumpPath(platform):
         'macosx64_gecko': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Android uses OSX because the Foopies are OSX.
         'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-        'android-noion': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Pandas will run on Linux Foopies.
         'android-armv6': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         }
@@ -4933,6 +4932,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
          command=['python', '/builds/sut_tools/verify.py'],
          workdir='build',
          haltOnFailure=True,
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
         ))
         self.addStep(SetProperty(
             name="GetFoopyPlatform",
@@ -5642,10 +5642,9 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             #32 bit (includes mac browsers)
-            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android',
-                           'tegra_android-armv6', 'tegra_android-noion',
-                           'leopard', 'snowleopard', 'leopard-o', 'lion',
-                           'mountainlion'):
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android', \
+                           'tegra_android-armv6', 'leopard', 'snowleopard', \
+                           'leopard-o', 'lion', 'mountainlion'):
                 self.addStep(DownloadFile(
                  url=WithProperties("%s/%s" % (self.supportUrlBase, self.plugins['32'])),
                  workdir=os.path.join(self.workdirBase, "talos/base_profile"),
