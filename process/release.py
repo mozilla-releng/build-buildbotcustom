@@ -1443,38 +1443,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         important_builders.append(builderPrefix('signing_done'))
 
     if hasPlatformSubstring(manuallySignedPlatforms, 'android'):
-        for platform in manuallySignedPlatforms:
-            locale = 'en-US'
-            candidatesDir = makeCandidatesDir(
-                releaseConfig['productName'],
-                releaseConfig['version'],
-                releaseConfig['buildNumber'],
-                protocol='http',
-                server=releaseConfig['ftpServer'])
-            enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-                (candidatesDir,
-                 buildbot2ftp(platform),
-                 locale, releaseConfig['productName'], releaseConfig['version'],
-                 locale)
-            change_source.append(UrlPoller(
-                branch=builderPrefix('android_post_signing'),
-                url=enUS_signed_apk_url,
-                pollInterval=60*10
-            ))
-            if branchConfig['platforms'][platform].get('multi_locale'):
-                locale = 'multi'
-                signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-                    (candidatesDir,
-                     buildbot2ftp(platform),
-                     locale,
-                     releaseConfig['productName'],
-                     releaseConfig['version'],
-                     locale)
-                change_source.append(UrlPoller(
-                    branch=builderPrefix('android_post_signing'),
-                    url=signed_apk_url,
-                    pollInterval=60*10
-                ))
+        # Watch only armv7 en-US APK
+        platform = 'android'
+        locale = 'en-US'
+        candidatesDir = makeCandidatesDir(
+            releaseConfig['productName'],
+            releaseConfig['version'],
+            releaseConfig['buildNumber'],
+            protocol='http',
+            server=releaseConfig['ftpServer'])
+        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
+            (candidatesDir,
+             buildbot2ftp(platform),
+             locale, releaseConfig['productName'], releaseConfig['version'],
+             locale)
+        change_source.append(UrlPoller(
+            branch=builderPrefix('android_post_signing'),
+            url=enUS_signed_apk_url,
+            pollInterval=60*10
+        ))
 
     reset_schedulers_scheduler = Scheduler(
         name=builderPrefix('%s_reset_schedulers' % releaseConfig['productName']),
