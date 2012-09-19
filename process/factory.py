@@ -4225,15 +4225,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             # We only push test channel snippets from automation.
             if localDir.endswith('test'):
                 self.addStep(RetryingShellCommand(
-                 name='backupsnip',
-                 command=['ssh', '-t', '-l', self.ausUser,
-                          '-oIdentityFile=~/.ssh/%s' % self.ausSshKey,
-                          self.ausHost, '~/bin/backupsnip %s' % remoteDir],
-                 timeout=7200, # 2 hours
-                 description=['backupsnip'],
-                 haltOnFailure=True
-                ))
-                self.addStep(RetryingShellCommand(
                  name='pushsnip',
                  command=['ssh', '-t', '-l', self.ausUser,
                           '-oIdentityFile=~/.ssh/%s' % self.ausSshKey,
