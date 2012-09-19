@@ -5192,6 +5192,8 @@ class TalosFactory(RequestSortingBuildFactory):
                 self.remoteProcessName = 'org.mozilla.fennec'
 
         self.addInfoSteps()
+        if self.remoteTests:
+            self.addMobileCleanupSteps()
         self.addCleanupSteps()
         self.addDmgInstaller()
         self.addDownloadBuildStep()
@@ -5238,6 +5240,16 @@ class TalosFactory(RequestSortingBuildFactory):
                  command=['bash', '-c', 'echo $SUT_IP'],
                  property='sut_ip'
             ))
+
+    def addMobileCleanupSteps():
+        self.addStep(ShellCommand(
+         name="verify_tegra_state",
+         description="Running verify.py",
+         command=['python', '/builds/sut_tools/verify.py'],
+         workdir='build',
+         haltOnFailure=True,
+         log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+        ))
 
     def addCleanupSteps(self):
         if self.OS in ('xp', 'vista', 'win7', 'w764'):
@@ -5311,21 +5323,12 @@ class TalosFactory(RequestSortingBuildFactory):
          command='mkdir talos',
          env=self.env)
         )
-        if self.remoteTests:
-            self.addStep(ShellCommand(
-             name="verify_tegra_state",
-             description="Running verify.py",
-             command=['python', '/builds/sut_tools/verify.py'],
-             workdir='build',
-             haltOnFailure=True,
-            ))
         if not self.remoteTests:
             self.addStep(DownloadFile(
              url=WithProperties("%s/tools/buildfarm/maintenance/count_and_reboot.py" % self.supportUrlBase),
              workdir=self.workdirBase,
              haltOnFailure=True,
             ))
-
 
     def addDmgInstaller(self):
         if self.OS in ('leopard', 'tiger', 'snowleopard', 'lion', 'mountainlion'):
