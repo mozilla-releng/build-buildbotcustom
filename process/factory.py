@@ -5241,7 +5241,7 @@ class TalosFactory(RequestSortingBuildFactory):
                  property='sut_ip'
             ))
 
-    def addMobileCleanupSteps():
+    def addMobileCleanupSteps(self):
         self.addStep(ShellCommand(
          name="verify_tegra_state",
          description="Running verify.py",
