@@ -469,15 +469,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
                     properties['purge_target'] = '%sGB' % str(self.buildSpace)
                 return properties
 
-            if self.use_mock:
-                self.addStep(MockReset(
-                    target=self.mock_target,
-                ))
-                self.addStep(MockInit(
-                    target=self.mock_target,
-                ))
-
-            self.addStep(MockProperty(
+            self.addStep(SetProperty(
              name='clean_old_builds',
              command=command,
              description=['cleaning', 'old', 'builds'],
@@ -488,8 +480,14 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
              extract_fn=parse_purge_builds,
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, purge_error),
              env=self.env,
-             mock=self.use_mock,
-             target=self.mock_target,
+            ))
+
+        if self.use_mock:
+            self.addStep(MockReset(
+                target=self.mock_target,
+            ))
+            self.addStep(MockInit(
+                target=self.mock_target,
             ))
 
     def addPeriodicRebootSteps(self):
