@@ -2116,6 +2116,7 @@ class TryBuildFactory(MercurialBuildFactory):
              timeout=40*60, # 40 minutes
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
              locks=[upload_lock.access('counting')],
+             mock_workdir_prefix=None,
         ))
 
         talosBranch = "%s-%s-talos" % (self.branchName, self.complete_platform)
