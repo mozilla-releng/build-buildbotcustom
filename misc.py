@@ -579,6 +579,14 @@ def generateBranchObjects(config, name, secrets=None):
         pf = config['platforms'][platform]
         base_name = pf['base_name']
         pretty_name = PRETTY_NAME % base_name
+
+        # short-circuit the extra logic below for debug, l10n, pgo and nightly
+        # builds these aren't required (yet) for mozharness builds
+        if 'mozharness_config' in pf:
+            buildername = '%s_dep' % pf['base_name']
+            builders.append(buildername)
+            continue
+
         if platform.endswith("-debug"):
             debugBuilders.append(pretty_name)
             prettyNames[platform] = pretty_name
@@ -594,7 +602,7 @@ def generateBranchObjects(config, name, secrets=None):
                     test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
             # Skip l10n, unit tests
-            # Skip nightlies for debug builds unless requested  
+            # Skip nightlies for debug builds unless requested
             if not pf.has_key('enable_nightly'):
                 continue
         elif pf.get('enable_dep', True):
@@ -655,39 +663,6 @@ def generateBranchObjects(config, name, secrets=None):
     if config['enable_weekly_bundle']:
         weeklyBuilders.append('%s hg bundle' % name)
 
-    # Currently, each branch goes to a different tree
-    # If this changes in the future this may have to be
-    # moved out of the loop
-    if not config.get('disable_tinderbox_mail'):
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
-        # XULRunner builds
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['xulrunner_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=xulrunnerNightlyBuilders,
-            logCompression="gzip"
-        ))
-        # Code coverage builds go to a different tree
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['weekly_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=coverageBuilders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
-
     # Try Server notifier
     if config.get('enable_mail_notifier'):
         packageUrl = config['package_url']
@@ -747,26 +722,22 @@ def generateBranchObjects(config, name, secrets=None):
             binaryURL=l10n_binaryURL
         ))
 
-    # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
-    if config['hgurl'].startswith('https:'):
-        pass
+    if config.get('enable_try', False):
+        tipsOnly = True
+        # Pay attention to all branches for pushes to try
+        repo_branch = None
     else:
-        if config.get('enable_try', False):
-            tipsOnly = True
-            # Pay attention to all branches for pushes to try
-            repo_branch = None
-        else:
-            tipsOnly = True
-            # Other branches should only pay attention to the default branch
-            repo_branch = "default"
+        tipsOnly = True
+        # Other branches should only pay attention to the default branch
+        repo_branch = "default"
 
-        branchObjects['change_source'].append(HgPoller(
-            hgURL=config['hgurl'],
-            branch=config['repo_path'],
-            tipsOnly=tipsOnly,
-            repo_branch=repo_branch,
-            pollInterval=pollInterval,
-        ))
+    branchObjects['change_source'].append(HgPoller(
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        tipsOnly=tipsOnly,
+        repo_branch=repo_branch,
+        pollInterval=pollInterval,
+    ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
@@ -933,6 +904,34 @@ def generateBranchObjects(config, name, secrets=None):
         # shorthand
         pf = config['platforms'][platform]
 
+        if 'mozharness_config' in pf:
+            factory = ScriptFactory(
+                scriptRepo='%s%s' % (config['hgurl'],
+                                     config['mozharness_repo_path']),
+                scriptName=pf['mozharness_config']['script_name'],
+                extra_args=pf['mozharness_config'].get('extra_args'),
+                reboot_command=pf['mozharness_config'].get('reboot_command'),
+            )
+
+            builder = {
+                'name': '%s_dep' % pf['base_name'],
+                'slavenames': pf['slaves'],
+                'builddir': '%s_dep' % pf['base_name'],
+                'slavebuilddir': reallyShort('%s_dep' % pf['base_name']),
+                'factory': factory,
+                'category': name,
+                'properties': {
+                    'branch': name,
+                    'platform': platform,
+                    'product': pf['stage_product'],
+                    'repo_path': config['repo_path'],
+                }
+            }
+            branchObjects['builders'].append(builder)
+
+            # Nothing else to do for this builder
+            continue
+
         # The stage platform needs to be used by the factory __init__ methods
         # as well as the log handler status target.  Instead of repurposing the
         # platform property on each builder, we will create a new property
@@ -1042,6 +1041,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'use_mock': pf.get('use_mock'),
                 'mock_target': pf.get('mock_target'),
                 'mock_packages': pf.get('mock_packages'),
+                'mock_copyin_files': pf.get('mock_copyin_files'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
                 'stageGroup': config['stage_group'],
@@ -1110,7 +1110,7 @@ def generateBranchObjects(config, name, secrets=None):
             branchObjects['builders'].append(mozilla2_dep_builder)
 
             # We have some platforms which need to be built every X hours with PGO.
-            # These builds are as close to regular dep builds as we can make them, 
+            # These builds are as close to regular dep builds as we can make them,
             # other than PGO
             if config['pgo_strategy'] in ('periodic', 'try') and platform in config['pgo_platforms']:
                 pgo_kwargs = factory_kwargs.copy()
@@ -1299,6 +1299,7 @@ def generateBranchObjects(config, name, secrets=None):
                 use_mock=pf.get('use_mock'),
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
@@ -1426,6 +1427,10 @@ def generateBranchObjects(config, name, secrets=None):
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                         buildsBeforeReboot=pf.get('builds_before_reboot',0),
+                        use_mock=pf.get('use_mock'),
+                        mock_target=pf.get('mock_target'),
+                        mock_packages=pf.get('mock_packages'),
+                        mock_copyin_files=pf.get('mock_copyin_files'),
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -1499,8 +1504,14 @@ def generateBranchObjects(config, name, secrets=None):
                 valgrind_env=platform_env.copy()
                 valgrind_env['REVISION'] = WithProperties("%(revision)s")
                 mozilla2_valgrind_factory = ScriptFactory(
-                    "%s%s" % (config['hgurl'],config['build_tools_repo_path']),
-                    'scripts/valgrind/valgrind.sh',
+                    scriptRepo="%s%s" % (config['hgurl'],
+                                         config['build_tools_repo_path']),
+                    scriptName='scripts/valgrind/valgrind.sh',
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
+                    env=valgrind_env,
                 )
                 mozilla2_valgrind_builder = {
                     'name': '%s valgrind' % pf['base_name'],
@@ -1559,6 +1570,10 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 buildsBeforeReboot=pf.get('builds_before_reboot',0),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
@@ -1610,59 +1625,63 @@ def generateBranchObjects(config, name, secrets=None):
                 branchObjects['builders'].append(blocklistBuilder)
 
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
-             xr_env = pf['env'].copy()
-             xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
-             xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
-             xr_env['SYMBOL_SERVER_SSH_KEY'] = \
-                 xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
-             if pf.has_key('xr_mozconfig'):
-                 mozconfig = pf['xr_mozconfig']
-             else:
-                 mozconfig = '%s/%s/xulrunner' % (platform, name)
-             xulrunnerStageBasePath = '%s/xulrunner' % config['stage_base_path']
-             mozilla2_xulrunner_factory = NightlyBuildFactory(
-                 env=xr_env,
-                 objdir=pf['platform_objdir'],
-                 platform=platform,
-                 hgHost=config['hghost'],
-                 repoPath=config['repo_path'],
-                 buildToolsRepoPath=config['build_tools_repo_path'],
-                 configRepoPath=config['config_repo_path'],
-                 configSubDir=config['config_subdir'],
-                 profiledBuild=False,
-                 productName='xulrunner',
-                 mozconfig=mozconfig,
-                 srcMozconfig=pf.get('src_xulrunner_mozconfig'),
-                 stageServer=config['stage_server'],
-                 stageUsername=config['stage_username_xulrunner'],
-                 stageGroup=config['stage_group'],
-                 stageSshKey=config['stage_ssh_xulrunner_key'],
-                 stageBasePath=xulrunnerStageBasePath,
-                 codesighs=False,
-                 uploadPackages=uploadPackages,
-                 uploadSymbols=True,
-                 nightly=True,
-                 createSnippet=False,
-                 buildSpace=buildSpace,
-                 clobberURL=config['base_clobber_url'],
-                 clobberTime=clobberTime,
-                 buildsBeforeReboot=pf['builds_before_reboot'],
-                 packageSDK=True,
-                 signingServers=secrets.get(pf.get('nightly_signing_servers')),
-                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
-                 tooltool_url_list=config.get('tooltool_url_list', []),
-             )
-             mozilla2_xulrunner_builder = {
-                 'name': '%s xulrunner' % pf['base_name'],
-                 'slavenames': pf['slaves'],
-                 'builddir': '%s-%s-xulrunner' % (name, platform),
-                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
-                 'factory': mozilla2_xulrunner_factory,
-                 'category': name,
-                 'nextSlave': _nextSlowSlave,
-                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)), 'product': 'xulrunner'},
-             }
-             branchObjects['builders'].append(mozilla2_xulrunner_builder)
+            xr_env = pf['env'].copy()
+            xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
+            xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
+            xr_env['SYMBOL_SERVER_SSH_KEY'] = \
+                xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
+            if pf.has_key('xr_mozconfig'):
+                mozconfig = pf['xr_mozconfig']
+            else:
+                mozconfig = '%s/%s/xulrunner' % (platform, name)
+            xulrunnerStageBasePath = '%s/xulrunner' % config['stage_base_path']
+            mozilla2_xulrunner_factory = NightlyBuildFactory(
+                env=xr_env,
+                objdir=pf['platform_objdir'],
+                platform=platform,
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                configRepoPath=config['config_repo_path'],
+                configSubDir=config['config_subdir'],
+                profiledBuild=False,
+                productName='xulrunner',
+                mozconfig=mozconfig,
+                srcMozconfig=pf.get('src_xulrunner_mozconfig'),
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username_xulrunner'],
+                stageGroup=config['stage_group'],
+                stageSshKey=config['stage_ssh_xulrunner_key'],
+                stageBasePath=xulrunnerStageBasePath,
+                codesighs=False,
+                uploadPackages=uploadPackages,
+                uploadSymbols=True,
+                nightly=True,
+                createSnippet=False,
+                buildSpace=buildSpace,
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+                buildsBeforeReboot=pf['builds_before_reboot'],
+                packageSDK=True,
+                signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=config.get('tooltool_url_list', []),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
+            )
+            mozilla2_xulrunner_builder = {
+                'name': '%s xulrunner' % pf['base_name'],
+                'slavenames': pf['slaves'],
+                'builddir': '%s-%s-xulrunner' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
+                'factory': mozilla2_xulrunner_factory,
+                'category': name,
+                'nextSlave': _nextSlowSlave,
+                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)), 'product': 'xulrunner'},
+            }
+            branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
         # -- end of per-platform loop --
 
@@ -1725,7 +1744,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
            branch_config['platforms'].has_key(platform) and \
            not branch_config['platforms'][platform].get('enable_talos', True):
             continue
-        
+
         if platform_config.get('is_mobile', False):
             branchName = branch_config['mobile_branch_name']
             tinderboxTree = branch_config['mobile_tinderbox_tree']

@@ -412,6 +412,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         tag_factory = ScriptFactory(
             scriptRepo=tools_repo,
             scriptName='scripts/release/tagging.sh',
+            use_mock=pf.get('use_mock'),
+            mock_target=pf.get('mock_target'),
+            mock_packages=pf.get('mock_packages'),
+            mock_copyin_files=pf.get('mock_copyin_files'),
+            env=tag_env,
         )
 
         builders.append({
@@ -639,7 +644,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 triggerBuilds=True,
                 triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
-                use_mock=pf.get('use_mock'),
                 android_signing=pf.get('android_signing', False),
                 multiLocale=bool(releaseConfig.get('enableMultiLocale', False) and
                                  pf.get('multi_locale', False)),
@@ -660,6 +664,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 enableInstaller=pf.get('enable_installer', False),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
             )
 
             builders.append({
@@ -717,6 +725,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     interpreter='bash',
                     scriptName='scripts/l10n/release_repacks.sh',
                     extra_args=extra_args,
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
                 )
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
@@ -742,6 +754,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/mobile_l10n.py',
                         extra_args=extra_args,
+                        use_mock=pf.get('use_mock'),
+                        mock_target=pf.get('mock_target'),
+                        mock_packages=pf.get('mock_packages'),
+                        mock_copyin_files=pf.get('mock_copyin_files'),
+                        env=env,
                     )
                 else:
                     extra_args = [platform, branchConfigFile]
@@ -765,6 +782,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         scriptName='scripts/l10n/release_repacks.sh',
                         extra_args=extra_args,
                         script_timeout=2400,
+                        use_mock=pf.get('use_mock'),
+                        mock_target=pf.get('mock_target'),
+                        mock_packages=pf.get('mock_packages'),
+                        mock_copyin_files=pf.get('mock_copyin_files'),
                     )
 
                 builddir = builderPrefix('%s_repack' % platform) + \
@@ -862,6 +883,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 partialUpdates=releaseConfig.get('partialUpdates', {}),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
@@ -905,6 +930,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptRepo=mozharness_repo,
                     scriptName=mh_cfg['script'],
                     extra_args=extra_args,
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
+                    env=builder_env,
                 )
             else:
                 pr_pf = branchConfig['platforms']['macosx64']
@@ -925,6 +955,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     signingServers=getSigningServers(platform),
                     enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                     env=pr_pf['env'],
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
                 )
                 partner_repack_factory = PartnerRepackFactory(**repack_params)
 
@@ -1072,7 +1106,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             signingServers=getSigningServers('linux'),
             useChecksums=releaseConfig.get('enablePartialMarsAtBuildTime', True),
             mozRepoPath=moz_repo_path,
-            python=branchConfig['platforms']['linux']['env']['PYTHON26'],
+            python=branchConfig['platforms']['linux']['env'].get('PYTHON26', 'python'),
         )
 
         builders.append({
@@ -1443,38 +1477,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         important_builders.append(builderPrefix('signing_done'))
 
     if hasPlatformSubstring(manuallySignedPlatforms, 'android'):
-        for platform in manuallySignedPlatforms:
-            locale = 'en-US'
-            candidatesDir = makeCandidatesDir(
-                releaseConfig['productName'],
-                releaseConfig['version'],
-                releaseConfig['buildNumber'],
-                protocol='http',
-                server=releaseConfig['ftpServer'])
-            enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-                (candidatesDir,
-                 buildbot2ftp(platform),
-                 locale, releaseConfig['productName'], releaseConfig['version'],
-                 locale)
-            change_source.append(UrlPoller(
-                branch=builderPrefix('android_post_signing'),
-                url=enUS_signed_apk_url,
-                pollInterval=60*10
-            ))
-            if branchConfig['platforms'][platform].get('multi_locale'):
-                locale = 'multi'
-                signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-                    (candidatesDir,
-                     buildbot2ftp(platform),
-                     locale,
-                     releaseConfig['productName'],
-                     releaseConfig['version'],
-                     locale)
-                change_source.append(UrlPoller(
-                    branch=builderPrefix('android_post_signing'),
-                    url=signed_apk_url,
-                    pollInterval=60*10
-                ))
+        # Watch only armv7 en-US APK
+        platform = 'android'
+        locale = 'en-US'
+        candidatesDir = makeCandidatesDir(
+            releaseConfig['productName'],
+            releaseConfig['version'],
+            releaseConfig['buildNumber'],
+            protocol='http',
+            server=releaseConfig['ftpServer'])
+        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
+            (candidatesDir,
+             buildbot2ftp(platform),
+             locale, releaseConfig['productName'], releaseConfig['version'],
+             locale)
+        change_source.append(UrlPoller(
+            branch=builderPrefix('android_post_signing'),
+            url=enUS_signed_apk_url,
+            pollInterval=60*10
+        ))
 
     reset_schedulers_scheduler = Scheduler(
         name=builderPrefix('%s_reset_schedulers' % releaseConfig['productName']),
