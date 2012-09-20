@@ -1041,6 +1041,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'use_mock': pf.get('use_mock'),
                 'mock_target': pf.get('mock_target'),
                 'mock_packages': pf.get('mock_packages'),
+                'mock_copyin_files': pf.get('mock_copyin_files'),
                 'stageServer': config['stage_server'],
                 'stageUsername': config['stage_username'],
                 'stageGroup': config['stage_group'],
@@ -1298,6 +1299,7 @@ def generateBranchObjects(config, name, secrets=None):
                 use_mock=pf.get('use_mock'),
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 stageServer=config['stage_server'],
                 stageUsername=config['stage_username'],
                 stageGroup=config['stage_group'],
@@ -1425,6 +1427,10 @@ def generateBranchObjects(config, name, secrets=None):
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                         buildsBeforeReboot=pf.get('builds_before_reboot',0),
+                        use_mock=pf.get('use_mock'),
+                        mock_target=pf.get('mock_target'),
+                        mock_packages=pf.get('mock_packages'),
+                        mock_copyin_files=pf.get('mock_copyin_files'),
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -1498,8 +1504,14 @@ def generateBranchObjects(config, name, secrets=None):
                 valgrind_env=platform_env.copy()
                 valgrind_env['REVISION'] = WithProperties("%(revision)s")
                 mozilla2_valgrind_factory = ScriptFactory(
-                    "%s%s" % (config['hgurl'],config['build_tools_repo_path']),
-                    'scripts/valgrind/valgrind.sh',
+                    scriptRepo="%s%s" % (config['hgurl'],
+                                         config['build_tools_repo_path']),
+                    scriptName='scripts/valgrind/valgrind.sh',
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
+                    env=valgrind_env,
                 )
                 mozilla2_valgrind_builder = {
                     'name': '%s valgrind' % pf['base_name'],
@@ -1558,6 +1570,10 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 buildsBeforeReboot=pf.get('builds_before_reboot',0),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
@@ -1609,59 +1625,63 @@ def generateBranchObjects(config, name, secrets=None):
                 branchObjects['builders'].append(blocklistBuilder)
 
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
-             xr_env = pf['env'].copy()
-             xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
-             xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
-             xr_env['SYMBOL_SERVER_SSH_KEY'] = \
-                 xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
-             if pf.has_key('xr_mozconfig'):
-                 mozconfig = pf['xr_mozconfig']
-             else:
-                 mozconfig = '%s/%s/xulrunner' % (platform, name)
-             xulrunnerStageBasePath = '%s/xulrunner' % config['stage_base_path']
-             mozilla2_xulrunner_factory = NightlyBuildFactory(
-                 env=xr_env,
-                 objdir=pf['platform_objdir'],
-                 platform=platform,
-                 hgHost=config['hghost'],
-                 repoPath=config['repo_path'],
-                 buildToolsRepoPath=config['build_tools_repo_path'],
-                 configRepoPath=config['config_repo_path'],
-                 configSubDir=config['config_subdir'],
-                 profiledBuild=False,
-                 productName='xulrunner',
-                 mozconfig=mozconfig,
-                 srcMozconfig=pf.get('src_xulrunner_mozconfig'),
-                 stageServer=config['stage_server'],
-                 stageUsername=config['stage_username_xulrunner'],
-                 stageGroup=config['stage_group'],
-                 stageSshKey=config['stage_ssh_xulrunner_key'],
-                 stageBasePath=xulrunnerStageBasePath,
-                 codesighs=False,
-                 uploadPackages=uploadPackages,
-                 uploadSymbols=True,
-                 nightly=True,
-                 createSnippet=False,
-                 buildSpace=buildSpace,
-                 clobberURL=config['base_clobber_url'],
-                 clobberTime=clobberTime,
-                 buildsBeforeReboot=pf['builds_before_reboot'],
-                 packageSDK=True,
-                 signingServers=secrets.get(pf.get('nightly_signing_servers')),
-                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
-                 tooltool_url_list=config.get('tooltool_url_list', []),
-             )
-             mozilla2_xulrunner_builder = {
-                 'name': '%s xulrunner' % pf['base_name'],
-                 'slavenames': pf['slaves'],
-                 'builddir': '%s-%s-xulrunner' % (name, platform),
-                 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
-                 'factory': mozilla2_xulrunner_factory,
-                 'category': name,
-                 'nextSlave': _nextSlowSlave,
-                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)), 'product': 'xulrunner'},
-             }
-             branchObjects['builders'].append(mozilla2_xulrunner_builder)
+            xr_env = pf['env'].copy()
+            xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
+            xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
+            xr_env['SYMBOL_SERVER_SSH_KEY'] = \
+                xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
+            if pf.has_key('xr_mozconfig'):
+                mozconfig = pf['xr_mozconfig']
+            else:
+                mozconfig = '%s/%s/xulrunner' % (platform, name)
+            xulrunnerStageBasePath = '%s/xulrunner' % config['stage_base_path']
+            mozilla2_xulrunner_factory = NightlyBuildFactory(
+                env=xr_env,
+                objdir=pf['platform_objdir'],
+                platform=platform,
+                hgHost=config['hghost'],
+                repoPath=config['repo_path'],
+                buildToolsRepoPath=config['build_tools_repo_path'],
+                configRepoPath=config['config_repo_path'],
+                configSubDir=config['config_subdir'],
+                profiledBuild=False,
+                productName='xulrunner',
+                mozconfig=mozconfig,
+                srcMozconfig=pf.get('src_xulrunner_mozconfig'),
+                stageServer=config['stage_server'],
+                stageUsername=config['stage_username_xulrunner'],
+                stageGroup=config['stage_group'],
+                stageSshKey=config['stage_ssh_xulrunner_key'],
+                stageBasePath=xulrunnerStageBasePath,
+                codesighs=False,
+                uploadPackages=uploadPackages,
+                uploadSymbols=True,
+                nightly=True,
+                createSnippet=False,
+                buildSpace=buildSpace,
+                clobberURL=config['base_clobber_url'],
+                clobberTime=clobberTime,
+                buildsBeforeReboot=pf['builds_before_reboot'],
+                packageSDK=True,
+                signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=config.get('tooltool_url_list', []),
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
+            )
+            mozilla2_xulrunner_builder = {
+                'name': '%s xulrunner' % pf['base_name'],
+                'slavenames': pf['slaves'],
+                'builddir': '%s-%s-xulrunner' % (name, platform),
+                'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
+                'factory': mozilla2_xulrunner_factory,
+                'category': name,
+                'nextSlave': _nextSlowSlave,
+                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': reallyShort('%s-%s-xulrunner' % (name, platform)), 'product': 'xulrunner'},
+            }
+            branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
         # -- end of per-platform loop --
 
