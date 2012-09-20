@@ -2052,7 +2052,6 @@ class TryBuildFactory(MercurialBuildFactory):
          workdir='build/%s/tools/codesighs' % self.mozillaObjdir,
          mock=self.use_mock,
          target=self.mock_target,
-         mock_workdir_prefix=None,
         ))
         self.addStep(RetryingShellCommand(
          name='get_codesize_log',
