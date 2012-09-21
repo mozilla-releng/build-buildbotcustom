@@ -1996,7 +1996,6 @@ class TryBuildFactory(MercurialBuildFactory):
 
             step = self.makeHgtoolStep(
                     clone_by_revision=True,
-                    bundles=[],
                     wc='build',
                     workdir='.',
                     locks=[hg_try_lock.access('counting')],
