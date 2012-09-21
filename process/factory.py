@@ -1996,7 +1996,6 @@ class TryBuildFactory(MercurialBuildFactory):
 
             step = self.makeHgtoolStep(
                     clone_by_revision=True,
-                    bundles=[],
                     wc='build',
                     workdir='.',
                     locks=[hg_try_lock.access('counting')],
@@ -3484,8 +3483,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(MockCommand(
          name='repack_installers_pretty',
          description=['repack', 'installers', 'pretty'],
-         command=['sh', '-c', 'make', WithProperties('installers-%(locale)s'),
-                  'LOCALE_MERGEDIR=$PWD/merged'],
+         command=['sh', '-c',
+            WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env=prettyEnv,
          haltOnFailure=False,
          flunkOnFailure=False,
@@ -3756,8 +3755,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(MockCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=['make', WithProperties('installers-%(locale)s'),
-                  'LOCALE_MERGEDIR=$PWD/merged'],
+         command=['sh', '-c',
+            WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env = self.env,
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
