@@ -1085,6 +1085,8 @@ def generateBranchObjects(config, name, secrets=None):
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
                 'runAliveTests': pf.get('run_alive_tests', True),
+                'gaiaRepo': pf.get('gaia_repo'),
+                'gaiaRevision': config.get('gaia_revision'),
             }
             factory_kwargs.update(extra_args)
 
@@ -1347,6 +1349,8 @@ def generateBranchObjects(config, name, secrets=None):
                 mozillaDir=config.get('mozilla_dir', None),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=config.get('tooltool_url_list', []),
+                gaiaRepo=pf.get('gaia_repo'),
+                gaiaRevision=config.get('gaia_revision'),
                 **nightly_kwargs
             )
 

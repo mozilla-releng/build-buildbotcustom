@@ -729,6 +729,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  enablePackaging=True,
                  runAliveTests=True,
                  enableInstaller=False,
+                 gaiaRepo=None,
+                 gaiaRevision=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -799,6 +801,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.tooltool_script = tooltool_script
         self.tooltool_bootstrap = tooltool_bootstrap
         self.runAliveTests = runAliveTests
+        self.gaiaRepo = gaiaRepo
+        self.gaiaRevision = gaiaRevision
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1129,7 +1133,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.hgHost[0:5] == "ssh://":
             changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
                                                            self.repoPath)
-        else: 
+        else:
             changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
                                                           self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
@@ -1138,6 +1142,16 @@ class MercurialBuildFactory(MozillaBuildFactory):
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
 
+        if self.gaiaRepo:
+            self.addStep(self.makeHgtoolStep(
+                name="gaia_sources",
+                rev=self.gaiaRevision or 'default',
+                repo_url="http://%s/%s" % (self.hgHost, self.gaiaRepo),
+                workdir="build/",
+                use_properties=False,
+                mirrors=['%s/%s' % (url, self.gaiaRepo) for url in self.baseMirrorUrls],
+                bundles=[],
+            ))
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",
