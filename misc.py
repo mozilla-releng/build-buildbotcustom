@@ -433,7 +433,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             scriptName=suites['script_path'],
             hg_bin=suites['hg_bin'],
             extra_args=suites.get('extra_args', []),
-            script_maxtime=suites.get('script_maxtime', 1200),
+            script_maxtime=suites.get('script_maxtime', 3600),
             reboot_command=suites.get('reboot_command'),
             platform=platform,
             log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
@@ -585,6 +585,7 @@ def generateBranchObjects(config, name, secrets=None):
         if 'mozharness_config' in pf:
             buildername = '%s_dep' % pf['base_name']
             builders.append(buildername)
+            prettyNames[platform] = buildername
             continue
 
         if platform.endswith("-debug"):
@@ -911,6 +912,8 @@ def generateBranchObjects(config, name, secrets=None):
                 scriptName=pf['mozharness_config']['script_name'],
                 extra_args=pf['mozharness_config'].get('extra_args'),
                 reboot_command=pf['mozharness_config'].get('reboot_command'),
+                script_timeout=pf.get('timeout', 3600),
+                script_maxtime=pf.get('maxTime', 4 * 3600),
             )
 
             builder = {
@@ -1951,7 +1954,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             }
                             if isinstance(suites, dict) and "mozharness_repo" in suites:
                                 test_builder_kwargs['mozharness'] = True
-                                test_builder_kwargs['mozharness_python'] = platform_config['mozharness_python']
+                                test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                             branchObjects['builders'].extend(generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builder_kwargs = test_builder_kwargs.copy()
