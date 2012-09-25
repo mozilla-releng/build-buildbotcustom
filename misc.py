@@ -585,6 +585,7 @@ def generateBranchObjects(config, name, secrets=None):
         if 'mozharness_config' in pf:
             buildername = '%s_dep' % pf['base_name']
             builders.append(buildername)
+            prettyNames[platform] = buildername
             continue
 
         if platform.endswith("-debug"):
@@ -911,6 +912,8 @@ def generateBranchObjects(config, name, secrets=None):
                 scriptName=pf['mozharness_config']['script_name'],
                 extra_args=pf['mozharness_config'].get('extra_args'),
                 reboot_command=pf['mozharness_config'].get('reboot_command'),
+                script_timeout=pf.get('timeout', 3600),
+                script_maxtime=pf.get('maxTime', 4 * 3600),
             )
 
             builder = {
