@@ -74,7 +74,7 @@ from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, MockInst
 import buildbotcustom.steps.unittest as unittest_steps
 
 import buildbotcustom.steps.talos as talos_steps
-from buildbot.status.builder import SUCCESS, FAILURE
+from buildbot.status.builder import SUCCESS, FAILURE, RETRY
 
 from release.paths import makeCandidatesDir
 
@@ -5043,7 +5043,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
          command=['python', '/builds/sut_tools/verify.py'],
          workdir='build',
          haltOnFailure=True,
-         log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+         log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
         ))
         self.addStep(SetProperty(
             name="GetFoopyPlatform",
@@ -5368,7 +5368,7 @@ class TalosFactory(RequestSortingBuildFactory):
          command=['python', '/builds/sut_tools/verify.py'],
          workdir='build',
          haltOnFailure=True,
-         log_eval_func=lambda c,s: regex_log_evaluator(c, s, tegra_errors),
+         log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
         ))
 
     def addCleanupSteps(self):
