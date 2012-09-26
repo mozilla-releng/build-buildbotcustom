@@ -2385,7 +2385,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
     def addCreateUpdateSteps(self):
         self.addStep(ShellCommand(
             name='rm_existing_mars',
-            command=['bash', '-c', 'rm -rvf *.mar'],
+            command=['bash', '-c', 'rm -rf *.mar'],
             env=self.env,
             workdir='%s/dist/update' % self.absMozillaObjDir,
             haltOnFailure=True,
@@ -3809,7 +3809,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         # Remove the source (en-US) package so as not to confuse later steps
         # that look up build details.
         self.addStep(ShellCommand(name='rm_en-US_build',
-                                  command=['bash', '-c', 'rm -rvf *.en-US.*'],
+                                  command=['bash', '-c', 'rm -rf *.en-US.*'],
                                   description=['remove','en-US','build'],
                                   env=self.env,
                                   workdir='%s/dist' % self.absMozillaObjDir,
@@ -5027,7 +5027,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
         #On windows, we should try using cmd's attrib and native rmdir
         self.addStep(ShellCommand(
             name='rm_builddir',
-            command=['rm', '-rfv', 'build'],
+            command=['rm', '-rf', 'build'],
             workdir='.'
         ))
 
@@ -5414,7 +5414,7 @@ class TalosFactory(RequestSortingBuildFactory):
              name='remove any old working dirs',
              workdir=os.path.dirname(self.workdirBase),
              description="remove old working dirs",
-             command='if exist t-* nohup rm -vrf t-*',
+             command='if exist t-* nohup rm -rf t-*',
              env=self.env)
             )
             self.addStep(ShellCommand(
@@ -5429,7 +5429,7 @@ class TalosFactory(RequestSortingBuildFactory):
              name='cleanup',
              workdir=self.workdirBase,
              description="Cleanup",
-             command='nohup rm -vrf *',
+             command='nohup rm -rf *',
              env=self.env)
             )
         if 'fed' in self.OS:
