@@ -223,11 +223,11 @@ class UnpackFile(ShellCommand):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
         if filename.endswith(".zip") or filename.endswith(".apk"):
-            self.setCommand(['unzip', '-o', filename])
+            self.setCommand(['unzip', '-oq', filename])
         elif filename.endswith(".tar.gz"):
-            self.setCommand(['tar', '-zxvf', filename])
+            self.setCommand(['tar', '-zxf', filename])
         elif filename.endswith(".tar.bz2"):
-            self.setCommand(['tar', '-jxvf', filename])
+            self.setCommand(['tar', '-jxf', filename])
         elif filename.endswith(".dmg"):
             self.setCommand(['bash',
              '%s/installdmg.sh' % self.scripts_dir,
@@ -261,7 +261,7 @@ class UnpackTest(ShellCommand):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
         if filename.endswith(".zip"):
-            args = ['unzip', '-o', filename, 'bin*', 'certs*', 'modules*']
+            args = ['unzip', '-oq', filename, 'bin*', 'certs*', 'modules*']
 
             # modify the commands to extract only the files we need - the test directory and bin/ and certs/
             if self.testtype == "mochitest":
@@ -277,14 +277,14 @@ class UnpackTest(ShellCommand):
                 args.append('jetpack*')
             else:
                 # If it all fails, we extract the whole shebang
-                args = ['unzip', '-o', filename]
+                args = ['unzip', '-oq', filename]
 
             self.setCommand(args)
         #If we come across a test not packaged as a zip file, try unpacking the whole thing using tar+gzip/bzip2
         elif filename.endswith("tar.bz2"):
-            self.setCommand(['tar', '-jxvf', filename])
+            self.setCommand(['tar', '-jxf', filename])
         elif filename.endswith("tar.gz"):
-            self.setCommand(['tar', '-zxvf', filename])
+            self.setCommand(['tar', '-zxf', filename])
         else:
             # TODO: The test package is .zip across all three platforms, so we're special casing for that
             raise ValueError("Don't know how to handle %s" % filename)
