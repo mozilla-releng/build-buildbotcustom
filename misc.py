@@ -1820,7 +1820,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "talosCmd": branch_config['talos_command'],
                         "fetchSymbols": branch_config['fetch_symbols'] and
                           platform_config[slave_platform].get('download_symbols',True),
-                        "talos_from_source_code": branch_config.get('talos_from_source_code', False)
+                        "talos_from_source_code": branch_config.get('talos_from_source_code', False),
+                        "credentialsFile": os.path.join(os.getcwd(), "BuildSlaves.py"),
+                        "datazillaUrl": branch_config.get('datazilla_url')
                     }
 
                     if extra and extra.get('remoteTests', False) and 'xul' in platform:

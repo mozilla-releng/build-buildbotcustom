@@ -5261,8 +5261,9 @@ class TalosFactory(RequestSortingBuildFactory):
             configOptions, talosCmd, customManifest=None, customTalos=None,
             workdirBase=None, fetchSymbols=False, plugins=None, pagesets=[],
             remoteTests=False, productName="firefox", remoteExtras=None,
-            talosAddOns=[], releaseTester=False,
-            talosBranch=None, branch=None, talos_from_source_code=False):
+            talosAddOns=[], releaseTester=False, credentialsFile=None,
+            talosBranch=None, branch=None, talos_from_source_code=False,
+            datazillaUrl=None):
 
         BuildFactory.__init__(self)
 
@@ -5284,7 +5285,7 @@ class TalosFactory(RequestSortingBuildFactory):
         except:
             # simple-talos does not use --activeTests
             self.suites = ""
-        self.talosCmd = talosCmd
+        self.talosCmd = talosCmd[:]
         self.customManifest = customManifest
         self.customTalos = customTalos
         self.fetchSymbols = fetchSymbols
@@ -5297,6 +5298,11 @@ class TalosFactory(RequestSortingBuildFactory):
         self.productName = productName
         self.remoteExtras = remoteExtras
         self.talos_from_source_code = talos_from_source_code
+        self.credentialsFile = credentialsFile
+
+        if datazillaUrl:
+            self.talosCmd.extend(['--datazilla-url', datazillaUrl])
+            self.talosCmd.extend(['--authfile', os.path.basename(credentialsFile)])
         if talosBranch is None:
             self.talosBranch = branchName
         else:
@@ -5632,6 +5638,14 @@ class TalosFactory(RequestSortingBuildFactory):
                 name='check sdk okay'))
 
     def addSetupSteps(self):
+        if self.credentialsFile:
+            target_file_name = os.path.basename(self.credentialsFile)
+            self.addStep(FileDownload(
+                mastersrc=self.credentialsFile,
+                slavedest=target_file_name,
+                workdir=os.path.join(self.workdirBase, "talos"),
+                flunkOnFailure=False,
+            ))
         if self.customManifest:
             self.addStep(FileDownload(
              mastersrc=self.customManifest,
