@@ -2067,13 +2067,16 @@ class TryBuildFactory(MercurialBuildFactory):
         else:
             codesighsObjdir = '../%s' % self.mozillaObjdir
 
-        self.addStep(Codesighs(
+        self.addStep(MockCodesighs(
          name='get_codesighs_diff',
          objdir=codesighsObjdir,
          platform=self.platform,
          workdir='build%s' % self.mozillaDir,
          env=self.env,
          tbPrint=self.tbPrint,
+         mock=self.use_mock,
+         target=self.mock_target,
+         mock_workdir_prefix='%(basedir)s/',
         ))
 
         self.addStep(ShellCommand(
