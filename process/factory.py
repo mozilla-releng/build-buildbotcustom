@@ -414,6 +414,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
          name='rm_buildtools',
          command=['rm', '-rf', 'tools'],
          description=['clobber', 'build tools'],
+         haltOnFailure=True,
+         log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
          workdir='.'
         ))
         self.addStep(MercurialCloneCommand(
