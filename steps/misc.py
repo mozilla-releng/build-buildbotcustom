@@ -196,9 +196,9 @@ class DownloadFile(ShellCommand):
                     os.path.basename(renderedUrl), "DownloadFile")
 
         if self.ignore_certs:
-            self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", url])
+            self.setCommand(["wget"] + self.wget_args + ["--no-verbose", "-N", "--no-check-certificate", url])
         else:
-            self.setCommand(["wget"] + self.wget_args + ["-N", url])
+            self.setCommand(["wget"] + self.wget_args + ["--no-verbose", "-N", url])
         self.super_class.start(self)
 
     def evaluateCommand(self, cmd):
