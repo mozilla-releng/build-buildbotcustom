@@ -5409,7 +5409,7 @@ class TalosFactory(RequestSortingBuildFactory):
              flunkOnFailure=False,
              warnOnFailure=False,
              description="chmod files (see msys bug)",
-             command=["chmod", "-v", "-R", "a+rwx", "."],
+             command=["chmod", "-R", "a+rwx", "."],
              env=self.env)
             )
             #on windows move the whole working dir out of the way, saves us trouble later
@@ -5555,7 +5555,7 @@ class TalosFactory(RequestSortingBuildFactory):
              flunkOnFailure=False,
              warnOnFailure=False,
              description="chmod files (see msys bug)",
-             command=["chmod", "-v", "-R", "a+x", "."],
+             command=["chmod", "-R", "a+x", "."],
              env=self.env)
             )
         if self.OS in ('tiger', 'leopard', 'snowleopard', 'lion', 'mountainlion'):
