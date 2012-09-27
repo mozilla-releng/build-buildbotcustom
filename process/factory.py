@@ -2090,7 +2090,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(SetBuildProperty(
              name='set_who',
              property_name='who',
-             value=lambda build:str(build.source.changes[0].who) if len(build.source.changes) > 0 else "",
+             value=lambda build:str(build.source.changes[0].who) if len(build.source.changes) > 0 else "nobody@example.com",
              haltOnFailure=True
         ))
 
