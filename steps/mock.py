@@ -168,6 +168,7 @@ class MockReset(ShellCommand):
         kwargs['command'] = "sh -c " \
             "'rm -f /builds/mock_mozilla/%s/buildroot.lock; " \
             "mock_mozilla -v -r %s --orphanskill'" % (target, target)
+        assert target is not None, "target is required"
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
         self.target = target
