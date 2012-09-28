@@ -520,6 +520,31 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             builders.append(builder)
     return builders
 
+def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
+                                   hg_bin, mozharness_python,
+                                   reboot_command, extra_args=None,
+                                   script_timeout=3600,
+                                   script_maxtime=7200):
+    if extra_args is None:
+        extra_args = []
+    return ScriptFactory(
+        interpreter=mozharness_python,
+        scriptRepo=mozharness_repo,
+        scriptName=script_path,
+        hg_bin=hg_bin,
+        extra_args=extra_args,
+        script_timeout=script_timeout,
+        script_maxtime=script_maxtime,
+        reboot_command=reboot_command,
+        platform=platform,
+        log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
+         (re.compile('# TBPL WARNING #'), WARNINGS),
+         (re.compile('# TBPL FAILURE #'), FAILURE),
+         (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
+         (re.compile('# TBPL RETRY #'), RETRY),
+        ))
+    )
+
 def generateBranchObjects(config, name, secrets=None):
     """name is the name of branch which is usually the last part of the path
        to the repository. For example, 'mozilla-central', 'mozilla-aurora', or
@@ -1824,21 +1849,44 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "credentialsFile": os.path.join(os.getcwd(), "BuildSlaves.py"),
                         "datazillaUrl": branch_config.get('datazilla_url')
                     }
-
-                    if extra and extra.get('remoteTests', False) and 'xul' in platform:
-                        myextra      = deepcopy(extra)
-                        remoteExtras = myextra.get('remoteExtras', {})
-                        reOptions    = remoteExtras.get('options', [])
-                        reOptions.append('--nativeUI')
-                        remoteExtras['options'] = reOptions
-                        myextra['remoteExtras'] = remoteExtras
-                        factory_kwargs.update(myextra)
-                    else:
-                        factory_kwargs.update(extra)
+                    factory_kwargs.update(extra)
 
                     builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
                     slavebuilddir= 'test'
-                    factory = factory_class(**factory_kwargs)
+                    if branch_config.get('mozharness_talos') and not platform_config.get('is_mobile'):
+                        extra_args = ['--suite', suite,
+                                      '--add-option',
+                                      ','.join(['--webServer', 'localhost']),
+                                      '--branch-name', opt_talos_branch]
+                        if '64' in platform:
+                            extra_args.extend(['--system-bits', '64'])
+                        else:
+                            extra_args.extend(['--system-bits', '32'])
+                        if 'win' in platform:
+                            extra_args.extend(['--cfg', 'talos/windows_config.py'])
+                        elif 'mac' in platform:
+                            extra_args.extend(['--cfg', 'talos/mac_config.py'])
+                        else:
+                            assert 'linux' in platform, "buildbotcustom.misc: mozharness talos: unknown platform %s!" % platform
+                            extra_args.extend(['--cfg', 'talos/linux_config.py'])
+                        if factory_kwargs['fetchSymbols']:
+                            extra_args.append('--download-symbols')
+                        if factory_kwargs["talos_from_source_code"]:
+                            extra_args.append('--use-talos-json')
+                        factory = generateMozharnessTalosBuilder(
+                         platform=platform,
+                         mozharness_repo=platform_config['mozharness_config']['mozharness_repo'],
+                         script_path="scripts/talos_script.py",
+                         hg_bin=platform_config['mozharness_config']['hg_bin'],
+                         mozharness_python=platform_config['mozharness_config']['mozharness_python'],
+                         extra_args=extra_args,
+                         script_timeout=platform_config['mozharness_config'].get('script_timeout', 3600),
+                         script_maxtime=platform_config['mozharness_config'].get('script_maxtime', 7200),
+                         reboot_command=platform_config['mozharness_config'].get('reboot_command'),
+                        )
+                    else:
+                        factory = factory_class(**factory_kwargs)
+
                     builder = {
                         'name': "%s %s talos %s" % (platform_name, branch, suite),
                         'slavenames': platform_config[slave_platform]['slaves'],
