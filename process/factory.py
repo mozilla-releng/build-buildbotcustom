@@ -3225,7 +3225,8 @@ class BaseRepackFactory(MozillaBuildFactory):
          descriptionDone='configure done',
          env=self.env,
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
+         env=self.env
         )))
         self.addStep(ShellCommand( **self.processCommand(
          name='make_config',
