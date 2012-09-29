@@ -3201,16 +3201,14 @@ class BaseRepackFactory(MozillaBuildFactory):
              command=['bash', '-c', 'autoconf-2.13'],
              haltOnFailure=True,
              descriptionDone=['autoconf mozilla'],
-             workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir),
-             env=self.env
+             workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
             ))
         self.addStep(ShellCommand(
          name='autoconf_js_src',
          command=['bash', '-c', 'autoconf-2.13'],
          haltOnFailure=True,
          descriptionDone=['autoconf js/src'],
-         workdir='%s/%s/js/src' % (self.baseWorkDir, self.mozillaSrcDir),
-         env=self.env
+         workdir='%s/%s/js/src' % (self.baseWorkDir, self.mozillaSrcDir)
         ))
         # WinCE is the only platform that will do repackages with
         # a mozconfig for now. This will be fixed in bug 518359
@@ -3225,16 +3223,14 @@ class BaseRepackFactory(MozillaBuildFactory):
          descriptionDone='configure done',
          env=self.env,
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
-         env=self.env
+         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
         )))
         self.addStep(ShellCommand( **self.processCommand(
          name='make_config',
          command=['make'],
          workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make config'],
-         haltOnFailure=True,
-         env=self.env
+         haltOnFailure=True
         )))
 
     def tinderboxPrint(self, propName, propValue):
