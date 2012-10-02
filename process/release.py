@@ -1184,7 +1184,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         check_permissions_factory = ScriptFactory(
             scriptRepo=tools_repo,
             script_timeout=3*60*60,
-            scriptName='scripts/release/push-to-mirrors.sh',
+            scriptName='scripts/release/stage-tasks.sh',
             extra_args=[branchConfigFile, 'permissions',
                         '--extra-excludes=*.zip',
                         '--extra-excludes=*.zip.asc',
@@ -1216,7 +1216,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         antivirus_factory = ScriptFactory(
             scriptRepo=tools_repo,
             script_timeout=3*60*60,
-            scriptName='scripts/release/push-to-mirrors.sh',
+            scriptName='scripts/release/stage-tasks.sh',
             extra_args=[branchConfigFile, 'antivirus',
                        '--extra-excludes=*.zip',
                        '--extra-excludes=*.zip.asc',
@@ -1246,7 +1246,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         push_to_mirrors_factory = ScriptFactory(
             scriptRepo=tools_repo,
             script_timeout=3*60*60,
-            scriptName='scripts/release/push-to-mirrors.sh',
+            scriptName='scripts/release/stage-tasks.sh',
             extra_args=[branchConfigFile, 'push',
                        '--extra-excludes=*.zip',
                        '--extra-excludes=*.zip.asc',
@@ -1271,10 +1271,39 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
         })
+
+        postrelease_factory = ScriptFactory(
+            scriptRepo=tools_repo,
+            scriptName='scripts/release/stage-tasks.sh',
+            extra_args=[branchConfigFile, 'postrelease',
+                       '--extra-excludes=*.zip',
+                       '--extra-excludes=*.zip.asc',
+                       '--ssh-user', branchConfig['stage_username'],
+                       '--ssh-key', branchConfig['stage_ssh_key'],
+                       ],
+        )
+
+        builders.append({
+            'name': builderPrefix('postrelease'),
+            'slavenames': unix_slaves,
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('postrelease'),
+            'slavebuilddir': reallyShort(builderPrefix('postrelease'), releaseConfig['productName']),
+            'factory': postrelease_factory,
+            'env': builder_env,
+            'properties': {
+                'slavebuilddir': reallyShort(builderPrefix('postrelease'), releaseConfig['productName']),
+                'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+                },
+        })
+
         if releaseConfig.get('xulrunnerPlatforms'):
             xr_push_to_mirrors_factory = ScriptFactory(
                 scriptRepo=tools_repo,
-                scriptName='scripts/release/push-to-mirrors.sh',
+                scriptName='scripts/release/stage-tasks.sh',
                 extra_args=[
                     branchConfigFile, 'push',
                     '--product', 'xulrunner',
