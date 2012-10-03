@@ -87,7 +87,7 @@ def formatBytes(bytes, sigDigits=3):
 def formatCount(number, sigDigits=3):
     number=float(str(number) + '.0')
     return str(setSigDigits(number, sigDigits))
-    
+
 def setSigDigits(num, sigDigits=3):
     if num == 0:
         return '0'
@@ -165,7 +165,7 @@ class CompareLeakLogs(ShellCommand):
             log.msg("Could not find build property: leakStats")
             return worst_status(superResult, FAILURE)
         return superResult
-            
+
     def createSummary(self, log):
         leakStats = {}
         leakStats['old'] = {}
@@ -266,6 +266,7 @@ class Codesighs(ShellCommand):
                         '../codesize-' + type + '-diff.log']
 
     def createSummary(self, log):
+        rawBytes = ""
         bytes = ""
         diff = ""
         for line in log.readlines():
