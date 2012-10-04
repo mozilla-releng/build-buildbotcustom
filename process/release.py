@@ -1331,7 +1331,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if not releaseConfig.get('disableBouncerEntries'):
         trigger_uptake_factory = BuildFactory()
-        schedulerNames = [builderPrefix('ready-for-release')]
+        schedulerNames = [builderPrefix('almost-ready-for-release')]
         if releaseConfig.get('verifyConfigs'):
             schedulerNames.append(builderPrefix('ready-for-rel-test'))
         trigger_uptake_factory.addStep(Trigger(
@@ -1397,6 +1397,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 },
             ))
         important_builders.append(builderPrefix('ready_for_releasetest_testing'))
+
+        builders.append(makeDummyBuilder(
+            name=builderPrefix('almost_ready_for_release'),
+            slaves=all_slaves,
+            category=builderPrefix(''),
+            properties={
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+                },
+            ))
 
         builders.append(makeDummyBuilder(
             name=builderPrefix('ready_for_release'),
@@ -1642,7 +1652,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         schedulers.append(s)
 
     if not releaseConfig.get('disableBouncerEntries'):
+        readyForReleaseUpstreams = [builderPrefix('almost_ready_for_release')]
         if releaseConfig.get('verifyConfigs'):
+            readyForReleaseUpstreams += post_update_builders
+
             mirror_scheduler1 = TriggerBouncerCheck(
                 name=builderPrefix('ready-for-rel-test'),
                 configRepo=config_repo,
@@ -1657,16 +1670,27 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             schedulers.append(mirror_scheduler1)
 
-        mirror_scheduler2 = TriggerBouncerCheck(
-            name=builderPrefix('ready-for-release'),
+        # These next two schedulers are a bit weird. When updates are enabled,
+        # we need to wait for both the update verify builders and the uptake
+        # check before we send the "ready for release" e-mail. Because the
+        # TriggerBouncerCheck builder can't depend on an upstream, we need the
+        # "ready for release" scheduler to be downstream of both it and the
+        # update verify builders to get the behaviour we need.
+        schedulers.append(TriggerBouncerCheck(
+            name=builderPrefix('almost-ready-for-release'),
             configRepo=config_repo,
             minUptake=releaseConfig.get('releaseUptake', 45000),
-            builderNames=[builderPrefix('ready_for_release')],
+            builderNames=[builderPrefix('almost_ready_for_release')],
             username=BuildSlaves.tuxedoUsername,
             password=BuildSlaves.tuxedoPassword)
+        ))
 
-        schedulers.append(mirror_scheduler2)
-
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix('ready-for-release'),
+            branch=sourceRepoInfo['path'],
+            upstreamBuilders=readyForReleaseUpstreams,
+            builderNames=[builderPrefix('ready_for_release')],
+        ))
 
     if releaseConfig.get('enableAutomaticPushToMirrors') and \
         releaseConfig.get('verifyConfigs'):
