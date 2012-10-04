@@ -1682,7 +1682,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             minUptake=releaseConfig.get('releaseUptake', 45000),
             builderNames=[builderPrefix('almost_ready_for_release')],
             username=BuildSlaves.tuxedoUsername,
-            password=BuildSlaves.tuxedoPassword)
+            password=BuildSlaves.tuxedoPassword
         ))
 
         schedulers.append(AggregatingScheduler(
