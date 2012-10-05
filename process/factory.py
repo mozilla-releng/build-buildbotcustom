@@ -5257,6 +5257,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
             command=['python', '-u', '/builds/sut_tools/reboot.py',
                       WithProperties("%(sut_ip)s"),
                      ],
+            log_eval_func=lambda c,s: SUCCESS,
         ))
 
 class TalosFactory(RequestSortingBuildFactory):
@@ -5932,8 +5933,9 @@ class TalosFactory(RequestSortingBuildFactory):
                          command=['python', '-u', '/builds/sut_tools/reboot.py',
                                   WithProperties("%(sut_ip)s"),
                                  ],
-                         env=self.env)
-            )
+                         env=self.env,
+                         log_eval_func=lambda c,s: SUCCESS,
+            ))
         else:
             #the following step is to help the linux running on mac minis reboot cleanly
             #see bug561442
