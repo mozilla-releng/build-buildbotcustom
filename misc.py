@@ -968,7 +968,6 @@ def generateBranchObjects(config, name, secrets=None):
 
         uploadPackages = pf.get('uploadPackages', True)
         uploadSymbols = False
-        disableSymbols = pf.get('disable_symbols', False)
         packageTests = False
         talosMasters = pf.get('talos_masters', [])
         unittestBranch = "%s-%s-opt-unittest" % (name, platform)
@@ -1090,7 +1089,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'codesighs': codesighs,
                 'uploadPackages': uploadPackages,
                 'uploadSymbols': uploadSymbols,
-                'disableSymbols': disableSymbols,
                 'buildSpace': buildSpace,
                 'clobberURL': config['base_clobber_url'],
                 'clobberTime': clobberTime,
@@ -1344,7 +1342,6 @@ def generateBranchObjects(config, name, secrets=None):
                 doBuildAnalysis=doBuildAnalysis,
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
-                disableSymbols=pf.get('disable_symbols', False),
                 nightly=True,
                 createSnippet=create_snippet,
                 createPartial=pf.get('create_partial', config['create_partial']),
