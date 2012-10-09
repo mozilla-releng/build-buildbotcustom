@@ -71,17 +71,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     clobberer_url = releaseConfig.get('base_clobber_url', branchConfig['base_clobber_url'])
 
     branchConfigFile = getRealpath('localconfig.py')
+    platform_slaves = {}
     unix_slaves = []
     all_slaves = []
     for p in branchConfig['platforms']:
         if p == 'b2g':
             continue
-        platform_slaves = branchConfig['platforms'][p].get('slaves', [])
-        all_slaves.extend(platform_slaves)
+        if 'release_slaves' in branchConfig['platforms'][p]:
+            slaves = branchConfig['platforms'][p]['release_slaves']
+        else:
+            slaves = branchConfig['platforms'][p].get('slaves', [])
+        platform_slaves[p] = slaves
+        all_slaves.extend(slaves)
         if 'win' not in p:
-            unix_slaves.extend(platform_slaves)
+            unix_slaves.extend(slaves)
     unix_slaves = [x for x in set(unix_slaves)]
     all_slaves = [x for x in set(all_slaves)]
+
+    def slaves(platform):
+        return platform_slaves[platform]
 
     manuallySignedPlatforms = ()
     if not releaseConfig.get('enableSigningAtBuildTime', True):
@@ -421,8 +429,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('%s_tag' % releaseConfig['productName']),
-            'slavenames': pf['slaves'] + \
-            branchConfig['platforms']['linux64']['slaves'],
+            'slavenames': slaves('linux') + slaves('linux64'),
             'category': builderPrefix(''),
             'builddir': builderPrefix('%s_tag' % releaseConfig['productName']),
             'slavebuilddir': reallyShort(
@@ -483,8 +490,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
            'name': builderPrefix('%s_source' % releaseConfig['productName']),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-            branchConfig['platforms']['linux64']['slaves'],
+           'slavenames': slaves('linux') + slaves('linux64'),
            'category': builderPrefix(''),
            'builddir': builderPrefix(
                '%s_source' % releaseConfig['productName']),
@@ -531,8 +537,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                'name': builderPrefix('xulrunner_source'),
-               'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-               branchConfig['platforms']['linux64']['slaves'],
+               'slavenames': slaves('linux') + slaves('linux64'),
                'category': builderPrefix(''),
                'builddir': builderPrefix('xulrunner_source'),
                'slavebuilddir': reallyShort(builderPrefix('xulrunner_source'), releaseConfig['productName']),
@@ -672,7 +677,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                 'name': builderPrefix('%s_build' % platform),
-                'slavenames': pf['slaves'],
+                'slavenames': slaves(platform),
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('%s_build' % platform),
                 'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform), releaseConfig['productName']),
@@ -732,7 +737,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 )
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
-                    'slavenames': pf.get('l10n_slaves', pf['slaves']),
+                    'slavenames': pf.get('l10n_slaves', slaves(platform)),
                     'category': builderPrefix(''),
                     'builddir': builderPrefix("standalone_repack", platform),
                     'factory': standalone_factory,
@@ -793,7 +798,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
                 builders.append({
                     'name': builderName,
-                    'slavenames': pf.get('l10n_slaves', pf['slaves']),
+                    'slavenames': pf.get('l10n_slaves', slaves(platform)),
                     'category': builderPrefix(''),
                     'builddir': builddir,
                     'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
@@ -890,7 +895,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
-                'slavenames': pf['slaves'],
+                'slavenames': slaves(platform),
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_%s_build' % platform),
                 'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
@@ -920,10 +925,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if releaseConfig['doPartnerRepacks']:
         for platform in releaseConfig.get('partnerRepackPlatforms',
                                           releaseConfig['l10nPlatforms']):
-            slaves = None
+            pr_slaves = None
             partner_repack_factory = None
             if releaseConfig.get('partnerRepackConfig', {}).get('use_mozharness'):
-                slaves = branchConfig['platforms']['linux']['slaves']
+                pr_slaves = slaves('linux'),
                 mh_cfg = releaseConfig['partnerRepackConfig']['platforms'][platform]
                 extra_args = mh_cfg.get('extra_args', ['--cfg', mh_cfg['config_file']])
                 partner_repack_factory = ScriptFactory(
@@ -938,7 +943,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 )
             else:
                 pr_pf = branchConfig['platforms']['macosx64']
-                slaves = pr_pf['slaves']
+                pr_slaves = slaves('macosx64')
                 repack_params = dict(
                     hgHost=branchConfig['hghost'],
                     repoPath=sourceRepoInfo['path'],
@@ -964,7 +969,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                 'name': builderPrefix('partner_repack', platform),
-                'slavenames': slaves,
+                'slavenames': pr_slaves,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('partner_repack', platform),
                 'slavebuilddir': reallyShort(builderPrefix(
@@ -1012,8 +1017,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         )
         builders.append({
             'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-                branchConfig['platforms']['linux64']['slaves'],
+            'slavenames': slaves('linux') + slaves('linux64'),
             'category': builderPrefix(''),
             'builddir': builderPrefix(
                 '%s_checksums' % releaseConfig['productName']),
@@ -1047,8 +1051,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             )
             builders.append({
                 'name': builderPrefix('xulrunner_checksums'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-                    branchConfig['platforms']['linux64']['slaves'],
+                'slavenames': slaves('linux') + slaves('linux64'),
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_checksums'),
                 'slavebuilddir': reallyShort(builderPrefix('xulrunner_checksums')),
@@ -1111,7 +1114,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('updates'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'],
+            'slavenames': slaves('linux'),
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
@@ -1162,7 +1165,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                 'name': builderName,
-                'slavenames': branchConfig['platforms'][platform]['slaves'],
+                'slavenames': slaves(platform),
                 'category': builderPrefix(''),
                 'builddir': builddir,
                 'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
@@ -1371,8 +1374,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('final_verification', platform),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-            branchConfig['platforms']['linux64']['slaves'],
+            'slavenames': slaves('linux') + slaves('linux64'),
             'category': builderPrefix(''),
             'builddir': builderPrefix('final_verification', platform),
             'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
@@ -1440,8 +1442,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         builders.append({
             'name': builderPrefix('bouncer_submitter'),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-            branchConfig['platforms']['linux64']['slaves'],
+            'slavenames': slaves('linux') + slaves('linux64'),
             'category': builderPrefix(''),
             'builddir': builderPrefix('bouncer_submitter'),
             'slavebuilddir': reallyShort(builderPrefix('bncr_sub'), releaseConfig['productName']),
@@ -1476,8 +1477,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
             builders.append({
                 'name': builderPrefix('euballot_bouncer_submitter'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'] + \
-                branchConfig['platforms']['linux64']['slaves'],
+                'slavenames': slaves('linux') + slaves('linux64'),
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('euballot_bouncer_submitter'),
                 'slavebuilddir': reallyShort(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
