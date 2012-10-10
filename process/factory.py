@@ -3714,7 +3714,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='make_bsdiff',
             command=['sh', '-c',
                      'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
-                     'make tier_base; make -C config;' +
+                     'make tier_base; make tier_nspr; make -C config;' +
                      'make -C modules/libmar; make -C modules/libbz2;' +
                      'make -C other-licenses/bsdiff;'
                      'fi'],
