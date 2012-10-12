@@ -2373,6 +2373,15 @@ def generateSpiderMonkeyObjects(config, SLAVES):
         env['HG_REPO'] = config['hgurl'] + config['repo_path']
 
         for variant in variants:
+            factory_platform_args = [ 'use_mock',
+                                      'mock_target',
+                                      'mock_packages',
+                                      'mock_copyin_files' ]
+            factory_kwargs = {}
+            for a in factory_platform_args:
+                if a in pf:
+                    factory_kwargs[a] = pf[a]
+
             f = ScriptFactory(
                     config['scripts_repo'],
                     'scripts/spidermonkey_builds/spidermonkey.sh',
@@ -2380,6 +2389,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     log_eval_func=rc_eval_func({1: WARNINGS}),
                     extra_args=(variant,),
                     script_timeout=3600,
+                    **factory_kwargs
                     )
 
             builder = {'name': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
