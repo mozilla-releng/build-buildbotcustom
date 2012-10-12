@@ -930,7 +930,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             pr_slaves = None
             partner_repack_factory = None
             if releaseConfig.get('partnerRepackConfig', {}).get('use_mozharness'):
-                pr_slaves = slaves('linux'),
+                pr_slaves = slaves('linux')
                 mh_cfg = releaseConfig['partnerRepackConfig']['platforms'][platform]
                 extra_args = mh_cfg.get('extra_args', ['--cfg', mh_cfg['config_file']])
                 partner_repack_factory = ScriptFactory(

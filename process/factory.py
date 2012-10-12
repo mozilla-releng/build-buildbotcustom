@@ -202,7 +202,7 @@ def parse_make_upload(rc, stdout, stderr):
     the upload make target and returns a dictionary of important
     file urls.'''
     retval = {}
-    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar))$",
+    for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar|tar\.gz))$",
                         "\n".join([stdout, stderr]), re.M):
         if 'devel' in m and m.endswith('.rpm'):
             retval['develRpmUrl'] = m
@@ -716,6 +716,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  triggeredSchedulers=None, triggerBuilds=False,
                  mozconfigBranch="production", useSharedCheckouts=False,
                  stagePlatform=None, testPrettyNames=False, l10nCheckTest=False,
+                 disableSymbols=False,
                  doBuildAnalysis=False,
                  downloadSubdir=None,
                  multiLocale=False,
@@ -783,6 +784,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.baseName = baseName
         self.uploadPackages = uploadPackages
         self.uploadSymbols = uploadSymbols
+        self.disableSymbols = disableSymbols
         self.createSnippet = createSnippet
         self.createPartial = createPartial
         self.doCleanup = doCleanup
@@ -937,7 +939,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.multiLocale = multiLocale
 
         self.addBuildSteps()
-        if self.uploadSymbols or self.packageTests or self.leakTest:
+        if self.uploadSymbols or (not self.disableSymbols and (self.packageTests or self.leakTest)):
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
@@ -3714,7 +3716,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='make_bsdiff',
             command=['sh', '-c',
                      'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
-                     'make tier_base; make -C config;' +
+                     'make tier_base; make tier_nspr; make -C config;' +
                      'make -C modules/libmar; make -C modules/libbz2;' +
                      'make -C other-licenses/bsdiff;'
                      'fi'],
