@@ -2356,7 +2356,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
     builders = []
     branch = os.path.basename(config['repo_path'])
 
-    for platform, variants in config['platforms'].items():
+    for platform, variants in config['variants'].items():
         base_platform = platform.split('-', 1)[0]
         if 'win' in platform:
             slaves = SLAVES[base_platform]
@@ -2368,7 +2368,8 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             slaves = SLAVES[base_platform]
             interpreter = None
 
-        env = config['env'][platform].copy()
+        pf = config['platforms'][platform]
+        env = pf['env'].copy()
         env['HG_REPO'] = config['hgurl'] + config['repo_path']
 
         for variant in variants:
