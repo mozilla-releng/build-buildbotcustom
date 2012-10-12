@@ -2356,6 +2356,8 @@ def generateSpiderMonkeyObjects(config, SLAVES):
     builders = []
     branch = os.path.basename(config['repo_path'])
 
+    PRETTY_NAME = '%s spidermonkey-%s build'
+    prettyNames = {}
     for platform, variants in config['variants'].items():
         base_platform = platform.split('-', 1)[0]
         if 'win' in platform:
@@ -2392,7 +2394,10 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     **factory_kwargs
                     )
 
-            builder = {'name': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
+            prettyName = PRETTY_NAME % (pf['base_name'], variant)
+            prettyNames[platform] = prettyName
+
+            builder = {'name': prettyName,
                     'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                     'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
                     'slavenames': slaves,
@@ -2414,12 +2419,24 @@ def generateSpiderMonkeyObjects(config, SLAVES):
         return False
 
     # Set up scheduler
-    scheduler = Scheduler(
+    extra_args = {}
+    scheduler_class = None
+    if config.get('enable_try'):
+        scheduler_class = makePropertiesScheduler(BuilderChooserScheduler, [buildUIDSchedFunc])
+        extra_args['chooserFunc'] = tryChooser
+        extra_args['numberOfBuildsToTrigger'] = 1
+        extra_args['prettyNames'] = prettyNames
+        extra_args['buildbotBranch'] = branch
+    else:
+        scheduler_class = Scheduler
+
+    scheduler = scheduler_class(
             name="%s_spidermonkey" % branch,
             branch=config['repo_path'],
             treeStableTimer=None,
             builderNames=[b['name'] for b in builders],
             fileIsImportant=isImportant,
+            **extra_args
             )
 
     return {
