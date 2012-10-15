@@ -1657,16 +1657,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         readyForReleaseUpstreams = [builderPrefix('almost_ready_for_release')]
         if releaseConfig.get('verifyConfigs'):
             readyForReleaseUpstreams += post_update_builders
+            finalVerifyBuilders = []
+            for platform in releaseConfig['verifyConfigs'].keys():
+                finalVerifyBuilders.append(builderPrefix('final_verification', platform))
+            readyForReleaseUpstreams += finalVerifyBuilders
 
             mirror_scheduler1 = TriggerBouncerCheck(
                 name=builderPrefix('ready-for-rel-test'),
                 configRepo=config_repo,
                 minUptake=releaseConfig.get('releasetestUptake', 3),
-                builderNames=[
-                    builderPrefix('ready_for_releasetest_testing')] + \
-                        [builderPrefix('final_verification', platform)
-                         for platform in
-                         releaseConfig.get('verifyConfigs', {}).keys()],
+                builderNames=[builderPrefix('ready_for_releasetest_testing')] + finalVerifyBuilders,
                 username=BuildSlaves.tuxedoUsername,
                 password=BuildSlaves.tuxedoPassword)
 
