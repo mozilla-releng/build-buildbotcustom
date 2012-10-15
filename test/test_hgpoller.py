@@ -11,7 +11,6 @@ else:
 
 from buildbotcustom.changes.hgpoller import BasePoller, BaseHgPoller, HgPoller, \
   HgLocalePoller, HgAllLocalesPoller, _parse_changes
-from buildbotcustom.test.utils import startHTTPServer
 
 
 class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
