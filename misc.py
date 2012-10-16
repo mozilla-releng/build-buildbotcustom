@@ -828,7 +828,6 @@ def generateBranchObjects(config, name, secrets=None):
             properties={
                 'app': 'browser',
                 'en_revision': 'default',
-                'l10n_revision': 'default',
                 }
         ))
 
@@ -1414,10 +1413,8 @@ def generateBranchObjects(config, name, secrets=None):
 
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
-                    # TODO Linux and mac are not working with mozconfig at this point
-                    # and this will disable it for now. We will fix this in bug 518359.
                     objdir = ''
-                    mozconfig = None
+                    mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
                     l10n_kwargs = {}
                     if config.get('call_client_py', False):
                         l10n_kwargs['callClientPy'] = True
@@ -1440,8 +1437,6 @@ def generateBranchObjects(config, name, secrets=None):
                         appName=pf['app_name'],
                         enUSBinaryURL=config['enUS_binaryURL'],
                         nightly=True,
-                        configRepoPath=config['config_repo_path'],
-                        configSubDir=config['config_subdir'],
                         mozconfig=mozconfig,
                         l10nNightlyUpdate=config['l10nNightlyUpdate'],
                         l10nDatedDirs=config['l10nDatedDirs'],
@@ -1588,6 +1583,7 @@ def generateBranchObjects(config, name, secrets=None):
                      'skip_blank_repos':    config.get('skip_blank_repos', False),
                      'venkman_repo_path':   config.get('venkman_repo_path', ''),
                 }
+            mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
                 platform=platform,
@@ -1618,6 +1614,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                mozconfig=mozconfig,
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep

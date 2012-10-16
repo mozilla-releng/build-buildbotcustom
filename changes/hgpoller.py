@@ -126,7 +126,7 @@ class Pluggable(object):
 
     This is in particular useful when a network request doesn't really
     error in a reasonable time, and you want to make sure that if it
-    answers after you tried to give up on it, it's not confusing the 
+    answers after you tried to give up on it, it's not confusing the
     rest of your app by calling back with data twice or something.
     '''
     def __init__(self, d):
@@ -401,6 +401,7 @@ class HgLocalePoller(BaseHgPoller):
 
     def changeHook(self, change):
         change.properties.setProperty('locale', self.locale, 'HgLocalePoller')
+        change.properties.setProperty('l10n_revision', change.revision, 'HgLocalePoller')
 
     def pollDone(self, res):
         self.parent.localeDone(self.locale)
@@ -514,7 +515,7 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
                     msg += ". All %d locale pollers failed" % len(loadTimes)
                 else:
                     msg += ", min: %.1f, max: %.1f, mean: %.1f" % \
-                        (min(goodTimes), max(goodTimes), 
+                        (min(goodTimes), max(goodTimes),
                          sum(goodTimes) / len(goodTimes))
                     if len(loadTimes) > len(goodTimes):
                         msg += ", %d failed" % (len(loadTimes) - len(goodTimes))
@@ -528,7 +529,7 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     def localeDone(self, loc):
         if self.verboseChilds:
             log.msg("done with " + loc)
-        reactor.callLater(0, self.pollNextLocale)        
+        reactor.callLater(0, self.pollNextLocale)
 
     def __str__(self):
         return "<HgAllLocalesPoller for %s/%s/>" % (self.hgURL,
