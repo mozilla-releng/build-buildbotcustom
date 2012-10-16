@@ -3,9 +3,23 @@ import unittest
 
 ###### TEST CASES #####
 
-BUILDER_PRETTY_NAMES = {'macosx64':'OS X 10.6.2 try build', 'win32':'WINNT 5.2 try build', 'win32-debug':'WINNT 5.2 try leak test build', 'linux64':'Linux x86-64 try build', 'linux':'Linux try build', 'macosx64-debug':'OS X 10.6.2 try leak test build', 'linux64-debug':'Linux x86-64 try leak test build', 'linux-debug':'Linux try leak test build', 'macosx-debug':'OS X 10.5.2 try leak test build', 'android-r7':'Android R7 try build', 'maemo5-gtk':'Maemo 5 GTK try build'}
+BUILDER_PRETTY_NAMES = {'macosx64':'OS X 10.6.2 try build',
+                        'win32':'WINNT 5.2 try build',
+                        'win32-debug':'WINNT 5.2 try leak test build',
+                        'linux64':'Linux x86-64 try build',
+                        'linux':'Linux try build',
+                        'macosx64-debug':'OS X 10.6.2 try leak test build',
+                        'linux64-debug':'Linux x86-64 try leak test build',
+                        'linux-debug':'Linux try leak test build',
+                        'macosx-debug':'OS X 10.5.2 try leak test build',
+                        'android-r7':'Android R7 try build',
+                        'maemo5-gtk':'Maemo 5 GTK try build'}
 # TODO -- need to check on how to separate out the two win32 prettynames
-TESTER_PRETTY_NAMES = {'macosx':['Rev3 MacOSX Leopard 10.5.8'], 'macosx64':['Rev3 MacOSX Snow Leopard 10.6.2', 'Rev3 MacOSX Leopard 10.5.8'], 'win32':['Rev3 WINNT 5.1', 'Rev3 WINNT 6.1'], 'linux-64':['Rev3 Fedora 12x64'], 'linux':['Rev3 Fedora 12']}
+TESTER_PRETTY_NAMES = {'macosx':['Rev3 MacOSX Leopard 10.5.8'],
+                       'macosx64':['Rev3 MacOSX Snow Leopard 10.6.2', 'Rev3 MacOSX Leopard 10.5.8'],
+                       'win32':['Rev3 WINNT 5.1', 'Rev3 WINNT 6.1'],
+                       'linux-64':['Rev3 Fedora 12x64'],
+                       'linux':['Rev3 Fedora 12']}
 TESTER_PRETTY_TB_NAMES = {'linux':['TB Rev3 Fedora 12']}
 UNITTEST_PRETTY_NAMES = {'win32-debug':'WINNT 5.2 try debug test'}
 
@@ -14,11 +28,46 @@ UNITTEST_SUITES = ['reftest', 'crashtest', 'mochitest-1', 'mochitest-3', 'mochit
 UNITTEST_SUITES_TB = ['xpcshell', 'mozmill']
 MOBILE_UNITTEST_SUITES = ['reftest-1', 'reftest-3'] + UNITTEST_SUITES[1:]
 
-VALID_UPN = ['WINNT 5.2 try debug test mochitest-1', 'WINNT 5.2 try debug test mochitest-3', 'WINNT 5.2 try debug test mochitest-browser-chrome', 'WINNT 5.2 try debug test mochitest-other', 'WINNT 5.2 try debug test reftest', 'WINNT 5.2 try debug test crashtest']
-VALID_REFTEST_NAMES = ['WINNT 5.2 try debug test reftest', 'WINNT 5.2 try debug test reftest-1', 'WINNT 5.2 try debug test reftest-3']
-VALID_BUILDER_NAMES = ['OS X 10.6.2 try build', 'WINNT 5.2 try build', 'Linux x86-64 try build', 'Linux try build', 'OS X 10.5.2 try leak test build', 'OS X 10.6.2 try leak test build', 'WINNT 5.2 try leak test build', 'Linux x86-64 try leak test build', 'Linux try leak test build','Android R7 try build', 'Maemo 5 GTK try build']
-VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1', 'Rev3 Fedora 12 try opt test mochitest-browser-chrome', 'Rev3 Fedora 12 try opt test mochitest-other', 'Rev3 Fedora 12 try opt test crashtest', 'Rev3 Fedora 12 try debug test mochitest-1', 'Rev3 Fedora 12 try debug test mochitest-browser-chrome', 'Rev3 Fedora 12 try debug test mochitest-other', 'Rev3 WINNT 5.1 try opt test reftest', 'Rev3 WINNT 6.1 try opt test crashtest', 'Rev3 WINNT 6.1 try debug test crashtest', 'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome', 'Rev3 WINNT 6.1 try debug test mochitest-other', 'Rev3 WINNT 6.1 try debug test mochitest-3', 'Rev3 MacOSX Leopard 10.5.8 try talos tp4', 'Rev3 WINNT 5.1 try talos chrome', 'Rev3 WINNT 6.1 try talos tp4', 'Rev3 WINNT 5.1 try talos tp4', 'Rev3 WINNT 6.1 try talos chrome']
-VALID_TESTER_TB_NAMES = ['TB Rev3 Fedora 12 try-comm-central opt tests mozmill', 'TB Rev3 Fedora 12 try-comm-central opt tests xpcshell']
+VALID_UPN = ['WINNT 5.2 try debug test mochitest-1',
+             'WINNT 5.2 try debug test mochitest-3',
+             'WINNT 5.2 try debug test mochitest-browser-chrome',
+             'WINNT 5.2 try debug test mochitest-other',
+             'WINNT 5.2 try debug test reftest',
+             'WINNT 5.2 try debug test crashtest']
+VALID_REFTEST_NAMES = ['WINNT 5.2 try debug test reftest',
+                       'WINNT 5.2 try debug test reftest-1',
+                       'WINNT 5.2 try debug test reftest-3']
+VALID_BUILDER_NAMES = ['OS X 10.6.2 try build',
+                       'WINNT 5.2 try build',
+                       'Linux x86-64 try build',
+                       'Linux try build',
+                       'OS X 10.5.2 try leak test build',
+                       'OS X 10.6.2 try leak test build',
+                       'WINNT 5.2 try leak test build',
+                       'Linux x86-64 try leak test build',
+                       'Linux try leak test build',
+                       'Android R7 try build',
+                       'Maemo 5 GTK try build']
+VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
+                      'Rev3 Fedora 12 try opt test mochitest-browser-chrome',
+                      'Rev3 Fedora 12 try opt test mochitest-other',
+                      'Rev3 Fedora 12 try opt test crashtest',
+                      'Rev3 Fedora 12 try debug test mochitest-1',
+                      'Rev3 Fedora 12 try debug test mochitest-browser-chrome',
+                      'Rev3 Fedora 12 try debug test mochitest-other',
+                      'Rev3 WINNT 5.1 try opt test reftest',
+                      'Rev3 WINNT 6.1 try opt test crashtest',
+                      'Rev3 WINNT 6.1 try debug test crashtest',
+                      'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
+                      'Rev3 WINNT 6.1 try debug test mochitest-other',
+                      'Rev3 WINNT 6.1 try debug test mochitest-3',
+                      'Rev3 MacOSX Leopard 10.5.8 try talos tp4',
+                      'Rev3 WINNT 5.1 try talos chrome',
+                      'Rev3 WINNT 6.1 try talos tp4',
+                      'Rev3 WINNT 5.1 try talos tp4',
+                      'Rev3 WINNT 6.1 try talos chrome']
+VALID_TESTER_TB_NAMES = ['TB Rev3 Fedora 12 try-comm-central opt test mozmill',
+                         'TB Rev3 Fedora 12 try-comm-central opt test xpcshell']
 
 class TestTryParser(unittest.TestCase):
 
@@ -97,13 +146,26 @@ class TestTryParser(unittest.TestCase):
     def test_AllOnTestMaster(self):
         tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 Fedora 12 try opt test mochitest-1', 'Rev3 Fedora 12 try opt test mochitest-browser-chrome', 'Rev3 Fedora 12 try opt test mochitest-other', 'Rev3 Fedora 12 try opt test crashtest', 'Rev3 Fedora 12 try debug test mochitest-1', 'Rev3 Fedora 12 try debug test mochitest-browser-chrome', 'Rev3 Fedora 12 try debug test mochitest-other', 'Rev3 WINNT 5.1 try opt test reftest', 'Rev3 WINNT 6.1 try opt test crashtest', 'Rev3 WINNT 6.1 try debug test crashtest', 'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome', 'Rev3 WINNT 6.1 try debug test mochitest-other', 'Rev3 WINNT 6.1 try debug test mochitest-3']
+        builders = ['Rev3 Fedora 12 try opt test mochitest-1',
+                    'Rev3 Fedora 12 try opt test mochitest-other',
+                    'Rev3 Fedora 12 try opt test mochitest-browser-chrome',
+                    'Rev3 Fedora 12 try opt test crashtest',
+                    'Rev3 Fedora 12 try debug test mochitest-1',
+                    'Rev3 Fedora 12 try debug test mochitest-other',
+                    'Rev3 Fedora 12 try debug test mochitest-browser-chrome',
+                    'Rev3 WINNT 5.1 try opt test reftest',
+                    'Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest',
+                    'Rev3 WINNT 6.1 try debug test mochitest-other',
+                    'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
+                    'Rev3 WINNT 6.1 try debug test mochitest-3']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllOnTestMasterCC(self):
         tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_TB_NAMES, TESTER_PRETTY_TB_NAMES, None, UNITTEST_SUITES_TB, None, "try-comm-central")
-        builders = ['TB Rev3 Fedora 12 try-comm-central opt tests mozmill', 'TB Rev3 Fedora 12 try-comm-central opt tests xpcshell']
+        builders = ['TB Rev3 Fedora 12 try-comm-central opt test mozmill',
+                    'TB Rev3 Fedora 12 try-comm-central opt test xpcshell']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_MochitestAliasesOnBuilderMaster(self):
