@@ -1,5 +1,7 @@
 from twisted.internet import defer, reactor
 from twisted.trial import unittest
+import threading
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 from buildbot.util import json
 if not hasattr(json.decoder, 'JSONDecodeError'):
@@ -9,7 +11,36 @@ else:
 
 from buildbotcustom.changes.hgpoller import BasePoller, BaseHgPoller, HgPoller, \
   HgLocalePoller, HgAllLocalesPoller, _parse_changes
-from buildbotcustom.test.utils import startHTTPServer
+
+
+class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    # This class requires the consumer to set contents, because we
+    # cannot override __init__ due to the way HTTPServer works
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(self.contents)
+        return
+
+    def log_message(self, fmt, *args): pass
+
+
+def startHTTPServer(contents):
+    # Starts up a simple HTTPServer that processes requests with
+    # VerySimpleHTTPRequestHandler (subclassed to make sure it's unique
+    # for each instance), and serving the contents passed as contents
+    # Returns a tuple containing the HTTPServer instance and the port it is
+    # listening on. The caller is responsible for shutting down the HTTPServer.
+    class OurHandler(VerySimpleHTTPRequestHandler):
+        pass
+    OurHandler.contents = contents
+    server = HTTPServer(('', 0), OurHandler)
+    ip, port = server.server_address
+    server_thread = threading.Thread(target=server.serve_forever)
+    server_thread.setDaemon(True)
+    server_thread.start()
+    return (server, port)
 
 class UrlCreation(unittest.TestCase):
     def testSimpleUrl(self):
