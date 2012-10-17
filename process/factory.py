@@ -3755,8 +3755,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
-        NightlyRepackFactory.__init__(self, mozillaDir='mozilla',
-            mozconfigBranch='default', **kwargs)
+        NightlyRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way
     # this is basically mirroring what mobile does
