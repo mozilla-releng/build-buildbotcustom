@@ -126,7 +126,7 @@ class Pluggable(object):
 
     This is in particular useful when a network request doesn't really
     error in a reasonable time, and you want to make sure that if it
-    answers after you tried to give up on it, it's not confusing the 
+    answers after you tried to give up on it, it's not confusing the
     rest of your app by calling back with data twice or something.
     '''
     def __init__(self, d):
@@ -400,6 +400,7 @@ class HgLocalePoller(BaseHgPoller):
 
     def changeHook(self, change):
         change.properties.setProperty('locale', self.locale, 'HgLocalePoller')
+        change.properties.setProperty('l10n_revision', change.revision, 'HgLocalePoller')
 
     def pollDone(self, res):
         self.parent.localeDone(self.locale)

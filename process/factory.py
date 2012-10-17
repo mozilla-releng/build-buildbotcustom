@@ -3023,9 +3023,9 @@ class BaseRepackFactory(MozillaBuildFactory):
     def __init__(self, project, appName, l10nRepoPath,
                  compareLocalesRepoPath, compareLocalesTag, stageServer,
                  stageUsername, stageSshKey=None, objdir='', platform='',
-                 mozconfig=None, configRepoPath=None, configSubDir=None,
+                 mozconfig=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
-                 mergeLocales=True, mozconfigBranch="production",
+                 mergeLocales=True,
                  testPrettyNames=False, **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -3043,17 +3043,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageSshKey = stageSshKey
         self.tree = tree
         self.mozconfig = mozconfig
-        self.mozconfigBranch = mozconfigBranch
         self.testPrettyNames = testPrettyNames
-
-        # WinCE is the only platform that will do repackages with
-        # a mozconfig for now. This will be fixed in bug 518359
-        if mozconfig and configSubDir and configRepoPath:
-            self.mozconfig = 'configs/%s/%s/mozconfig' % (configSubDir,
-                                                          mozconfig)
-            self.configRepoPath = configRepoPath
-            self.configRepo = self.getRepository(self.configRepoPath,
-                                             kwargs['hgHost'])
 
         self.addStep(SetBuildProperty(
          property_name='tree',
@@ -3151,41 +3141,32 @@ class BaseRepackFactory(MozillaBuildFactory):
         return kwargs
     
     def getMozconfig(self):
-        if self.mozconfig:
-            self.addStep(ShellCommand(
-             name='rm_configs',
-             command=['rm', '-rf', 'configs'],
-             description=['remove', 'configs'],
-             workdir='build/'+self.origSrcDir,
-             haltOnFailure=True
-            ))
-            self.addStep(MercurialCloneCommand(
-             name='checkout_configs',
-             command=['hg', 'clone', self.configRepo, 'configs'],
-             description=['checkout', 'configs'],
-             workdir='build/'+self.origSrcDir,
-             haltOnFailure=True
-            ))
-            self.addStep(ShellCommand(
-             name='hg_update',
-             command=['hg', 'update', '-r', self.mozconfigBranch],
-             description=['updating', 'mozconfigs'],
-             workdir="build/%s/configs" % self.origSrcDir,
-             haltOnFailure=True
-            ))
-            self.addStep(ShellCommand(
-             # cp configs/mozilla2/$platform/$branchname/$type/mozconfig .mozconfig
-             name='copy_mozconfig',
-             command=['cp', self.mozconfig, '.mozconfig'],
-             description=['copy mozconfig'],
-             workdir='build/'+self.origSrcDir,
-             haltOnFailure=True
-            ))
-            self.addStep(ShellCommand(
-             name='cat_mozconfig',
-             command=['cat', '.mozconfig'],
-             workdir='build/'+self.origSrcDir
-            ))
+        if not self.mozconfig:
+            return
+        
+        cmd = ['bash', '-c',
+               '''if [ -f "%(mozconfig)s" ]; then
+                   echo Using in-tree mozconfig;
+                   cp %(mozconfig)s .mozconfig;
+                else
+                   echo Could not find in-tree mozconfig;
+                   exit 1;
+                fi'''.replace("\n","") % {'mozconfig': self.mozconfig}]
+        
+        self.addStep(RetryingShellCommand(
+            name='get_mozconfig',
+            command=cmd,
+            description=['getting', 'mozconfig'],
+            descriptionDone=['got', 'mozconfig'],
+            workdir='build/'+self.origSrcDir,
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='cat_mozconfig',
+            command=['cat', '.mozconfig'],
+            workdir='build/'+self.origSrcDir
+        ))
+        
 
     def configure(self):
         self.addStep(ShellCommand(

@@ -835,7 +835,6 @@ def generateBranchObjects(config, name, secrets=None):
             properties={
                 'app': 'browser',
                 'en_revision': 'default',
-                'l10n_revision': 'default',
                 }
         ))
 
@@ -1362,10 +1361,8 @@ def generateBranchObjects(config, name, secrets=None):
 
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
-                    # TODO Linux and mac are not working with mozconfig at this point
-                    # and this will disable it for now. We will fix this in bug 518359.
                     objdir = ''
-                    mozconfig = None
+                    mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=platform_env,
@@ -1377,8 +1374,6 @@ def generateBranchObjects(config, name, secrets=None):
                         appName=pf['app_name'],
                         enUSBinaryURL=config['enUS_binaryURL'],
                         nightly=True,
-                        configRepoPath=config['config_repo_path'],
-                        configSubDir=config['config_subdir'],
                         mozconfig=mozconfig,
                         l10nNightlyUpdate=config['l10nNightlyUpdate'],
                         l10nDatedDirs=config['l10nDatedDirs'],
@@ -1501,6 +1496,7 @@ def generateBranchObjects(config, name, secrets=None):
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
+            mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
                 platform=platform,
@@ -1525,6 +1521,7 @@ def generateBranchObjects(config, name, secrets=None):
                 signingServers=secrets.get(pf.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                mozconfig=mozconfig,
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
@@ -2106,7 +2103,6 @@ def generateCCBranchObjects(config, name, secrets=None):
             properties={
                 'app': pf['app_name'],
                 'en_revision': 'default',
-                'l10n_revision': 'default',
                 }
         ))
 
@@ -2638,10 +2634,8 @@ def generateCCBranchObjects(config, name, secrets=None):
 
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
-                    # TODO Linux and mac are not working with mozconfig at this point
-                    # and this will disable it for now. We will fix this in bug 518359.
                     objdir = ''
-                    mozconfig = None
+                    mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
                         env=platform_env,
@@ -2653,8 +2647,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                         appName=pf['app_name'],
                         enUSBinaryURL=config['enUS_binaryURL'],
                         nightly=True,
-                        configRepoPath=config['config_repo_path'],
-                        configSubDir=config['config_subdir'],
                         mozconfig=mozconfig,
                         l10nNightlyUpdate=config['l10nNightlyUpdate'],
                         l10nDatedDirs=config['l10nDatedDirs'],
@@ -2781,6 +2773,7 @@ def generateCCBranchObjects(config, name, secrets=None):
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
+            mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = CCNightlyRepackFactory(
                 env=platform_env,
                 platform=platform,
@@ -2807,6 +2800,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 branchName=name,
+                mozconfig=mozconfig,
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
