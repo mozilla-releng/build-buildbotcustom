@@ -3861,7 +3861,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                              '--release-to-candidates-dir'
         BaseRepackFactory.__init__(self, env=env, platform=platform,
                                    mergeLocales=mergeLocales, mozillaDir='mozilla',
-                                   mozconfigBranch='default', **kwargs)
+                                   **kwargs)
 
     # Repeated here since the Parent classes fail hgtool/checkouts due to
     # relbranch issues, and not actually having the tag after clone
