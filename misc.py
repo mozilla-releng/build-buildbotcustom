@@ -390,7 +390,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         mochitestLeakThreshold, crashtestLeakThreshold,
                         slaves=None, resetHwClock=False, category=None,
                         stagePlatform=None, stageProduct=None,
-                        mozharness=False, mozharness_python=None):
+                        mozharness=False, mozharness_python=None,
+                        mozharness_suite_config=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -436,15 +437,19 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         builders.append(builder)
     elif mozharness:
         # suites is a dict!
-        extra_args = suites.get('extra_args', [])
+        if mozharness_suite_config is None:
+            mozharness_suite_config = {}
+        extra_args = mozharness_suite_config.get('extra_args', suites.get('extra_args', []))
+        reboot_command = mozharness_suite_config.get('reboot_command', suites.get('reboot_command', None))
+        hg_bin = mozharness_suite_config.get('hg_bin', suites.get('hg_bin', 'hg'))
         factory = ScriptFactory(
             interpreter=mozharness_python,
             scriptRepo=suites['mozharness_repo'],
             scriptName=suites['script_path'],
-            hg_bin=suites['hg_bin'],
-            extra_args=suites.get('extra_args', []),
+            hg_bin=hg_bin,
+            extra_args=extra_args,
             script_maxtime=suites.get('script_maxtime', 3600),
-            reboot_command=suites.get('reboot_command'),
+            reboot_command=reboot_command,
             platform=platform,
             log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
              (re.compile('# TBPL WARNING #'), WARNINGS),
@@ -2014,6 +2019,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if isinstance(suites, dict) and "mozharness_repo" in suites:
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
+                                if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
+                                    test_builder_kwargs['mozharness_suite_config'] = branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name].copy()
+                                else:
+                                    test_builder_kwargs['mozharness_suite_config'] = {}
+                                test_builder_kwargs['mozharness_suite_config']['hg_bin'] = platform_config['mozharness_config']['hg_bin']
+                                test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
                             branchObjects['builders'].extend(generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builder_kwargs = test_builder_kwargs.copy()
