@@ -6293,14 +6293,14 @@ class ScriptFactory(BuildFactory):
                                  '--copyin', source, target],
                         haltOnFailure=True,
                     ))
-                self.addStep(MockCommand(
-                    command='chown -R mock_mozilla %s' % target,
-                    target=self.mock_target,
-                    mock=True,
-                    workdir='/',
-                    mock_args=[],
-                    mock_workdir_prefix=None,
-                ))
+                    self.addStep(MockCommand(
+                        command='chown -R mock_mozilla %s' % target,
+                        target=self.mock_target,
+                        mock=True,
+                        workdir='/',
+                        mock_args=[],
+                        mock_workdir_prefix=None,
+                    ))
 
             self.addStep(MockInstall(
                 target=self.mock_target,
