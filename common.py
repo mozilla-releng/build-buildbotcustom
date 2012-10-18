@@ -69,6 +69,7 @@ def reallyShort(name, product=None):
         'release': 'rel',
         'mochitests': 'mochi',
         'mochitest': 'm',
+        'browser-chrome': 'b-c',
         'other': 'oth',
         'browser': 'br',
         'nightly': 'ntly',
