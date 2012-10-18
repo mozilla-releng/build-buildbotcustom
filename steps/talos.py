@@ -97,7 +97,7 @@ class MozillaRunPerfTests(ShellCommand):
             if "RETURN:" in line:
                 summary.append(line.replace("RETURN:", "TinderboxPrint:"))
             if "FAIL:" in line:
-                summary.append(line.replace("FAIL:", "TinderboxPrint:FAIL:"))
+                summary.append(line.replace("FAIL:", "talosError:"))
         self.addCompleteLog('summary', "\n".join(summary))
 
     def evaluateCommand(self, cmd):

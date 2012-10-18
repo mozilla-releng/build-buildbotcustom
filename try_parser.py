@@ -20,6 +20,10 @@ def expandTestSuites(user_suites,valid_suites):
             for v in valid_suites:
                 if re.search(u,v):
                     test_suites.append(v)
+        elif u == 'mochitest-bc':
+            for v in valid_suites:
+                if v.startswith('mochitest-browser-chrome'):
+                    test_suites.append(v)
         elif u.startswith('mochitest-'):
             num = u.split('-')[1]
             for v in valid_suites:
