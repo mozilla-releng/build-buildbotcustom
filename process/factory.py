@@ -1920,7 +1920,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(RetryingMockCommand(
+        self.addStep(MockCommand(
          name='make_uploadsymbols',
          command=self.makeCmd + ['uploadsymbols'],
          env=self.env,
