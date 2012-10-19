@@ -1144,8 +1144,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 },
         ))
         post_signing_builders.append(builderPrefix('updates'))
-        important_builders.append(builderPrefix('updates'))
-
 
     for platform in sorted(releaseConfig.get('verifyConfigs', {}).keys()):
         for n, builderName in updateVerifyBuilders(platform).iteritems():
