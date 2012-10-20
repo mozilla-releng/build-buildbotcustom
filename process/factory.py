@@ -3159,7 +3159,8 @@ class BaseRepackFactory(MozillaBuildFactory):
             description=['getting', 'mozconfig'],
             descriptionDone=['got', 'mozconfig'],
             workdir='build/'+self.origSrcDir,
-            haltOnFailure=True,
+            haltOnFailure=False,
+            flunkOnFailure=False,
         ))
         self.addStep(ShellCommand(
             name='cat_mozconfig',
