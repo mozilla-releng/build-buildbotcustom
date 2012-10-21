@@ -4045,6 +4045,13 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             ))
 
     def doRepack(self):
+        self.addStep(ShellCommand(
+         name='make_tier_base',
+         command=['make', 'tier_base'],
+         workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
+         description=['make tier_base'],
+         haltOnFailure=True
+        ))
         # Because we're generating updates we need to build the libmar tools
         self.addStep(ShellCommand(
             name='make_tier_nspr',
