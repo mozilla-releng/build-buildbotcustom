@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 
 import os
+import hashlib
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.tinderbox import TinderboxMailNotifier
@@ -305,7 +306,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     xr_deliverables_builders = []
     post_deliverables_builders = []
     post_antivirus_builders = []
-
+    email_message_id = hashlib.md5("%(baseTag)s %(productName)s %(version)s %(buildNumber)s" %releaseConfig).hexdigest()
     ##### Builders
     builder_env = {
         'BUILDBOT_CONFIGS': '%s%s' % (branchConfig['hgurl'],
@@ -1143,8 +1144,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 },
         ))
         post_signing_builders.append(builderPrefix('updates'))
-        important_builders.append(builderPrefix('updates'))
-
 
     for platform in sorted(releaseConfig.get('verifyConfigs', {}).keys()):
         for n, builderName in updateVerifyBuilders(platform).iteritems():
@@ -1817,6 +1816,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 relayhost="mail.build.mozilla.org",
                 sendToInterestedUsers=False,
                 extraRecipients=[recipient],
+                extraHeaders={'Message-Id': email_message_id},
                 branches=[sourceRepoInfo['path']],
                 messageFormatter=createReleaseChangeMessage,
                 changeIsImportant=lambda c: \
@@ -1830,6 +1830,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     relayhost="mail.build.mozilla.org",
                     sendToInterestedUsers=False,
                     extraRecipients=[recipient],
+                    extraHeaders={'In-Reply-To': email_message_id, 'References': email_message_id},
                     branches=[builderPrefix('android_post_signing')],
                     messageFormatter=createReleaseChangeMessage,
                     changeIsImportant=lambda c: \
@@ -1841,6 +1842,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             fromaddr='release@mozilla.com',
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['ImportantRecipients'],
+            extraHeaders={'In-Reply-To': email_message_id, 'References': email_message_id},
             mode='passing',
             builders=important_builders,
             relayhost='mail.build.mozilla.org',
@@ -1852,6 +1854,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             fromaddr='release@mozilla.com',
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['AllRecipients'],
+            extraHeaders={'In-Reply-To': email_message_id, 'References': email_message_id},
             mode='all',
             builders=[b['name'] for b in builders + test_builders],
             relayhost='mail.build.mozilla.org',
@@ -1863,6 +1866,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 fromaddr='release@mozilla.com',
                 sendToInterestedUsers=False,
                 extraRecipients=releaseConfig['AVVendorsRecipients'],
+                extraHeaders={'In-Reply-To': email_message_id, 'References': email_message_id},
                 mode='passing',
                 builders=[builderPrefix('updates')],
                 relayhost='mail.build.mozilla.org',
