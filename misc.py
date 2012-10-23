@@ -1,15 +1,13 @@
 from urlparse import urljoin
 try:
     import json
-    assert json # pyflakes
+    assert json  # pyflakes
 except:
     import simplejson as json
 import collections
 import random
 import re
 import sys, os, time
-
-from copy import deepcopy
 
 from twisted.python import log
 
@@ -112,15 +110,64 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
 # dep/nightlies and release builds. Because they build the same "branch" this
 # allows us to have the release builder ignore HgPoller triggered changse
 # and the dep builders only obey HgPoller/Force Build triggered ones.
-
 def isHgPollerTriggered(change, hgUrl):
     if (change.revlink and hgUrl in change.revlink) or \
-       change.comments.find(hgUrl) > -1:
+            change.comments.find(hgUrl) > -1:
         return True
+
 
 def shouldBuild(change):
     """check for commit message disabling build for this change"""
     return "DONTBUILD" not in change.comments
+
+
+_product_excludes = {
+    'firefox': [
+        re.compile('^mobile/'),
+        re.compile('^b2g/'),
+    ],
+    'mobile': [
+        re.compile('^browser/'),
+        re.compile('^b2g/'),
+        re.compile('^xulrunner/'),
+    ],
+    'b2g': [
+        re.compile('^browser/'),
+        re.compile('^mobile/'),
+        re.compile('^xulrunner/'),
+    ],
+    'thunderbird': [re.compile("^suite/")],
+}
+def isImportantForProduct(change, product):
+    """Handles product specific handling of important files"""
+    # For each file, check each product's exclude list
+    # If a file is not excluded, then the change is important
+    # If all files are excluded, then the change is not important
+    # As long as hgpoller's 'overflow' marker isn't excluded, it will cause all
+    # products to build
+    excludes = _product_excludes.get(product, [])
+    for f in change.files:
+        excluded = any(e.search(f) for e in excludes)
+        if not excluded:
+            log.msg("%s important for %s because of %s" % (change.revision, product, f))
+            return True
+
+    # Everything was excluded
+    log.msg("%s not important for %s because all files were excluded" % (change.revision, product))
+    return False
+
+
+def makeImportantFunc(hgurl, product):
+    def isImportant(c):
+        if not isHgPollerTriggered(c, hgurl):
+            return False
+        if not shouldBuild(c):
+            return False
+        # No product is specified, so all changes are important
+        if product is None:
+            return True
+        return isImportantForProduct(c, product)
+    return isImportant
 
 def isImportantL10nFile(change, l10nModules):
     for f in change.files:
@@ -579,12 +626,11 @@ def generateBranchObjects(config, name, secrets=None):
     if secrets is None:
         secrets = {}
     builders = []
-    unittestBuilders = []
+    buildersByProduct = {}
     triggeredUnittestBuilders = []
     nightlyBuilders = []
     xulrunnerNightlyBuilders = []
     periodicPgoBuilders = [] # Only used for the 'periodic' strategy. rename to perodicPgoBuilders?
-    debugBuilders = []
     weeklyBuilders = []
     coverageBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
@@ -624,11 +670,13 @@ def generateBranchObjects(config, name, secrets=None):
         if 'mozharness_config' in pf:
             buildername = '%s_dep' % pf['base_name']
             builders.append(buildername)
+            buildersByProduct.setdefault(pf['stage_product'], []).append(buildername)
             prettyNames[platform] = buildername
             continue
 
         if platform.endswith("-debug"):
-            debugBuilders.append(pretty_name)
+            builders.append(pretty_name)
+            buildersByProduct.setdefault(pf['stage_product'], []).append(pretty_name)
             prettyNames[platform] = pretty_name
             # Debug unittests
             if pf.get('enable_unittests'):
@@ -647,6 +695,7 @@ def generateBranchObjects(config, name, secrets=None):
                 continue
         elif pf.get('enable_dep', True):
             builders.append(pretty_name)
+            buildersByProduct.setdefault(pf['stage_product'], []).append(pretty_name)
             prettyNames[platform] = pretty_name
 
         # Fill the l10n dep dict
@@ -672,6 +721,7 @@ def generateBranchObjects(config, name, secrets=None):
             periodicPgoBuilders.append('%s pgo-build' % pf['base_name'])
         elif config['pgo_strategy'] in ('try',) and platform in config['pgo_platforms']:
             builders.append('%s pgo-build' % pf['base_name'])
+            buildersByProduct.setdefault(pf['stage_product'], []).append('%s pgo-build' % pf['base_name'])
 
         if do_nightly:
             builder = '%s nightly' % base_name
@@ -764,10 +814,12 @@ def generateBranchObjects(config, name, secrets=None):
 
     if config.get('enable_try', False):
         tipsOnly = True
+        maxChanges = 100
         # Pay attention to all branches for pushes to try
         repo_branch = None
     else:
-        tipsOnly = True
+        tipsOnly = False
+        maxChanges = 100
         # Other branches should only pay attention to the default branch
         repo_branch = "default"
 
@@ -775,6 +827,7 @@ def generateBranchObjects(config, name, secrets=None):
         hgURL=config['hgurl'],
         branch=config['repo_path'],
         tipsOnly=tipsOnly,
+        maxChanges=maxChanges,
         repo_branch=repo_branch,
         pollInterval=pollInterval,
     ))
@@ -802,7 +855,7 @@ def generateBranchObjects(config, name, secrets=None):
         scheduler_class = makePropertiesScheduler(Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
     if not config.get('enable_merging', True):
-        nomergeBuilders.extend(builders + unittestBuilders + debugBuilders)
+        nomergeBuilders.extend(builders)
     nomergeBuilders.extend(periodicPgoBuilders) # these should never, ever merge
     extra_args['treeStableTimer'] = None
 
@@ -811,13 +864,24 @@ def generateBranchObjects(config, name, secrets=None):
     else:
         scheduler_name_prefix = name
 
-    branchObjects['schedulers'].append(scheduler_class(
-        name=scheduler_name_prefix,
-        branch=config['repo_path'],
-        builderNames=builders + unittestBuilders + debugBuilders,
-        fileIsImportant=lambda c: isHgPollerTriggered(c, config['hgurl']) and shouldBuild(c),
-        **extra_args
-    ))
+    for product, product_builders in buildersByProduct.items():
+        if config.get('enable_try'):
+            fileIsImportant = lambda c: isHgPollerTriggered(c, config['hgurl'])
+        else:
+            # The per-produt build behaviour is tweakable per branch. If it's
+            # not enabled, pass None as the product, which disables the
+            # per-product build behaviour.
+            if not config.get('enable_perproduct_builds'):
+                product = None
+            fileIsImportant = makeImportantFunc(config['hgurl'], product)
+
+        branchObjects['schedulers'].append(scheduler_class(
+            name=scheduler_name_prefix + "-" + product,
+            branch=config['repo_path'],
+            builderNames=product_builders,
+            fileIsImportant=fileIsImportant,
+            **extra_args
+        ))
 
     if config['enable_l10n']:
         l10n_builders = []
