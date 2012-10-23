@@ -86,10 +86,8 @@ which of the form
 """
 
 import time
-from calendar import timegm
-import operator
 
-from twisted.python import log, failure
+from twisted.python import log
 from twisted.internet import defer, reactor
 from twisted.internet.task import LoopingCall
 from twisted.web.client import getPage
@@ -97,28 +95,13 @@ from twisted.web.client import getPage
 from buildbot.changes import base, changes
 from buildbot.util import json
 
-def _parse_changes(data):
-    pushes = json.loads(data)
-    changes = []
-    for push_id, push_data in pushes.iteritems():
-        push_time = push_data['date']
-        push_user = push_data['user']
-        for cset in push_data['changesets']:
-            change = {}
-            change['updated'] = push_time
-            change['author'] = push_user
-            change['changeset'] = cset['node']
-            change['files'] = cset['files']
-            change['branch'] = cset['branch']
-            change['comments'] = cset['desc']
-            changes.append(change)
 
+def _parse_changes(data):
+    pushes = json.loads(data).values()
     # Sort by push date
-    # Changes in the same push have their order preserved because python list
-    # sorts are stable. The leaf of each push is sorted at the end of the list
-    # of changes for that push.
-    changes.sort(key=lambda c:c['updated'])
-    return changes
+    pushes.sort(key=lambda p: p['date'])
+    return pushes
+
 
 class Pluggable(object):
     '''The Pluggable class implements a forward for Deferred's that
@@ -191,7 +174,6 @@ class BasePoller(object):
         pass
 
 
-
 class BaseHgPoller(BasePoller):
     """Common base of HgPoller, HgLocalePoller, and HgAllLocalesPoller.
 
@@ -200,7 +182,8 @@ class BaseHgPoller(BasePoller):
     timeout = 30
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
-                 tipsOnly=False, tree=None, repo_branch=None, maxChanges=100):
+                 tipsOnly=False, tree=None, repo_branch=None, maxChanges=100,
+                 mergePushChanges=True):
         self.super_class = BasePoller
         self.super_class.__init__(self)
         self.hgURL = hgURL
@@ -219,6 +202,10 @@ class BaseHgPoller(BasePoller):
         self.loadTime = None
         self.repo_branch = repo_branch
         self.maxChanges = maxChanges
+        # With mergePushChanges=True we get one buildbot change per push to hg.
+        # The files from all changes in the push will be accumulated in the buildbot change
+        # and the comments of tipmost change of the push will be used
+        self.mergePushChanges = mergePushChanges
 
         self.emptyRepo = False
 
@@ -226,7 +213,7 @@ class BaseHgPoller(BasePoller):
         url = self._make_url()
         if self.verbose:
             log.msg("Polling Hg server at %s" % url)
-        return getPage(url, timeout = self.timeout)
+        return getPage(url, timeout=self.timeout)
 
     def _make_url(self):
         url = None
@@ -263,8 +250,8 @@ class BaseHgPoller(BasePoller):
         return self.super_class.dataFailed(self, res)
 
     def processData(self, query):
-        all_changes = _parse_changes(query)
-        if len(all_changes) == 0:
+        pushes = _parse_changes(query)
+        if len(pushes) == 0:
             if self.lastChangeset is None:
                 # We don't have a lastChangeset, and there are no changes.  Assume
                 # the repository is empty.
@@ -274,18 +261,80 @@ class BaseHgPoller(BasePoller):
             # Nothing else to do
             return
 
-        # We want to add at most self.maxChanges changes.
-        # Go through the list of changes backwards, since we want to keep the
+        # We want to add at most self.maxChanges changes per push. If
+        # mergePushChanges is True, then we'll get up to maxChanges pushes,
+        # each with up to maxChanges changes.
+        # Go through the list of pushes backwards, since we want to keep the
         # latest ones and possibly discard earlier ones.
         change_list = []
-        for change in reversed(all_changes):
-            if self.maxChanges is not None and len(change_list) >= self.maxChanges:
-                break
+        too_many = False
+        for push in reversed(pushes):
+            # Used for merging push changes
+            c = dict(
+                user=push['user'],
+                date=push['date'],
+                files=[],
+                desc="",
+                node=None,
+            )
 
-            # Ignore changes not on the specified in-repo branch.
-            if self.repo_branch is not None and self.repo_branch != change['branch']:
-                continue
-            change_list.append(change)
+            i = 0
+            for change in reversed(push['changesets']):
+                if self.maxChanges is not None and (len(change_list) >= self.maxChanges or
+                                                    i >= self.maxChanges):
+                    too_many = True
+                    log.msg("%s: got too many changes" % self.baseURL)
+                    break
+
+                # Ignore changes not on the specified in-repo branch.
+                if self.repo_branch is not None and self.repo_branch != change['branch']:
+                    continue
+
+                i += 1
+
+                if self.mergePushChanges:
+                    # Collect all the files for this push
+                    c['files'].extend(change['files'])
+                    # Keep the comments and revision of the last change of this push.
+                    # We're going through the changes in reverse order, so we
+                    # should use the comments and revision of the first change
+                    # in this loop
+                    if c['node'] is None:
+                        c['desc'] = change['desc']
+                        c['node'] = change['node']
+                else:
+                    c = dict(
+                        user=push['user'],
+                        date=push['date'],
+                        files=change['files'],
+                        desc=change['desc'],
+                        node=change['node'],
+                        branch=change['branch'],
+                    )
+                    change_list.append(c)
+
+            if too_many and self.mergePushChanges:
+                # Add a dummy change to indicate we had too many changes
+                c['files'].extend(['overflow'])
+
+            if self.mergePushChanges and c['node'] is not None:
+                change_list.append(c)
+
+        if too_many and not self.mergePushChanges:
+            # We add this at the end, and the list gets reversed below. That
+            # means this dummy change ends up being the 'first' change of the
+            # set, and buildbot chooses the last change as the one to
+            # build, so this dummy change doesn't impact which revision
+            # gets built.
+            c = dict(
+                user='buildbot',
+                files=['overflow'],
+                node=None,
+                desc='more than maxChanges(%i) received; ignoring the rest' % self.maxChanges,
+                date=time.time(),
+            )
+            change_list.append(c)
+
         # Un-reverse the list of changes so they get added in the right order
         change_list.reverse()
 
@@ -300,14 +349,14 @@ class BaseHgPoller(BasePoller):
         # the latest changeset in the repository
         if self.lastChangeset is not None or self.emptyRepo:
             for change in change_list:
-                link = "%s/rev/%s" % (self.baseURL, change["changeset"])
-                c = changes.Change(who = change["author"],
-                                   files = change["files"],
-                                   revision = change["changeset"],
-                                   comments = change["comments"],
-                                   revlink = link,
-                                   when = change["updated"],
-                                   branch = self.branch)
+                link = "%s/rev/%s" % (self.baseURL, change["node"])
+                c = changes.Change(who=change["user"],
+                                   files=change["files"],
+                                   revision=change["node"],
+                                   comments=change["desc"],
+                                   revlink=link,
+                                   when=change["date"],
+                                   branch=self.branch)
                 self.changeHook(c)
                 self.parent.addChange(c)
 
@@ -316,13 +365,14 @@ class BaseHgPoller(BasePoller):
         # Use the last change found by the poller, regardless of if it's on our
         # branch or not. This is so we don't have to constantly ignore it in
         # future polls.
-        self.lastChangeset = all_changes[-1]["changeset"]
+        self.lastChangeset = pushes[-1]["changesets"][-1]["node"]
         if self.verbose:
             log.msg("last changeset %s on %s" %
                     (self.lastChangeset, self.baseURL))
 
     def changeHook(self, change):
         pass
+
 
 class HgPoller(base.ChangeSource, BaseHgPoller):
     """This source will poll a Mercurial server over HTTP using
@@ -331,14 +381,14 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
 
     compare_attrs = ['hgURL', 'branch', 'pollInterval',
                      'pushlogUrlOverride', 'tipsOnly', 'storeRev',
-                     'repo_branch']
+                     'repo_branch', 'maxChanges']
     parent = None
     loop = None
     volatile = ['loop']
 
     def __init__(self, hgURL, branch, pushlogUrlOverride=None,
                  tipsOnly=False, pollInterval=30, storeRev=None,
-                 repo_branch="default"):
+                 repo_branch="default", maxChanges=100):
         """
         @type   hgURL:          string
         @param  hgURL:          The base URL of the Hg repo
@@ -362,7 +412,7 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         """
 
         BaseHgPoller.__init__(self, hgURL, branch, pushlogUrlOverride,
-                              tipsOnly, repo_branch=repo_branch)
+                              tipsOnly, repo_branch=repo_branch, maxChanges=maxChanges)
         self.pollInterval = pollInterval
         self.storeRev = storeRev
 

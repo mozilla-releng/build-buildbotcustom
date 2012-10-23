@@ -162,7 +162,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             majorReleaseName = majorReleasePrefix()
         platform = platform[0] if len(platform) >= 1 else ''
         bare_platform = platform.replace('xulrunner_', '')
-        message_tag = releaseConfig.get('messagePrefix', '[release] ')
+        message_tag = getMessageTag()
         buildbot_url = ''
         if master_status.getURLForThing(build):
             buildbot_url = "Full details are available at:\n %s\n" % master_status.getURLForThing(build)
@@ -219,7 +219,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
            listened on"""
         msgdict = {}
         releaseName = releasePrefix()
-        message_tag = releaseConfig.get('messagePrefix', '[release] ')
+        message_tag = getMessageTag()
         step = None
         ftpURL = genericFtpUrl()
         if change.branch.endswith('signing'):
@@ -255,7 +255,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             raise IOError("Cannot find a template file to use")
 
         template = open(template_name, "r", True)
-        subject = '%(productName)s %(version)s release'
+        subject = getMessageTag() + '%(productName)s %(version)s release'
         body = ''.join(template.readlines())
         template.close()
 
@@ -268,6 +268,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         msgdict['body'] = body % locals() + "\n"
         msgdict['type'] = 'plain'
         return msgdict
+
+    def getMessageTag():
+        return releaseConfig.get('messagePrefix', '[release] ')
 
     def parallelizeBuilders(base_name, platform, chunks):
         builders = {}
