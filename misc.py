@@ -872,8 +872,9 @@ def generateBranchObjects(config, name, secrets=None):
             # not enabled, pass None as the product, which disables the
             # per-product build behaviour.
             if not config.get('enable_perproduct_builds'):
-                product = None
-            fileIsImportant = makeImportantFunc(config['hgurl'], product)
+                fileIsImportant = makeImportantFunc(config['hgurl'], None)
+            else:
+                fileIsImportant = makeImportantFunc(config['hgurl'], product)
 
         branchObjects['schedulers'].append(scheduler_class(
             name=scheduler_name_prefix + "-" + product,
