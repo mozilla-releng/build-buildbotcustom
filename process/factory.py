@@ -4737,7 +4737,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         if 'linux' in self.platform:
             self.addStep(ShellCommand(
                 name='disable_screensaver',
-                command=['xset', 's', 'reset'],
+                command=['xset', 's', 'off', 's', 'reset'],
                 env=self.env,
             ))
         if self.platform.startswith('win32'):
@@ -5417,7 +5417,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if 'fed' in self.OS:
             self.addStep(ShellCommand(
                 name='disable_screensaver',
-                command=['xset', 's', 'reset']))
+                command=['xset', 's', 'off', 's', 'reset']))
         self.addStep(ShellCommand(
          name='create talos dir',
          workdir=self.workdirBase,
