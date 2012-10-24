@@ -734,8 +734,6 @@ def generateBranchObjects(config, name, secrets=None):
                     '%s %s %s l10n nightly' % (pf['product_name'].capitalize(),
                                        name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-            if config['enable_shark'] and pf.get('enable_shark'):
-                nightlyBuilders.append('%s shark' % base_name)
             if config['enable_valgrind'] and \
                platform in config['valgrind_platforms']:
                 nightlyBuilders.append('%s valgrind' % base_name)
@@ -1559,55 +1557,6 @@ def generateBranchObjects(config, name, secrets=None):
                     }
                     branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
 
-            if config['enable_shark'] and pf.get('enable_shark'):
-                shark_objdir = pf['platform_objdir']
-                mozilla2_shark_factory = NightlyBuildFactory(
-                    env=platform_env,
-                    objdir=shark_objdir,
-                    platform=platform,
-                    stagePlatform=stage_platform,
-                    hgHost=config['hghost'],
-                    repoPath=config['repo_path'],
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    configRepoPath=config['config_repo_path'],
-                    configSubDir=config['config_subdir'],
-                    profiledBuild=False,
-                    productName=pf['product_name'],
-                    mozconfig='%s/%s/shark' % (platform, name),
-                    srcMozconfig=pf.get('src_shark_mozconfig'),
-                    stageServer=config['stage_server'],
-                    stageUsername=config['stage_username'],
-                    stageGroup=config['stage_group'],
-                    stageSshKey=config['stage_ssh_key'],
-                    stageBasePath=stageBasePath,
-                    stageLogBaseUrl=config.get('stage_log_base_url', None),
-                    stageProduct=pf.get('stage_product'),
-                    codesighs=False,
-                    uploadPackages=uploadPackages,
-                    uploadSymbols=False,
-                    nightly=True,
-                    createSnippet=False,
-                    buildSpace=buildSpace,
-                    clobberURL=config['base_clobber_url'],
-                    clobberTime=clobberTime,
-                    buildsBeforeReboot=pf['builds_before_reboot'],
-                    post_upload_include_platform=pf.get('post_upload_include_platform', False),
-                )
-                mozilla2_shark_builder = {
-                    'name': '%s shark' % pf['base_name'],
-                    'slavenames': pf['slaves'],
-                    'builddir': '%s-%s-shark' % (name, platform),
-                    'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform), pf['stage_product']),
-                    'factory': mozilla2_shark_factory,
-                    'category': name,
-                    'nextSlave': _nextSlowSlave,
-                    'properties': {'branch': name,
-                                   'platform': platform,
-                                   'stage_platform': stage_platform,
-                                   'product': pf['stage_product'],
-                                   'slavebuilddir': reallyShort('%s-%s-shark' % (name, platform), pf['stage_product'])},
-                }
-                branchObjects['builders'].append(mozilla2_shark_builder)
             if config['enable_valgrind'] and \
                platform in config['valgrind_platforms']:
                 valgrind_env=platform_env.copy()
