@@ -4207,6 +4207,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              command=command,
              workdir='.',
              description=['bump', self.verifyConfigs[platform]],
+             haltOnFailure=True,
             ))
         self.addStep(TinderboxShellCommand(
          name='diff_configs',
