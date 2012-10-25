@@ -49,9 +49,6 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
     '''Return builder names that are found in both prettyNames[p] for some
        (expanded) platform p, and in builderNames'''
 
-    if user_platforms == 'none':
-        return []
-
     # When prettyNames contains list values rather than simple strings, it
     # means that we're processing the argument for selecting test suites, so do
     # not return any build builders.
@@ -158,24 +155,26 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
                         options.user_platforms.append(platform.split('-')[0])
                     elif buildType == 'opt' and not platform.endswith('debug'):
                         options.user_platforms.append(platform)
-    elif options.user_platforms != 'none':
-        # ugly
-        user_platforms = []
-        for user_platform in options.user_platforms.split(','):
-            user_platforms.append(user_platform)
-        options.user_platforms = user_platforms
+    elif options.user_platforms == 'none':
+        options.user_platforms = []
+    else:
+        options.user_platforms = options.user_platforms.split(',')
 
     if unittestSuites:
-      if options.test == 'all':
-        options.test = unittestSuites
-      elif options.test != 'none':
-        options.test = expandTestSuites(options.test.split(','), unittestSuites)
+        if options.test == 'all':
+            options.test = unittestSuites
+        elif options.test == 'none':
+            options.test = []
+        else:
+            options.test = expandTestSuites(options.test.split(','), unittestSuites)
 
     if talosSuites:
-      if options.talos == 'all':
-          options.talos = talosSuites
-      elif options.talos != 'none':
-          options.talos = options.talos.split(',')
+        if options.talos == 'all':
+            options.talos = talosSuites
+        elif options.talos == 'none':
+            options.talos = []
+        else:
+            options.talos = options.talos.split(',')
 
     # List for the custom builder names that match prettyNames passed in from misc.py
     customBuilderNames = []
@@ -183,7 +182,7 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         log.msg("TryChooser OPTIONS : MESSAGE %s : %s" % (options, message))
         customBuilderNames = getPlatformBuilders(options.user_platforms, builderNames, options.build, prettyNames)
 
-        if options.test != 'none' and unittestSuites:
+        if options.test and unittestSuites:
             # get test builders for test_master first
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
                                       builderNames, options.build, buildbotBranch, prettyNames, None))
@@ -191,7 +190,7 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
             if unittestPrettyNames:
                 customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
                                       builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
-        if options.talos != 'none' and talosSuites is not None:
+        if options.talos and talosSuites is not None:
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, builderNames, 
                                       options.build, buildbotBranch, prettyNames, None))
 
