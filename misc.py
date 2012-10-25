@@ -194,8 +194,8 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
         for i in range(totalChunks):
-            test_builders.append('%s %s-%i/%i' % \
-                    (name_prefix, suites_name, i+1, totalChunks))
+            test_builders.append('%s %s-%i' % \
+                    (name_prefix, suites_name, i+1))
     else:
         test_builders.append('%s %s' % (name_prefix, suites_name))
 
@@ -540,7 +540,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     resetHwClock=resetHwClock,
                 )
                 builder = {
-                    'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                    'name': '%s %s-%i' % (name_prefix, suites_name, i+1),
                     'slavenames': slavenames,
                     'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
                     'slavebuilddir': 'test',
