@@ -58,6 +58,7 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 Fedora 12 try debug test mochitest-browser-chrome',
                       'Rev3 Fedora 12 try debug test mochitest-other',
                       'Rev3 WINNT 5.1 try opt test reftest',
+                      'Rev3 WINNT 5.1 try opt test crashtest',
                       'Rev3 WINNT 6.1 try opt test crashtest',
                       'Rev3 WINNT 6.1 try debug test crashtest',
                       'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
@@ -91,7 +92,20 @@ class TestTryParser(unittest.TestCase):
         # Should get default set with junk input to the test masters
         tm = "try: junk"
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 Fedora 12 try opt test mochitest-1', 'Rev3 Fedora 12 try opt test mochitest-browser-chrome', 'Rev3 Fedora 12 try opt test mochitest-other', 'Rev3 Fedora 12 try opt test crashtest', 'Rev3 Fedora 12 try debug test mochitest-1', 'Rev3 Fedora 12 try debug test mochitest-browser-chrome', 'Rev3 Fedora 12 try debug test mochitest-other', 'Rev3 WINNT 5.1 try opt test reftest', 'Rev3 WINNT 6.1 try opt test crashtest', 'Rev3 WINNT 6.1 try debug test crashtest', 'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome', 'Rev3 WINNT 6.1 try debug test mochitest-other', 'Rev3 WINNT 6.1 try debug test mochitest-3']
+        builders = ['Rev3 Fedora 12 try opt test mochitest-1',
+                    'Rev3 Fedora 12 try opt test mochitest-browser-chrome',
+                    'Rev3 Fedora 12 try opt test mochitest-other',
+                    'Rev3 Fedora 12 try opt test crashtest',
+                    'Rev3 Fedora 12 try debug test mochitest-1',
+                    'Rev3 Fedora 12 try debug test mochitest-browser-chrome',
+                    'Rev3 Fedora 12 try debug test mochitest-other',
+                    'Rev3 WINNT 5.1 try opt test reftest',
+                    'Rev3 WINNT 5.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest',
+                    'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
+                    'Rev3 WINNT 6.1 try debug test mochitest-other',
+                    'Rev3 WINNT 6.1 try debug test mochitest-3']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkBuildMessage(self):
@@ -168,6 +182,7 @@ class TestTryParser(unittest.TestCase):
                     'Rev3 Fedora 12 try debug test mochitest-other',
                     'Rev3 Fedora 12 try debug test mochitest-browser-chrome',
                     'Rev3 WINNT 5.1 try opt test reftest',
+                    'Rev3 WINNT 5.1 try opt test crashtest',
                     'Rev3 WINNT 6.1 try opt test crashtest',
                     'Rev3 WINNT 6.1 try debug test crashtest',
                     'Rev3 WINNT 6.1 try debug test mochitest-other',
@@ -251,7 +266,10 @@ class TestTryParser(unittest.TestCase):
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
         # test in the getTestBuilders (for local builder_master unittests)
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 WINNT 6.1 try opt test crashtest', 'Rev3 WINNT 6.1 try debug test crashtest', 'Rev3 WINNT 6.1 try debug test mochitest-other']
+        builders = ['Rev3 WINNT 5.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest',
+                    'Rev3 WINNT 6.1 try debug test mochitest-other']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_NoTests(self):
@@ -292,7 +310,60 @@ class TestTryParser(unittest.TestCase):
     def test_DebugWin32OnTestMaster(self):
         tm = 'try: -b do -p win32 -u crashtest'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
-        builders = ['Rev3 WINNT 6.1 try debug test crashtest', 'Rev3 WINNT 6.1 try opt test crashtest']
+        builders = ['Rev3 WINNT 6.1 try debug test crashtest',
+                    'Rev3 WINNT 5.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try opt test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_RestrictionBaseline(self):
+        # This isn't really a test of anything. It's mostly to make reading the
+        # following tests easier by giving the full set of possible builds
+        # without any filtering.
+        tm = 'try: -b do -p win32 -u crashtest'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 5.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_Include5_1(self):
+        tm = 'try: -b do -p win32 -u crashtest[5.1]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 5.1 try opt test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_IncludeExclude(self):
+        tm = 'try: -b do -p win32 -u crashtest[-5.1,debug]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 6.1 try debug test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_IncludeExcludeEmpty(self):
+        tm = 'try: -b do -p win32 -u crashtest[-5.1,5.1]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = []
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_IncludeDummyExclude(self):
+        tm = 'try: -b do -p win32 -u crashtest[5.1,-notfound]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 5.1 try opt test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_Exclude5_1(self):
+        tm = 'try: -b do -p win32 -u crashtest[-5.1]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest']
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_MultipleInclusions(self):
+        tm = 'try: -b do -p win32 -u all[5.1,crash]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES,None, UNITTEST_SUITES)
+        builders = ['Rev3 WINNT 5.1 try opt test reftest',
+                    'Rev3 WINNT 5.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_HiddenCharactersAndOldSyntax(self):
@@ -315,7 +386,9 @@ class TestTryParser(unittest.TestCase):
 
         # should get both build types in test_builders
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = ['Rev3 WINNT 6.1 try opt test crashtest', 'Rev3 WINNT 6.1 try debug test crashtest']
+        builders = ['Rev3 WINNT 6.1 try opt test crashtest',
+                    'Rev3 WINNT 5.1 try opt test crashtest',
+                    'Rev3 WINNT 6.1 try debug test crashtest']
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def _testNewLineProcessMessage(self, message, value=None):

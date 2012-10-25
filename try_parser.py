@@ -19,6 +19,8 @@ def testSuiteMatches(v, u):
         return v.startswith('mochitest-browser-chrome')
     elif u in ('reftests', 'reftest'):
         return v.startswith('reftest')
+    elif u == 'all':
+        return True
     else:
         # validate other test names
         return u == v
@@ -59,7 +61,35 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
     builders = [ prettyNames[p] for p in platforms.intersection(prettyNames) ]
     return list(set(builders).intersection(builderNames))
 
-def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, buildbotBranch,
+def passesFilter(testFilters, test, pretty):
+    if test not in testFilters:
+        # No filter requested for test, so accept anything
+        return True
+
+    # filters is a set of inclusion and exclusion rules. Exclusions begin with
+    # '-'. To be accepted, a pretty name must match at least one inclusion and
+    # no exclusion -- unless no inclusions are given, in which case the pretty
+    # name has to just not match any exclusions.
+    #
+    #   all[a] means "anything that matches a"
+    #   all[a,-x] means "anything that matches a and not x"
+    #   all[a,b,-x] means "anything that matches a or b but does not match x"
+    #   all[-x] means "anything that does not match x"
+    #   all[-x,-y] means "anything that matches neither x nor y"
+    sawInclusion = False
+    matchedInclusion = False
+    for f in testFilters[test]:
+        if f.startswith('-'):
+            if f[1:] in pretty:
+                return False
+        else:
+            sawInclusion = True
+            if f in pretty:
+                matchedInclusion = True
+
+    return matchedInclusion or not sawInclusion
+
+def getTestBuilders(platforms, testType, tests, testFilters, builderNames, buildTypes, buildbotBranch,
                     prettyNames, unittestPrettyNames):
     if tests == 'none':
         return []
@@ -83,15 +113,18 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, buildb
                             pretties = [ pretties ]
                         for pretty in pretties:
                             custom_builder = "%s %s %s %s %s" % (pretty, buildbotBranch, buildType, testType, test)
-                            testBuilders.add(custom_builder)
+                            if passesFilter(testFilters, test, custom_builder):
+                                testBuilders.add(custom_builder)
 
         # we do all but debug win32 over on test masters so have to check the 
         # unittestPrettyNames platforms for local builder master unittests
         for platform in builder_test_platforms.intersection(unittestPrettyNames or {}):
             assert platform.endswith('-debug')
             for test in tests:
-                debug_custom_builder = "%s %s" % (unittestPrettyNames[platform], test)
-                testBuilders.add(debug_custom_builder)
+                pretty = unittestPrettyNames[platform]
+                debug_custom_builder = "%s %s" % (pretty, test)
+                if passesFilter(testFilters, test, debug_custom_builder):
+                    testBuilders.add(debug_custom_builder)
 
     if testType == "talos":
         for platform in set(platforms).intersection(prettyNames):
@@ -99,9 +132,100 @@ def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, buildb
             for slave_platform in prettyNames[platform]:
                 for test in tests:
                     custom_builder = "%s %s talos %s" % (slave_platform, buildbotBranch, test)
-                    testBuilders.add(custom_builder)
+                    if passesFilter(testFilters, test, custom_builder):
+                        testBuilders.add(custom_builder)
 
     return list(testBuilders.intersection(builderNames))
+
+def parseTestOptions(s, unittestSuites):
+    '''parse a comma-separated list of tests, each optionally followed by a
+    comma-separated list of restrictions enclosed in square brackets
+
+    Examples:
+      none - returns the empty list
+
+      all - returns all known test suites
+
+      all[moch] - returns all known tests suites with 'moch' in their prettyNames
+
+      test1,test2[moch,ref],test3 - restrictions can be specific to a test suite
+
+      test[-moch,ref] - a preceding '-' character means to accept any test whose
+        prettyName does NOT contain the following substring
+
+      test[a,b,-x,-y] - the '-' character binds to only the next option, so this is
+        "any builder containing either the substring a or the substring b, excluding
+        those that contain either x or y."
+
+      test[-x] - If no positive substrings are given, anything matches except builders
+        whose prettyNames contain x.
+      '''
+
+    if s == 'none':
+        return [], {}
+
+    # Handle nested commas by extracting out all restrictions and replacing
+    # them with a numeric id, saving the list of restrictions in an array
+    # indexed by those ids. This allows a simple split on comma to find the
+    # list of test suites requested. Example:
+    #
+    #    "mochitests[a,b],test2,mochitest-1[c]"
+    #
+    #  gets turned into
+    #
+    #    "mochitests[0],test2,mochitest-1[1]" plus a side table
+    #      0: [ 'a', 'b' ]
+    #      1: [ 'c' ]
+    #
+    #  gets split into
+    #
+    #    [ 'mochitests[0]', 'test2', 'mochitest-1[1]' ]
+    #
+    #  which is scanned to produce a final set of tests requested:
+    #
+    #    [ 'mochitest-1', 'test2', 'mochitest-2', ... ]
+    #
+    # and a mapping table from each test to the set of restrictions:
+    #
+    #    mochitest-1: [ 'c' ]
+    #    test2: []
+    #    mochitest-2: [ 'a', 'b' ]
+    #    ...
+    #
+    # These will be tested against tests' prettyNames in passesFilter().
+    #
+    # Note that if the same test shows up multiple times in the list (eg
+    # mochitest-1 in the example above), the last set of restrictions for that
+    # test will override any previous ones. (Unioning the restrictions is less
+    # likely to be what the user intended, especially when exclusion-only
+    # filters are involved.)
+    #
+    restrictions = []
+    def grab_restrictions(m):
+        n = len(restrictions)
+        s = m.group(1)
+        restrictions.append(s.split(','))
+        return '[' + str(n) + ']'
+    # Replace restrictions inside of square brackets with a numeric id, and
+    # generate a side table mapping that numeric id to a list of restrictions
+    s = re.sub(r'\[(.*?)\]', grab_restrictions, s)
+
+    all_tests = set()
+    restrictions_map = {}
+    for t in s.split(','):
+        # Grab out the stuff before and after the square brackets
+        m = re.match(r'(.*?)(?:\[(\d+)\])?$', t)
+        if not m:
+            return [] # Bad syntax
+
+        tests = expandTestSuites([ m.group(1) ], unittestSuites)
+        if m.group(2):
+            for test in tests:
+                restrictions_map[test] = restrictions[int(m.group(2))]
+
+        all_tests.update(tests)
+
+    return list(all_tests), restrictions_map
 
 def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
               buildbotBranch='try'):
@@ -160,13 +284,10 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
     else:
         options.user_platforms = options.user_platforms.split(',')
 
+    testFilters = None
     if unittestSuites:
-        if options.test == 'all':
-            options.test = unittestSuites
-        elif options.test == 'none':
-            options.test = []
-        else:
-            options.test = expandTestSuites(options.test.split(','), unittestSuites)
+        orig = options.test
+        options.test, testFilters = parseTestOptions(options.test, unittestSuites)
 
     if talosSuites:
         if options.talos == 'all':
@@ -184,14 +305,14 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
 
         if options.test and unittestSuites:
             # get test builders for test_master first
-            customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
+            customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, testFilters,
                                       builderNames, options.build, buildbotBranch, prettyNames, None))
             # then add any builder_master test builders
             if unittestPrettyNames:
-                customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
+                customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, testFilters,
                                       builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
         if options.talos and talosSuites is not None:
-            customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, builderNames, 
+            customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, {}, builderNames,
                                       options.build, buildbotBranch, prettyNames, None))
 
     return customBuilderNames
