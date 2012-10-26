@@ -2352,11 +2352,11 @@ def generateNanojitObjects(config, SLAVES):
             'status': status,
             }
 
-def generateSpiderMonkeyObjects(config, SLAVES):
+def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
     branch = os.path.basename(config['repo_path'])
 
-    PRETTY_NAME = '%s spidermonkey-%s build'
+    PRETTY_NAME = '%s %s-%s build'
     prettyNames = {}
     for platform, variants in config['variants'].items():
         base_platform = platform.split('-', 1)[0]
@@ -2394,7 +2394,7 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     **factory_kwargs
                     )
 
-            prettyName = PRETTY_NAME % (pf['base_name'], variant)
+            prettyName = PRETTY_NAME % (project, pf['base_name'], variant)
             prettyNames[platform] = prettyName
 
             builder = {'name': prettyName,
@@ -2572,7 +2572,7 @@ def generateProjectObjects(project, config, SLAVES):
 
     # Spidermonkey
     elif project.startswith('spidermonkey'):
-        spiderMonkeyObjects = generateSpiderMonkeyObjects(config, SLAVES)
+        spiderMonkeyObjects = generateSpiderMonkeyObjects(project, config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
 
     # DXR
