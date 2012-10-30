@@ -296,6 +296,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platforms = (platforms,)
         return bool([p for p in platforms if substring in p])
 
+    def getMessageId():
+        md5 = hashlib.md5(getMessageTag())
+        for key in ("version", "buildNumber", "productName"):
+            md5.update(str(releaseConfig.get(key)))
+        return "<%s@mozilla.com>" % md5.hexdigest()
+
     builders = []
     test_builders = []
     schedulers = []
@@ -309,7 +315,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     xr_deliverables_builders = []
     post_deliverables_builders = []
     post_antivirus_builders = []
-    email_message_id = hashlib.md5("%(baseTag)s %(productName)s %(version)s %(buildNumber)s" %releaseConfig).hexdigest()
+    email_message_id = getMessageId()
     ##### Builders
     builder_env = {
         'BUILDBOT_CONFIGS': '%s%s' % (branchConfig['hgurl'],
