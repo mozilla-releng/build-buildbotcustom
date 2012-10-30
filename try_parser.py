@@ -24,11 +24,6 @@ def expandTestSuites(user_suites,valid_suites):
             for v in valid_suites:
                 if v.startswith('mochitest-browser-chrome'):
                     test_suites.append(v)
-        elif u.startswith('mochitest-'):
-            num = u.split('-')[1]
-            for v in valid_suites:
-                if v.startswith('mochitest') and re.search(num,v.split('/')[0]):
-                    test_suites.append(v)
         elif u == 'reftests' or u == 'reftest':
             for v in valid_suites:
                 if v.startswith('reftest'):

@@ -194,8 +194,8 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
         for i in range(totalChunks):
-            test_builders.append('%s %s-%i/%i' % \
-                    (name_prefix, suites_name, i+1, totalChunks))
+            test_builders.append('%s %s-%i' % \
+                    (name_prefix, suites_name, i+1))
     else:
         test_builders.append('%s %s' % (name_prefix, suites_name))
 
@@ -540,7 +540,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     resetHwClock=resetHwClock,
                 )
                 builder = {
-                    'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
+                    'name': '%s %s-%i' % (name_prefix, suites_name, i+1),
                     'slavenames': slavenames,
                     'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
                     'slavebuilddir': 'test',
@@ -2352,11 +2352,13 @@ def generateNanojitObjects(config, SLAVES):
             'status': status,
             }
 
-def generateSpiderMonkeyObjects(config, SLAVES):
+def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
     branch = os.path.basename(config['repo_path'])
 
-    for platform, variants in config['platforms'].items():
+    PRETTY_NAME = '%s %s-%s build'
+    prettyNames = {}
+    for platform, variants in config['variants'].items():
         base_platform = platform.split('-', 1)[0]
         if 'win' in platform:
             slaves = SLAVES[base_platform]
@@ -2368,10 +2370,20 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             slaves = SLAVES[base_platform]
             interpreter = None
 
-        env = config['env'][platform].copy()
+        pf = config['platforms'][platform]
+        env = pf['env'].copy()
         env['HG_REPO'] = config['hgurl'] + config['repo_path']
 
         for variant in variants:
+            factory_platform_args = [ 'use_mock',
+                                      'mock_target',
+                                      'mock_packages',
+                                      'mock_copyin_files' ]
+            factory_kwargs = {}
+            for a in factory_platform_args:
+                if a in pf:
+                    factory_kwargs[a] = pf[a]
+
             f = ScriptFactory(
                     config['scripts_repo'],
                     'scripts/spidermonkey_builds/spidermonkey.sh',
@@ -2379,9 +2391,13 @@ def generateSpiderMonkeyObjects(config, SLAVES):
                     log_eval_func=rc_eval_func({1: WARNINGS}),
                     extra_args=(variant,),
                     script_timeout=3600,
+                    **factory_kwargs
                     )
 
-            builder = {'name': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
+            prettyName = PRETTY_NAME % (project, pf['base_name'], variant)
+            prettyNames[platform] = prettyName
+
+            builder = {'name': prettyName,
                     'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                     'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
                     'slavenames': slaves,
@@ -2403,12 +2419,24 @@ def generateSpiderMonkeyObjects(config, SLAVES):
         return False
 
     # Set up scheduler
-    scheduler = Scheduler(
+    extra_args = {}
+    scheduler_class = None
+    if config.get('enable_try'):
+        scheduler_class = makePropertiesScheduler(BuilderChooserScheduler, [buildUIDSchedFunc])
+        extra_args['chooserFunc'] = tryChooser
+        extra_args['numberOfBuildsToTrigger'] = 1
+        extra_args['prettyNames'] = prettyNames
+        extra_args['buildbotBranch'] = branch
+    else:
+        scheduler_class = Scheduler
+
+    scheduler = scheduler_class(
             name="%s_spidermonkey" % branch,
             branch=config['repo_path'],
             treeStableTimer=None,
             builderNames=[b['name'] for b in builders],
             fileIsImportant=isImportant,
+            **extra_args
             )
 
     return {
@@ -2544,7 +2572,7 @@ def generateProjectObjects(project, config, SLAVES):
 
     # Spidermonkey
     elif project.startswith('spidermonkey'):
-        spiderMonkeyObjects = generateSpiderMonkeyObjects(config, SLAVES)
+        spiderMonkeyObjects = generateSpiderMonkeyObjects(project, config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
 
     # DXR

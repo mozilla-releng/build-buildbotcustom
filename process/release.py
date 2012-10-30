@@ -1765,12 +1765,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         upstream_builders = [builderPrefix('push_to_mirrors')]
         if releaseConfig.get('verifyConfigs'):
             upstream_builders.append(builderPrefix('updates'))
-        schedulers.append(AggregatingScheduler(
-            name=builderPrefix('%s_uptake_check' % releaseConfig['productName']),
-            branch=sourceRepoInfo['path'],
-            upstreamBuilders=upstream_builders,
-            builderNames=[builderPrefix('start_uptake_monitoring')]
-        ))
+        if not releaseConfig.get('disableBouncerEntries'):
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('%s_uptake_check' % releaseConfig['productName']),
+                branch=sourceRepoInfo['path'],
+                upstreamBuilders=upstream_builders,
+                builderNames=[builderPrefix('start_uptake_monitoring')]
+            ))
 
     # This builder should be come after all AggregatingSchedulers are set
     aggregating_shedulers = []
