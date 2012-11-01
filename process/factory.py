@@ -263,11 +263,10 @@ def getPlatformMinidumpPath(platform):
         'macosx': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
         'macosx64_gecko': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-        # Android uses OSX because the Foopies are OSX.
-        'android': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-        'android-noion': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
-        # Pandas will run on Linux Foopies.
-        'android-armv6': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
+        # Android uses OSX *and* Linux because the Foopies are on both.
+        'android': WithProperties('~/bin/minidump_stackwalk'),
+        'android-noion': WithProperties('~/bin/minidump_stackwalk'),
+        'android-armv6': WithProperties('~/bin/minidump_stackwalk'),
         }
     return platform_minidump_path[platform]
 
