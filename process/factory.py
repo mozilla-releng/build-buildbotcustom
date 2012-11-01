@@ -264,9 +264,9 @@ def getPlatformMinidumpPath(platform):
         'macosx64': WithProperties('%(toolsdir:-)s/breakpad/osx64/minidump_stackwalk'),
         'macosx64_gecko': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Android uses OSX *and* Linux because the Foopies are on both.
-        'android': WithProperties('~/bin/minidump_stackwalk'),
-        'android-noion': WithProperties('~/bin/minidump_stackwalk'),
-        'android-armv6': WithProperties('~/bin/minidump_stackwalk'),
+        'android': WithProperties('/builds/minidump_stackwalk'),
+        'android-noion': WithProperties('/builds/minidump_stackwalk'),
+        'android-armv6': WithProperties('/builds/minidump_stackwalk'),
         }
     return platform_minidump_path[platform]
 
