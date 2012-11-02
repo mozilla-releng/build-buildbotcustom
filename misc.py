@@ -2370,16 +2370,9 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
     PRETTY_NAME = '%s %s-%s build'
     prettyNames = {}
     for platform, variants in config['variants'].items():
-        base_platform = platform.split('-', 1)[0]
+        interpreter = None
         if 'win' in platform:
-            slaves = SLAVES[base_platform]
             interpreter = 'bash'
-        elif 'lion' in platform:
-            slaves = SLAVES['macosx64-lion']
-            interpreter = None
-        else:
-            slaves = SLAVES[base_platform]
-            interpreter = None
 
         pf = config['platforms'][platform]
         env = pf['env'].copy()
@@ -2415,7 +2408,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             builder = {'name': prettyName,
                     'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                     'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
-                    'slavenames': slaves,
+                    'slavenames': pf['slaves'],
                     'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                     'factory': f,
                     'category': branch,
