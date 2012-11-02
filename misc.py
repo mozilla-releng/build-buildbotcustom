@@ -2384,7 +2384,11 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                     **factory_kwargs
                     )
 
-            prettyName = PRETTY_NAME % (project, pf['base_name'], variant)
+            # Fill in interpolated variables in pf['base_name'], which is currently only
+            # "%(branch)s"
+            base_name = pf['base_name'] % config
+
+            prettyName = PRETTY_NAME % (base_name, project, variant)
             prettyNames[platform] = prettyName
 
             builder = {'name': prettyName,
