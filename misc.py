@@ -672,6 +672,10 @@ def generateBranchObjects(config, name, secrets=None):
             builders.append(buildername)
             buildersByProduct.setdefault(pf['stage_product'], []).append(buildername)
             prettyNames[platform] = buildername
+
+            if pf.get('enable_nightly'):
+                buildername = '%s_nightly' % pf['base_name']
+                nightlyBuilders.append(buildername)
             continue
 
         if platform.endswith("-debug"):
@@ -1033,6 +1037,23 @@ def generateBranchObjects(config, name, secrets=None):
             }
             branchObjects['builders'].append(builder)
 
+            if pf.get('enable_nightly'):
+                builder = {
+                    'name': '%s_nightly' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s_nightly' % pf['base_name'],
+                    'slavebuilddir': reallyShort('%s_nightly' % pf['base_name']),
+                    'factory': factory,
+                    'category': name,
+                    'properties': {
+                        'branch': name,
+                        'platform': platform,
+                        'product': pf['stage_product'],
+                        'repo_path': config['repo_path'],
+                        'nightly_build': True,
+                    }
+                }
+                branchObjects['builders'].append(builder)
             # Nothing else to do for this builder
             continue
 
