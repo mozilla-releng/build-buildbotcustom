@@ -22,6 +22,8 @@ TESTER_PRETTY_NAMES = {'macosx':['Rev3 MacOSX Leopard 10.5.8'],
                        'linux':['Rev3 Fedora 12']}
 TESTER_PRETTY_TB_NAMES = {'linux':['TB Rev3 Fedora 12']}
 UNITTEST_PRETTY_NAMES = {'win32-debug':'WINNT 5.2 try debug test'}
+BUILDER_PRETTY_B2G_NAMES = { 'ics_armv7a_gecko': 'b2g_try_ics_armv7a_gecko build',
+                            'ics_armv7a_gecko-debug': 'b2g_try_ics_armv7a_gecko-debug build' }
 
 TALOS_SUITES = ['tp4', 'chrome']
 UNITTEST_SUITES = ['reftest', 'crashtest', 'mochitest-1', 'mochitest-3', 'mochitest-browser-chrome', 'mochitest-other']
@@ -68,6 +70,8 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 6.1 try talos chrome']
 VALID_TESTER_TB_NAMES = ['TB Rev3 Fedora 12 try-comm-central opt test mozmill',
                          'TB Rev3 Fedora 12 try-comm-central opt test xpcshell']
+VALID_BUILDER_B2G_NAMES = ['b2g_try_ics_armv7a_gecko-debug build',
+                           'b2g_try_ics_armv7a_gecko build']
 
 class TestTryParser(unittest.TestCase):
 
@@ -123,6 +127,16 @@ class TestTryParser(unittest.TestCase):
         tm = 'try: -b od -p macosx64,macosx'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = ['OS X 10.6.2 try build', 'OS X 10.6.2 try leak test build', 'OS X 10.5.2 try leak test build']
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
+
+    def test_B2GPlatform(self):
+        tm = 'try: -b od -p ics_armv7a_gecko'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_B2G_NAMES, BUILDER_PRETTY_B2G_NAMES)
+        builders = ['b2g_try_ics_armv7a_gecko-debug build', 'b2g_try_ics_armv7a_gecko build' ]
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
+        tm = 'try: -b o -p ics_armv7a_gecko'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_B2G_NAMES, BUILDER_PRETTY_B2G_NAMES)
+        builders = ['b2g_try_ics_armv7a_gecko build' ]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_AllPlatformsBoth(self):

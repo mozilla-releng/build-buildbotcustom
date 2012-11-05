@@ -672,6 +672,10 @@ def generateBranchObjects(config, name, secrets=None):
             builders.append(buildername)
             buildersByProduct.setdefault(pf['stage_product'], []).append(buildername)
             prettyNames[platform] = buildername
+
+            if pf.get('enable_nightly'):
+                buildername = '%s_nightly' % pf['base_name']
+                nightlyBuilders.append(buildername)
             continue
 
         if platform.endswith("-debug"):
@@ -1033,6 +1037,23 @@ def generateBranchObjects(config, name, secrets=None):
             }
             branchObjects['builders'].append(builder)
 
+            if pf.get('enable_nightly'):
+                builder = {
+                    'name': '%s_nightly' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s_nightly' % pf['base_name'],
+                    'slavebuilddir': reallyShort('%s_nightly' % pf['base_name']),
+                    'factory': factory,
+                    'category': name,
+                    'properties': {
+                        'branch': name,
+                        'platform': platform,
+                        'product': pf['stage_product'],
+                        'repo_path': config['repo_path'],
+                        'nightly_build': True,
+                    }
+                }
+                branchObjects['builders'].append(builder)
             # Nothing else to do for this builder
             continue
 
@@ -1055,7 +1076,6 @@ def generateBranchObjects(config, name, secrets=None):
         if platform.find('-debug') > -1:
             # Some platforms can't run on the build host
             leakTest = pf.get('enable_leaktests', True)
-            codesighs = False
             if not pf.get('enable_unittests'):
                 uploadPackages = pf.get('packageTests', False)
             else:
@@ -1067,17 +1087,11 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
-            codesighs = pf.get('enable_codesighs', True)
             leakTest = False
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
         packageTests = pf.get('packageTests', packageTests)
-
-        if platform.find('win') > -1:
-            codesighs = False
-        if 'b2g' in platform:
-            codesighs = False
 
         doBuildAnalysis = pf.get('enable_build_analysis', False)
 
@@ -1163,7 +1177,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'leakTest': leakTest,
                 'checkTest': checkTest,
                 'valgrindCheck': valgrindCheck,
-                'codesighs': codesighs,
                 'uploadPackages': uploadPackages,
                 'uploadSymbols': uploadSymbols,
                 'disableSymbols': disableSymbols,
@@ -1416,7 +1429,6 @@ def generateBranchObjects(config, name, secrets=None):
                 stageLogBaseUrl=config.get('stage_log_base_url', None),
                 stagePlatform=pf['stage_platform'],
                 stageProduct=pf['stage_product'],
-                codesighs=False,
                 doBuildAnalysis=doBuildAnalysis,
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
@@ -1713,7 +1725,6 @@ def generateBranchObjects(config, name, secrets=None):
                 stageGroup=config['stage_group'],
                 stageSshKey=config['stage_ssh_xulrunner_key'],
                 stageBasePath=xulrunnerStageBasePath,
-                codesighs=False,
                 uploadPackages=uploadPackages,
                 uploadSymbols=True,
                 nightly=True,
@@ -2359,16 +2370,9 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
     PRETTY_NAME = '%s %s-%s build'
     prettyNames = {}
     for platform, variants in config['variants'].items():
-        base_platform = platform.split('-', 1)[0]
+        interpreter = None
         if 'win' in platform:
-            slaves = SLAVES[base_platform]
             interpreter = 'bash'
-        elif 'lion' in platform:
-            slaves = SLAVES['macosx64-lion']
-            interpreter = None
-        else:
-            slaves = SLAVES[base_platform]
-            interpreter = None
 
         pf = config['platforms'][platform]
         env = pf['env'].copy()
@@ -2394,13 +2398,17 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                     **factory_kwargs
                     )
 
-            prettyName = PRETTY_NAME % (project, pf['base_name'], variant)
+            # Fill in interpolated variables in pf['base_name'], which is currently only
+            # "%(branch)s"
+            base_name = pf['base_name'] % config
+
+            prettyName = PRETTY_NAME % (base_name, project, variant)
             prettyNames[platform] = prettyName
 
             builder = {'name': prettyName,
                     'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                     'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
-                    'slavenames': slaves,
+                    'slavenames': pf['slaves'],
                     'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                     'factory': f,
                     'category': branch,

@@ -59,8 +59,7 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps
 from buildbotcustom.steps.release import SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
-from buildbotcustom.steps.test import Codesighs, \
-     GraphServerPost
+from buildbotcustom.steps.test import GraphServerPost
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.steps.signing import SigningServerAuthenication
@@ -69,7 +68,7 @@ from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
   genBuildID, reallyShort
 from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, MockInstall, \
   MockMozillaCheck, MockProperty, RetryingMockProperty, RetryingMockCommand, \
-  MockAliveTest, MockCompareLeakLogs, MockCodesighs
+  MockAliveTest, MockCompareLeakLogs
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -706,7 +705,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
                  ausHost=None, nightly=False, leakTest=False, leakTarget=None,
-                 checkTest=False, valgrindCheck=False, codesighs=True,
+                 checkTest=False, valgrindCheck=False,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, createPartial=False, doCleanup=True,
@@ -776,7 +775,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.leakTarget = leakTarget
         self.checkTest = checkTest
         self.valgrindCheck = valgrindCheck
-        self.codesighs = codesighs
         self.graphServer = graphServer
         self.graphSelector = graphSelector
         self.graphBranch = graphBranch
@@ -956,8 +954,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addCheckTestSteps()
         if self.valgrindCheck:
             self.addValgrindCheckSteps()
-        if self.codesighs:
-            self.addCodesighsSteps()
         if self.createSnippet:
             self.addUpdateSteps()
         if self.triggerBuilds:
@@ -1274,6 +1270,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                              branch=self.graphBranch,
                                              resultsname=self.baseName,
                                              env=gs_env,
+                                             flunkOnFailure=False,
+                                             haltOnFailure=False,
                                              propertiesFile="properties.json"))
             else:
                 self.addStep(OutputStep(
@@ -1729,81 +1727,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         # Call out to a subclass to do the actual uploading
         self.doUpload(uploadMulti=self.multiLocale)
 
-    def addCodesighsSteps(self):
-        codesighs_dir = WithProperties('%(basedir)s/build/' + self.mozillaObjdir +
-                                       '/tools/codesighs')
-        if self.platform.startswith('win'):
-            codesighs_dir = 'build/%s/tools/codesighs' % self.mozillaObjdir
-        self.addStep(MockCommand(
-         name='make_codesighs',
-         command=self.makeCmd,
-         workdir=codesighs_dir,
-         mock=self.use_mock,
-         target=self.mock_target,
-         mock_workdir_prefix=None,
-        ))
-
-        cmd = ['/bin/bash', '-c',
-                WithProperties('%(toolsdir)s/buildfarm/utils/wget_unpack.sh ' +
-                               self.logBaseUrl + ' codesize-auto.tar.gz '+
-                               'codesize-auto.log:codesize-auto.log.old') ]
-        self.addStep(RetryingShellCommand(
-            name='get_codesize_logs',
-            env=self.env,
-            workdir='.',
-            command=cmd,
-        ))
-
-        if self.mozillaDir == '':
-            codesighsObjdir = self.objdir
-        else:
-            codesighsObjdir = '../%s' % self.mozillaObjdir
-
-        self.addStep(MockCodesighs(
-         name='get_codesighs_diff',
-         objdir=codesighsObjdir,
-         platform=self.platform,
-         workdir='build%s' % self.mozillaDir,
-         env=self.env,
-         tbPrint=self.tbPrint,
-         mock=self.use_mock,
-         target=self.mock_target,
-         mock_workdir_prefix='%(basedir)s/',
-        ))
-
-        if self.graphServer:
-            gs_env = self.env.copy()
-            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
-            self.addBuildInfoSteps()
-            self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
-            self.addStep(GraphServerPost(server=self.graphServer,
-                                         selector=self.graphSelector,
-                                         branch=self.graphBranch,
-                                         resultsname=self.baseName,
-                                         env=gs_env,
-                                         propertiesFile="properties.json"))
-        self.addStep(ShellCommand(
-         name='echo_codesize_log',
-         command=['cat', '../codesize-auto-diff.log'],
-         workdir='build%s' % self.mozillaDir
-        ))
-
-        cmd = ['/bin/bash', '-c',
-                WithProperties('%(toolsdir)s/buildfarm/utils/pack_scp.sh ' +
-                    'codesize-auto.tar.gz ' + ' .. ' +
-                    '%s ' % self.stageUsername +
-                    '%s ' % self.stageSshKey +
-                    # Notice the '/' after the ':'. This prevents windows from trying to modify
-                    # the path
-                    '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
-                        self.logUploadDir) +
-                    'codesize-auto.log') ]
-        self.addStep(ShellCommand(
-            name='upload_codesize_logs',
-            command=cmd,
-            workdir='build%s' % self.mozillaDir
-            ))
-
     def addCreateSnippetsSteps(self, milestone_extra=''):
         if 'android' in self.complete_platform:
             cmd = [
@@ -1965,10 +1888,10 @@ class TryBuildFactory(MercurialBuildFactory):
 
         self.tinderboxBuildsDir = tinderboxBuildsDir
 
-        self.codeSighsReferenceRepo = 'mozilla-central'
+        self.leakTestReferenceRepo = 'mozilla-central'
         if 'thunderbird' in kwargs['stageProduct']:
-            self.codeSighsReferenceRepo = 'comm-central'
-
+            self.leakTestReferenceRepo = 'comm-central'
+        
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
@@ -2034,47 +1957,8 @@ class TryBuildFactory(MercurialBuildFactory):
         leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/%s-%s' % \
-            (self.stageServer, self.productName, self.codeSighsReferenceRepo, self.complete_platform)
+            (self.stageServer, self.productName, self.leakTestReferenceRepo, self.complete_platform)
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
-
-    def addCodesighsSteps(self):
-        self.addStep(MockCommand(
-         name='make_codesighs',
-         command=self.makeCmd,
-         workdir='build/%s/tools/codesighs' % self.mozillaObjdir,
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-        self.addStep(RetryingShellCommand(
-         name='get_codesize_log',
-         command=['wget', '-O', 'codesize-auto-old.log',
-         'http://%s/pub/mozilla.org/%s/tinderbox-builds/%s-%s/codesize-auto.log' % \
-           (self.stageServer, self.productName, self.codeSighsReferenceRepo, self.platform)],
-         workdir='.',
-         env=self.env
-        ))
-        if self.mozillaDir == '':
-            codesighsObjdir = self.objdir
-        else:
-            codesighsObjdir = '../%s' % self.mozillaObjdir
-
-        self.addStep(MockCodesighs(
-         name='get_codesighs_diff',
-         objdir=codesighsObjdir,
-         platform=self.platform,
-         workdir='build%s' % self.mozillaDir,
-         env=self.env,
-         tbPrint=self.tbPrint,
-         mock=self.use_mock,
-         target=self.mock_target,
-         mock_workdir_prefix='%(basedir)s/',
-        ))
-
-        self.addStep(ShellCommand(
-         name='echo_codesize_log',
-         command=['cat', '../codesize-auto-diff.log'],
-         workdir='build%s' % self.mozillaDir
-        ))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         self.addStep(SetBuildProperty(
@@ -5506,7 +5390,7 @@ class TalosFactory(RequestSortingBuildFactory):
              command=[WithProperties('%(filename)s'), WithProperties('/INI=%(workdir_pwd)s\\firefoxInstallConfig.ini')],
              env=self.env)
             )
-        elif self.OS.startswith('tegra_android'):
+        elif self.OS.startswith('tegra_android') or self.OS.startswith('panda_android'):
             self.addStep(UnpackFile(
              filename=WithProperties("../%(filename)s"),
              workdir="%s/%s" % (self.workdirBase, self.productName),
@@ -5544,7 +5428,7 @@ class TalosFactory(RequestSortingBuildFactory):
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
             ))
-        elif self.OS.startswith('tegra_android'):
+        elif self.OS.startswith('tegra_android') or self.OS.startswith('panda_android'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
@@ -5747,7 +5631,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.plugins:
             #32 bit (includes mac browsers)
             if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android',
-                           'tegra_android-armv6', 'tegra_android-noion',
+                           'tegra_android-armv6', 'tegra_android-noion', 'panda_android',
                            'leopard', 'snowleopard', 'leopard-o', 'lion',
                            'mountainlion'):
                 self.addStep(DownloadFile(

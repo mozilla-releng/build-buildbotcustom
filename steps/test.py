@@ -43,7 +43,6 @@ from os import path
 import string
 
 from buildbotcustom.steps.base import ShellCommand
-from buildbotcustom.common import getCodesighsPlatforms
 
 class AliveTest(ShellCommand):
     name = "alive test"
@@ -239,64 +238,6 @@ class CompareLeakLogs(ShellCommand):
             logText += "%s: %s\n%s: %s\n%s: %s\n" % (lkAbbr, lk, mhAbbr, mh, aAbbr, a)
 
         self.addCompleteLog(slug, logText)
-
-
-class Codesighs(ShellCommand):
-    def __init__(self, objdir, platform, type='auto', tbPrint=True, **kwargs):
-        self.super_class = ShellCommand
-        self.super_class.__init__(self, **kwargs)
-        self.addFactoryArguments(objdir=objdir, platform=platform, type=type, tbPrint=tbPrint)
-
-        assert platform in getCodesighsPlatforms()
-        assert type in ('auto', 'base')
-
-        self.objdir = objdir
-        self.platform = platform
-        if 'linux' in self.platform or 'osx' in self.platform:
-            self.platform = 'unix'
-        self.type = type
-        self.tbPrint = tbPrint
-
-        runScript = 'tools/codesighs/' + \
-                    type + 'summary.' + self.platform + '.bash'
-
-        self.command = [runScript, '-o', objdir, '-s', '.',
-                        '../codesize-' + type + '.log',
-                        '../codesize-' + type + '-old.log',
-                        '../codesize-' + type + '-diff.log']
-
-    def createSummary(self, log):
-        rawBytes = ""
-        bytes = ""
-        diff = ""
-        for line in log.readlines():
-            if '__codesize:' in line:
-                rawBytes = line.split(':')[1].rstrip()
-                bytes = formatBytes(rawBytes)
-            elif '__codesizeDiff:' in line:
-                diffData = line.split(':')[1].rstrip()
-                # if we anything but '+0' here, we print additional data
-                if diffData[0:2] != '+0':
-                    diff = diffData
-
-        z = 'Z'
-        zLong = "codesighs"
-        if self.type == 'base':
-            z = 'mZ'
-            zLong = "codesighs_embed"
-
-        self.setProperty('testresults', [(z, zLong, rawBytes, bytes)])
-
-        if self.tbPrint:
-            slug = '%s:%s' % (z, bytes)
-            summary = 'TinderboxPrint:%s\n' % slug
-            self.addCompleteLog(slug, summary)
-
-        if diff:
-            # buildbot chokes if we put all the data in the short log
-            slug = '%sdiff' % z
-            summary = 'TinderboxPrint:%s:%s\n' % (slug, diff)
-            self.addCompleteLog(slug, summary)
 
 class GraphServerPost(ShellCommand):
     flunkOnFailure = True

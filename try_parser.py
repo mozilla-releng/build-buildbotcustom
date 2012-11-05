@@ -9,30 +9,24 @@ from twisted.python import log
 '''Given a list of arguments from commit message or info file
    returns only those builder names that should be built.'''
 
-def expandTestSuites(user_suites,valid_suites):
-    test_suites = []
-    for u in user_suites:
-        if u == 'mochitests' or u == 'mochitest':
-            for v in valid_suites:
-                if v.startswith('mochitest'):
-                    test_suites.append(v)
-        elif u == 'mochitest-o':
-            for v in valid_suites:
-                if re.search(u,v):
-                    test_suites.append(v)
-        elif u == 'mochitest-bc':
-            for v in valid_suites:
-                if v.startswith('mochitest-browser-chrome'):
-                    test_suites.append(v)
-        elif u == 'reftests' or u == 'reftest':
-            for v in valid_suites:
-                if v.startswith('reftest'):
-                    test_suites.append(v)
-        else:
-            # validate other test names
-            if u in valid_suites:
-                test_suites.append(u)
-    return test_suites
+def testSuiteMatches(v, u):
+    '''Check whether test suite v matches a user-requested test suite spec u'''
+    if u in ('mochitests', 'mochitest'):
+        return v.startswith('mochitest')
+    elif u == 'mochitest-o':
+        return re.search(u, v)
+    elif u == 'mochitest-bc':
+        return v.startswith('mochitest-browser-chrome')
+    elif u in ('reftests', 'reftest'):
+        return v.startswith('reftest')
+    else:
+        # validate other test names
+        return u == v
+
+def expandTestSuites(user_suites, valid_suites):
+    '''Grab out all of the test suites from valid_suites that match something
+       requested by the user'''
+    return [ v for v in valid_suites for u in user_suites if testSuiteMatches(v, u) ]
 
 def processMessage(message):
     for line in message.split('\n'):
@@ -43,69 +37,71 @@ def processMessage(message):
             return line
     return [""]
 
-def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
-    platformBuilders = []
+def expandPlatforms(user_platforms, buildTypes):
+    platforms = set()
+    if 'opt' in buildTypes:
+        platforms.update(user_platforms)
+    if 'debug' in buildTypes:
+        platforms.update([ "%s-debug" % p for p in user_platforms ])
+    return platforms
 
-    if user_platforms != 'none':
-        for buildType in buildTypes:
-            for platform in user_platforms:
-              # add -debug to the platform name
-              if buildType == 'debug':
-                  platform += '-debug'
-              if platform in prettyNames.keys():
-                  custom_builder = prettyNames[platform]
-                  if custom_builder in builderNames and custom_builder not in platformBuilders:
-                      platformBuilders.extend([custom_builder])
-    return platformBuilders
+def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
+    '''Return builder names that are found in both prettyNames[p] for some
+       (expanded) platform p, and in builderNames'''
+
+    # When prettyNames contains list values rather than simple strings, it
+    # means that we're processing the argument for selecting test suites, so do
+    # not return any build builders.
+    if prettyNames and isinstance(prettyNames.values()[0], list):
+        return []
+
+    platforms = expandPlatforms(user_platforms, buildTypes)
+    builders = [ prettyNames[p] for p in platforms.intersection(prettyNames) ]
+    return list(set(builders).intersection(builderNames))
 
 def getTestBuilders(platforms, testType, tests, builderNames, buildTypes, buildbotBranch,
                     prettyNames, unittestPrettyNames):
-    testBuilders = []
-    builder_test_platforms = []
+    if tests == 'none':
+        return []
+
+    testBuilders = set()
     # for all possible suites, add in the builderNames for that platform
-    if tests != 'none':
-        if testType == "test":
-            for buildType in buildTypes:
-                for platform in platforms:
-                    # this is to catch debug unittests triggered on the build master
-                    # if the user asks for win32 with -b d
-                    if buildType == 'debug' and not platform.endswith('debug'):
-                        builder_test_platforms.append('%s-debug' % platform)
-                    if platform in prettyNames.keys():
-                        for test in tests:
-                          # checking for list type so this is only run for test_master builders where slave_platforms are used
-                          if type(prettyNames[platform])==type(list()):
-                            for slave_platform in prettyNames[platform]:
-                                custom_builder = "%s %s %s %s %s" % (slave_platform, buildbotBranch, buildType, testType, test)
-                                # have to check that custom_builder is not already present
-                                if custom_builder in (builderNames) and custom_builder not in testBuilders:
-                                    testBuilders.extend([custom_builder])
-                          else:
-                              custom_builder = "%s %s %s %s %s" % (prettyNames[platform], buildbotBranch, buildType, testType, test)
-                               # have to check that custom_builder is not already present
-                              if custom_builder in (builderNames) and custom_builder not in testBuilders:
-                                  testBuilders.extend([custom_builder])
-
-                    # we do all but debug win32 over on test masters so have to check the 
-                    # unittestPrettyNames platforms for local builder master unittests
-                    for platform in builder_test_platforms:
-                      if unittestPrettyNames and unittestPrettyNames.has_key(platform):
-                         for test in tests:
-                             debug_custom_builder = "%s %s" % (unittestPrettyNames[platform], test)
-                             if debug_custom_builder in (builderNames) and debug_custom_builder not in testBuilders:
-                                 testBuilders.extend([debug_custom_builder])
-
-        if testType == "talos":
+    if testType == "test":
+        builder_test_platforms = set()
+        for buildType in buildTypes:
             for platform in platforms:
-              # make sure we do talos for this platform
-              if platform in prettyNames.keys():
-                for test in tests:
-                    for slave_platform in prettyNames[platform]:
-                        custom_builder = "%s %s %s %s" % (slave_platform, buildbotBranch, testType, test)
-                        if custom_builder in (builderNames) and custom_builder not in testBuilders:
-                            testBuilders.extend([custom_builder])
+                # this is to catch debug unittests triggered on the build master
+                # if the user asks for win32 with -b d
+                if buildType == 'debug' and not platform.endswith('debug'):
+                    builder_test_platforms.add('%s-debug' % platform)
+                if platform in prettyNames:
+                    for test in tests:
+                        # check for list type to handle test_master builders
+                        # where slave_platforms are used
+                        pretties = prettyNames[platform]
+                        if not isinstance(pretties, list):
+                            pretties = [ pretties ]
+                        for pretty in pretties:
+                            custom_builder = "%s %s %s %s %s" % (pretty, buildbotBranch, buildType, testType, test)
+                            testBuilders.add(custom_builder)
 
-    return testBuilders
+        # we do all but debug win32 over on test masters so have to check the 
+        # unittestPrettyNames platforms for local builder master unittests
+        for platform in builder_test_platforms.intersection(unittestPrettyNames or {}):
+            assert platform.endswith('-debug')
+            for test in tests:
+                debug_custom_builder = "%s %s" % (unittestPrettyNames[platform], test)
+                testBuilders.add(debug_custom_builder)
+
+    if testType == "talos":
+        for platform in set(platforms).intersection(prettyNames):
+            # check whether we do talos for this platform
+            for slave_platform in prettyNames[platform]:
+                for test in tests:
+                    custom_builder = "%s %s talos %s" % (slave_platform, buildbotBranch, test)
+                    testBuilders.add(custom_builder)
+
+    return list(testBuilders.intersection(builderNames))
 
 def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
               buildbotBranch='try'):
@@ -159,24 +155,26 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
                         options.user_platforms.append(platform.split('-')[0])
                     elif buildType == 'opt' and not platform.endswith('debug'):
                         options.user_platforms.append(platform)
-    elif options.user_platforms != 'none':
-        # ugly
-        user_platforms = []
-        for user_platform in options.user_platforms.split(','):
-            user_platforms.append(user_platform)
-        options.user_platforms = user_platforms
+    elif options.user_platforms == 'none':
+        options.user_platforms = []
+    else:
+        options.user_platforms = options.user_platforms.split(',')
 
     if unittestSuites:
-      if options.test == 'all':
-        options.test = unittestSuites
-      elif options.test != 'none':
-        options.test = expandTestSuites(options.test.split(','), unittestSuites)
+        if options.test == 'all':
+            options.test = unittestSuites
+        elif options.test == 'none':
+            options.test = []
+        else:
+            options.test = expandTestSuites(options.test.split(','), unittestSuites)
 
     if talosSuites:
-      if options.talos == 'all':
-          options.talos = talosSuites
-      elif options.talos != 'none':
-          options.talos = options.talos.split(',')
+        if options.talos == 'all':
+            options.talos = talosSuites
+        elif options.talos == 'none':
+            options.talos = []
+        else:
+            options.talos = options.talos.split(',')
 
     # List for the custom builder names that match prettyNames passed in from misc.py
     customBuilderNames = []
@@ -184,7 +182,7 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         log.msg("TryChooser OPTIONS : MESSAGE %s : %s" % (options, message))
         customBuilderNames = getPlatformBuilders(options.user_platforms, builderNames, options.build, prettyNames)
 
-        if options.test != 'none' and unittestSuites:
+        if options.test and unittestSuites:
             # get test builders for test_master first
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
                                       builderNames, options.build, buildbotBranch, prettyNames, None))
@@ -192,7 +190,7 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
             if unittestPrettyNames:
                 customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, 
                                       builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
-        if options.talos != 'none' and talosSuites is not None:
+        if options.talos and talosSuites is not None:
             customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, builderNames, 
                                       options.build, buildbotBranch, prettyNames, None))
 
