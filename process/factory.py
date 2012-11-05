@@ -5390,7 +5390,7 @@ class TalosFactory(RequestSortingBuildFactory):
              command=[WithProperties('%(filename)s'), WithProperties('/INI=%(workdir_pwd)s\\firefoxInstallConfig.ini')],
              env=self.env)
             )
-        elif self.OS.startswith('tegra_android'):
+        elif self.OS.startswith('tegra_android') or self.OS.startswith('panda_android'):
             self.addStep(UnpackFile(
              filename=WithProperties("../%(filename)s"),
              workdir="%s/%s" % (self.workdirBase, self.productName),
@@ -5428,7 +5428,7 @@ class TalosFactory(RequestSortingBuildFactory):
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
             ))
-        elif self.OS.startswith('tegra_android'):
+        elif self.OS.startswith('tegra_android') or self.OS.startswith('panda_android'):
             self.addStep(SetBuildProperty(
              property_name="exepath",
              value="../%s/%s" % (self.productName, self.productName)
@@ -5631,7 +5631,7 @@ class TalosFactory(RequestSortingBuildFactory):
         if self.plugins:
             #32 bit (includes mac browsers)
             if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android',
-                           'tegra_android-armv6', 'tegra_android-noion',
+                           'tegra_android-armv6', 'tegra_android-noion', 'panda_android',
                            'leopard', 'snowleopard', 'leopard-o', 'lion',
                            'mountainlion'):
                 self.addStep(DownloadFile(
