@@ -1270,6 +1270,8 @@ class MercurialBuildFactory(MozillaBuildFactory):
                                              branch=self.graphBranch,
                                              resultsname=self.baseName,
                                              env=gs_env,
+                                             flunkOnFailure=False,
+                                             haltOnFailure=False,
                                              propertiesFile="properties.json"))
             else:
                 self.addStep(OutputStep(
