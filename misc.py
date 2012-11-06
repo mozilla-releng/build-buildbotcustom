@@ -2518,7 +2518,7 @@ def generateDXRObjects(config, SLAVES):
             config['scripts_repo'],
             script,
             log_eval_func=rc_eval_func({1: WARNINGS}),
-            script_timeout=3600,
+            script_timeout=7200,
             )
 
     builder = {'name': 'dxr-%s' % branch,
