@@ -397,17 +397,22 @@ def _nextSlowIdleSlave(nReserved):
 # Purge with fire when this is no longer needed
 def _nextOldTegra(builder, available_slaves):
     try:
-        old = []
+        valid = []
         for s in available_slaves:
+            if 'panda-' in s.slave.slavename:
+                # excempt Panda's from this foolishness
+                valid.append(s)
+                continue
+            
             number = s.slave.slavename.replace('tegra-', '')
             try:
                 if int(number) < 286:
-                    old.append(s)
+                    valid.append(s)
             except ValueError:
                 log.msg("Error parsing number out of '%s', discarding from old list" % s.slave.slavename)
                 continue
-        if old:
-            return random.choice(old)
+        if valid:
+            return random.choice(valid)
         return None
     except:
         log.msg("Error choosing old tegra for builder '%s', choosing randomly instead" % builder.name)
@@ -2518,7 +2523,7 @@ def generateDXRObjects(config, SLAVES):
             config['scripts_repo'],
             script,
             log_eval_func=rc_eval_func({1: WARNINGS}),
-            script_timeout=3600,
+            script_timeout=7200,
             )
 
     builder = {'name': 'dxr-%s' % branch,
