@@ -3026,7 +3026,12 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mozconfig=None,
                  tree="notset", mozillaDir=None, l10nTag='default',
                  mergeLocales=True,
-                 testPrettyNames=False, **kwargs):
+                 testPrettyNames=False,
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=None,
+                 tooltool_script='/tools/tooltool.py',
+                 **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
         self.platform = platform
@@ -3044,6 +3049,12 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tree = tree
         self.mozconfig = mozconfig
         self.testPrettyNames = testPrettyNames
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list or []
+        self.tooltool_script = tooltool_script
+        self.tooltool_bootstrap = tooltool_bootstrap
+
+        assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
         self.addStep(SetBuildProperty(
          property_name='tree',
@@ -3167,7 +3178,19 @@ class BaseRepackFactory(MozillaBuildFactory):
             command=['cat', '.mozconfig'],
             workdir='build/'+self.origSrcDir
         ))
-        
+        if self.tooltool_manifest_src:
+          self.addStep(ShellCommand(
+            name='run_tooltool',
+            command=[
+                 WithProperties('%(toolsdir)s/scripts/tooltool/fetch_and_unpack.sh'),
+                 self.tooltool_manifest_src,
+                 self.tooltool_url_list[0],
+                 self.tooltool_script,
+                 self.tooltool_bootstrap
+            ],
+            haltOnFailure=True,
+          ))
+
 
     def configure(self):
         self.addStep(ShellCommand(
