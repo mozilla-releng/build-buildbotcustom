@@ -3189,6 +3189,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  self.tooltool_bootstrap
             ],
             haltOnFailure=True,
+            workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
           ))
 
 
