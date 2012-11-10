@@ -2225,7 +2225,22 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
     pf = config['platforms'].get(platform, {})
-    extra_args = ['-b', config['repo_path']]
+    extra_args = ['-b', config['repo_path'],
+                  '--hgtool', 'scripts/buildfarm/utils/hgtool.py']
+
+    mirrors = None
+    if config['base_mirror_urls']:
+        mirrors = ["%s/%s" % (url, config['repo_path']) for url in config['base_mirror_urls']]
+    if mirrors:
+        for mirror in mirrors:
+            extra_args.extend(["--mirror", mirror])
+    bundles = None
+    if config['base_bundle_urls']:
+        bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip('/').split('/')[-1]) for url in config['base_bundle_urls']]
+    if bundles:
+        for bundle in bundles:
+            extra_args.extend(["--bundle", bundle])
+
     if pf['product_name'] is not None:
         extra_args.extend(['-p', pf['product_name']])
     if config['hg_username'] is not None:
