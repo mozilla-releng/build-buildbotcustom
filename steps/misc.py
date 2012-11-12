@@ -548,7 +548,7 @@ class UnpackTest(ShellCommand):
             if self.testtype == "mochitest":
                 args.append('mochitest*')
             elif self.testtype == "xpcshell":
-                args.append('xpchsell*')
+                args.append('xpcshell*')
             elif self.testtype == "jsreftest":
                 # jsreftest needs both jsreftest/ and reftest/ in addition to bin/ and certs/
                 args.append('jsreftest*', 'reftest*')
