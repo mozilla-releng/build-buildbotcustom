@@ -179,7 +179,7 @@ def summarizeLogJetpacktests(name, log):
     # Format the counts
     summary = "%d/%d" % (totalCount, failCount)
     # Return the summary.
-    return "TinderboxPrint:%s<br />%s\n" % (name, summary)
+    return "TinderboxPrint:%s<br/>%s\n" % (name, summary)
 
 def summarizeTUnit(name, log):
     # Counts and flags.
