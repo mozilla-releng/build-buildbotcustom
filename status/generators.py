@@ -15,13 +15,13 @@ def buildTryChangeMessage(change, packageDir):
                           "References": "<%(branch)s-%(revision)s>" % locals(),
                           }
     msgdict["body"] = """\
-Thanks for your try submission (http://hg.mozilla.org/%(branch)s/pushloghtml?changeset=%(revision)s).  It's the best!
+Thank you for your try submission. It's the best!
 
-Watch https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s for your results to come in.
+Results will be displayed on TBPL as they come in:
+https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s
 
-Builds and logs will be available at %(packageDir)s.
-
-This directory won't be created until the first builds are uploaded, so please be patient.
+Once completed, builds and logs will be available at:
+%(packageDir)s
 """ % locals()
 
     return msgdict
