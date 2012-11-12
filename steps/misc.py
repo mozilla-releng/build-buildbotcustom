@@ -543,21 +543,23 @@ class UnpackTest(ShellCommand):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
         if filename.endswith(".zip"):
+            args = ['unzip', '-o', filename, 'bin*', 'certs*', 'modules*']
             # modify the commands to extract only the files we need - the test directory and bin/ and certs/
             if self.testtype == "mochitest":
-                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'mochitest*'])
+                args.append('mochitest*')
             elif self.testtype == "xpcshell":
-                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'xpcshell*'])
+                args.append('xpchsell*')
             elif self.testtype == "jsreftest":
                 # jsreftest needs both jsreftest/ and reftest/ in addition to bin/ and certs/
-                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'jsreftest*', 'reftest*'])
+                args.append('jsreftest*', 'reftest*')
             elif self.testtype == "reftest":
-                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'reftest*'])
+                args.append('reftest*')
             elif self.testtype == "jetpack":
-                self.setCommand(['unzip', '-o', filename, 'bin*', 'certs*', 'jetpack*'])
+                args.append('jetpack*')
             else:
                 # If it all fails, we extract the whole shebang
-                self.setCommand(['unzip', '-o', filename])
+                args = ['unzip', '-o', filename]
+            self.setCommand(args)
         #If we come across a test not packaged as a zip file, try unpacking the whole thing using tar+gzip/bzip2
         elif filename.endswith("tar.bz2"):
             self.setCommand(['tar', '-jxvf', filename])
