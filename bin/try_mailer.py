@@ -8,7 +8,7 @@ import cPickle
 from email.message import Message
 from email.utils import formatdate
 
-from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION, RETRY
 
 def getBuild(builder_path, build_number):
     build_path = os.path.join(builder_path, build_number)
@@ -92,6 +92,9 @@ def makeTryMessage(build, log_url):
     elif result == FAILURE:
         subject = "%(tree)s submission %(revision)s - errors" % locals()
         result_msg = "failed to complete"
+    elif result == RETRY:
+        subject = "Try submission %(revision)s - retried" % locals()
+        result_msg = "is being automatically retried"
     else:
         subject = "%(tree)s submission %(revision)s - errors" % locals()
         result_msg = "had unknown problem (%s)" % result
@@ -201,7 +204,7 @@ if __name__ == '__main__':
     if tm_options.all_emails:
         msgdict = makeTryMessage(build, log_url)
     elif tm_options.failure:
-        if result != SUCCESS:
+        if result != SUCCESS and result != RETRY:
             msgdict = makeTryMessage(build, log_url)
 
     # Send it!

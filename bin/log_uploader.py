@@ -291,7 +291,10 @@ if __name__ == "__main__":
                     if options.nightly:
                         uploadArgs['to_tinderbox_dated'] = False
                         uploadArgs['to_dated'] = True
-                        uploadArgs['to_latest'] = True
+                        # Don't upload to the latest directory - the logs are
+                        # already in the dated directory and we should keep the
+                        # latest-* directory clean.
+                        #uploadArgs['to_latest'] = True
                     else:
                         uploadArgs['to_tinderbox_builds'] = True
                         uploadArgs['upload_dir'] = uploadArgs['branch']
@@ -301,9 +304,9 @@ if __name__ == "__main__":
 
                     if options.nightly or isNightly(build):
                         uploadArgs['to_dated'] = True
-                        # Don't upload to the latest directory for now; we have no
-                        # way of purging the logs out of the latest-<branch>
-                        # directories
+                        # Don't upload to the latest directory - the logs are
+                        # already in the dated directory and we should keep the
+                        # latest-* directory clean.
                         #uploadArgs['to_latest'] = True
                         if 'mobile' in options.product:
                             uploadArgs['branch'] = options.branch + '-' + platform
