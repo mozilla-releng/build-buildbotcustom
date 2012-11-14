@@ -479,7 +479,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     properties = {'branch': branchProperty, 'platform': platform,
                   'slavebuilddir': 'test', 'stage_platform': stagePlatform,
-                  'product': stageProduct}
+                  'product': stageProduct, 'repo_path': config['repo_path']}
     if pf.get('is_remote', False):
         hostUtils = pf['host_utils_url']
         factory = RemoteUnittestFactory(
