@@ -6219,11 +6219,13 @@ class ScriptFactory(BuildFactory):
             workdir=".",
             haltOnFailure=True,
         ))
-        self.addStep(ShellCommand(
+        self.addStep(MercurialCloneCommand(
             name="clone_scripts",
             command=[hg_bin, 'clone', scriptRepo, 'scripts'],
             workdir=".",
-            haltOnFailure=True))
+            haltOnFailure=True,
+            retry=False,
+        ))
         self.addStep(ShellCommand(
             name="update_scripts",
             command=[hg_bin, 'update', '-C', '-r',
