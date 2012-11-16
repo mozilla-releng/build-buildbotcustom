@@ -45,8 +45,8 @@ reload(mozilla_buildtools.queuedir)
 from buildbotcustom.common import reallyShort
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
-  NightlyRepackFactory, UnittestPackagedBuildFactory, TalosFactory, \
-  TryBuildFactory, ScriptFactory, rc_eval_func
+    NightlyRepackFactory, UnittestPackagedBuildFactory, TalosFactory, \
+    TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import RemoteUnittestFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly
@@ -403,7 +403,7 @@ def _nextOldTegra(builder, available_slaves):
                 # excempt Panda's from this foolishness
                 valid.append(s)
                 continue
-            
+
             number = s.slave.slavename.replace('tegra-', '')
             try:
                 if int(number) < 286:
@@ -437,6 +437,28 @@ def mergeBuildObjects(d1, d2):
 
     return retval
 
+
+def makeMHFactory(config, pf, **kwargs):
+    factory_class = ScriptFactory
+    if 'signingServers' in kwargs:
+        if kwargs['signingServers'] is not None:
+            factory_class = SigningScriptFactory
+        else:
+            del kwargs['signingServers']
+
+    factory = factory_class(
+        scriptRepo='%s%s' % (config['hgurl'],
+                             config['mozharness_repo_path']),
+        scriptName=pf['mozharness_config']['script_name'],
+        extra_args=pf['mozharness_config'].get('extra_args'),
+        reboot_command=pf['mozharness_config'].get('reboot_command'),
+        script_timeout=pf.get('timeout', 3600),
+        script_maxtime=pf.get('maxTime', 4 * 3600),
+        **kwargs
+    )
+    return factory
+
+
 def generateTestBuilder(config, branch_name, platform, name_prefix,
                         build_dir_prefix, suites_name, suites,
                         mochitestLeakThreshold, crashtestLeakThreshold,
@@ -457,7 +479,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     properties = {'branch': branchProperty, 'platform': platform,
                   'slavebuilddir': 'test', 'stage_platform': stagePlatform,
-                  'product': stageProduct}
+                  'product': stageProduct, 'repo_path': config['repo_path']}
     if pf.get('is_remote', False):
         hostUtils = pf['host_utils_url']
         factory = RemoteUnittestFactory(
@@ -1016,16 +1038,7 @@ def generateBranchObjects(config, name, secrets=None):
         pf = config['platforms'][platform]
 
         if 'mozharness_config' in pf:
-            factory = ScriptFactory(
-                scriptRepo='%s%s' % (config['hgurl'],
-                                     config['mozharness_repo_path']),
-                scriptName=pf['mozharness_config']['script_name'],
-                extra_args=pf['mozharness_config'].get('extra_args'),
-                reboot_command=pf['mozharness_config'].get('reboot_command'),
-                script_timeout=pf.get('timeout', 3600),
-                script_maxtime=pf.get('maxTime', 4 * 3600),
-            )
-
+            factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('dep_signing_servers')))
             builder = {
                 'name': '%s_dep' % pf['base_name'],
                 'slavenames': pf['slaves'],
@@ -1043,6 +1056,10 @@ def generateBranchObjects(config, name, secrets=None):
             branchObjects['builders'].append(builder)
 
             if pf.get('enable_nightly'):
+                if pf.get('dep_signing_servers') != pf.get('nightly_signing_servers'):
+                    # We need a new factory for this because our signing servers are different
+                    factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('nightly_signing_servers')))
+
                 builder = {
                     'name': '%s_nightly' % pf['base_name'],
                     'slavenames': pf['slaves'],

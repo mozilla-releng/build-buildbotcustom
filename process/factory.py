@@ -1904,7 +1904,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.leakTestReferenceRepo = 'mozilla-central'
         if 'thunderbird' in kwargs['stageProduct']:
             self.leakTestReferenceRepo = 'comm-central'
-        
+
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
@@ -6219,11 +6219,13 @@ class ScriptFactory(BuildFactory):
             workdir=".",
             haltOnFailure=True,
         ))
-        self.addStep(ShellCommand(
+        self.addStep(MercurialCloneCommand(
             name="clone_scripts",
             command=[hg_bin, 'clone', scriptRepo, 'scripts'],
             workdir=".",
-            haltOnFailure=True))
+            haltOnFailure=True,
+            retry=False,
+        ))
         self.addStep(ShellCommand(
             name="update_scripts",
             command=[hg_bin, 'update', '-C', '-r',
@@ -6357,5 +6359,6 @@ class SigningScriptFactory(ScriptFactory):
             ))
             self.env['MOZ_SIGN_CMD'] = WithProperties(get_signing_cmd(
                 self.signingServers, self.env.get('PYTHON26')))
+            self.env['MOZ_SIGNING_SERVERS'] = ",".join(s[0] for s in self.signingServers)
 
         ScriptFactory.runScript(self)
