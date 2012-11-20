@@ -416,18 +416,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
                 self.signingServers, self.env.get('PYTHON26'))
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
 
-        self.addStep(OutputStep(
-         name='get_buildername',
-         data=WithProperties('Building on: %(slavename)s'),
-        ))
-        self.addStep(OutputStep(
-         name='tinderboxprint_buildername',
-         data=WithProperties('TinderboxPrint: s: %(slavename)s'),
-        ))
-        self.addStep(OutputStep(
-         name='tinderboxsummarymessage_buildername',
-         data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
-        ))
         self.addInitialSteps()
 
     def addInitialSteps(self):
@@ -5289,10 +5277,6 @@ class TalosFactory(RequestSortingBuildFactory):
         return step.build.getProperties().has_key(prop)
 
     def addInfoSteps(self):
-        self.addStep(OutputStep(
-         name='tinderboxprint_slavename',
-         data=WithProperties('TinderboxPrint: s: %(slavename)s'),
-        ))
         if self.remoteTests:
             self.addStep(SetProperty(
                  command=['bash', '-c', 'echo $SUT_IP'],
