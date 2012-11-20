@@ -416,18 +416,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
                 self.signingServers, self.env.get('PYTHON26'))
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
 
-        self.addStep(OutputStep(
-         name='get_buildername',
-         data=WithProperties('Building on: %(slavename)s'),
-        ))
-        self.addStep(OutputStep(
-         name='tinderboxprint_buildername',
-         data=WithProperties('TinderboxPrint: s: %(slavename)s'),
-        ))
-        self.addStep(OutputStep(
-         name='tinderboxsummarymessage_buildername',
-         data=WithProperties('TinderboxSummaryMessage: s: %(slavename)s'),
-        ))
         self.addInitialSteps()
 
     def addInitialSteps(self):
@@ -1136,13 +1124,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
              command=['hg', 'identify', '-i'],
              property='got_revision'
             ))
-
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
-        changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(OutputStep(
-         name='tinderboxprint_changeset',
-         data=['TinderboxPrint:', WithProperties(changesetLink)]
-        ))
 
         if self.gaiaRepo:
             self.addStep(self.makeHgtoolStep(
@@ -1951,13 +1932,6 @@ class TryBuildFactory(MercurialBuildFactory):
          name = 'set_got_revision',
          command=['hg', 'parent', '--template={node}'],
          extract_fn = short_hash
-        ))
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
-                                                      self.repoPath)
-        changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(OutputStep(
-         name='tinderboxprint_changeset_link',
-         data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
         self.addStep(SetBuildProperty(
             name='set_comments',
@@ -5289,10 +5263,6 @@ class TalosFactory(RequestSortingBuildFactory):
         return step.build.getProperties().has_key(prop)
 
     def addInfoSteps(self):
-        self.addStep(OutputStep(
-         name='tinderboxprint_slavename',
-         data=WithProperties('TinderboxPrint: s: %(slavename)s'),
-        ))
         if self.remoteTests:
             self.addStep(SetProperty(
                  command=['bash', '-c', 'echo $SUT_IP'],
