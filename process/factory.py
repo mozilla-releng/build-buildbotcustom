@@ -1125,13 +1125,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
              property='got_revision'
             ))
 
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
-        changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(OutputStep(
-         name='tinderboxprint_changeset',
-         data=['TinderboxPrint:', WithProperties(changesetLink)]
-        ))
-
         if self.gaiaRepo:
             self.addStep(self.makeHgtoolStep(
                 name="gaia_sources",
@@ -1939,13 +1932,6 @@ class TryBuildFactory(MercurialBuildFactory):
          name = 'set_got_revision',
          command=['hg', 'parent', '--template={node}'],
          extract_fn = short_hash
-        ))
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
-                                                      self.repoPath)
-        changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
-        self.addStep(OutputStep(
-         name='tinderboxprint_changeset_link',
-         data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
         self.addStep(SetBuildProperty(
             name='set_comments',
