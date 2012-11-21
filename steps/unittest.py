@@ -370,8 +370,6 @@ class ShellCommandReportTimeout(ShellCommand):
         for line in cmd.logs["stdio"].readlines(channel=HEADER):
             if "command timed out" in line:
                 self.addCompleteLog('timeout',
-                                    'buildbot.slave.commands.TimeoutError: ' +
-                                    line +
                                     "TinderboxPrint: " + self.name + "<br/>" +
                                     emphasizeFailureText("timeout") + "\n")
                 # We don't need to print a second error if we timed out
