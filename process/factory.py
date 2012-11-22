@@ -2796,6 +2796,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              user="sendchange",
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
+             env=self.env,
             ))
 
         for master, warn, retries in self.unittestMasters:
@@ -2811,6 +2812,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              user="sendchange-unittest",
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
+             env=self.env,
             ))
 
 class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):

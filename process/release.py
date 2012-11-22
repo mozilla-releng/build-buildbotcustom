@@ -649,8 +649,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
                 'multilocale_config', {}).get('multilocaleOptions')
-            enableUpdatePackaging = bool(releaseConfig.get('verifyConfigs',
-                                                      {}).get(platform))
             build_factory = ReleaseBuildFactory(
                 env=platform_env,
                 objdir=pf['platform_objdir'],
@@ -700,7 +698,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 multiLocaleConfig=multiLocaleConfig,
                 mozharnessMultiOptions=mozharnessMultiOptions,
                 usePrettyNames=releaseConfig.get('usePrettyNames', True),
-                enableUpdatePackaging=enableUpdatePackaging,
+                enableUpdatePackaging=True,
                 mozconfigBranch=releaseTag,
                 signingServers=getSigningServers(platform),
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
