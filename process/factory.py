@@ -5131,6 +5131,13 @@ class RemoteUnittestFactory(MozillaTestFactory):
                 haltOnFailure=True)
             )
             if name.startswith('mochitest'):
+                # XXX Hack for Bug 811444
+                # Slow down tests for panda boards
+                if 'panda' in self.platform:
+                    slowTests = True
+                else:
+                    slowTests = False
+
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
                  testtype='mochitest',
@@ -5148,6 +5155,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          variant=variant,
                          symbols_path=symbols_path,
                          testPath=tp,
+                         slowTests=slowTests,
                          workdir='build/tests',
                          timeout=2400,
                          app=self.remoteProcessName,
@@ -5162,6 +5170,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                      variant=variant,
                      symbols_path=symbols_path,
                      testManifest=suite.get('testManifest', None),
+                     slowTests=slowTests,
                      workdir='build/tests',
                      timeout=2400,
                      app=self.remoteProcessName,
