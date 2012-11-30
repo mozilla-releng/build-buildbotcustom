@@ -1173,6 +1173,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 use_properties=False,
                 mirrors=['%s/%s' % (url, self.gaiaRepo) for url in self.baseMirrorUrls],
                 bundles=[],
+                wc='gaia',
             ))
             if self.gaiaLanguagesFile:
                 languagesFile = '%(basedir)s/build/gaia/' + self.gaiaLanguagesFile
