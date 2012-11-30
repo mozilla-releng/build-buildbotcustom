@@ -52,7 +52,7 @@ reload(release.paths)
 from buildbotcustom.status.errors import purge_error, global_errors, \
   upload_errors, talos_hgweb_errors, tegra_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
-  Trigger, RetryingShellCommand, RetryingSetProperty
+  Trigger, RetryingShellCommand
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
   MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
   SetBuildProperty, DisconnectStep, OutputStep, \
@@ -571,9 +571,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         elif 'maemo' in self.complete_platform:
             packageFilename = '*.linux-*-arm.tar.*'
         elif platform.startswith("linux64"):
-            packageFilename = '*.linux-x86_64.tar.bz2'
+            packageFilename = '*.linux-x86_64*.tar.bz2'
         elif platform.startswith("linux"):
-            packageFilename = '*.linux-i686.tar.bz2'
+            packageFilename = '*.linux-i686*.tar.bz2'
         elif platform.startswith("macosx"):
             packageFilename = '*.dmg'
         elif platform.startswith("win32"):
@@ -766,6 +766,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  enableInstaller=False,
                  gaiaRepo=None,
                  gaiaRevision=None,
+                 gaiaLanguagesFile=None,
+                 gaiaLanguagesScript=None,
+                 gaiaL10nRoot=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -944,14 +947,17 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addStep(ShellCommand(command=['ccache', '-z'],
                      name="clear_ccache_stats", warnOnFailure=False,
                      flunkOnFailure=False, haltOnFailure=False, env=self.env))
+        if mozharnessRepoPath:
+            assert mozharnessRepoPath and mozharnessTag
+            self.mozharnessRepoPath = mozharnessRepoPath
+            self.mozharnessTag = mozharnessTag
+            self.addMozharnessRepoSteps()
         if multiLocale:
             assert compareLocalesRepoPath and compareLocalesTag
             assert mozharnessRepoPath and mozharnessTag
             assert multiLocaleScript and multiLocaleConfig
             self.compareLocalesRepoPath = compareLocalesRepoPath
             self.compareLocalesTag = compareLocalesTag
-            self.mozharnessRepoPath = mozharnessRepoPath
-            self.mozharnessTag = mozharnessTag
             self.multiLocaleScript = multiLocaleScript
             self.multiLocaleConfig = multiLocaleConfig
             self.multiLocaleMerge = multiLocaleMerge
@@ -965,6 +971,15 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addMultiLocaleRepoSteps()
 
         self.multiLocale = multiLocale
+
+        if gaiaLanguagesFile:
+            assert gaiaLanguagesScript and gaiaL10nRoot
+            self.gaiaLanguagesFile = gaiaLanguagesFile
+            self.gaiaLanguagesScript = gaiaLanguagesScript
+            self.gaiaL10nRoot = gaiaL10nRoot
+            self.gaiaL10nBaseDir = WithProperties('%(basedir)s/build-gaia-l10n')
+            self.env['LOCALE_BASEDIR'] = self.gaiaL10nBaseDir
+            self.env['LOCALES_FILE'] = self.gaiaLanguagesFile
 
         self.addBuildSteps()
         if self.uploadSymbols or (not self.disableSymbols and (self.packageTests or self.leakTest)):
@@ -998,33 +1013,57 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
 
+    def addMozharnessRepoSteps(self):
+        name=self.mozharnessRepoPath.rstrip('/').split('/')[-1]
+        self.addStep(ShellCommand(
+            name='rm_%s'%name,
+            command=['rm', '-rf', '%s' % name],
+            description=['removing', name],
+            descriptionDone=['remove', name],
+            haltOnFailure=True,
+            workdir='.',
+        ))
+        self.addStep(MercurialCloneCommand(
+            name='hg_clone_%s' % name,
+            command=['hg', 'clone', self.getRepository(self.mozharnessRepoPath), name],
+            description=['checking', 'out', name],
+            descriptionDone=['checkout', name],
+            haltOnFailure=True,
+            workdir='.',
+        ))
+        self.addStep(ShellCommand(
+            name='hg_update_%s'% name,
+            command=['hg', 'update', '-r', self.mozharnessTag],
+            description=['updating', name, 'to', self.mozharnessTag],
+            workdir=name,
+            haltOnFailure=True
+        ))
+
     def addMultiLocaleRepoSteps(self):
-        for repo,tag in ((self.compareLocalesRepoPath,self.compareLocalesTag),
-                            (self.mozharnessRepoPath,self.mozharnessTag)):
-            name=repo.rstrip('/').split('/')[-1]
-            self.addStep(ShellCommand(
-                name='rm_%s'%name,
-                command=['rm', '-rf', '%s' % name],
-                description=['removing', name],
-                descriptionDone=['remove', name],
-                haltOnFailure=True,
-                workdir='.',
-            ))
-            self.addStep(MercurialCloneCommand(
-                name='hg_clone_%s' % name,
-                command=['hg', 'clone', self.getRepository(repo), name],
-                description=['checking', 'out', name],
-                descriptionDone=['checkout', name],
-                haltOnFailure=True,
-                workdir='.',
-            ))
-            self.addStep(ShellCommand(
-                name='hg_update_%s'% name,
-                command=['hg', 'update', '-r', tag],
-                description=['updating', name, 'to', tag],
-                workdir=name,
-                haltOnFailure=True
-           ))
+        name=self.compareLocalesRepoPath.rstrip('/').split('/')[-1]
+        self.addStep(ShellCommand(
+            name='rm_%s'%name,
+            command=['rm', '-rf', '%s' % name],
+            description=['removing', name],
+            descriptionDone=['remove', name],
+            haltOnFailure=True,
+            workdir='.',
+        ))
+        self.addStep(MercurialCloneCommand(
+            name='hg_clone_%s' % name,
+            command=['hg', 'clone', self.getRepository(self.compareLocalesRepoPath), name],
+            description=['checking', 'out', name],
+            descriptionDone=['checkout', name],
+            haltOnFailure=True,
+            workdir='.',
+        ))
+        self.addStep(ShellCommand(
+            name='hg_update_%s'% name,
+            command=['hg', 'update', '-r', self.compareLocalesTag],
+            description=['updating', name, 'to', self.compareLocalesTag],
+            workdir=name,
+            haltOnFailure=True
+        ))
 
 
     def addTriggeredBuildsSteps(self,
@@ -1135,6 +1174,25 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 mirrors=['%s/%s' % (url, self.gaiaRepo) for url in self.baseMirrorUrls],
                 bundles=[],
             ))
+            if self.gaiaLanguagesFile:
+                languagesFile = '%(basedir)s/build/gaia/' + self.gaiaLanguagesFile
+                # call mozharness script that will checkout all of the repos
+                # it should only need the languages file path passed to it
+                # need to figure out what to pass to the build system to make
+                # gaia create a multilocale profile, too
+                self.addStep(MockCommand(
+                    name='clone_gaia_l10n_repos',
+                    command=['python', 'mozharness/%s' % self.gaiaLanguagesScript,
+                             '--gaia-languages-file', WithProperties(languagesFile),
+                             '--gaia-l10n-root', self.gaiaL10nRoot,
+                             '--gaia-l10n-base-dir', self.gaiaL10nBaseDir],
+                    env=self.env,
+                    workdir=WithProperties('%(basedir)s'),
+                    haltOnFailure=True,
+                    mock=self.use_mock,
+                    target=self.mock_target,
+                    mock_workdir_prefix=None,
+                ))
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",

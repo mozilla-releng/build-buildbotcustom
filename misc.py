@@ -1228,6 +1228,11 @@ def generateBranchObjects(config, name, secrets=None):
                 'runAliveTests': pf.get('run_alive_tests', True),
                 'gaiaRepo': pf.get('gaia_repo'),
                 'gaiaRevision': config.get('gaia_revision'),
+                'gaiaLanguagesFile': pf.get('gaia_languages_file'),
+                'gaiaLanguagesScript': pf.get('gaia_languages_script', 'scripts/clone_gaia_locales.py'),
+                'gaiaL10nRoot': config.get('gaia_l10n_root'),
+                'mozharnessRepoPath': config.get('mozharness_repo_path'),
+                'mozharnessTag': config.get('mozharness_tag'),
             }
             factory_kwargs.update(extra_args)
 
@@ -1369,8 +1374,6 @@ def generateBranchObjects(config, name, secrets=None):
                 multiargs['multiLocaleMerge'] = config['multi_locale_merge']
                 multiargs['compareLocalesRepoPath'] = config['compare_locales_repo_path']
                 multiargs['compareLocalesTag'] = config['compare_locales_tag']
-                multiargs['mozharnessRepoPath'] = config['mozharness_repo_path']
-                multiargs['mozharnessTag'] = config['mozharness_tag']
                 multi_config_name = 'multi_locale/%s_%s.json' % (name, platform)
                 if 'android' in platform:
                     multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
@@ -1492,6 +1495,11 @@ def generateBranchObjects(config, name, secrets=None):
                 tooltool_url_list=config.get('tooltool_url_list', []),
                 gaiaRepo=pf.get('gaia_repo'),
                 gaiaRevision=config.get('gaia_revision'),
+                gaiaLanguagesFile=pf.get('gaia_languages_file'),
+                gaiaLanguagesScript=pf.get('gaia_languages_script', 'scripts/clone_gaia_locales.py'),
+                gaiaL10nRoot=config.get('gaia_l10n_root'),
+                mozharnessRepoPath=config.get('mozharness_repo_path'),
+                mozharnessTag=config.get('mozharness_tag'),
                 **nightly_kwargs
             )
 
