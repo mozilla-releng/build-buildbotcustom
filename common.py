@@ -88,6 +88,8 @@ def reallyShort(name, product=None):
         'devtools': 'dev',
         'services': 'srv',
         'private-browsing': 'pb',
+        'gecko': 'g',
+        'localizer': 'lz',
     }
     hyphen_seperated_words = name.split('-')
     words = []
