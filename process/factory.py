@@ -1695,7 +1695,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         # Get package details
         self.packageFilename = self.getPackageFilename(self.platform,
                                                   self.platform_variation)
-        if self.packageFilename and 'rpm' not in self.platform_variation and self.productName != 'xulrunner':
+        if self.packageFilename and 'rpm' not in self.platform_variation and self.productName not in ('xulrunner', 'b2g'):
             self.addFilePropertiesSteps(filename=self.packageFilename,
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
