@@ -158,6 +158,8 @@ class DownloadFile(ShellCommand):
     haltOnFailure = True
     name = "download"
     description = ["download"]
+    retries = 5
+    waitRetry = 120
 
     def __init__(self, url_fn=None, url=None, url_property=None, filename_property=None,
             ignore_certs=False, wget_args=None, **kwargs):
@@ -172,6 +174,7 @@ class DownloadFile(ShellCommand):
             self.wget_args = wget_args
         else:
             self.wget_args = ['--progress=dot:mega']
+        self.wget_args += ["--tries=%d" % self.retries, "--waitretry=%d" % self.waitRetry]
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
         self.addFactoryArguments(url_fn=url_fn, url=url,
