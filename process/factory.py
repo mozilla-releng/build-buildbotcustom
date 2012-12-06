@@ -2646,15 +2646,17 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             workdir='%s/current' % self.absMozillaObjDir,
         ))
         for oldVersion in self.partialUpdates:
+            oldBuildNumber = self.partialUpdates[oldVersion]['buildNumber']
+
             previous_mar_name = '%s-%s.complete.mar' % (self.productName,
                                                         oldVersion)
             partial_mar_name = '%s-%s-%s.partial.mar' % \
                 (self.productName, oldVersion, self.version)
-            oldReleaseDir = makeReleasesDir(
-                self.productName, oldVersion,
+            oldCandidatesDir = makeCandidatesDir(
+                self.productName, oldVersion, oldBuildNumber,
                 protocol='http', server=self.stageServer)
             previousMarURL = '%s/update/%s/en-US/%s' % \
-                (oldReleaseDir, getPlatformFtpDir(self.platform),
+                (oldCandidatesDir, getPlatformFtpDir(self.platform),
                 previous_mar_name)
 
             self.addStep(ShellCommand(
