@@ -1371,21 +1371,21 @@ def generateBranchObjects(config, name, secrets=None):
 
 
             multiargs = {}
+            if pf.get('product_name') == 'b2g':
+                multiargs['multiLocaleScript'] = 'scripts/b2g_desktop_multilocale.py'
+            else:
+                if 'android' in platform:
+                    multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
+            if pf.get('multi_config_name'):
+                multiargs['multiLocaleConfig'] = pf['multi_config_name']
+            else:
+                multiargs['multiLocaleConfig'] = 'multi_locale/%s_%s.json' % (name, platform)
             if config.get('enable_multi_locale') and pf.get('multi_locale'):
                 multiargs['multiLocale'] = True
                 multiargs['multiLocaleMerge'] = config['multi_locale_merge']
                 multiargs['compareLocalesRepoPath'] = config['compare_locales_repo_path']
                 multiargs['compareLocalesTag'] = config['compare_locales_tag']
                 multiargs['mozharnessMultiOptions'] = pf.get('mozharness_multi_options')
-                if pf.get('product_name') == 'b2g':
-                    multiargs['multiLocaleScript'] = 'scripts/b2g_desktop_multilocale.py'
-                else:
-                    if 'android' in platform:
-                        multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
-                if pf.get('multi_config_name'):
-                    multiargs['multiLocaleConfig'] = pf['multi_config_name']
-                else:
-                    multiargs['multiLocaleConfig'] = 'multi_locale/%s_%s.json' % (name, platform)
 
 
             create_snippet = config['create_snippet']

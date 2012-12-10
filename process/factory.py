@@ -849,6 +849,11 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.gaiaLanguagesScript = gaiaLanguagesScript
         self.gaiaL10nRoot = gaiaL10nRoot
         self.gaiaL10nBaseDir = WithProperties('%(basedir)s/build-gaia-l10n')
+        self.compareLocalesRepoPath = compareLocalesRepoPath
+        self.compareLocalesTag = compareLocalesTag
+        self.multiLocaleScript = multiLocaleScript
+        self.multiLocaleConfig = multiLocaleConfig
+        self.multiLocaleMerge = multiLocaleMerge
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -964,11 +969,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             assert compareLocalesRepoPath and compareLocalesTag
             assert mozharnessRepoPath and mozharnessTag
             assert multiLocaleScript and multiLocaleConfig
-            self.compareLocalesRepoPath = compareLocalesRepoPath
-            self.compareLocalesTag = compareLocalesTag
-            self.multiLocaleScript = multiLocaleScript
-            self.multiLocaleConfig = multiLocaleConfig
-            self.multiLocaleMerge = multiLocaleMerge
             if mozharnessMultiOptions:
                 self.mozharnessMultiOptions = mozharnessMultiOptions
             else:
@@ -1181,16 +1181,18 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             ))
             if self.gaiaLanguagesFile:
                 languagesFile = '%(basedir)s/build/gaia/' + self.gaiaLanguagesFile
+                cmd = ['python', 'mozharness/%s' % self.gaiaLanguagesScript,
+                       '--pull',
+                       '--gaia-languages-file', WithProperties(languagesFile),
+                       '--gaia-l10n-root', self.gaiaL10nRoot,
+                       '--gaia-l10n-base-dir', self.gaiaL10nBaseDir,
+                       '--config-file', self.multiLocaleConfig,
+                       '--gecko-l10n-root', self.geckoL10nRoot]
+                if self.geckoLanguagesFile:
+                    cmd.extend(['--gecko-languages-file', self.geckoLanguagesFile])
                 self.addStep(MockCommand(
                     name='clone_gaia_l10n_repos',
-                    command=['python', 'mozharness/%s' % self.gaiaLanguagesScript,
-                             '--pull',
-                             '--gaia-languages-file', WithProperties(languagesFile),
-                             '--gaia-l10n-root', self.gaiaL10nRoot,
-                             '--gaia-l10n-base-dir', self.gaiaL10nBaseDir,
-                             '--config-file', self.multiLocaleConfig,
-                             '--gecko-l10n-root', self.geckoL10nRoot,
-                             '--gecko-languages-file', self.geckoLanguagesFile],
+                    command=cmd,
                     env=self.env,
                     workdir=WithProperties('%(basedir)s'),
                     haltOnFailure=True,
