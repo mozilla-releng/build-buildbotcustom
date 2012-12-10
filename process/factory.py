@@ -4776,7 +4776,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  chunkByDir=self.chunkByDir,
                  totalChunks=self.totalChunks,
                  thisChunk=self.thisChunk,
-                 maxTime=90*60, # One and a half hours, to allow for slow minis
+                 maxTime=90*60, # One and a half hours, to allow for slow hardware
                 ))
             elif suite.startswith('mochitest'):
                 # Unpack the tests
@@ -4796,7 +4796,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  chunkByDir=self.chunkByDir,
                  totalChunks=self.totalChunks,
                  thisChunk=self.thisChunk,
-                 maxTime=90*60, # One and a half hours, to allow for slow minis
+                 maxTime=120*60, # Two hours for slow debug tests
                 ))
             elif suite == 'xpcshell':
                 # Unpack the tests
