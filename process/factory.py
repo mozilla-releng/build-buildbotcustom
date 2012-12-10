@@ -845,6 +845,10 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.gaiaRevision = gaiaRevision
         self.geckoL10nRoot = geckoL10nRoot
         self.geckoLanguagesFile = geckoLanguagesFile
+        self.gaiaLanguagesFile = gaiaLanguagesFile
+        self.gaiaLanguagesScript = gaiaLanguagesScript
+        self.gaiaL10nRoot = gaiaL10nRoot
+        self.gaiaL10nBaseDir = WithProperties('%(basedir)s/build-gaia-l10n')
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -978,10 +982,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
 
         if gaiaLanguagesFile:
             assert gaiaLanguagesScript and gaiaL10nRoot
-            self.gaiaLanguagesFile = gaiaLanguagesFile
-            self.gaiaLanguagesScript = gaiaLanguagesScript
-            self.gaiaL10nRoot = gaiaL10nRoot
-            self.gaiaL10nBaseDir = WithProperties('%(basedir)s/build-gaia-l10n')
             self.env['LOCALE_BASEDIR'] = self.gaiaL10nBaseDir
             self.env['LOCALES_FILE'] = self.gaiaLanguagesFile
 
