@@ -769,6 +769,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  gaiaLanguagesFile=None,
                  gaiaLanguagesScript=None,
                  gaiaL10nRoot=None,
+                 geckoL10nRoot=None,
+                 geckoLanguagesFile=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -841,6 +843,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.runAliveTests = runAliveTests
         self.gaiaRepo = gaiaRepo
         self.gaiaRevision = gaiaRevision
+        self.geckoL10nRoot = geckoL10nRoot
+        self.geckoLanguagesFile = geckoLanguagesFile
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1177,16 +1181,16 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             ))
             if self.gaiaLanguagesFile:
                 languagesFile = '%(basedir)s/build/gaia/' + self.gaiaLanguagesFile
-                # call mozharness script that will checkout all of the repos
-                # it should only need the languages file path passed to it
-                # need to figure out what to pass to the build system to make
-                # gaia create a multilocale profile, too
                 self.addStep(MockCommand(
                     name='clone_gaia_l10n_repos',
                     command=['python', 'mozharness/%s' % self.gaiaLanguagesScript,
+                             '--pull',
                              '--gaia-languages-file', WithProperties(languagesFile),
                              '--gaia-l10n-root', self.gaiaL10nRoot,
-                             '--gaia-l10n-base-dir', self.gaiaL10nBaseDir],
+                             '--gaia-l10n-base-dir', self.gaiaL10nBaseDir,
+                             '--config-file', self.multiLocaleConfig,
+                             '--gecko-l10n-root', self.geckoL10nRoot,
+                             '--gecko-languages-file', self.geckoLanguagesFile],
                     env=self.env,
                     workdir=WithProperties('%(basedir)s'),
                     haltOnFailure=True,
@@ -1757,6 +1761,14 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                    '--config-file', self.multiLocaleConfig]
             if self.multiLocaleMerge:
                 cmd.append('--merge-locales')
+            if self.gaiaLanguagesFile:
+                cmd.extend(['--gaia-languages-file', WithProperties('%(basedir)s/build/gaia/' + self.gaiaLanguagesFile)])
+            if self.gaiaL10nRoot:
+                cmd.extend(['--gaia-l10n-root', self.gaiaL10nRoot])
+            if self.geckoLanguagesFile:
+                cmd.extend(['--gecko-languages-file', self.geckoLanguagesFile])
+            if self.geckoL10nRoot:
+                cmd.extend(['--gecko-l10n-root', self.geckoL10nRoot])
             cmd.extend(self.mozharnessMultiOptions)
             self.addStep(MockCommand(
                 name='mozharness_multilocale',
@@ -1768,11 +1780,12 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 target=self.mock_target,
                 mock_workdir_prefix=None,
             ))
-            # We need to set packageFilename to the multi apk
-            self.addFilePropertiesSteps(filename=self.packageFilename,
-                                        directory='build/%s/dist' % self.mozillaObjdir,
-                                        fileType='package',
-                                        haltOnFailure=True)
+            # b2g doesn't get snippets, and these steps don't work it, so don't run them
+            if self.productName != 'b2g':
+                self.addFilePropertiesSteps(filename=self.packageFilename,
+                                            directory='build/%s/dist' % self.mozillaObjdir,
+                                            fileType='package',
+                                            haltOnFailure=True)
 
         if self.createSnippet and 'android' not in self.complete_platform:
             self.addCreateUpdateSteps();
