@@ -2465,13 +2465,21 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             for a in factory_platform_args:
                 if a in pf:
                     factory_kwargs[a] = pf[a]
+            factory_kwargs['env'] = env
+
+            extra_args = [ '-r', WithProperties("%(revision)s") ]
+            for url in config['branchconfig']['base_mirror_urls']:
+                extra_args += [ '-m', "%s/%s" % (url, config['repo_path']) ]
+            for url in config['branchconfig']['base_bundle_urls']:
+                extra_args += [ '-b', "%s/%s.hg" % (url, config['repo_path']) ]
+            extra_args += [variant]
 
             f = ScriptFactory(
                     config['scripts_repo'],
                     'scripts/spidermonkey_builds/spidermonkey.sh',
                     interpreter=interpreter,
                     log_eval_func=rc_eval_func({1: WARNINGS}),
-                    extra_args=(variant,),
+                    extra_args=tuple(extra_args),
                     script_timeout=3600,
                     **factory_kwargs
                     )
