@@ -4861,7 +4861,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   symbols_path=symbols_path,
                   maxTime=120*60, # Two Hours
                  ))
-            elif suite in ('reftest', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
+            elif suite in ('reftest', 'reftestsmall' 'reftest-ipc', 'reftest-d2d', 'crashtest', \
                            'crashtest-ipc', 'direct3D', 'opengl', 'opengl-no-accel', \
                            'reftest-no-d2d-d3d'):
                 if suite in ('direct3D', 'opengl'):
@@ -5183,6 +5183,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
             elif name.startswith('reftest') or name == 'crashtest':
                 totalChunks = suite.get('totalChunks', None)
                 thisChunk = suite.get('thisChunk', None)
+                extra_args = suite.get('extra_args', None)
                 # Unpack the tests
                 self.addStep(UnpackTest(
                  filename=WithProperties('../%(tests_filename)s'),
@@ -5195,6 +5196,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                  symbols_path=symbols_path,
                  totalChunks=totalChunks,
                  thisChunk=thisChunk,
+                 extra_args=extra_args,
                  workdir='build/tests',
                  timeout=2400,
                  app=self.remoteProcessName,
