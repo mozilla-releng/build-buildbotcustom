@@ -316,7 +316,7 @@ class ReftestMixin(object):
         elif suite == 'crashtest-ipc':
             return ['--setpref=browser.tabs.remote=true',
                     'reftest/tests/testing/crashtest/crashtests.list']
-        elif suite in ('reftest', 'direct3D', 'opengl'):
+        elif suite in ('reftest', 'direct3D', 'opengl', 'reftestsmall'):
             return ['reftest/tests/layout/reftests/reftest.list']
         elif suite in ('reftest-ipc'):
             # See bug 637858 for why we are doing a subset of all reftests
@@ -587,7 +587,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                  xrePath='../hostutils/xre', testManifest=None,
                  utilityPath='../hostutils/bin', certificatePath='certs',
                  app='org.mozilla.fennec', consoleLevel='INFO', 
-                 totalChunks=None, thisChunk=None, **kwargs):
+                 totalChunks=None, thisChunk=None, slowTests=False, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
@@ -598,7 +598,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                                  testPath=testPath, xrePath=xrePath,
                                  testManifest=testManifest, utilityPath=utilityPath,
                                  certificatePath=certificatePath, app=app,
-                                 consoleLevel=consoleLevel,
+                                 consoleLevel=consoleLevel, slowTests=slowTests,
                                  totalChunks=totalChunks, thisChunk=thisChunk)
 
         self.name = 'mochitest-%s' % variant
@@ -620,6 +620,8 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
             self.command.extend(['--run-only-tests', testManifest])
         if symbols_path:
             self.command.append(WithProperties("--symbols-path=%s" % symbols_path))
+        if slowTests:
+            self.command.append(['--run-slower'])
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
 
 
@@ -640,14 +642,14 @@ class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
 class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, xrePath='../hostutils/xre',
                  utilityPath='../hostutils/bin', app='org.mozilla.fennec',
-                 totalChunks=None, thisChunk=None, cmdOptions=None, **kwargs):
+                 totalChunks=None, thisChunk=None, cmdOptions=None, extra_args=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(suite=suite, xrePath=xrePath,
                                  symbols_path=symbols_path,
                                  utilityPath=utilityPath, app=app,
                                  totalChunks=totalChunks, thisChunk=thisChunk,
-                                 cmdOptions=cmdOptions)
+                                 cmdOptions=cmdOptions, extra_args=extra_args)
 
         self.name = suite
         if totalChunks:
@@ -664,6 +666,8 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                        ]
         if suite == 'jsreftest' or suite == 'crashtest':
             self.command.append('--ignore-window-size')
+        if extra_args:
+           self.command.append(extra_args)
 
         if cmdOptions:
           self.command.extend(cmdOptions)
