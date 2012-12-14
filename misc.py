@@ -695,10 +695,11 @@ def generateBranchObjects(config, name, secrets=None):
         # short-circuit the extra logic below for debug, l10n, pgo and nightly
         # builds these aren't required (yet) for mozharness builds
         if 'mozharness_config' in pf:
-            buildername = '%s_dep' % pf['base_name']
-            builders.append(buildername)
-            buildersByProduct.setdefault(pf['stage_product'], []).append(buildername)
-            prettyNames[platform] = buildername
+            if pf.get('enable_dep', True):
+                buildername = '%s_dep' % pf['base_name']
+                builders.append(buildername)
+                buildersByProduct.setdefault(pf['stage_product'], []).append(buildername)
+                prettyNames[platform] = buildername
 
             if pf.get('enable_nightly'):
                 buildername = '%s_nightly' % pf['base_name']
@@ -969,24 +970,30 @@ def generateBranchObjects(config, name, secrets=None):
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
     if nightlyBuilders or xulrunnerNightlyBuilders:
-        goodFunc = lastGoodFunc(
+        scheduler_args = dict(
+            name="%s nightly" % scheduler_name_prefix,
+            branch=config['repo_path'],
+            # bug 482123 - keep the minute to avoid problems with DST
+            # changes
+            hour=config['start_hour'], minute=config['start_minute'],
+            builderNames=nightlyBuilders + xulrunnerNightlyBuilders,
+        )
+        if config.get('enable_nightly_lastgood', True):
+            goodFunc = lastGoodFunc(
                 branch=config['repo_path'],
                 builderNames=builders,
                 triggerBuildIfNoChanges=False,
                 l10nBranch=config.get('l10n_repo_path')
-                )
+            )
+            scheduler_args['ssFunc'] = goodFunc
+            scheduler_class = SpecificNightly
+        else:
+            scheduler_class = Nightly
 
         nightly_scheduler = makePropertiesScheduler(
-                SpecificNightly,
-                [buildIDSchedFunc, buildUIDSchedFunc])(
-                    ssFunc=goodFunc,
-                    name="%s nightly" % scheduler_name_prefix,
-                    branch=config['repo_path'],
-                    # bug 482123 - keep the minute to avoid problems with DST
-                    # changes
-                    hour=config['start_hour'], minute=config['start_minute'],
-                    builderNames=nightlyBuilders + xulrunnerNightlyBuilders,
-        )
+            scheduler_class,
+            [buildIDSchedFunc, buildUIDSchedFunc]
+        )(**scheduler_args)
         branchObjects['schedulers'].append(nightly_scheduler)
 
     if len(periodicPgoBuilders) > 0:
@@ -1053,7 +1060,8 @@ def generateBranchObjects(config, name, secrets=None):
                     'repo_path': config['repo_path'],
                 }
             }
-            branchObjects['builders'].append(builder)
+            if pf.get('enable_dep', True):
+                branchObjects['builders'].append(builder)
 
             if pf.get('enable_nightly'):
                 if pf.get('dep_signing_servers') != pf.get('nightly_signing_servers'):
