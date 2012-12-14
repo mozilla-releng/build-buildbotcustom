@@ -256,6 +256,7 @@ def getPlatformMinidumpPath(platform):
         'linuxqt': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux32_gecko': WithProperties('%(toolsdir:-)s/breakpad/linux/minidump_stackwalk'),
         'linux64': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
+        'linux64_gecko': WithProperties('%(toolsdir:-)s/breakpad/linux64/minidump_stackwalk'),
         'win32': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'win32_gecko': WithProperties('%(toolsdir:-)s/breakpad/win32/minidump_stackwalk.exe'),
         'win64': WithProperties('%(toolsdir:-)s/breakpad/win64/minidump_stackwalk.exe'),
