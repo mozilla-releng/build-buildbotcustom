@@ -8,6 +8,7 @@ import collections
 import random
 import re
 import sys, os, time
+from copy import deepcopy
 
 from twisted.python import log
 
@@ -492,6 +493,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             buildToolsRepoPath=config['build_tools_repo_path'],
             branchName=branch_name,
             remoteExtras=pf.get('remote_extras'),
+            # NB. If you change the defaults here, make sure to update the
+            # logic in generateTalosBranchObjects for test_type == "debug"
             downloadSymbols=pf.get('download_symbols', False),
             downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
         )
@@ -562,6 +565,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     thisChunk=i+1,
                     chunkByDir=suites.get('chunkByDir'),
                     env=pf.get('unittest-env', {}),
+                    # NB. If you change the defaults here, make sure to update the
+                    # logic in generateTalosBranchObjects for test_type == "debug"
                     downloadSymbols=pf.get('download_symbols', False),
                     downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
                     resetHwClock=resetHwClock,
@@ -2048,6 +2053,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         pgoUnittestBuilders = []
                         unittest_suites = "%s_unittest_suites" % test_type
                         if test_type == "debug":
+                            # Debug tests always need to download symbols for runtime assertions
+                            branch_config = deepcopy(branch_config)
+                            pf = branch_config['platforms'][platform]
+                            if pf.get('download_symbols', False) or pf.get('download_symbols_ondemand', True):
+                                pf['download_symbols'] = True
+                                pf['download_symbols_ondemand'] = False
                             slave_platform_name = "%s-debug" % slave_platform
                         elif test_type == "mobile":
                             slave_platform_name = "%s-mobile" % slave_platform
