@@ -265,6 +265,7 @@ def getPlatformMinidumpPath(platform):
         'macosx64_gecko': WithProperties('%(toolsdir:-)s/breakpad/osx/minidump_stackwalk'),
         # Android uses OSX *and* Linux because the Foopies are on both.
         'android': WithProperties('/builds/minidump_stackwalk'),
+        'android-x86': WithProperties('/builds/minidump_stackwalk'),
         'android-noion': WithProperties('/builds/minidump_stackwalk'),
         'android-armv6': WithProperties('/builds/minidump_stackwalk'),
         }
@@ -566,6 +567,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
     def getPackageFilename(self, platform, platform_variation):
         if 'android-armv6' in self.complete_platform:
             packageFilename = '*arm-armv6.apk'
+        elif 'android-x86' in self.complete_platform:
+            packageFilename = '*android-i386.apk'
         elif 'android' in self.complete_platform:
             packageFilename = '*arm.apk' #the arm.apk is to avoid
                                          #unsigned/unaligned apks
