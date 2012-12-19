@@ -124,20 +124,26 @@ def shouldBuild(change):
 
 _product_excludes = {
     'firefox': [
+        re.compile('^CLOBBER'),
         re.compile('^mobile/'),
         re.compile('^b2g/'),
     ],
     'mobile': [
+        re.compile('^CLOBBER'),
         re.compile('^browser/'),
         re.compile('^b2g/'),
         re.compile('^xulrunner/'),
     ],
     'b2g': [
+        re.compile('^CLOBBER'),
         re.compile('^browser/'),
         re.compile('^mobile/'),
         re.compile('^xulrunner/'),
     ],
-    'thunderbird': [re.compile("^suite/")],
+    'thunderbird': [
+        re.compile('^CLOBBER'),
+        re.compile("^suite/")
+    ],
 }
 def isImportantForProduct(change, product):
     """Handles product specific handling of important files"""
