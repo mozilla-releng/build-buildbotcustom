@@ -453,8 +453,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
          name='clone_buildtools',
          command=['hg', 'clone', self.buildToolsRepo, 'tools'],
          description=['clone', 'build tools'],
+         log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
          workdir='.',
-         retry=False
+         retry=False # We cannot use retry.py until we have this repo checked out
         ))
         self.addStep(SetProperty(
             name='set_toolsdir',
