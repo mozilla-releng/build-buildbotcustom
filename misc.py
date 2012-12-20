@@ -532,7 +532,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             scriptName=suites['script_path'],
             hg_bin=hg_bin,
             extra_args=extra_args,
-            script_maxtime=suites.get('script_maxtime', 3600),
+            script_maxtime=suites.get('script_maxtime', 7200),
             reboot_command=reboot_command,
             platform=platform,
             log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
