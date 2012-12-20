@@ -1023,28 +1023,27 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addPeriodicRebootSteps()
 
     def addMozharnessRepoSteps(self):
-        name=self.mozharnessRepoPath.rstrip('/').split('/')[-1]
         self.addStep(ShellCommand(
-            name='rm_%s'%name,
-            command=['rm', '-rf', '%s' % name],
-            description=['removing', name],
-            descriptionDone=['remove', name],
+            name='rm_mozharness',
+            command=['rm', '-rf', 'mozharness'],
+            description=['removing', 'mozharness'],
+            descriptionDone=['remove', 'mozharness'],
             haltOnFailure=True,
             workdir='.',
         ))
         self.addStep(MercurialCloneCommand(
-            name='hg_clone_%s' % name,
-            command=['hg', 'clone', self.getRepository(self.mozharnessRepoPath), name],
-            description=['checking', 'out', name],
-            descriptionDone=['checkout', name],
+            name='hg_clone_mozharness',
+            command=['hg', 'clone', self.getRepository(self.mozharnessRepoPath), 'mozharness'],
+            description=['checking', 'out', 'mozharness'],
+            descriptionDone=['checkout', 'mozharness'],
             haltOnFailure=True,
             workdir='.',
         ))
         self.addStep(ShellCommand(
-            name='hg_update_%s'% name,
+            name='hg_update_mozharness',
             command=['hg', 'update', '-r', self.mozharnessTag],
-            description=['updating', name, 'to', self.mozharnessTag],
-            workdir=name,
+            description=['updating', 'mozharness', 'to', self.mozharnessTag],
+            workdir='mozharness',
             haltOnFailure=True
         ))
 
