@@ -124,20 +124,26 @@ def shouldBuild(change):
 
 _product_excludes = {
     'firefox': [
+        re.compile('^CLOBBER'),
         re.compile('^mobile/'),
         re.compile('^b2g/'),
     ],
     'mobile': [
+        re.compile('^CLOBBER'),
         re.compile('^browser/'),
         re.compile('^b2g/'),
         re.compile('^xulrunner/'),
     ],
     'b2g': [
+        re.compile('^CLOBBER'),
         re.compile('^browser/'),
         re.compile('^mobile/'),
         re.compile('^xulrunner/'),
     ],
-    'thunderbird': [re.compile("^suite/")],
+    'thunderbird': [
+        re.compile('^CLOBBER'),
+        re.compile("^suite/")
+    ],
 }
 def isImportantForProduct(change, product):
     """Handles product specific handling of important files"""
@@ -975,14 +981,6 @@ def generateBranchObjects(config, name, secrets=None):
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
     if nightlyBuilders or xulrunnerNightlyBuilders:
-        scheduler_args = dict(
-            name="%s nightly" % scheduler_name_prefix,
-            branch=config['repo_path'],
-            # bug 482123 - keep the minute to avoid problems with DST
-            # changes
-            hour=config['start_hour'], minute=config['start_minute'],
-            builderNames=nightlyBuilders + xulrunnerNightlyBuilders,
-        )
         if config.get('enable_nightly_lastgood', True):
             goodFunc = lastGoodFunc(
                 branch=config['repo_path'],
@@ -990,15 +988,20 @@ def generateBranchObjects(config, name, secrets=None):
                 triggerBuildIfNoChanges=False,
                 l10nBranch=config.get('l10n_repo_path')
             )
-            scheduler_args['ssFunc'] = goodFunc
-            scheduler_class = SpecificNightly
         else:
-            scheduler_class = Nightly
+            goodFunc = lastRevFunc(config['repo_path'], triggerBuildIfNoChanges=True)
 
         nightly_scheduler = makePropertiesScheduler(
-            scheduler_class,
-            [buildIDSchedFunc, buildUIDSchedFunc]
-        )(**scheduler_args)
+            SpecificNightly,
+            [buildIDSchedFunc, buildUIDSchedFunc])(
+                name="%s nightly" % scheduler_name_prefix,
+                ssFunc=goodFunc,
+                branch=config['repo_path'],
+                # bug 482123 - keep the minute to avoid problems with DST
+                # changes
+                hour=config['start_hour'], minute=config['start_minute'],
+                builderNames=nightlyBuilders + xulrunnerNightlyBuilders,
+            )
         branchObjects['schedulers'].append(nightly_scheduler)
 
     if len(periodicPgoBuilders) > 0:
