@@ -977,9 +977,10 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             if mozharnessMultiOptions:
                 self.mozharnessMultiOptions = mozharnessMultiOptions
             else:
-                self.mozharnessMultiOptions = ['--only-pull-locale-source',
-                                               '--only-add-locales',
-                                               '--only-package-multi']
+                self.mozharnessMultiOptions = ['--pull-locale-source',
+                                               '--add-locales',
+                                               '--package-multi',
+                                               '--summary',]
 
             self.addMultiLocaleRepoSteps()
 
