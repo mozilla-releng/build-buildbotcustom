@@ -472,7 +472,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         slaves=None, resetHwClock=False, category=None,
                         stagePlatform=None, stageProduct=None,
                         mozharness=False, mozharness_python=None,
-                        mozharness_suite_config=None):
+                        mozharness_suite_config=None,
+                        mozharness_repo=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves == None:
@@ -527,11 +528,11 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         hg_bin = mozharness_suite_config.get('hg_bin', suites.get('hg_bin', 'hg'))
         factory = ScriptFactory(
             interpreter=mozharness_python,
-            scriptRepo=suites['mozharness_repo'],
+            scriptRepo=mozharness_repo,
             scriptName=suites['script_path'],
             hg_bin=hg_bin,
             extra_args=extra_args,
-            script_maxtime=suites.get('script_maxtime', 3600),
+            script_maxtime=suites.get('script_maxtime', 7200),
             reboot_command=reboot_command,
             platform=platform,
             log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
@@ -1969,7 +1970,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             extra_args.append('--use-talos-json')
                         factory = generateMozharnessTalosBuilder(
                          platform=platform,
-                         mozharness_repo=platform_config['mozharness_config']['mozharness_repo'],
+                         mozharness_repo=branch_config.get('mozharness_repo', platform_config['mozharness_config']['mozharness_repo']),
                          script_path="scripts/talos_script.py",
                          hg_bin=platform_config['mozharness_config']['hg_bin'],
                          mozharness_python=platform_config['mozharness_config']['mozharness_python'],
@@ -2103,6 +2104,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "stageProduct": stage_product
                             }
                             if isinstance(suites, dict) and "mozharness_repo" in suites:
+                                test_builder_kwargs['mozharness_repo'] = branch_config.get('mozharness_repo', suites['mozharness_repo'])
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
