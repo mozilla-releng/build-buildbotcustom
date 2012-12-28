@@ -2443,7 +2443,8 @@ def generateNanojitObjects(config, SLAVES):
 
 def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
-    branch = os.path.basename(config['repo_path'])
+    branch = config['branch']
+    bconfig = config['branchconfig']
 
     PRETTY_NAME = '%s %s-%s build'
     prettyNames = {}
@@ -2468,9 +2469,9 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             factory_kwargs['env'] = env
 
             extra_args = [ '-r', WithProperties("%(revision)s") ]
-            for url in config['branchconfig']['base_mirror_urls']:
+            for url in bconfig['base_mirror_urls']:
                 extra_args += [ '-m', "%s/%s" % (url, config['repo_path']) ]
-            for url in config['branchconfig']['base_bundle_urls']:
+            for url in bconfig['base_bundle_urls']:
                 extra_args += [ '-b', "%s/%s.hg" % (url, config['repo_path']) ]
             extra_args += [variant]
 
@@ -2489,9 +2490,10 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             base_name = pf['base_name'] % config
 
             prettyName = PRETTY_NAME % (base_name, project, variant)
+            name = prettyName
             prettyNames[platform] = prettyName
 
-            builder = {'name': prettyName,
+            builder = {'name': name,
                     'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                     'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
                     'slavenames': pf['slaves'],
@@ -2502,6 +2504,8 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                     'properties': {'branch': branch, 'platform': platform, 'product': 'spidermonkey'},
                     }
             builders.append(builder)
+            if not bconfig.get('enable_merging', True):
+                nomergeBuilders.append(name)
 
     def isImportant(change):
         if not shouldBuild(change):
