@@ -8,6 +8,7 @@ BUILDER_PRETTY_NAMES = {'macosx64':'OS X 10.6.2 try build',
                         'macosx-debug':'OS X 10.5.2 try leak test build',
                         'win32':'WINNT 5.2 try build',
                         'win32-debug':'WINNT 5.2 try leak test build',
+                        'win64':'WINNT 6.1 try try-nondefault build',
                         'linux64':'Linux x86-64 try build',
                         'linux64-debug':'Linux x86-64 try leak test build',
                         'linux':'Linux try build',
@@ -113,13 +114,15 @@ class TestTryParser(unittest.TestCase):
         # Should get default set with blank input
         tm = ""
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        self.assertEqual(sorted(self.customBuilders),sorted(VALID_BUILDER_NAMES))
+        builders = [ b for b in VALID_BUILDER_NAMES if 'nondefault' not in b ]
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkMessageBuilders(self):
         # Should get default set with junk input
         tm = "try: junk"
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        self.assertEqual(sorted(self.customBuilders),sorted(VALID_BUILDER_NAMES))
+        builders = [ b for b in VALID_BUILDER_NAMES if 'nondefault' not in b ]
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkMessageTesters(self):
         # Should get default set with junk input to the test masters
@@ -181,31 +184,60 @@ class TestTryParser(unittest.TestCase):
     def test_AllPlatformsBoth(self):
         tm = 'try: -b od -p all'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = [ b for b in BUILDER_PRETTY_NAMES.values() if 'nondefault' not in b ]
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_FullPlatformsBoth(self):
+        tm = 'try: -b od -p full'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = BUILDER_PRETTY_NAMES.values()
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_FullPlatformsOpt(self):
+        tm = 'try: -b o -p full'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = dictslice(BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_FullPlatformsDebug(self):
+        tm = 'try: -b d -p full'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = dictslice(BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_AllPlatformsBoth(self):
+        tm = 'try: -b od -p all'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        builders = BUILDER_PRETTY_NAMES.values()
+        builders = [ b for b in builders if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllPlatformsOpt(self):
         tm = 'try: -b o -p all'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = dictslice(BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
+        builders = [ b for b in builders if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllPlatformsDebug(self):
         tm = 'try: -b d -p all'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = dictslice(BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
+        builders = [ b for b in builders if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllOnTestMaster(self):
         tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [ n for n in VALID_TESTER_NAMES if 'talos' not in n ]
+        builders = [ b for b in builders if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllOnTestMasterCC(self):
         tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_TB_NAMES, TESTER_PRETTY_TB_NAMES, None, UNITTEST_SUITES_TB, None, "try-comm-central")
         builders = VALID_TESTER_TB_NAMES
+        builders = [ b for b in builders if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_MochitestAliasesOnBuilderMaster(self):
