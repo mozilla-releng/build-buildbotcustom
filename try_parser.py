@@ -44,7 +44,7 @@ def expandPlatforms(user_platforms, buildTypes):
     if 'opt' in buildTypes:
         platforms.update(user_platforms)
     if 'debug' in buildTypes:
-        platforms.update([ "%s-debug" % p for p in user_platforms ])
+        platforms.update([ p + '-debug' for p in user_platforms ])
     return platforms
 
 def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
@@ -264,25 +264,46 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         # for any input other than do/od, d, o, all set to default
         options.build = ['opt','debug']
 
-    if options.user_platforms == 'all' and prettyNames:
-        # test builder pretty names don't have -debug in them, so all gets all prettyNames
-        if options.test != 'none' and unittestSuites:
-            options.user_platforms = prettyNames.keys()
-        else:
-            # for builders though, you need to check against the prettyNames for -debug
-            options.user_platforms = []
-            for buildType in options.build:
-                for platform in prettyNames.keys():
-                    if buildType == 'debug' and platform.endswith('debug'):
-                        # append platform with the -debug stripped off
-                        # it gets tacked on in the getPlatformBuilders for buildType == debug
-                        options.user_platforms.append(platform.split('-')[0])
-                    elif buildType == 'opt' and not platform.endswith('debug'):
-                        options.user_platforms.append(platform)
-    elif options.user_platforms == 'none':
-        options.user_platforms = []
+    if unittestSuites:
+        all_platforms = prettyNames.keys()
     else:
-        options.user_platforms = options.user_platforms.split(',')
+        # for build builders (as opposed to test builders), check against the
+        # prettyNames for -debug
+        all_platforms = set()
+        if 'debug' in options.build:
+            all_platforms.update([ p for p in prettyNames.keys() if p.endswith('debug') ])
+        if 'opt' in options.build:
+            all_platforms.update([ p for p in prettyNames.keys() if not p.endswith('debug') ])
+
+        # Strip off -debug. It gets tacked on in the getPlatformBuilders for
+        # buildType == debug
+        all_platforms = list(set([ p.replace('-debug', '') for p in all_platforms ]))
+
+    # Platforms whose prettyNames all have 'try-nondefault' in them are not included in -p all
+    default_platforms = set()
+    if unittestSuites:
+        for p in all_platforms:
+            default_platforms.update([ p for n in prettyNames[p] if 'try-nondefault' not in n ])
+    else:
+        defaultPrettyNames = dict([ (k,v)
+                                    for k,v in prettyNames.items()
+                                    if 'try-nondefault' not in v ])
+        for p in all_platforms:
+            if p in defaultPrettyNames:
+                default_platforms.add(p)
+            elif p + '-debug' in defaultPrettyNames:
+                default_platforms.add(p)
+
+    user_platforms = set()
+    for platform in options.user_platforms.split(','):
+        if platform == 'all':
+            user_platforms.update(default_platforms)
+        elif platform == 'full':
+            user_platforms.update(all_platforms)
+        else:
+            user_platforms.add(platform)
+
+    options.user_platforms = user_platforms
 
     testFilters = None
     if unittestSuites:
