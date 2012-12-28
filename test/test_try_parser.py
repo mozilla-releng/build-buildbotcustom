@@ -1,6 +1,9 @@
 from buildbotcustom.try_parser import TryParser, processMessage
 import unittest
 
+def base_platform(platform):
+    return platform.replace(' try-nondefault', '')
+
 ###### TEST CASES #####
 
 BUILDER_PRETTY_NAMES = {'macosx64':'OS X 10.6.2 try build',
@@ -19,10 +22,10 @@ BUILDER_PRETTY_NAMES = {'macosx64':'OS X 10.6.2 try build',
 # TODO -- need to check on how to separate out the two win32 prettynames
 TESTER_PRETTY_NAMES = {'macosx':   ['Rev3 MacOSX Leopard 10.5.8'],
                        'macosx64': ['Rev3 MacOSX Snow Leopard 10.6.2',
-                                    'Rev3 MacOSX Leopard 10.5.8'],
+                                    'Rev3 MacOSX Leopard 9.0 try-nondefault'],
                        'win32':    ['Rev3 WINNT 5.1',
                                     'Rev3 WINNT 6.1'],
-                       'linux-64': ['Rev3 Fedora 12x64'],
+                       'linux64':  ['Rev3 Fedora 12x64'],
                        'linux':    ['Rev3 Fedora 12'],
                        }
 TESTER_PRETTY_TB_NAMES = {'linux': ['TB Rev3 Fedora 12']}
@@ -49,7 +52,7 @@ VALID_UPN = ['WINNT 5.2 try debug test mochitest-1',
 VALID_REFTEST_NAMES = ['WINNT 5.2 try debug test reftest',
                        'WINNT 5.2 try debug test reftest-1',
                        'WINNT 5.2 try debug test reftest-3']
-VALID_BUILDER_NAMES = BUILDER_PRETTY_NAMES.values()
+VALID_BUILDER_NAMES = [ base_platform(b) for b in BUILDER_PRETTY_NAMES.values() ]
 VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 Fedora 12 try opt test mochitest-browser-chrome',
                       'Rev3 Fedora 12 try opt test mochitest-other',
@@ -64,7 +67,9 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
                       'Rev3 WINNT 6.1 try debug test mochitest-other',
                       'Rev3 WINNT 6.1 try debug test mochitest-3',
-                      'Rev3 MacOSX Leopard 10.5.8 try talos tp4',
+                      'Rev3 MacOSX Snow Leopard 10.6.2 try debug test crashtest',
+                      'Rev3 MacOSX Leopard 9.0 try debug test crashtest',
+                      'Rev3 MacOSX Leopard 9.0 try talos tp4',
                       'Rev3 WINNT 5.1 try talos chrome',
                       'Rev3 WINNT 6.1 try talos tp4',
                       'Rev3 WINNT 5.1 try talos tp4',
@@ -87,6 +92,16 @@ class TestTryParser(unittest.TestCase):
         builders = [ t for t in builders if 'crashtest' in t or 'reftest' in t ]
         self.baselineBuilders = builders
 
+    def removeNondefaults(self, builders, pretties):
+        platform_names = pretties.values()
+        if isinstance(platform_names[0], list):
+            platform_names = reduce(lambda a, b: a+b, platform_names)
+        nondefaults = [ base_platform(n)
+                        for n in platform_names
+                        if 'try-nondefault' in n ]
+        nondefault_builders = set([ b for b in builders for nd in nondefaults if nd in b ])
+        return set(builders) - nondefault_builders
+
     def filterBuilders(self, platforms,
                        pretties = BUILDER_PRETTY_NAMES,
                        valid = VALID_BUILDER_NAMES):
@@ -104,24 +119,25 @@ class TestTryParser(unittest.TestCase):
         chosen = set()
         assert isinstance(platforms, list)
         for platform in platforms:
-            arches = pretties.get(platform, [])
-            assert isinstance(arches, list)
-            for platform_name in arches:
-                chosen.update([ builder for builder in valid if platform_name in builder ])
+            slave_platforms = pretties.get(platform, [])
+            assert isinstance(slave_platforms, list)
+            for slave_platform in slave_platforms:
+                base = base_platform(slave_platform)
+                chosen.update([ builder for builder in valid if base in builder ])
         return list(chosen)
 
     def test_BlankMessage(self):
         # Should get default set with blank input
         tm = ""
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [ b for b in VALID_BUILDER_NAMES if 'nondefault' not in b ]
+        builders = self.removeNondefaults(VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkMessageBuilders(self):
         # Should get default set with junk input
         tm = "try: junk"
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [ b for b in VALID_BUILDER_NAMES if 'nondefault' not in b ]
+        builders = self.removeNondefaults(VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkMessageTesters(self):
@@ -129,6 +145,7 @@ class TestTryParser(unittest.TestCase):
         tm = "try: junk"
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [ b for b in VALID_TESTER_NAMES if 'talos' not in b ]
+        builders = self.removeNondefaults(builders, TESTER_PRETTY_NAMES)
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_JunkBuildMessage(self):
@@ -190,13 +207,14 @@ class TestTryParser(unittest.TestCase):
     def test_FullPlatformsBoth(self):
         tm = 'try: -b od -p full'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = BUILDER_PRETTY_NAMES.values()
+        builders = VALID_BUILDER_NAMES
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_FullPlatformsOpt(self):
         tm = 'try: -b o -p full'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = dictslice(BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
+        builders = [ base_platform(b) for b in builders ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_FullPlatformsDebug(self):
@@ -208,8 +226,7 @@ class TestTryParser(unittest.TestCase):
     def test_AllPlatformsBoth(self):
         tm = 'try: -b od -p all'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = BUILDER_PRETTY_NAMES.values()
-        builders = [ b for b in builders if 'nondefault' not in b ]
+        builders = [ b for b in BUILDER_PRETTY_NAMES.values() if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllPlatformsOpt(self):
@@ -226,18 +243,32 @@ class TestTryParser(unittest.TestCase):
         builders = [ b for b in builders if 'nondefault' not in b ]
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
+    def test_NoNondefaultTests(self):
+        tm = 'try: -b d -p macosx64 -u all'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = self.filterTesters(['macosx64'])
+        builders = self.removeNondefaults(builders, TESTER_PRETTY_NAMES)
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
+    def test_NondefaultsTest(self):
+        tm = 'try: -b d -p macosx64 -u all[]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = self.filterTesters(['macosx64'])
+        builders = [ b for b in builders if 'talos' not in b ]
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
+
     def test_AllOnTestMaster(self):
         tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [ n for n in VALID_TESTER_NAMES if 'talos' not in n ]
-        builders = [ b for b in builders if 'nondefault' not in b ]
+        builders = self.removeNondefaults(builders, TESTER_PRETTY_NAMES)
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_AllOnTestMasterCC(self):
         tm = 'try: -a'
         self.customBuilders = TryParser(tm, VALID_TESTER_TB_NAMES, TESTER_PRETTY_TB_NAMES, None, UNITTEST_SUITES_TB, None, "try-comm-central")
         builders = VALID_TESTER_TB_NAMES
-        builders = [ b for b in builders if 'nondefault' not in b ]
+        builders = self.removeNondefaults(builders, TESTER_PRETTY_TB_NAMES)
         self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_MochitestAliasesOnBuilderMaster(self):
@@ -350,7 +381,8 @@ class TestTryParser(unittest.TestCase):
         # should get all unittests too since that's the default set
         tm = 'try: -b od -t all'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES, TALOS_SUITES)
-        self.assertEqual(sorted(self.customBuilders),sorted(VALID_TESTER_NAMES))
+        builders = self.removeNondefaults(VALID_TESTER_NAMES, TESTER_PRETTY_NAMES)
+        self.assertEqual(sorted(self.customBuilders),sorted(builders))
 
     def test_SelecTalos(self):
         tm = 'try: -b od -p win32 -t tp4'

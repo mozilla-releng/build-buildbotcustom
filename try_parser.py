@@ -47,6 +47,11 @@ def expandPlatforms(user_platforms, buildTypes):
         platforms.update([ p + '-debug' for p in user_platforms ])
     return platforms
 
+def basePlatform(platform):
+    '''Platform name without any 'try-nondefault' markers, whether at the
+    beginning or in the middle of the string'''
+    return platform.replace(' try-nondefault', '').replace('try-nondefault ', '')
+
 def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
     '''Return builder names that are found in both prettyNames[p] for some
        (expanded) platform p, and in builderNames'''
@@ -58,13 +63,17 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
         return []
 
     platforms = expandPlatforms(user_platforms, buildTypes)
-    builders = [ prettyNames[p] for p in platforms.intersection(prettyNames) ]
+    builders = [ basePlatform(prettyNames[p])
+                 for p in platforms.intersection(prettyNames) ]
     return list(set(builders).intersection(builderNames))
 
-def passesFilter(testFilters, test, pretty):
+def passesFilter(testFilters, test, pretty, isDefault):
     if test not in testFilters:
-        # No filter requested for test, so accept anything
-        return True
+        # No filter requested for test, so accept all defaults
+        return isDefault
+
+    # If a filter *has* been set, then ignore the try-nondefault flag;
+    # everything is eligible for selection
 
     # filters is a set of inclusion and exclusion rules. Exclusions begin with
     # '-'. To be accepted, a pretty name must match at least one inclusion and
@@ -112,8 +121,9 @@ def getTestBuilders(platforms, testType, tests, testFilters, builderNames, build
                         if not isinstance(pretties, list):
                             pretties = [ pretties ]
                         for pretty in pretties:
-                            custom_builder = "%s %s %s %s %s" % (pretty, buildbotBranch, buildType, testType, test)
-                            if passesFilter(testFilters, test, custom_builder):
+                            base_pretty = basePlatform(pretty)
+                            custom_builder = "%s %s %s %s %s" % (base_pretty, buildbotBranch, buildType, testType, test)
+                            if passesFilter(testFilters, test, custom_builder, base_pretty == pretty):
                                 testBuilders.add(custom_builder)
 
         # we do all but debug win32 over on test masters so have to check the 
@@ -122,17 +132,19 @@ def getTestBuilders(platforms, testType, tests, testFilters, builderNames, build
             assert platform.endswith('-debug')
             for test in tests:
                 pretty = unittestPrettyNames[platform]
-                debug_custom_builder = "%s %s" % (pretty, test)
-                if passesFilter(testFilters, test, debug_custom_builder):
+                base_pretty = basePlatform(pretty)
+                debug_custom_builder = "%s %s" % (base_pretty, test)
+                if passesFilter(testFilters, test, debug_custom_builder, base_pretty == pretty):
                     testBuilders.add(debug_custom_builder)
 
     if testType == "talos":
         for platform in set(platforms).intersection(prettyNames):
             # check whether we do talos for this platform
             for slave_platform in prettyNames[platform]:
+                base_slave_platform = basePlatform(slave_platform)
                 for test in tests:
-                    custom_builder = "%s %s talos %s" % (slave_platform, buildbotBranch, test)
-                    if passesFilter(testFilters, test, custom_builder):
+                    custom_builder = "%s %s talos %s" % (base_slave_platform, buildbotBranch, test)
+                    if passesFilter(testFilters, test, custom_builder, base_slave_platform == slave_platform):
                         testBuilders.add(custom_builder)
 
     return list(testBuilders.intersection(builderNames))
