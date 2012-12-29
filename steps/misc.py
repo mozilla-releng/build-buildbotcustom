@@ -171,7 +171,7 @@ class DownloadFile(ShellCommand):
         assert bool(self.url) ^ bool(self.url_fn), \
                 "One of url_fn or url must be set, not both (%s %s)"
         if wget_args:
-            self.wget_args = wget_args
+            self.wget_args = wget_args[:]
         else:
             self.wget_args = ['--progress=dot:mega']
         self.wget_args += ["--tries=%d" % self.retries, "--waitretry=%d" % self.waitRetry]
