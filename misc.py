@@ -673,7 +673,8 @@ def generateBranchObjects(config, name, secrets=None):
     weeklyBuilders = []
     coverageBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
-    PRETTY_NAME = '%s build'
+    PRETTY_NAME = '%(basename)s %(trystatus)sbuild'
+    NAME = '%(basename)s build'
     prettyNames = {}
     unittestPrettyNames = {}
     unittestSuites = []
@@ -702,7 +703,6 @@ def generateBranchObjects(config, name, secrets=None):
     for platform in enabled_platforms:
         pf = config['platforms'][platform]
         base_name = pf['base_name']
-        pretty_name = PRETTY_NAME % base_name
 
         # short-circuit the extra logic below for debug, l10n, pgo and nightly
         # builds these aren't required (yet) for mozharness builds
@@ -718,9 +718,15 @@ def generateBranchObjects(config, name, secrets=None):
                 nightlyBuilders.append(buildername)
             continue
 
+        values = { 'basename': base_name,
+                   'trystatus': '' if pf.get('try-by-default', True) else 'try-nondefault ',
+                   }
+        pretty_name = PRETTY_NAME % values
+        name = NAME % values
+
         if platform.endswith("-debug"):
-            builders.append(pretty_name)
-            buildersByProduct.setdefault(pf['stage_product'], []).append(pretty_name)
+            builders.append(name)
+            buildersByProduct.setdefault(pf['stage_product'], []).append(name)
             prettyNames[platform] = pretty_name
             # Debug unittests
             if pf.get('enable_unittests'):
@@ -738,8 +744,8 @@ def generateBranchObjects(config, name, secrets=None):
             if not pf.has_key('enable_nightly'):
                 continue
         elif pf.get('enable_dep', True):
-            builders.append(pretty_name)
-            buildersByProduct.setdefault(pf['stage_product'], []).append(pretty_name)
+            builders.append(name)
+            buildersByProduct.setdefault(pf['stage_product'], []).append(name)
             prettyNames[platform] = pretty_name
 
         # Fill the l10n dep dict
@@ -1906,13 +1912,22 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             talos_builders = {}
             talos_pgo_builders = {}
 
+            try_default = True
+            if not branch_config['platforms'][platform].get('try-by-default', True):
+                try_default = False
+            elif not platform_config.get('try-by-default', True):
+                try_default = False
+
             for slave_platform in slave_platforms:
                 platform_name = platform_config[slave_platform]['name']
                 # this is to handle how a platform has more than one slave platform
-                if prettyNames.has_key(platform):
-                    prettyNames[platform].append(platform_name)
-                else:
-                    prettyNames[platform] = [platform_name]
+                slave_platform_try_default = try_default
+                if not platform_config[slave_platform].get('try-by-default', True):
+                    slave_platform_try_default = False
+                platformPrettyName = platform_name
+                if not slave_platform_try_default:
+                    platformPrettyName += ' try-nondefault'
+                prettyNames.setdefault(platform, []).append(platformPrettyName)
                 for suite, talosConfig in SUITES.items():
                     tests, merge, extra, platforms = branch_config['%s_tests' % suite]
                     if tests == 0 or slave_platform not in platforms:
@@ -2443,7 +2458,8 @@ def generateNanojitObjects(config, SLAVES):
 
 def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
-    branch = os.path.basename(config['repo_path'])
+    branch = config['branch']
+    bconfig = config['branchconfig']
 
     PRETTY_NAME = '%s %s-%s build'
     prettyNames = {}
@@ -2468,9 +2484,9 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             factory_kwargs['env'] = env
 
             extra_args = [ '-r', WithProperties("%(revision)s") ]
-            for url in config['branchconfig']['base_mirror_urls']:
+            for url in bconfig['base_mirror_urls']:
                 extra_args += [ '-m', "%s/%s" % (url, config['repo_path']) ]
-            for url in config['branchconfig']['base_bundle_urls']:
+            for url in bconfig['base_bundle_urls']:
                 extra_args += [ '-b', "%s/%s.hg" % (url, config['repo_path']) ]
             extra_args += [variant]
 
@@ -2489,9 +2505,12 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             base_name = pf['base_name'] % config
 
             prettyName = PRETTY_NAME % (base_name, project, variant)
+            name = prettyName
+            if not config.get('try-by-default', True):
+                prettyName += ' try-nondefault'
             prettyNames[platform] = prettyName
 
-            builder = {'name': prettyName,
+            builder = {'name': name,
                     'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                     'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
                     'slavenames': pf['slaves'],
@@ -2502,6 +2521,8 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                     'properties': {'branch': branch, 'platform': platform, 'product': 'spidermonkey'},
                     }
             builders.append(builder)
+            if not bconfig.get('enable_merging', True):
+                nomergeBuilders.append(name)
 
     def isImportant(change):
         if not shouldBuild(change):
