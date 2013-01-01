@@ -4866,7 +4866,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                   symbols_path=symbols_path,
                   maxTime=120*60, # Two Hours
                  ))
-            elif suite in ('reftest', 'reftestsmall' 'reftest-ipc', 'reftest-d2d', 'crashtest', \
+            elif suite in ('reftest', 'reftestsmall', 'reftest-ipc', 'reftest-d2d', 'crashtest', \
                            'crashtest-ipc', 'direct3D', 'opengl', 'opengl-no-accel', \
                            'reftest-no-d2d-d3d'):
                 if suite in ('direct3D', 'opengl'):
