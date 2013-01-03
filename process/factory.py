@@ -4164,7 +4164,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         if self.useBetaChannelForRelease:
             bumpCommand.append('-u')
         if self.releaseNotesUrl:
-            bumpCommand.extend(['-n', self.releaseNotesUrl])
+            rnurl = self.releaseNotesUrl
+            if self.use_mock:
+                rnurl = self.releaseNotesUrl.replace('%', '%%')
+            bumpCommand.extend(['-n', rnurl])
         if self.schema:
             bumpCommand.extend(['-s', str(self.schema)])
         bump_env = self.env.copy()
