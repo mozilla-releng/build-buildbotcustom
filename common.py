@@ -90,6 +90,7 @@ def reallyShort(name, product=None):
         'private-browsing': 'pb',
         'gecko': 'g',
         'localizer': 'lz',
+        'esr': 'e',
     }
     hyphen_seperated_words = name.split('-')
     words = []
