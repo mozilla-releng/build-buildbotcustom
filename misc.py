@@ -1965,7 +1965,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             assert 'linux' in platform, "buildbotcustom.misc: mozharness talos: unknown platform %s!" % platform
                             extra_args.extend(['--cfg', 'talos/linux_config.py'])
                         if factory_kwargs['fetchSymbols']:
-                            extra_args.append('--download-symbols')
+                            extra_args += ['--download-symbols', 'ondemand']
                         if factory_kwargs["talos_from_source_code"]:
                             extra_args.append('--use-talos-json')
                         factory = generateMozharnessTalosBuilder(
