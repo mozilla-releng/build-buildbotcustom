@@ -13,6 +13,7 @@ from copy import deepcopy
 from twisted.python import log
 
 from buildbot.scheduler import Nightly, Scheduler, Triggerable
+from buildbot.schedulers.filter import ChangeFilter
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import WARNINGS, FAILURE, EXCEPTION, RETRY
@@ -1965,7 +1966,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             assert 'linux' in platform, "buildbotcustom.misc: mozharness talos: unknown platform %s!" % platform
                             extra_args.extend(['--cfg', 'talos/linux_config.py'])
                         if factory_kwargs['fetchSymbols']:
-                            extra_args.append('--download-symbols')
+                            extra_args += ['--download-symbols', 'ondemand']
                         if factory_kwargs["talos_from_source_code"]:
                             extra_args.append('--use-talos-json')
                         factory = generateMozharnessTalosBuilder(
@@ -2526,10 +2527,10 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
 
     scheduler = scheduler_class(
             name="%s_spidermonkey" % branch,
-            branch=config['repo_path'],
             treeStableTimer=None,
             builderNames=[b['name'] for b in builders],
             fileIsImportant=isImportant,
+            change_filter=ChangeFilter(branch=config['repo_path'], filter_fn=isImportant),
             **extra_args
             )
 
