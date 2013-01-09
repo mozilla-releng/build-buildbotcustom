@@ -2444,7 +2444,9 @@ def generateNanojitObjects(config, SLAVES):
 
 def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
-    branch = os.path.basename(config['repo_path'])
+    branch = config['branch']
+    assert branch == os.path.basename(config['repo_path']), "spidermonkey project object has mismatched branch and repo_path"
+    bconfig = config['branchconfig']
 
     PRETTY_NAME = '%s %s-%s build'
     prettyNames = {}
