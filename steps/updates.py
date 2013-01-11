@@ -66,7 +66,7 @@ class CreateUpdateSnippet(BuildStep):
         downloadURL += self.getProperty(self.snippetType + 'MarFilename')
 
         # type of update (partial vs complete)
-        snippet = "version=1\n"
+        snippet = "version=2\n"
         snippet += "type=%s\n" % self.snippetType
         # download URL
         snippet += "url=%s\n" % (downloadURL)
@@ -78,10 +78,12 @@ class CreateUpdateSnippet(BuildStep):
         snippet += "size=%s\n" % self.getProperty(self.snippetType + 'MarSize')
         # buildid
         snippet += "build=%s\n" % self.getProperty('buildid') # double check case
-        # app version
-        snippet += "appv=%s\n" % self.getProperty('appVersion')
-        # extension version (same as app version)
-        snippet += "extv=%s\n" % self.getProperty('appVersion')
+        # version in user interface
+        snippet += "displayVersion=%s\n" % self.getProperty('appVersion')
+        # actual version of application
+        snippet += "appVersion=%s\n" % self.getProperty('appVersion')
+        # toolkit version
+        snippet += "platformVersion=%s\n" % self.getProperty('appVersion')
         return StringIO(snippet)
 
     def start(self):
