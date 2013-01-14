@@ -105,8 +105,8 @@ class MozillaRunPerfTests(ShellCommand):
         stdioText = cmd.logs['stdio'].getText()
         # Override the result for non-harness/infra failures, so they are shown as
         # orange (WARNINGS) rather than red (FAILURE) on TBPL
-        if FAILURE == superResult and
-           (None != re.search('PROCESS-CRASH', stdioText) or
+        if FAILURE == superResult and \
+            (None != re.search('PROCESS-CRASH', stdioText) or
             None != re.search('TEST-UNEXPECTED-FAIL', stdioText)):
             return WARNINGS
         if SUCCESS != superResult:
