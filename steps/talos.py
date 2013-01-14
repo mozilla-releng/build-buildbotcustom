@@ -103,11 +103,18 @@ class MozillaRunPerfTests(ShellCommand):
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
         stdioText = cmd.logs['stdio'].getText()
+        # Override the result for non-harness/infra failures, so they are shown as
+        # orange (WARNINGS) rather than red (FAILURE) on TBPL
+        if FAILURE == superResult and
+           (None != re.search('PROCESS-CRASH', stdioText) or
+            None != re.search('TEST-UNEXPECTED-FAIL', stdioText)):
+            return WARNINGS
         if SUCCESS != superResult:
             return superResult
+        # In case there were error/fail lines even with a zero return value
+        # TODO: We should fix up all failure modes in Talos to exit non-zero
+        # so we don't need these
         if None != re.search('ERROR', stdioText):
-            return FAILURE
-        if None != re.search('USAGE:', stdioText):
             return FAILURE
         if None != re.search('FAIL:', stdioText):
             return WARNINGS
