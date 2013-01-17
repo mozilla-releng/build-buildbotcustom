@@ -1374,14 +1374,17 @@ def generateBranchObjects(config, name, secrets=None):
                     builderName = "%s l10n nightly %s/%s" % \
                         (pf['base_name'], n, pf['l10n_chunks'])
                     mobile_l10n_builders.append(builderName)
-                    factory = ScriptFactory(
+                    extra_args = ['--cfg',
+                                  'single_locale/%s_%s.py' % (name, platform),
+                                  '--total-chunks', str(pf['l10n_chunks']),
+                                  '--this-chunk', str(n)]
+                    signing_servers = secrets.get(pf.get('nightly_signing_servers'))
+                    factory = SigningScriptFactory(
+                        signingServers=signing_servers,
                         scriptRepo='%s%s' % (config['hgurl'],
                                              config['mozharness_repo_path']),
                         scriptName='scripts/mobile_l10n.py',
-                        extra_args=['--cfg',
-                                    'single_locale/%s_%s.py' % (name, platform),
-                                    '--total-chunks', str(pf['l10n_chunks']),
-                                    '--this-chunk', str(n)]
+                        extra_args=extra_args
                     )
                     slavebuilddir = reallyShort(builddir, pf['stage_product'])
                     branchObjects['builders'].append({
