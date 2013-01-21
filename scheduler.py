@@ -130,7 +130,7 @@ class PersistentScheduler(BaseScheduler):
         return now() + self.pollInterval
 
 class BuilderChooserScheduler(MultiScheduler):
-    compare_attrs = MultiScheduler.compare_attrs + ('chooserFunc', 'prettyNames', 
+    compare_attrs = MultiScheduler.compare_attrs + ('chooserFunc', 'prettyNames',
                      'unittestPrettyNames', 'unittestSuites', 'talosSuites', 'buildbotBranch')
     def __init__(self, chooserFunc, prettyNames=None, unittestPrettyNames=None, unittestSuites=None,
                  talosSuites=None, buildbotBranch=None, **kwargs):
@@ -353,19 +353,22 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
     (SUCCESS,WARNINGS)."""
 
     compare_attrs = ('name', 'branch', 'builderNames', 'properties',
-                     'upstreamBuilders', 'okResults')
+                     'upstreamBuilders', 'okResults', 'enable_service')
 
     def __init__(self, name, branch, builderNames, upstreamBuilders,
-                 okResults=(SUCCESS,WARNINGS), properties={}):
+                 okResults=(SUCCESS, WARNINGS), properties={}):
         BaseScheduler.__init__(self, name, builderNames, properties)
         self.branch = branch
         self.lock = defer.DeferredLock()
         assert isinstance(upstreamBuilders, (list, tuple))
         self.upstreamBuilders = upstreamBuilders
-        self.reason = "AccumulatingScheduler(%s)" % name
+        self.reason = "AggregatingScheduler(%s)" % name
         self.okResults = okResults
         self.log_prefix = '%s(%s) <id=%s>' % (self.__class__.__name__, name,
                                               id(self))
+
+        # Set this to False to disable the service component of this scheduler
+        self.enable_service = True
 
     def get_initial_state(self, max_changeid):
         log.msg('%s: get_initial_state()' % self.log_prefix)
@@ -379,6 +382,8 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                 }
 
     def startService(self):
+        if not self.enable_service:
+            return
         self.parent.db.runInteractionNow(self._startService)
         BaseScheduler.startService(self)
 
@@ -418,6 +423,9 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         self.set_state(t, state)
 
     def run(self):
+        if not self.enable_service:
+            return
+
         if self.lock.locked:
             return
 
