@@ -793,7 +793,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             for n, builderName in l10nBuilders(platform).iteritems():
                 if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
-                    repack_factory = ScriptFactory(
+                    repack_factory = SigningScriptFactory(
+                        signingServers=getSigningServers(platform),
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/mobile_l10n.py',
                         extra_args=extra_args,
