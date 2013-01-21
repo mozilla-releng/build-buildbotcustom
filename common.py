@@ -85,6 +85,7 @@ def reallyShort(name, product=None):
         'snowleopard': 'snow',
         'fedora': 'fed',
         'fedora64': 'fed64',
+        'ubuntu64': 'ub64',
         'repack': 'rpk',
         'alder': 'a',
         'holly': 'h',
