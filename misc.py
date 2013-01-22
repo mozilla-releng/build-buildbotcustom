@@ -1374,6 +1374,7 @@ def generateBranchObjects(config, name, secrets=None):
             # other than PGO
             if config['pgo_strategy'] in ('periodic', 'try') and platform in config['pgo_platforms']:
                 pgo_kwargs = factory_kwargs.copy()
+                pgo_kwargs["doPostLinkerSize"] = pf.get('enable_post_linker_size', False)
                 pgo_kwargs['profiledBuild'] = True
                 pgo_kwargs['stagePlatform'] += '-pgo'
                 pgo_kwargs['unittestBranch'] = pgoUnittestBranch
