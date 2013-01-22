@@ -1,6 +1,7 @@
 import re
 import os.path
 
+
 def buildTryChangeMessage(change, packageDir):
     got_revision = revision = change.revision[:12]
     who = change.who
@@ -25,5 +26,3 @@ Once completed, builds and logs will be available at:
 """ % locals()
 
     return msgdict
-
-

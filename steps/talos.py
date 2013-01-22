@@ -1,17 +1,21 @@
-import re, os, time, copy
+import re
+import os
+import time
+import copy
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, EXCEPTION, worst_status
 
 from buildbotcustom.steps.base import ShellCommand
+
 
 class MozillaUpdateConfig(ShellCommand):
     """Configure YAML file for run_tests.py"""
     name = "Update config"
 
     def __init__(self, branch, branchName, executablePath,
-            addOptions=None, useSymbols=False,
-            remoteTests=False, extName=None, remoteExtras=None,
-            remoteProcessName=None, **kwargs):
+                 addOptions=None, useSymbols=False,
+                 remoteTests=False, extName=None, remoteExtras=None,
+                 remoteProcessName=None, **kwargs):
 
         if addOptions is None:
             self.addOptions = []
@@ -37,18 +41,19 @@ class MozillaUpdateConfig(ShellCommand):
         self.super_class.__init__(self, **kwargs)
 
         self.addFactoryArguments(branch=branch, addOptions=addOptions,
-                branchName=branchName, executablePath=executablePath,
-                remoteTests=remoteTests, useSymbols=useSymbols,
-                extName=extName,
-                remoteExtras=self.remoteExtras,
-                remoteProcessName=remoteProcessName)
+                                 branchName=branchName, executablePath=executablePath,
+                                 remoteTests=remoteTests, useSymbols=useSymbols,
+                                 extName=extName,
+                                 remoteExtras=self.remoteExtras,
+                                 remoteProcessName=remoteProcessName)
 
     def setBuild(self, build):
         self.super_class.setBuild(self, build)
         title = build.slavename
 
         try:
-            self.addOptions += self.getProperty('configurationOptions').split(',')
+            self.addOptions += self.getProperty(
+                'configurationOptions').split(',')
         # Property doesn't exist, that's fine
         except KeyError:
             pass
@@ -59,14 +64,15 @@ class MozillaUpdateConfig(ShellCommand):
         if self.remoteTests:
             exePath = self.remoteProcessName
             perfconfigurator = "remotePerfConfigurator.py"
-            self.addOptions += ['--remoteDevice', WithProperties('%(sut_ip)s'), ]
+            self.addOptions += ['--remoteDevice',
+                                WithProperties('%(sut_ip)s'), ]
             self.addOptions += self.remoteOptions
         else:
             exePath = self.exePath
             perfconfigurator = "PerfConfigurator.py"
 
         self.setCommand(["python", perfconfigurator, "-v", "-e", exePath,
-            "-t", title, '--branchName', self.branchName] + self.addOptions)
+                         "-t", title, '--branchName', self.branchName] + self.addOptions)
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
@@ -84,9 +90,11 @@ class MozillaUpdateConfig(ShellCommand):
             self.setProperty("configFile", configFileMatch.group(1))
         return SUCCESS
 
+
 class MozillaRunPerfTests(ShellCommand):
     """Run the performance tests"""
     name = "Run performance tests"
+
     def __init__(self, **kwargs):
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
@@ -107,7 +115,7 @@ class MozillaRunPerfTests(ShellCommand):
         # orange (WARNINGS) rather than red (FAILURE) on TBPL
         if FAILURE == superResult and \
             (None != re.search('PROCESS-CRASH', stdioText) or
-            None != re.search('TEST-UNEXPECTED-FAIL', stdioText)):
+             None != re.search('TEST-UNEXPECTED-FAIL', stdioText)):
             return WARNINGS
         if SUCCESS != superResult:
             return superResult

@@ -5,11 +5,13 @@ from twisted.python import log as twlog
 from buildbot.status import base
 from buildbot.util import json
 
+
 class QueuedCommandHandler(base.StatusReceiverMultiService):
     """
     Runs a command when a build finishes
     """
     compare_attrs = ['command', 'categories', 'builders']
+
     def __init__(self, command, queuedir, categories=None, builders=None):
         base.StatusReceiverMultiService.__init__(self)
 
@@ -42,7 +44,7 @@ class QueuedCommandHandler(base.StatusReceiverMultiService):
             return None
 
         self.watched.append(builder)
-        return self # subscribe to this builder
+        return self  # subscribe to this builder
 
     def buildStarted(self, builderName, build):
         pass
@@ -50,10 +52,10 @@ class QueuedCommandHandler(base.StatusReceiverMultiService):
     def buildFinished(self, builderName, build, results):
         builder = build.getBuilder()
         if self.builders is not None and builderName not in self.builders:
-            return # ignore this build
+            return  # ignore this build
         if self.categories is not None and \
-               builder.category not in self.categories:
-            return # ignore this build
+                builder.category not in self.categories:
+            return  # ignore this build
 
         core_builder = self.master_status.botmaster.builders[builderName]
         core_build = core_builder.getBuild(build.number)
@@ -65,12 +67,14 @@ class QueuedCommandHandler(base.StatusReceiverMultiService):
 
         cmd = build.getProperties().render(cmd)
         cmd.extend(["--master-name", self.master_status.botmaster.master_name])
-        cmd.extend(["--master-incarnation", self.master_status.botmaster.master_incarnation])
+        cmd.extend(["--master-incarnation",
+                   self.master_status.botmaster.master_incarnation])
 
         # Cap to the first 100 requests
         # If we have more than that....too bad
         requests = [str(r.id) for r in core_build.requests][:100]
         cmd.extend([
-               os.path.join(self.master_status.basedir, builder.basedir, str(build.number)),
-               ] + requests)
+                   os.path.join(self.master_status.basedir,
+                                builder.basedir, str(build.number)),
+                   ] + requests)
         self.queuedir.add(json.dumps(cmd))

@@ -29,9 +29,9 @@ import buildbotcustom.steps.test
 
 
 class MockCommand(ShellCommand):
-    #Note: this class doesn't deal with all WithProperties invocations.
-    #in particular, it only deals with the WithProperties('format string')
-    #case
+    # Note: this class doesn't deal with all WithProperties invocations.
+    # in particular, it only deals with the WithProperties('format string')
+    # case
     # Things to address:
     #   -what happens if the workdir doesn't exist?
     #     -only issue if this is the first command called in a build
@@ -62,10 +62,10 @@ class MockCommand(ShellCommand):
         )
 
     def set_mock_command(self):
-        #This variable is used to decide whether to wrap the
+        # This variable is used to decide whether to wrap the
 
-        #We need to have all commands as a string.  We'll
-        #convert argv commands into string commands
+        # We need to have all commands as a string.  We'll
+        # convert argv commands into string commands
         if isinstance(self.command, list):
             string_list = []
             for arg in self.command:
@@ -80,8 +80,8 @@ class MockCommand(ShellCommand):
             string_command = self.command
         mock_workdir = self.mock_workdir_mutator(self.remote_kwargs['workdir'])
 
-        #If the workdir is a WithProperties instance, we need to get the format
-        #string and wrap it in another WithProperties
+        # If the workdir is a WithProperties instance, we need to get the format
+        # string and wrap it in another WithProperties
         if issubclass(mock_workdir.__class__, WithProperties):
             mock_workdir = mock_workdir.fmtstring
         if self.mock_workdir_prefix is not None:
@@ -91,8 +91,8 @@ class MockCommand(ShellCommand):
             pre_render_env = self.remote_kwargs['env']
             properties = self.build.getProperties()
             rendered_env = properties.render(pre_render_env)
-            environment = ' '.join('%s="%s"' % (k, rendered_env[k]) \
-                                    for k in rendered_env.keys())
+            environment = ' '.join('%s="%s"' % (k, rendered_env[k])
+                                   for k in rendered_env.keys())
         else:
             environment = ''
 
@@ -119,7 +119,7 @@ class MockProperty(MockCommand):
         self.strip = strip
 
         assert (property is not None) ^ (extract_fn is not None), \
-                "Exactly one of property and extract_fn must be set"
+            "Exactly one of property and extract_fn must be set"
 
         self.super_class = MockCommand
         self.super_class.__init__(self, **kwargs)
@@ -142,8 +142,9 @@ class MockProperty(MockCommand):
         else:
             log = cmd.logs['stdio']
             new_props = self.extract_fn(cmd.rc,
-                    ''.join(log.getChunks([STDOUT], onlyText=True)),
-                    ''.join(log.getChunks([STDERR], onlyText=True)))
+                                        ''.join(log.getChunks(
+                                                [STDOUT], onlyText=True)),
+                                        ''.join(log.getChunks([STDERR], onlyText=True)))
             for k, v in new_props.items():
                 self.setProperty(k, v, "MockProperty Step")
             self.property_changes = new_props
@@ -242,8 +243,8 @@ def addMockCommand(obj):
                 return
             self.properties_rendered = True
 
-            #We need to have all commands as a string.  We'll
-            #convert argv commands into string commands
+            # We need to have all commands as a string.  We'll
+            # convert argv commands into string commands
             if isinstance(self.command, list):
                 string_list = []
                 for arg in self.command:
@@ -270,8 +271,8 @@ def addMockCommand(obj):
                 pre_render_env = self.remote_kwargs['env']
                 properties = self.build.getProperties()
                 rendered_env = properties.render(pre_render_env)
-                environment = ' '.join('%s="%s"' % (k, rendered_env[k]) \
-                                        for k in rendered_env.keys())
+                environment = ' '.join('%s="%s"' % (k, rendered_env[k])
+                                       for k in rendered_env.keys())
             else:
                 environment = ''
 

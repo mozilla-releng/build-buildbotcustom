@@ -5,6 +5,7 @@ from buildbot.status.builder import SKIPPED
 from buildbot.steps.shell import ShellCommand, Compile
 from buildbot.steps.source import Mercurial
 
+
 class SetLocalesStep(BuildStep):
     """Dummy step to set the "locales" build property"""
 
@@ -19,6 +20,7 @@ class SetLocalesStep(BuildStep):
 
     def start(self):
         return SKIPPED
+
 
 class LocaleCompile(Compile):
     """Subclass of Compile step for localized builds."""
@@ -42,6 +44,7 @@ class LocaleCompile(Compile):
 
     def commandComplete(self, cmd):
         self.step_status.locale = self.locale
+
 
 class NonLocaleMercurial(Mercurial):
     """Subclass of Mercurial pull step for the main tree of a l10n build."""
@@ -67,6 +70,7 @@ class NonLocaleMercurial(Mercurial):
                 return change.revision
 
         return None
+
 
 class LocaleMercurial(Mercurial):
     """Subclass of Mercurial pull step for localized pulls."""
@@ -111,11 +115,12 @@ class LocaleMercurial(Mercurial):
         self.step_status.locale = self.locale
         Mercurial.commandComplete(self, cmd)
 
+
 def getLocalesForRequests(requests):
     """Return a list of locales to build from a list of build requests.
 
     The list of locales is obtained from various sources:
-    * TriggerLocalesStep (from the main Mozilla build) sets .allLocales on the 
+    * TriggerLocalesStep (from the main Mozilla build) sets .allLocales on the
       source stamp from the all-locales file in the main build.
     * When triggered from L10nPeriodic the locales to build are taken from the
       changes (for one more more locales) themselves.
@@ -136,6 +141,7 @@ def getLocalesForRequests(requests):
                 found[locale] = 1
 
     return found.keys()
+
 
 class RepackFactory(buildbot.util.ComparableMixin):
     buildClass = Build
@@ -167,7 +173,7 @@ class RepackFactory(buildbot.util.ComparableMixin):
         @param extraConfigureArgs: any extra configure arguments specific to
                                this build
         """
-        
+
         self.mainRepoURL = mainRepoURL
         self.localesRepoURL = localesRepoURL
         self.repackLocation = repackLocation
@@ -191,12 +197,13 @@ class RepackFactory(buildbot.util.ComparableMixin):
                                       haltOnFailure=True))
             steps.append(ShellCommand(command=['rm', '-rf', 'obj'],
                                       flunkOnFailure=False))
-            steps.append(ShellCommand(command=['mkdir', '-p', 'l10n', 'obj/dist'],
-                                      flunkOnFailure=False))
+            steps.append(
+                ShellCommand(command=['mkdir', '-p', 'l10n', 'obj/dist'],
+                             flunkOnFailure=False))
 
             configureArgs = ['../configure', '--enable-application=browser',
-                                          '--disable-compile-environment',
-                                          '--with-l10n-base=../l10n']
+                             '--disable-compile-environment',
+                             '--with-l10n-base=../l10n']
             configureArgs.extend(self.extraConfigureArgs)
 
             steps.append(Compile(command=configureArgs,

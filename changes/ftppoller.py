@@ -8,13 +8,14 @@ from twisted.web.client import getPage
 from buildbot.changes import base, changes
 from buildbotcustom.l10n import ParseLocalesFile
 
+
 class FtpPollerBase(base.ChangeSource):
     """This source will poll an ftp directory searching for a specific file and when found
     trigger a change to the change master."""
 
     compare_attrs = ["ftpURLs", "pollInterval", "branch"]
 
-    parent = None # filled in when we're added
+    parent = None  # filled in when we're added
     loop = None
     volatile = ['loop']
     working = 0
@@ -72,11 +73,11 @@ class FtpPollerBase(base.ChangeSource):
 
     def _process_changes(self, pageContents, url):
         if self.parseContents(pageContents):
-            c = changes.Change(who = url,
-                           comments = "success",
-                           files = [],
-                           properties={'who': url},
-                           branch = self.branch)
+            c = changes.Change(who=url,
+                               comments="success",
+                               files=[],
+                               properties={'who': url},
+                               branch=self.branch)
             self.parent.addChange(c)
 
 
@@ -99,7 +100,8 @@ class FtpPoller(FtpPollerBase):
     def parseContents(self, pageContents):
         """ Check through lines to see if file exists """
         # scenario 1:
-        # buildbot restarts or file already exists, so we don't want to trigger anything
+        # buildbot restarts or file already exists, so we don't want to trigger
+        # anything
         if self.gotFile == 1:
             if re.search(self.searchString, pageContents):
                 self.stopService()
@@ -151,7 +153,8 @@ class LocalesFtpPoller(FtpPollerBase):
         """Poll the ftp page with the given url. Return the page as a string
            along with the list of locales from the previous callback"""
         d = self._get_page(url)
-        d.addCallback(lambda result: {'pageContents': result, 'locales': locales})
+        d.addCallback(
+            lambda result: {'pageContents': result, 'locales': locales})
         return d
 
     def poll(self):
@@ -174,18 +177,19 @@ class LocalesFtpPoller(FtpPollerBase):
         parsedLocales = ParseLocalesFile(pageContents)
         return [re.compile(re.escape("%s/" % l)) for l in parsedLocales if len(parsedLocales[l]) == 0 or self.sl_platform_map[self.platform] in parsedLocales[l]]
 
-
     def searchAllStrings(self, pageContents, locales):
         """match the ftp page against the locales list"""
         req_matches = len(locales)
-        #count number of strings with at least one positive match
-        matches = sum([1 for regex in locales if re.search(regex, pageContents)])
+        # count number of strings with at least one positive match
+        matches = sum(
+            [1 for regex in locales if re.search(regex, pageContents)])
         return matches == req_matches
 
     def parseContents(self, pageContents, locales):
         """ Check through lines to see if file exists """
         # scenario 1:
-        # buildbot restarts or all files already exist, so we don't want to trigger anything
+        # buildbot restarts or all files already exist, so we don't want to
+        # trigger anything
         if self.gotAllFiles:
             if self.searchAllStrings(pageContents, locales):
                 self.stopService()
@@ -207,13 +211,14 @@ class LocalesFtpPoller(FtpPollerBase):
         pageContents = results['pageContents']
         locales = results['locales']
         if self.parseContents(pageContents, locales):
-            c = changes.Change(who = url,
-                           comments = "success",
-                           files = [],
-                           branch = self.branch)
+            c = changes.Change(who=url,
+                               comments="success",
+                               files=[],
+                               branch=self.branch)
             self.parent.addChange(c)
-        #return the locales list for the next ftp poller in the callback chain
+        # return the locales list for the next ftp poller in the callback chain
         return locales
+
 
 class UrlPoller(FtpPollerBase):
     compare_attrs = FtpPollerBase.compare_attrs + ['url']
@@ -225,7 +230,7 @@ class UrlPoller(FtpPollerBase):
 
     def poll(self):
         if self.working > 0:
-            log.msg("Not polling UrlPoller because last poll is still working (%s)" \
+            log.msg("Not polling UrlPoller because last poll is still working (%s)"
                     % self.working)
         else:
             self.working = self.working + 1

@@ -7,7 +7,9 @@ except:
 import collections
 import random
 import re
-import sys, os, time
+import sys
+import os
+import time
 from copy import deepcopy
 
 from twisted.python import log
@@ -62,6 +64,7 @@ from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
 
+
 def get_l10n_repositories(file, l10nRepoPath, relbranch):
     """Reads in a list of locale names and revisions for their associated
        repository from 'file'.
@@ -72,7 +75,7 @@ def get_l10n_repositories(file, l10nRepoPath, relbranch):
     for localeLine in open(file).readlines():
         locale, revision = localeLine.rstrip().split()
         if revision == 'FIXME':
-            raise Exception('Found FIXME in %s for locale "%s"' % \
+            raise Exception('Found FIXME in %s for locale "%s"' %
                            (file, locale))
         locale = urljoin(l10nRepoPath, locale)
         repositories[locale] = {
@@ -82,6 +85,7 @@ def get_l10n_repositories(file, l10nRepoPath, relbranch):
         }
 
     return repositories
+
 
 def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
     if not l10nRepoPath.endswith('/'):
@@ -95,7 +99,7 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
     for locale in localesJson.keys():
         revision = localesJson[locale]['revision']
         if revision == 'FIXME':
-            raise Exception('Found FIXME in %s for locale "%s"' % \
+            raise Exception('Found FIXME in %s for locale "%s"' %
                            (jsonFile, locale))
         localeUrl = urljoin(l10nRepoPath, locale)
         l10nRepositories[localeUrl] = {
@@ -104,7 +108,8 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
             'bumpFiles': []
         }
         for platform in localesJson[locale]['platforms']:
-            platformLocales[platform][locale] = localesJson[locale]['platforms']
+            platformLocales[platform][locale] = localesJson[
+                locale]['platforms']
 
     return (l10nRepositories, platformLocales)
 
@@ -112,6 +117,8 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
 # dep/nightlies and release builds. Because they build the same "branch" this
 # allows us to have the release builder ignore HgPoller triggered changse
 # and the dep builders only obey HgPoller/Force Build triggered ones.
+
+
 def isHgPollerTriggered(change, hgUrl):
     if (change.revlink and hgUrl in change.revlink) or \
             change.comments.find(hgUrl) > -1:
@@ -146,6 +153,8 @@ _product_excludes = {
         re.compile("^suite/")
     ],
 }
+
+
 def isImportantForProduct(change, product):
     """Handles product specific handling of important files"""
     # For each file, check each product's exclude list
@@ -157,11 +166,13 @@ def isImportantForProduct(change, product):
     for f in change.files:
         excluded = any(e.search(f) for e in excludes)
         if not excluded:
-            log.msg("%s important for %s because of %s" % (change.revision, product, f))
+            log.msg("%s important for %s because of %s" % (
+                change.revision, product, f))
             return True
 
     # Everything was excluded
-    log.msg("%s not important for %s because all files were excluded" % (change.revision, product))
+    log.msg("%s not important for %s because all files were excluded" %
+            (change.revision, product))
     return False
 
 
@@ -177,6 +188,7 @@ def makeImportantFunc(hgurl, product):
         return isImportantForProduct(c, product)
     return isImportant
 
+
 def isImportantL10nFile(change, l10nModules):
     for f in change.files:
         for basepath in l10nModules:
@@ -184,12 +196,14 @@ def isImportantL10nFile(change, l10nModules):
                 return True
     return False
 
+
 def changeContainsProduct(change, productName):
     products = change.properties.getProperty("products")
     if isinstance(products, basestring) and \
-        productName in products.split(','):
+            productName in products.split(','):
             return True
     return False
+
 
 def changeContainsProperties(change, props={}):
     for prop, value in props.iteritems():
@@ -197,13 +211,14 @@ def changeContainsProperties(change, props={}):
             return False
     return True
 
+
 def generateTestBuilderNames(name_prefix, suites_name, suites):
     test_builders = []
     if isinstance(suites, dict) and "totalChunks" in suites:
         totalChunks = suites['totalChunks']
         for i in range(totalChunks):
-            test_builders.append('%s %s-%i' % \
-                    (name_prefix, suites_name, i+1))
+            test_builders.append('%s %s-%i' %
+                                (name_prefix, suites_name, i + 1))
     else:
         test_builders.append('%s %s' % (name_prefix, suites_name))
 
@@ -211,6 +226,7 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
 
 fastRegexes = []
 nReservedSlaves = 0
+
 
 def _partitionSlaves(slaves):
     """Partitions the list of slaves into 'fast' and 'slow' slaves, according
@@ -228,6 +244,7 @@ def _partitionSlaves(slaves):
             slow.append(s)
     return fast, slow
 
+
 def _partitionUnreservedSlaves(slaves):
     fast, slow = _partitionSlaves(slaves)
     fast = fast[nReservedSlaves:]
@@ -237,9 +254,10 @@ def _partitionUnreservedSlaves(slaves):
     # and reserved_slow will be > 0
     # If nReservedSlaves <= len(fast), then we have enough fast slaves, and
     # reserved_slow will be 0
-    reserved_slow = max(0, nReservedSlaves-reserved_fast)
+    reserved_slow = max(0, nReservedSlaves - reserved_fast)
     slow = slow[reserved_slow:]
     return fast, slow
+
 
 def _readReservedFile(filename):
     if not filename or not os.path.exists(filename):
@@ -262,8 +280,10 @@ def _readReservedFile(filename):
 
     global nReservedSlaves
     if n != nReservedSlaves:
-        log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n, nReservedSlaves))
+        log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n,
+                nReservedSlaves))
         nReservedSlaves = n
+
 
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so
@@ -281,12 +301,14 @@ def _getLastTimeOnBuilder(builder, slavename):
             continue
     return None
 
+
 def _recentSort(builder):
     def sortfunc(s1, s2):
         t1 = _getLastTimeOnBuilder(builder, s1.slave.slavename)
         t2 = _getLastTimeOnBuilder(builder, s2.slave.slavename)
         return cmp(t1, t2)
     return sortfunc
+
 
 def _nextSlowSlave(builder, available_slaves):
     try:
@@ -304,6 +326,7 @@ def _nextSlowSlave(builder, available_slaves):
         log.msg("Error choosing next slow slave for builder '%s', choosing randomly instead" % builder.name)
         log.err()
         return random.choice(available_slaves)
+
 
 def _nextFastSlave(builder, available_slaves, only_fast=False, reserved=False):
     # Check if our reserved slaves count needs updating
@@ -350,12 +373,16 @@ def _nextFastSlave(builder, available_slaves, only_fast=False, reserved=False):
 
 _checkedReservedSlaveFile = 0
 _reservedFileName = None
+
+
 def setReservedFileName(filename):
     global _reservedFileName
     _reservedFileName = filename
 
+
 def _nextFastReservedSlave(builder, available_slaves, only_fast=True):
     return _nextFastSlave(builder, available_slaves, only_fast, reserved=True)
+
 
 def _nextL10nSlave(n=4):
     """Return a nextSlave function that restricts itself to choosing amongst
@@ -370,8 +397,9 @@ def _nextL10nSlave(n=4):
             connected_slaves.sort(key=lambda s: s.slave.slavename)
             fast, slow = _partitionUnreservedSlaves(connected_slaves)
             slow = slow[:n]
-            # Choose enough fast slaves so that we're considering a total of n slaves
-            fast = fast[:n-(len(slow))]
+            # Choose enough fast slaves so that we're considering a total of n
+            # slaves
+            fast = fast[:n - (len(slow))]
 
             # Now keep only those that are in available_slaves
             slow = [s for s in slow if s in available_slaves]
@@ -391,6 +419,7 @@ def _nextL10nSlave(n=4):
             return random.choice(available_slaves)
     return _nextslave
 
+
 def _nextSlowIdleSlave(nReserved):
     """Return a nextSlave function that will only return a slave to run a build
     if there are at least nReserved slaves available."""
@@ -403,6 +432,8 @@ def _nextSlowIdleSlave(nReserved):
 
 # XXX Bug 790698 hack for no android reftests on new tegras
 # Purge with fire when this is no longer needed
+
+
 def _nextOldTegra(builder, available_slaves):
     try:
         valid = []
@@ -428,13 +459,17 @@ def _nextOldTegra(builder, available_slaves):
         return random.choice(available_slaves)
 
 nomergeBuilders = []
+
+
 def mergeRequests(builder, req1, req2):
     if builder.name in nomergeBuilders:
         return False
     if 'Self-serve' in req1.reason or 'Self-serve' in req2.reason:
-        # A build was explicitly requested on this revision, so don't coalesce it
+        # A build was explicitly requested on this revision, so don't coalesce
+        # it
         return False
     return req1.canBeMergedWith(req2)
+
 
 def mergeBuildObjects(d1, d2):
     retval = d1.copy()
@@ -524,9 +559,12 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         # suites is a dict!
         if mozharness_suite_config is None:
             mozharness_suite_config = {}
-        extra_args = mozharness_suite_config.get('extra_args', suites.get('extra_args', []))
-        reboot_command = mozharness_suite_config.get('reboot_command', suites.get('reboot_command', None))
-        hg_bin = mozharness_suite_config.get('hg_bin', suites.get('hg_bin', 'hg'))
+        extra_args = mozharness_suite_config.get(
+            'extra_args', suites.get('extra_args', []))
+        reboot_command = mozharness_suite_config.get(
+            'reboot_command', suites.get('reboot_command', None))
+        hg_bin = mozharness_suite_config.get(
+            'hg_bin', suites.get('hg_bin', 'hg'))
         factory = ScriptFactory(
             interpreter=mozharness_python,
             scriptRepo=mozharness_repo,
@@ -536,12 +574,12 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             script_maxtime=suites.get('script_maxtime', 7200),
             reboot_command=reboot_command,
             platform=platform,
-            log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
-             (re.compile('# TBPL WARNING #'), WARNINGS),
-             (re.compile('# TBPL FAILURE #'), FAILURE),
-             (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
-             (re.compile('# TBPL RETRY #'), RETRY),
-            ))
+            log_eval_func=lambda c, s: regex_log_evaluator(c, s, (
+                                                           (re.compile('# TBPL WARNING #'), WARNINGS),
+                                                           (re.compile('# TBPL FAILURE #'), FAILURE),
+                                                           (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
+                                                           (re.compile('# TBPL RETRY #'), RETRY),
+                                                           ))
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
@@ -568,26 +606,29 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     posixBinarySuffix=posixBinarySuffix,
                     buildToolsRepoPath=config['build_tools_repo_path'],
                     buildSpace=1.0,
-                    buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+                    buildsBeforeReboot=config[
+                        'platforms'][platform]['builds_before_reboot'],
                     totalChunks=totalChunks,
-                    thisChunk=i+1,
+                    thisChunk=i + 1,
                     chunkByDir=suites.get('chunkByDir'),
                     env=pf.get('unittest-env', {}),
                     # NB. If you change the defaults here, make sure to update the
-                    # logic in generateTalosBranchObjects for test_type == "debug"
+                    # logic in generateTalosBranchObjects for test_type ==
+                    # "debug"
                     downloadSymbols=pf.get('download_symbols', False),
-                    downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
+                    downloadSymbolsOnDemand=pf.get(
+                        'download_symbols_ondemand', True),
                     resetHwClock=resetHwClock,
                 )
                 builder = {
-                    'name': '%s %s-%i' % (name_prefix, suites_name, i+1),
+                    'name': '%s %s-%i' % (name_prefix, suites_name, i + 1),
                     'slavenames': slavenames,
-                    'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i+1),
+                    'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i + 1),
                     'slavebuilddir': 'test',
                     'factory': factory,
                     'category': category,
                     'properties': properties,
-                    'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
+                    'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
                 }
                 builders.append(builder)
         else:
@@ -602,9 +643,11 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 posixBinarySuffix=posixBinarySuffix,
                 buildToolsRepoPath=config['build_tools_repo_path'],
                 buildSpace=1.0,
-                buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
+                buildsBeforeReboot=config['platforms'][
+                    platform]['builds_before_reboot'],
                 downloadSymbols=pf.get('download_symbols', False),
-                downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
+                downloadSymbolsOnDemand=pf.get(
+                    'download_symbols_ondemand', True),
                 env=pf.get('unittest-env', {}),
                 resetHwClock=resetHwClock,
             )
@@ -616,10 +659,11 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 'factory': factory,
                 'category': category,
                 'properties': properties,
-                'env' : MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
+                'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
             }
             builders.append(builder)
     return builders
+
 
 def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
                                    hg_bin, mozharness_python,
@@ -638,13 +682,14 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         script_maxtime=script_maxtime,
         reboot_command=reboot_command,
         platform=platform,
-        log_eval_func=lambda c,s: regex_log_evaluator(c, s, (
-         (re.compile('# TBPL WARNING #'), WARNINGS),
-         (re.compile('# TBPL FAILURE #'), FAILURE),
-         (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
-         (re.compile('# TBPL RETRY #'), RETRY),
+        log_eval_func=lambda c, s: regex_log_evaluator(c, s, (
+                                                       (re.compile('# TBPL WARNING #'), WARNINGS),
+                        (re.compile('# TBPL FAILURE #'), FAILURE),
+            (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
+            (re.compile('# TBPL RETRY #'), RETRY),
         ))
     )
+
 
 def generateBranchObjects(config, name, secrets=None):
     """name is the name of branch which is usually the last part of the path
@@ -670,7 +715,8 @@ def generateBranchObjects(config, name, secrets=None):
     triggeredUnittestBuilders = []
     nightlyBuilders = []
     xulrunnerNightlyBuilders = []
-    periodicPgoBuilders = [] # Only used for the 'periodic' strategy. rename to perodicPgoBuilders?
+    periodicPgoBuilders = []
+        # Only used for the 'periodic' strategy. rename to perodicPgoBuilders?
     weeklyBuilders = []
     coverageBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
@@ -680,15 +726,16 @@ def generateBranchObjects(config, name, secrets=None):
     unittestPrettyNames = {}
     unittestSuites = []
     # These dicts provides mapping between en-US dep and nightly scheduler names
-    # to l10n dep and l10n nightly scheduler names. It's filled out just below here.
+    # to l10n dep and l10n nightly scheduler names. It's filled out just below
+    # here.
     l10nBuilders = {}
     l10nNightlyBuilders = {}
     pollInterval = config.get('pollInterval', 60)
-    l10nPollInterval = config.get('l10nPollInterval', 5*60)
+    l10nPollInterval = config.get('l10nPollInterval', 5 * 60)
 
     # We only understand a couple PGO strategies
     assert config['pgo_strategy'] in ('per-checkin', 'periodic', 'try', None), \
-            "%s is not an understood PGO strategy" % config['pgo_strategy']
+        "%s is not an understood PGO strategy" % config['pgo_strategy']
 
     # This section is to make it easier to disable certain products.
     # Ideally we could specify a shorter platforms key on the branch,
@@ -711,7 +758,8 @@ def generateBranchObjects(config, name, secrets=None):
             if pf.get('enable_dep', True):
                 buildername = '%s_dep' % pf['base_name']
                 builders.append(buildername)
-                buildersByProduct.setdefault(pf['stage_product'], []).append(buildername)
+                buildersByProduct.setdefault(
+                    pf['stage_product'], []).append(buildername)
                 prettyNames[platform] = buildername
 
             if pf.get('enable_nightly'):
@@ -719,15 +767,16 @@ def generateBranchObjects(config, name, secrets=None):
                 nightlyBuilders.append(buildername)
             continue
 
-        values = { 'basename': base_name,
-                   'trystatus': '' if pf.get('try-by-default', True) else 'try-nondefault ',
-                   }
+        values = {'basename': base_name,
+                  'trystatus': '' if pf.get('try-by-default', True) else 'try-nondefault ',
+                  }
         pretty_name = PRETTY_NAME % values
         builder_id = NAME % values
 
         if platform.endswith("-debug"):
             builders.append(builder_id)
-            buildersByProduct.setdefault(pf['stage_product'], []).append(builder_id)
+            buildersByProduct.setdefault(
+                pf['stage_product'], []).append(builder_id)
             prettyNames[platform] = pretty_name
             # Debug unittests
             if pf.get('enable_unittests'):
@@ -735,32 +784,35 @@ def generateBranchObjects(config, name, secrets=None):
                 if 'opt_base_name' in config['platforms'][platform]:
                     base_name = config['platforms'][platform]['opt_base_name']
                 else:
-                    base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                    base_name = config['platforms'][
+                        platform.replace("-debug", "")]['base_name']
                 for suites_name, suites in config['unittest_suites']:
                     unittestPrettyNames[platform] = '%s debug test' % base_name
-                    test_builders.extend(generateTestBuilderNames('%s debug test' % base_name, suites_name, suites))
+                    test_builders.extend(generateTestBuilderNames(
+                        '%s debug test' % base_name, suites_name, suites))
                 triggeredUnittestBuilders.append(('%s-%s-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
             # Skip l10n, unit tests
             # Skip nightlies for debug builds unless requested
-            if not pf.has_key('enable_nightly'):
+            if 'enable_nightly' not in pf:
                 continue
         elif pf.get('enable_dep', True):
             builders.append(builder_id)
-            buildersByProduct.setdefault(pf['stage_product'], []).append(builder_id)
+            buildersByProduct.setdefault(
+                pf['stage_product'], []).append(builder_id)
             prettyNames[platform] = pretty_name
 
         # Fill the l10n dep dict
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-           config['enable_l10n_onchange']:
+                config['enable_l10n_onchange']:
                 l10nBuilders[base_name] = {}
                 l10nBuilders[base_name]['tree'] = config['l10n_tree']
                 l10nBuilders[base_name]['l10n_builder'] = \
                     '%s %s %s l10n dep' % (pf['product_name'].capitalize(),
-                                       name, platform)
+                    name, platform)
                 l10nBuilders[base_name]['platform'] = platform
         # Check if branch wants nightly builds
         if config['enable_nightly']:
-            if pf.has_key('enable_nightly'):
+            if 'enable_nightly' in pf:
                 do_nightly = pf['enable_nightly']
             else:
                 do_nightly = True
@@ -772,7 +824,8 @@ def generateBranchObjects(config, name, secrets=None):
             periodicPgoBuilders.append('%s pgo-build' % pf['base_name'])
         elif config['pgo_strategy'] in ('try',) and platform in config['pgo_platforms']:
             builders.append('%s pgo-build' % pf['base_name'])
-            buildersByProduct.setdefault(pf['stage_product'], []).append('%s pgo-build' % pf['base_name'])
+            buildersByProduct.setdefault(pf['stage_product'], []).append(
+                '%s pgo-build' % pf['base_name'])
 
         if do_nightly:
             builder = '%s nightly' % base_name
@@ -783,17 +836,18 @@ def generateBranchObjects(config, name, secrets=None):
                 l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
                 l10nNightlyBuilders[builder]['l10n_builder'] = \
                     '%s %s %s l10n nightly' % (pf['product_name'].capitalize(),
-                                       name, platform)
+                    name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
             if config['enable_valgrind'] and \
-               platform in config['valgrind_platforms']:
+                    platform in config['valgrind_platforms']:
                 nightlyBuilders.append('%s valgrind' % base_name)
         # Optimized unittest builds
         if pf.get('enable_opt_unittests'):
             test_builders = []
             for suites_name, suites in config['unittest_suites']:
                 unittestPrettyNames[platform] = '%s opt test' % base_name
-                test_builders.extend(generateTestBuilderNames('%s opt test' % base_name, suites_name, suites))
+                test_builders.extend(generateTestBuilderNames(
+                    '%s opt test' % base_name, suites_name, suites))
             triggeredUnittestBuilders.append(('%s-%s-opt-unittest' % (name, platform), test_builders, config.get('enable_merging', True)))
         if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
@@ -824,15 +878,16 @@ def generateBranchObjects(config, name, secrets=None):
             extraRecipients=extraRecipients,
             branches=[config['repo_path']],
             messageFormatter=lambda c: buildTryChangeMessage(c,
-                '/'.join([packageUrl, packageDir])),
-            ))
+                                                             '/'.join([packageUrl, packageDir])),
+        ))
 
     if config['enable_l10n']:
         l10n_builders = []
         for b in l10nBuilders:
             if config['enable_l10n_onchange']:
                 l10n_builders.append(l10nBuilders[b]['l10n_builder'])
-            l10n_builders.append(l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
+            l10n_builders.append(
+                l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
         l10n_binaryURL = config['enUS_binaryURL']
         if l10n_binaryURL.endswith('/'):
             l10n_binaryURL = l10n_binaryURL[:-1]
@@ -861,14 +916,12 @@ def generateBranchObjects(config, name, secrets=None):
             binaryURL=l10n_binaryURL
         ))
 
+    tipsOnly = False
+    maxChanges = 100
     if config.get('enable_try', False):
-        tipsOnly = True
-        maxChanges = 100
         # Pay attention to all branches for pushes to try
         repo_branch = None
     else:
-        tipsOnly = False
-        maxChanges = 100
         # Other branches should only pay attention to the default branch
         repo_branch = "default"
 
@@ -882,10 +935,11 @@ def generateBranchObjects(config, name, secrets=None):
     ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
-        hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
-                            repositoryIndex = config['l10n_repo_path'],
-                            pollInterval=l10nPollInterval,
-                            branch=name)
+        hg_all_locales_poller = HgAllLocalesPoller(hgURL=config['hgurl'],
+                                                   repositoryIndex=config[
+                                                   'l10n_repo_path'],
+                                                   pollInterval=l10nPollInterval,
+                                                   branch=name)
         hg_all_locales_poller.parallelRequests = 1
         branchObjects['change_source'].append(hg_all_locales_poller)
 
@@ -895,17 +949,20 @@ def generateBranchObjects(config, name, secrets=None):
     # in order to know what to schedule
     extra_args = {}
     if config.get('enable_try'):
-        scheduler_class = makePropertiesScheduler(BuilderChooserScheduler, [buildUIDSchedFunc])
+        scheduler_class = makePropertiesScheduler(
+            BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
         extra_args['prettyNames'] = prettyNames
         extra_args['buildbotBranch'] = name
     else:
-        scheduler_class = makePropertiesScheduler(Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
+        scheduler_class = makePropertiesScheduler(
+            Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders)
-    nomergeBuilders.extend(periodicPgoBuilders) # these should never, ever merge
+    nomergeBuilders.extend(
+        periodicPgoBuilders)  # these should never, ever merge
     extra_args['treeStableTimer'] = None
 
     if 'product_prefix' in config:
@@ -943,11 +1000,12 @@ def generateBranchObjects(config, name, secrets=None):
             branch=config['l10n_repo_path'],
             treeStableTimer=None,
             builderNames=l10n_builders,
-            fileIsImportant=lambda c: isImportantL10nFile(c, config['l10n_modules']),
+            fileIsImportant=lambda c: isImportantL10nFile(
+                c, config['l10n_modules']),
             properties={
                 'app': 'browser',
                 'en_revision': 'default',
-                }
+            }
         ))
 
     for scheduler_branch, test_builders, merge in triggeredUnittestBuilders:
@@ -997,7 +1055,8 @@ def generateBranchObjects(config, name, secrets=None):
                 l10nBranch=config.get('l10n_repo_path')
             )
         else:
-            goodFunc = lastRevFunc(config['repo_path'], triggerBuildIfNoChanges=True)
+            goodFunc = lastRevFunc(
+                config['repo_path'], triggerBuildIfNoChanges=True)
 
         nightly_scheduler = makePropertiesScheduler(
             SpecificNightly,
@@ -1014,14 +1073,15 @@ def generateBranchObjects(config, name, secrets=None):
 
     if len(periodicPgoBuilders) > 0:
         pgo_scheduler = makePropertiesScheduler(
-                            SpecificNightly,
-                            [buildIDSchedFunc, buildUIDSchedFunc])(
-                            ssFunc=lastRevFunc(config['repo_path'], triggerBuildIfNoChanges=False),
-                            name="%s pgo" % scheduler_name_prefix,
-                            branch=config['repo_path'],
-                            builderNames=periodicPgoBuilders,
-                            hour=range(0,24,config['periodic_pgo_interval']),
-                        )
+            SpecificNightly,
+            [buildIDSchedFunc, buildUIDSchedFunc])(
+                ssFunc=lastRevFunc(config['repo_path'],
+                                   triggerBuildIfNoChanges=False),
+                name="%s pgo" % scheduler_name_prefix,
+                branch=config['repo_path'],
+                builderNames=periodicPgoBuilders,
+                hour=range(0, 24, config['periodic_pgo_interval']),
+            )
         branchObjects['schedulers'].append(pgo_scheduler)
 
     for builder in nightlyBuilders + xulrunnerNightlyBuilders:
@@ -1030,22 +1090,23 @@ def generateBranchObjects(config, name, secrets=None):
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
             platform = l10nNightlyBuilders[builder]['platform']
             branchObjects['schedulers'].append(TriggerableL10n(
-                                   name=l10n_builder,
-                                   platform=platform,
-                                   builderNames=[l10n_builder],
-                                   branch=config['repo_path'],
-                                   baseTag='default',
-                                   localesURL=config.get('localesURL', None)
-                                  ))
+                                               name=l10n_builder,
+                                               platform=platform,
+                                               builderNames=[l10n_builder],
+                                               branch=config['repo_path'],
+                                               baseTag='default',
+                                               localesURL=config.get(
+                                               'localesURL', None)
+                                               ))
 
     if coverageBuilders or weeklyBuilders:
         weekly_scheduler = Nightly(
-                name='weekly-%s' % scheduler_name_prefix,
-                branch=config['repo_path'],
-                dayOfWeek=5, # Saturday
-                hour=[3], minute=[02],
-                builderNames=coverageBuilders + weeklyBuilders,
-                )
+            name='weekly-%s' % scheduler_name_prefix,
+            branch=config['repo_path'],
+            dayOfWeek=5,  # Saturday
+            hour=[3], minute=[02],
+            builderNames=coverageBuilders + weeklyBuilders,
+        )
         branchObjects['schedulers'].append(weekly_scheduler)
 
     # We iterate throught the platforms a second time, so we need
@@ -1061,7 +1122,8 @@ def generateBranchObjects(config, name, secrets=None):
         pf = config['platforms'][platform]
 
         if 'mozharness_config' in pf:
-            factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('dep_signing_servers')))
+            factory = makeMHFactory(config, pf, signingServers=secrets.get(
+                pf.get('dep_signing_servers')))
             builder = {
                 'name': '%s_dep' % pf['base_name'],
                 'slavenames': pf['slaves'],
@@ -1081,7 +1143,8 @@ def generateBranchObjects(config, name, secrets=None):
 
             if pf.get('enable_nightly'):
                 if pf.get('dep_signing_servers') != pf.get('nightly_signing_servers'):
-                    # We need a new factory for this because our signing servers are different
+                    # We need a new factory for this because our signing
+                    # servers are different
                     factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('nightly_signing_servers')))
 
                 builder = {
@@ -1132,7 +1195,7 @@ def generateBranchObjects(config, name, secrets=None):
             tinderboxBuildsDir = "%s-%s" % (name, platform)
         else:
             if pf.get('enable_opt_unittests'):
-                packageTests=True
+                packageTests = True
             leakTest = False
 
         # Allow for test packages on platforms that can't be tested
@@ -1165,7 +1228,7 @@ def generateBranchObjects(config, name, secrets=None):
                                      WithProperties("%(basedir)s/build/build/pymake/make.py")]
 
         stageBasePath = '%s/%s' % (config['stage_base_path'],
-                                       pf['stage_product'])
+                                   pf['stage_product'])
 
         # For the 'per-checkin' pgo strategy, we want PGO
         # enabled on what would be 'opt' builds.
@@ -1190,20 +1253,24 @@ def generateBranchObjects(config, name, secrets=None):
 
         multiargs = {}
         if pf.get('product_name') == 'b2g':
-            multiargs['multiLocaleScript'] = 'scripts/b2g_desktop_multilocale.py'
+            multiargs[
+                'multiLocaleScript'] = 'scripts/b2g_desktop_multilocale.py'
         else:
             if 'android' in platform:
                 multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
         if pf.get('multi_config_name'):
             multiargs['multiLocaleConfig'] = pf['multi_config_name']
         else:
-            multiargs['multiLocaleConfig'] = 'multi_locale/%s_%s.json' % (name, platform)
+            multiargs['multiLocaleConfig'] = 'multi_locale/%s_%s.json' % (
+                name, platform)
         if config.get('enable_multi_locale') and pf.get('multi_locale'):
             multiargs['multiLocale'] = True
             multiargs['multiLocaleMerge'] = config['multi_locale_merge']
-            multiargs['compareLocalesRepoPath'] = config['compare_locales_repo_path']
+            multiargs['compareLocalesRepoPath'] = config[
+                'compare_locales_repo_path']
             multiargs['compareLocalesTag'] = config['compare_locales_tag']
-            multiargs['mozharnessMultiOptions'] = pf.get('mozharness_multi_options')
+            multiargs['mozharnessMultiOptions'] = pf.get(
+                'mozharness_multi_options')
 
         # Some platforms shouldn't do dep builds (i.e. RPM)
         if pf.get('enable_dep', True):
@@ -1282,7 +1349,7 @@ def generateBranchObjects(config, name, secrets=None):
                 factory_kwargs.update(multiargs)
 
             mozilla2_dep_factory = factory_class(**factory_kwargs)
-            #eg. TB Linux comm-central build
+            # eg. TB Linux comm-central build
             #    TB Linux comm-central leak test build
             mozilla2_dep_builder = {
                 'name': '%s build' % pf['base_name'],
@@ -1298,7 +1365,7 @@ def generateBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir' : reallyShort('%s-%s' % (name, platform), pf['stage_product'])},
+                               'slavebuilddir': reallyShort('%s-%s' % (name, platform), pf['stage_product'])},
             }
             branchObjects['builders'].append(mozilla2_dep_builder)
 
@@ -1307,6 +1374,7 @@ def generateBranchObjects(config, name, secrets=None):
             # other than PGO
             if config['pgo_strategy'] in ('periodic', 'try') and platform in config['pgo_platforms']:
                 pgo_kwargs = factory_kwargs.copy()
+                pgo_kwargs["doPostLinkerSize"] = pf.get('enable_post_linker_size', False)
                 pgo_kwargs['profiledBuild'] = True
                 pgo_kwargs['stagePlatform'] += '-pgo'
                 pgo_kwargs['unittestBranch'] = pgoUnittestBranch
@@ -1314,16 +1382,16 @@ def generateBranchObjects(config, name, secrets=None):
                 pgo_builder = {
                     'name': '%s pgo-build' % pf['base_name'],
                     'slavenames': pf['slaves'],
-                    'builddir':  '%s-%s-pgo' % (name, platform),
+                    'builddir': '%s-%s-pgo' % (name, platform),
                     'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
                     'category': name,
                     'nextSlave': _nextFastSlave,
                     'properties': {'branch': name,
-                               'platform': platform,
-                               'stage_platform': stage_platform + '-pgo',
-                               'product': pf['stage_product'],
-                               'slavebuilddir' : reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product'])},
+                                   'platform': platform,
+                                   'stage_platform': stage_platform + '-pgo',
+                                   'product': pf['stage_product'],
+                                   'slavebuilddir': reallyShort('%s-%s-pgo' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(pgo_builder)
 
@@ -1336,9 +1404,11 @@ def generateBranchObjects(config, name, secrets=None):
                         suites.remove('mochitest-a11y')
 
                     if 'opt_base_name' in config['platforms'][platform]:
-                        base_name = config['platforms'][platform]['opt_base_name']
+                        base_name = config[
+                            'platforms'][platform]['opt_base_name']
                     else:
-                        base_name = config['platforms'][platform.replace("-debug", "")]['base_name']
+                        base_name = config['platforms'][
+                            platform.replace("-debug", "")]['base_name']
 
                     branchObjects['builders'].extend(generateTestBuilder(
                         config, name, platform, "%s debug test" % base_name,
@@ -1346,11 +1416,11 @@ def generateBranchObjects(config, name, secrets=None):
                         suites_name, suites, mochitestLeakThreshold,
                         crashtestLeakThreshold, stagePlatform=stage_platform,
                         stageProduct=pf['stage_product']))
-            if not pf.has_key('enable_nightly'):
+            if 'enable_nightly' not in pf:
                 continue
 
         if config['enable_nightly']:
-            if pf.has_key('enable_nightly'):
+            if 'enable_nightly' in pf:
                 do_nightly = pf['enable_nightly']
             else:
                 do_nightly = True
@@ -1364,13 +1434,13 @@ def generateBranchObjects(config, name, secrets=None):
             if 'update_channel' in config and config.get('create_snippet'):
                 platform_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
 
-            triggeredSchedulers=None
+            triggeredSchedulers = None
             if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
                 mobile_l10n_scheduler_name = '%s-%s-l10n' % (name, platform)
                 mobile_l10n_builders = []
                 builder_env = platform_env.copy()
                 for n in range(1, int(pf['l10n_chunks']) + 1):
-                    builddir='%s-%s-l10n_%s' % (name, platform, str(n))
+                    builddir = '%s-%s-l10n_%s' % (name, platform, str(n))
                     builderName = "%s l10n nightly %s/%s" % \
                         (pf['base_name'], n, pf['l10n_chunks'])
                     mobile_l10n_builders.append(builderName)
@@ -1378,7 +1448,8 @@ def generateBranchObjects(config, name, secrets=None):
                                   'single_locale/%s_%s.py' % (name, platform),
                                   '--total-chunks', str(pf['l10n_chunks']),
                                   '--this-chunk', str(n)]
-                    signing_servers = secrets.get(pf.get('nightly_signing_servers'))
+                    signing_servers = secrets.get(
+                        pf.get('nightly_signing_servers'))
                     factory = SigningScriptFactory(
                         signingServers=signing_servers,
                         scriptRepo='%s%s' % (config['hgurl'],
@@ -1408,15 +1479,16 @@ def generateBranchObjects(config, name, secrets=None):
                     name=mobile_l10n_scheduler_name,
                     builderNames=mobile_l10n_builders
                 ))
-                triggeredSchedulers=[mobile_l10n_scheduler_name]
+                triggeredSchedulers = [mobile_l10n_scheduler_name]
 
             else:  # Non-mobile l10n is done differently at this time
                 if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-                   nightly_builder in l10nNightlyBuilders:
-                    triggeredSchedulers=[l10nNightlyBuilders[nightly_builder]['l10n_builder']]
+                        nightly_builder in l10nNightlyBuilders:
+                    triggeredSchedulers = [
+                        l10nNightlyBuilders[nightly_builder]['l10n_builder']]
 
             create_snippet = config['create_snippet']
-            if pf.has_key('create_snippet') and config['create_snippet']:
+            if 'create_snippet' in pf and config['create_snippet']:
                 create_snippet = pf.get('create_snippet')
             if create_snippet and 'android' in platform:
                 # Ideally, this woud use some combination of product name and
@@ -1439,7 +1511,6 @@ def generateBranchObjects(config, name, secrets=None):
                     'ausBaseUploadDir': config['aus2_base_upload_dir'],
                 }
 
-
             nightly_kwargs = {}
             nightly_kwargs.update(multiargs)
             nightly_kwargs.update(ausargs)
@@ -1460,7 +1531,7 @@ def generateBranchObjects(config, name, secrets=None):
                 nightlyUnittestBranch = unittestBranch
                 nightly_pgo = False
 
-            nightly_env=platform_env.copy()
+            nightly_env = platform_env.copy()
             nightly_env['IS_NIGHTLY'] = "yes"
 
             mozilla2_nightly_factory = NightlyBuildFactory(
@@ -1494,7 +1565,8 @@ def generateBranchObjects(config, name, secrets=None):
                 disableSymbols=pf.get('disable_symbols', False),
                 nightly=True,
                 createSnippet=create_snippet,
-                createPartial=pf.get('create_partial', config['create_partial']),
+                createPartial=pf.get(
+                    'create_partial', config['create_partial']),
                 updatePlatform=pf['update_platform'],
                 ausUser=config['aus2_user'],
                 ausSshKey=config['aus2_ssh_key'],
@@ -1510,7 +1582,8 @@ def generateBranchObjects(config, name, secrets=None):
                 enablePackaging=pf.get('enable_packaging', True),
                 enableInstaller=pf.get('enable_installer', False),
                 packageTests=packageTests,
-                unittestMasters=pf.get('unittest_masters', config['unittest_masters']),
+                unittestMasters=pf.get(
+                    'unittest_masters', config['unittest_masters']),
                 unittestBranch=nightlyUnittestBranch,
                 triggerBuilds=config['enable_l10n'],
                 triggeredSchedulers=triggeredSchedulers,
@@ -1520,7 +1593,8 @@ def generateBranchObjects(config, name, secrets=None):
                 testPrettyNames=pf.get('test_pretty_names', False),
                 l10nCheckTest=pf.get('l10n_check_test', False),
                 android_signing=pf.get('android_signing', False),
-                post_upload_include_platform=pf.get('post_upload_include_platform', False),
+                post_upload_include_platform=pf.get(
+                    'post_upload_include_platform', False),
                 signingServers=secrets.get(pf.get('nightly_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
@@ -1539,7 +1613,7 @@ def generateBranchObjects(config, name, secrets=None):
                 **nightly_kwargs
             )
 
-            #eg. TB Linux comm-aurora nightly
+            # eg. TB Linux comm-aurora nightly
             mozilla2_nightly_builder = {
                 'name': nightly_builder,
                 'slavenames': pf['slaves'],
@@ -1560,17 +1634,18 @@ def generateBranchObjects(config, name, secrets=None):
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
                     objdir = ''
-                    mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
+                    mozconfig = os.path.join(os.path.dirname(
+                        pf['src_mozconfig']), 'l10n-mozconfig')
                     l10n_kwargs = {}
                     if config.get('call_client_py', False):
                         l10n_kwargs['callClientPy'] = True
                         l10n_kwargs['clientPyConfig'] = {
-                             'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
-                             'cvsroot':             config.get('cvsroot', ''),
-                             'inspector_repo_path': config.get('inspector_repo_path', ''),
-                             'moz_repo_path':       config.get('moz_repo_path', ''),
-                             'skip_blank_repos':    config.get('skip_blank_repos', False),
-                             'venkman_repo_path':   config.get('venkman_repo_path', ''),
+                            'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
+                            'cvsroot': config.get('cvsroot', ''),
+                            'inspector_repo_path': config.get('inspector_repo_path', ''),
+                            'moz_repo_path': config.get('moz_repo_path', ''),
+                            'skip_blank_repos': config.get('skip_blank_repos', False),
+                            'venkman_repo_path': config.get('venkman_repo_path', ''),
                         }
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
@@ -1594,7 +1669,8 @@ def generateBranchObjects(config, name, secrets=None):
                         ausSshKey=config['aus2_ssh_key'],
                         ausHost=config['aus2_host'],
                         balrog_api_root=config.get('balrog_api_root', None),
-                        balrog_credentials_file=config['balrog_credentials_file'],
+                        balrog_credentials_file=config[
+                            'balrog_credentials_file'],
                         hashType=config['hash_type'],
                         stageServer=config['stage_server'],
                         stageUsername=config['stage_username'],
@@ -1602,16 +1678,19 @@ def generateBranchObjects(config, name, secrets=None):
                         repoPath=config['repo_path'],
                         l10nRepoPath=config['l10n_repo_path'],
                         buildToolsRepoPath=config['build_tools_repo_path'],
-                        compareLocalesRepoPath=config['compare_locales_repo_path'],
+                        compareLocalesRepoPath=config[
+                            'compare_locales_repo_path'],
                         compareLocalesTag=config['compare_locales_tag'],
                         buildSpace=l10nSpace,
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
                         mozillaDir=config.get('mozilla_dir', None),
-                        signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                        signingServers=secrets.get(
+                            pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
-                        extraConfigureArgs=config.get('l10n_extra_configure_args', []),
-                        buildsBeforeReboot=pf.get('builds_before_reboot',0),
+                        extraConfigureArgs=config.get(
+                            'l10n_extra_configure_args', []),
+                        buildsBeforeReboot=pf.get('builds_before_reboot', 0),
                         use_mock=pf.get('use_mock'),
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
@@ -1631,13 +1710,14 @@ def generateBranchObjects(config, name, secrets=None):
                                        'platform': platform,
                                        'product': pf['stage_product'],
                                        'stage_platform': stage_platform,
-                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),},
+                                       'slavebuilddir': reallyShort('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']), },
                     }
-                    branchObjects['builders'].append(mozilla2_l10n_nightly_builder)
+                    branchObjects['builders'].append(
+                        mozilla2_l10n_nightly_builder)
 
             if config['enable_valgrind'] and \
-               platform in config['valgrind_platforms']:
-                valgrind_env=platform_env.copy()
+                    platform in config['valgrind_platforms']:
+                valgrind_env = platform_env.copy()
                 valgrind_env['REVISION'] = WithProperties("%(revision)s")
                 mozilla2_valgrind_factory = ScriptFactory(
                     scriptRepo="%s%s" % (config['hgurl'],
@@ -1668,19 +1748,20 @@ def generateBranchObjects(config, name, secrets=None):
 
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-           config['enable_l10n_onchange']:
+                config['enable_l10n_onchange']:
             dep_kwargs = {}
             if config.get('call_client_py', False):
                 dep_kwargs['callClientPy'] = True
                 dep_kwargs['clientPyConfig'] = {
-                     'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
-                     'cvsroot':             config.get('cvsroot', ''),
-                     'inspector_repo_path': config.get('inspector_repo_path', ''),
-                     'moz_repo_path':       config.get('moz_repo_path', ''),
-                     'skip_blank_repos':    config.get('skip_blank_repos', False),
-                     'venkman_repo_path':   config.get('venkman_repo_path', ''),
+                    'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
+                    'cvsroot': config.get('cvsroot', ''),
+                    'inspector_repo_path': config.get('inspector_repo_path', ''),
+                    'moz_repo_path': config.get('moz_repo_path', ''),
+                    'skip_blank_repos': config.get('skip_blank_repos', False),
+                    'venkman_repo_path': config.get('venkman_repo_path', ''),
                 }
-            mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
+            mozconfig = os.path.join(
+                os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
                 platform=platform,
@@ -1706,7 +1787,7 @@ def generateBranchObjects(config, name, secrets=None):
                 signingServers=secrets.get(pf.get('dep_signing_servers')),
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
-                buildsBeforeReboot=pf.get('builds_before_reboot',0),
+                buildsBeforeReboot=pf.get('builds_before_reboot', 0),
                 use_mock=pf.get('use_mock'),
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
@@ -1759,16 +1840,18 @@ def generateBranchObjects(config, name, secrets=None):
 
         if config.get('enable_blocklist_update', False):
             if platform == 'linux':
-                blocklistBuilder = generateBlocklistBuilder(config, name, platform, pf['base_name'], pf['slaves'])
+                blocklistBuilder = generateBlocklistBuilder(
+                    config, name, platform, pf['base_name'], pf['slaves'])
                 branchObjects['builders'].append(blocklistBuilder)
 
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
             xr_env = pf['env'].copy()
             xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
-            xr_env['SYMBOL_SERVER_PATH'] = config['symbol_server_xulrunner_path']
+            xr_env['SYMBOL_SERVER_PATH'] = config[
+                'symbol_server_xulrunner_path']
             xr_env['SYMBOL_SERVER_SSH_KEY'] = \
                 xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
-            if pf.has_key('xr_mozconfig'):
+            if 'xr_mozconfig' in pf:
                 mozconfig = pf['xr_mozconfig']
             else:
                 mozconfig = '%s/%s/xulrunner' % (platform, name)
@@ -1838,7 +1921,7 @@ def generateBranchObjects(config, name, secrets=None):
                 config['stage_username'],
                 stageBasePath,
                 config['stage_ssh_key'],
-                ],
+            ],
         )
         slaves = set()
         for p in sorted(config['platforms'].keys()):
@@ -1861,9 +1944,11 @@ def generateBranchObjects(config, name, secrets=None):
 
     return branchObjects
 
+
 def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-        ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
-    branchObjects = {'schedulers': [], 'builders': [], 'status': [], 'change_source': []}
+                               ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
+    branchObjects = {'schedulers': [], 'builders': [], 'status': [],
+                     'change_source': []}
     branch_builders = {}
     all_test_builders = {}
     all_builders = []
@@ -1872,20 +1957,22 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     # We only understand a couple PGO strategies
     assert branch_config['pgo_strategy'] in ('per-checkin', 'periodic', 'try', None), \
-            "%s is not an understood PGO strategy" % branch_config['pgo_strategy']
+        "%s is not an understood PGO strategy" % branch_config[
+        'pgo_strategy']
 
     buildBranch = branch_config['build_branch']
 
     for platform, platform_config in PLATFORMS.items():
-        if branch_config.has_key('platforms') and \
-           branch_config['platforms'].has_key(platform) and \
+        if 'platforms' in branch_config and \
+           platform in branch_config['platforms'] and \
            not branch_config['platforms'][platform].get('enable_talos', True):
             continue
 
         if platform_config.get('is_mobile', False):
             branchName = branch_config['mobile_branch_name']
             tinderboxTree = branch_config['mobile_tinderbox_tree']
-            talosBranch = branch_config.get('mobile_talos_branch', branch_config['mobile_tinderbox_tree'])
+            talosBranch = branch_config.get(
+                'mobile_talos_branch', branch_config['mobile_tinderbox_tree'])
         else:
             branchName = branch_config['branch_name']
             tinderboxTree = branch_config['tinderbox_tree']
@@ -1910,7 +1997,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         # if platform is in the branch config check for overriding slave_platforms at the branch level
         # before creating the builders & schedulers
         if branch_config['platforms'].get(platform):
-            slave_platforms = branch_config['platforms'][platform].get('slave_platforms', platform_config.get('slave_platforms', []))
+            slave_platforms = branch_config['platforms'][platform].get(
+                'slave_platforms', platform_config.get('slave_platforms', []))
 
             # Map of # of test runs to builder names
             talos_builders = {}
@@ -1924,7 +2012,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
             for slave_platform in slave_platforms:
                 platform_name = platform_config[slave_platform]['name']
-                # this is to handle how a platform has more than one slave platform
+                # this is to handle how a platform has more than one slave
+                # platform
                 slave_platform_try_default = try_default
                 if not platform_config[slave_platform].get('try-by-default', True):
                     slave_platform_try_default = False
@@ -1933,7 +2022,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     platformPrettyName += ' try-nondefault'
                 prettyNames.setdefault(platform, []).append(platformPrettyName)
                 for suite, talosConfig in SUITES.items():
-                    tests, merge, extra, platforms = branch_config['%s_tests' % suite]
+                    tests, merge, extra, platforms = branch_config[
+                        '%s_tests' % suite]
                     if tests == 0 or slave_platform not in platforms:
                         continue
 
@@ -1958,15 +2048,17 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         "configOptions": talosConfig,
                         "talosCmd": branch_config['talos_command'],
                         "fetchSymbols": branch_config['fetch_symbols'] and
-                          platform_config[slave_platform].get('download_symbols',True),
+                        platform_config[
+                            slave_platform].get('download_symbols', True),
                         "talos_from_source_code": branch_config.get('talos_from_source_code', False),
                         "credentialsFile": os.path.join(os.getcwd(), "BuildSlaves.py"),
                         "datazillaUrl": branch_config.get('datazilla_url')
                     }
                     factory_kwargs.update(extra)
 
-                    builddir = "%s_%s_test-%s" % (branch, slave_platform, suite)
-                    slavebuilddir= 'test'
+                    builddir = "%s_%s_test-%s" % (
+                        branch, slave_platform, suite)
+                    slavebuilddir = 'test'
                     if branch_config.get('mozharness_talos') and not platform_config.get('is_mobile'):
                         extra_args = ['--suite', suite,
                                       '--add-option',
@@ -1977,26 +2069,33 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         else:
                             extra_args.extend(['--system-bits', '32'])
                         if 'win' in platform:
-                            extra_args.extend(['--cfg', 'talos/windows_config.py'])
+                            extra_args.extend(
+                                ['--cfg', 'talos/windows_config.py'])
                         elif 'mac' in platform:
                             extra_args.extend(['--cfg', 'talos/mac_config.py'])
                         else:
                             assert 'linux' in platform, "buildbotcustom.misc: mozharness talos: unknown platform %s!" % platform
-                            extra_args.extend(['--cfg', 'talos/linux_config.py'])
+                            extra_args.extend(
+                                ['--cfg', 'talos/linux_config.py'])
                         if factory_kwargs['fetchSymbols']:
                             extra_args += ['--download-symbols', 'ondemand']
                         if factory_kwargs["talos_from_source_code"]:
                             extra_args.append('--use-talos-json')
                         factory = generateMozharnessTalosBuilder(
-                         platform=platform,
-                         mozharness_repo=branch_config.get('mozharness_repo', platform_config['mozharness_config']['mozharness_repo']),
-                         script_path="scripts/talos_script.py",
-                         hg_bin=platform_config['mozharness_config']['hg_bin'],
-                         mozharness_python=platform_config['mozharness_config']['mozharness_python'],
-                         extra_args=extra_args,
-                         script_timeout=platform_config['mozharness_config'].get('script_timeout', 3600),
-                         script_maxtime=platform_config['mozharness_config'].get('script_maxtime', 7200),
-                         reboot_command=platform_config['mozharness_config'].get('reboot_command'),
+                            platform=platform,
+                            mozharness_repo=branch_config.get('mozharness_repo', platform_config['mozharness_config']['mozharness_repo']),
+                            script_path="scripts/talos_script.py",
+                            hg_bin=platform_config[
+                                'mozharness_config']['hg_bin'],
+                            mozharness_python=platform_config[
+                                'mozharness_config']['mozharness_python'],
+                            extra_args=extra_args,
+                            script_timeout=platform_config[
+                                'mozharness_config'].get('script_timeout', 3600),
+                            script_maxtime=platform_config[
+                                'mozharness_config'].get('script_maxtime', 7200),
+                            reboot_command=platform_config[
+                                'mozharness_config'].get('reboot_command'),
                         )
                     else:
                         factory = factory_class(**factory_kwargs)
@@ -2021,7 +2120,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     if not merge:
                         nomergeBuilders.append(builder['name'])
 
-                    talos_builders.setdefault(tests, []).append(builder['name'])
+                    talos_builders.setdefault(
+                        tests, []).append(builder['name'])
                     branchObjects['builders'].append(builder)
                     branch_builders[tinderboxTree].append(builder['name'])
                     all_builders.append(builder['name'])
@@ -2051,14 +2151,16 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         if not merge:
                             nomergeBuilders.append(pgo_builder['name'])
                         branchObjects['builders'].append(pgo_builder)
-                        talos_pgo_builders.setdefault(tests, []).append(pgo_builder['name'])
-                        branch_builders[tinderboxTree].append(pgo_builder['name'])
+                        talos_pgo_builders.setdefault(
+                            tests, []).append(pgo_builder['name'])
+                        branch_builders[
+                            tinderboxTree].append(pgo_builder['name'])
                         all_builders.append(pgo_builder['name'])
-
 
                 if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
                     testTypes = []
-                    # unittestSuites are gathered up for each platform from config.py
+                    # unittestSuites are gathered up for each platform from
+                    # config.py
                     unittestSuites = []
                     if branch_config['platforms'][platform].get('enable_opt_unittests'):
                         testTypes.append('opt')
@@ -2076,7 +2178,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         pgoUnittestBuilders = []
                         unittest_suites = "%s_unittest_suites" % test_type
                         if test_type == "debug":
-                            # Debug tests always need to download symbols for runtime assertions
+                            # Debug tests always need to download symbols for
+                            # runtime assertions
                             branch_config = deepcopy(branch_config)
                             pf = branch_config['platforms'][platform]
                             if pf.get('download_symbols', False) or pf.get('download_symbols_ondemand', True):
@@ -2094,16 +2197,23 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builders.extend(generateTestBuilderNames(
-                                '%s %s pgo test' % (platform_name, branch), suites_name, suites))
+                                                    '%s %s pgo test' % (platform_name, branch), suites_name, suites))
                         # Collect test builders for the TinderboxMailNotifier
-                        all_test_builders[tinderboxTree].extend(test_builders + pgo_builders)
+                        all_test_builders[tinderboxTree].extend(
+                            test_builders + pgo_builders)
                         all_builders.extend(test_builders + pgo_builders)
 
-                        triggeredUnittestBuilders.append(('tests-%s-%s-%s-unittest' % (branch, slave_platform, test_type),
-                                                         test_builders, merge_tests))
+                        triggeredUnittestBuilders.append(
+                            (
+                                'tests-%s-%s-%s-unittest' % (
+                                    branch, slave_platform, test_type),
+                                test_builders, merge_tests))
                         if create_pgo_builders and test_type == 'opt':
-                            pgoUnittestBuilders.append(('tests-%s-%s-pgo-unittest' % (branch, slave_platform),
-                                                       pgo_builders, merge_tests))
+                            pgoUnittestBuilders.append(
+                                (
+                                    'tests-%s-%s-pgo-unittest' % (
+                                        branch, slave_platform),
+                                    pgo_builders, merge_tests))
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             # create the builders
@@ -2129,21 +2239,26 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
                                     test_builder_kwargs['mozharness_suite_config'] = branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name].copy()
                                 else:
-                                    test_builder_kwargs['mozharness_suite_config'] = {}
+                                    test_builder_kwargs[
+                                        'mozharness_suite_config'] = {}
                                 test_builder_kwargs['mozharness_suite_config']['hg_bin'] = platform_config['mozharness_config']['hg_bin']
                                 test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
-                            branchObjects['builders'].extend(generateTestBuilder(**test_builder_kwargs))
+                            branchObjects['builders'].extend(
+                                generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builder_kwargs = test_builder_kwargs.copy()
                                 pgo_builder_kwargs['name_prefix'] = "%s %s pgo test" % (platform_name, branch)
-                                pgo_builder_kwargs['build_dir_prefix'] += '_pgo'
+                                pgo_builder_kwargs[
+                                    'build_dir_prefix'] += '_pgo'
                                 pgo_builder_kwargs['stagePlatform'] += '-pgo'
-                                branchObjects['builders'].extend(generateTestBuilder(**pgo_builder_kwargs))
+                                branchObjects['builders'].extend(
+                                    generateTestBuilder(**pgo_builder_kwargs))
 
                         for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
                             for test in test_builders:
                                 unittestSuites.append(test.split(' ')[-1])
-                            scheduler_branch = ('%s-%s-%s-unittest' % (branch, platform, test_type))
+                            scheduler_branch = ('%s-%s-%s-unittest' %
+                                                (branch, platform, test_type))
                             if not merge:
                                 nomergeBuilders.extend(test_builders)
                             extra_args = {}
@@ -2166,7 +2281,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         for scheduler_name, test_builders, merge in pgoUnittestBuilders:
                             for test in test_builders:
                                 unittestSuites.append(test.split(' ')[-1])
-                            scheduler_branch = '%s-%s-pgo-unittest' % (branch, platform)
+                            scheduler_branch = '%s-%s-pgo-unittest' % (
+                                branch, platform)
                             if not merge:
                                 nomergeBuilders.extend(pgo_builders)
                             extra_args = {}
@@ -2192,10 +2308,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 extra_args = {}
                 if tests == 1:
                     scheduler_class = Scheduler
-                    name='tests-%s-%s-talos' % (branch, platform)
+                    name = 'tests-%s-%s-talos' % (branch, platform)
                 else:
                     scheduler_class = MultiScheduler
-                    name='tests-%s-%s-talos-x%s' % (branch, platform, tests)
+                    name = 'tests-%s-%s-talos-x%s' % (branch, platform, tests)
                     extra_args['numberOfBuildsToTrigger'] = tests
 
                 if branch_config.get('enable_try'):
@@ -2207,22 +2323,23 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     extra_args['buildbotBranch'] = branch
 
                 s = scheduler_class(
-                        name=name,
-                        branch='%s-%s-talos' % (branch, platform),
-                        treeStableTimer=None,
-                        builderNames=builder_names,
-                        **extra_args
-                        )
+                    name=name,
+                    branch='%s-%s-talos' % (branch, platform),
+                    treeStableTimer=None,
+                    builderNames=builder_names,
+                    **extra_args
+                )
                 branchObjects['schedulers'].append(s)
             # PGO Schedulers
             for tests, builder_names in talos_pgo_builders.items():
                 extra_args = {}
                 if tests == 1:
                     scheduler_class = Scheduler
-                    name='tests-%s-%s-pgo-talos' % (branch, platform)
+                    name = 'tests-%s-%s-pgo-talos' % (branch, platform)
                 else:
                     scheduler_class = MultiScheduler
-                    name='tests-%s-%s-pgo-talos-x%s' % (branch, platform, tests)
+                    name = 'tests-%s-%s-pgo-talos-x%s' % (
+                        branch, platform, tests)
                     extra_args['numberOfBuildsToTrigger'] = tests
 
                 if branch_config.get('enable_try'):
@@ -2234,47 +2351,50 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     extra_args['buildbotBranch'] = branch
 
                 s = scheduler_class(
-                        name=name,
-                        branch='%s-%s-pgo-talos' % (branch, platform),
-                        treeStableTimer=None,
-                        builderNames=builder_names,
-                        **extra_args
-                        )
+                    name=name,
+                    branch='%s-%s-pgo-talos' % (branch, platform),
+                    treeStableTimer=None,
+                    builderNames=builder_names,
+                    **extra_args
+                )
                 branchObjects['schedulers'].append(s)
 
     if not branch_config.get('disable_tinderbox_mail'):
         for tinderboxTree in branch_builders.keys():
             if len(branch_builders[tinderboxTree]):
                 branchObjects['status'].append(TinderboxMailNotifier(
-                               fromaddr="talos.buildbot@build.mozilla.org",
-                               tree=tinderboxTree,
-                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                               relayhost="mail.build.mozilla.org",
-                               builders=branch_builders[tinderboxTree],
-                               useChangeTime=False,
-                               logCompression="gzip"))
+                                               fromaddr="talos.buildbot@build.mozilla.org",
+                                               tree=tinderboxTree,
+                                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org", ],
+                                               relayhost="mail.build.mozilla.org",
+                                               builders=branch_builders[
+                                               tinderboxTree],
+                                               useChangeTime=False,
+                                               logCompression="gzip"))
         ###  Unittests need specific errorparser
         for tinderboxTree in all_test_builders.keys():
             if len(all_test_builders[tinderboxTree]):
                 branchObjects['status'].append(TinderboxMailNotifier(
-                               fromaddr="talos.buildbot@build.mozilla.org",
-                               tree=tinderboxTree,
-                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                               relayhost="mail.build.mozilla.org",
-                               builders=all_test_builders[tinderboxTree],
-                               useChangeTime=False,
-                               errorparser="unittest",
-                               logCompression="gzip"))
+                                               fromaddr="talos.buildbot@build.mozilla.org",
+                                               tree=tinderboxTree,
+                                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org", ],
+                                               relayhost="mail.build.mozilla.org",
+                                               builders=all_test_builders[
+                                               tinderboxTree],
+                                               useChangeTime=False,
+                                               errorparser="unittest",
+                                               logCompression="gzip"))
 
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
-                branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
-        for k,v in releaseObjects.items():
+                                                           branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
+        for k, v in releaseObjects.items():
             branchObjects[k].extend(v)
     return branchObjects
 
+
 def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-        ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
+                                      ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branch_config = branch_config.copy()
     release_tests = branch_config['release_tests']
 
@@ -2283,8 +2403,8 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     for suite, talosConfig in SUITES.items():
         tests, merge, extra, platforms = branch_config['%s_tests' % suite]
         if tests > 0:
-            branch_config['%s_tests' % suite] = (release_tests, False, extra, platforms)
-
+            branch_config['%s_tests' % suite] = (release_tests,
+                                                 False, extra, platforms)
 
     # Update the TinderboxTree and the branch_name
     branch_config['tinderbox_tree'] += '-Release'
@@ -2297,23 +2417,25 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     # Don't fetch symbols
     branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
     return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-        ACTIVE_UNITTEST_PLATFORMS, factory_class)
+                                      ACTIVE_UNITTEST_PLATFORMS, factory_class)
 
 
-def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
+def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves):
     pf = config['platforms'].get(platform, {})
     extra_args = ['-b', config['repo_path'],
                   '--hgtool', 'scripts/buildfarm/utils/hgtool.py']
 
     mirrors = None
     if config['base_mirror_urls']:
-        mirrors = ["%s/%s" % (url, config['repo_path']) for url in config['base_mirror_urls']]
+        mirrors = ["%s/%s" % (url, config['repo_path'])
+                   for url in config['base_mirror_urls']]
     if mirrors:
         for mirror in mirrors:
             extra_args.extend(["--mirror", mirror])
     bundles = None
     if config['base_bundle_urls']:
-        bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip('/').split('/')[-1]) for url in config['base_bundle_urls']]
+        bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip(
+            '/').split('/')[-1]) for url in config['base_bundle_urls']]
     if bundles:
         for bundle in bundles:
             extra_args.extend(["--bundle", bundle])
@@ -2346,20 +2468,21 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves) :
     }
     return blocklistupdate_builder
 
+
 def generateFuzzingObjects(config, SLAVES):
     builders = []
     f = ScriptFactory(
-            config['scripts_repo'],
-            'scripts/fuzzing/fuzzer.sh',
-            interpreter='bash',
-            script_timeout=1500,
-            script_maxtime=1800,
-            reboot_command=['python',
-                            'scripts/buildfarm/maintenance/count_and_reboot.py',
-                            '-f', './reboot_count.txt',
-                            '-n', '0',
-                            '-z'],
-            )
+        config['scripts_repo'],
+        'scripts/fuzzing/fuzzer.sh',
+        interpreter='bash',
+        script_timeout=1500,
+        script_maxtime=1800,
+        reboot_command=['python',
+                        'scripts/buildfarm/maintenance/count_and_reboot.py',
+                        '-f', './reboot_count.txt',
+                        '-n', '0',
+                        '-z'],
+    )
     for platform in config['platforms']:
         env = MozillaEnvironments.get("%s-unittest" % platform, {}).copy()
         env['HG_REPO'] = config['fuzzing_repo']
@@ -2378,20 +2501,21 @@ def generateFuzzingObjects(config, SLAVES):
                        'branch': 'idle',
                        'platform': platform,
                        'product': 'fuzzing',
-                    },
-                  }
+                   },
+                   }
         builders.append(builder)
         nomergeBuilders.append(builder)
     fuzzing_scheduler = PersistentScheduler(
-            name="fuzzer",
-            builderNames=[b['name'] for b in builders],
-            numPending=2,
-            pollInterval=300, # Check every 5 minutes
-        )
+        name="fuzzer",
+        builderNames=[b['name'] for b in builders],
+        numPending=2,
+        pollInterval=300,  # Check every 5 minutes
+    )
     return {
-            'builders': builders,
-            'schedulers': [fuzzing_scheduler],
-            }
+        'builders': builders,
+        'schedulers': [fuzzing_scheduler],
+    }
+
 
 def generateNanojitObjects(config, SLAVES):
     builders = []
@@ -2408,11 +2532,11 @@ def generateNanojitObjects(config, SLAVES):
             interpreter = None
 
         f = ScriptFactory(
-                config['scripts_repo'],
-                nanojit_script,
-                interpreter=interpreter,
-                log_eval_func=rc_eval_func({1: WARNINGS}),
-                )
+            config['scripts_repo'],
+            nanojit_script,
+            interpreter=interpreter,
+            log_eval_func=rc_eval_func({1: WARNINGS}),
+        )
 
         builder = {'name': 'nanojit-%s' % platform,
                    'builddir': 'nanojit-%s' % platform,
@@ -2421,24 +2545,24 @@ def generateNanojitObjects(config, SLAVES):
                    'factory': f,
                    'category': 'idle',
                    'properties': {'branch': branch, 'platform': platform, 'product': 'nanojit'},
-                  }
+                   }
         builders.append(builder)
         nomergeBuilders.append(builder)
 
     # Set up polling
     poller = HgPoller(
-            hgURL=config['hgurl'],
-            branch=config['repo_path'],
-            pollInterval=5*60,
-            )
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        pollInterval=5 * 60,
+    )
 
     # Set up scheduler
     scheduler = Scheduler(
-            name="nanojit",
-            branch=config['repo_path'],
-            treeStableTimer=None,
-            builderNames=[b['name'] for b in builders],
-            )
+        name="nanojit",
+        branch=config['repo_path'],
+        treeStableTimer=None,
+        builderNames=[b['name'] for b in builders],
+    )
 
     # Tinderbox notifier
     status = []
@@ -2454,11 +2578,12 @@ def generateNanojitObjects(config, SLAVES):
         status = [tbox_mailer]
 
     return {
-            'builders': builders,
-            'change_source': [poller],
-            'schedulers': [scheduler],
-            'status': status,
-            }
+        'builders': builders,
+        'change_source': [poller],
+        'schedulers': [scheduler],
+        'status': status,
+    }
+
 
 def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
@@ -2478,32 +2603,32 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
         env['HG_REPO'] = config['hgurl'] + config['repo_path']
 
         for variant in variants:
-            factory_platform_args = [ 'use_mock',
-                                      'mock_target',
-                                      'mock_packages',
-                                      'mock_copyin_files' ]
+            factory_platform_args = ['use_mock',
+                                     'mock_target',
+                                     'mock_packages',
+                                     'mock_copyin_files']
             factory_kwargs = {}
             for a in factory_platform_args:
                 if a in pf:
                     factory_kwargs[a] = pf[a]
             factory_kwargs['env'] = env
 
-            extra_args = [ '-r', WithProperties("%(revision)s") ]
+            extra_args = ['-r', WithProperties("%(revision)s")]
             for url in bconfig['base_mirror_urls']:
-                extra_args += [ '-m', "%s/%s" % (url, config['repo_path']) ]
+                extra_args += ['-m', "%s/%s" % (url, config['repo_path'])]
             for url in bconfig['base_bundle_urls']:
-                extra_args += [ '-b', "%s/%s.hg" % (url, config['repo_path']) ]
+                extra_args += ['-b', "%s/%s.hg" % (url, config['repo_path'])]
             extra_args += [variant]
 
             f = ScriptFactory(
-                    config['scripts_repo'],
-                    'scripts/spidermonkey_builds/spidermonkey.sh',
-                    interpreter=interpreter,
-                    log_eval_func=rc_eval_func({1: WARNINGS}),
-                    extra_args=tuple(extra_args),
-                    script_timeout=3600,
-                    **factory_kwargs
-                    )
+                config['scripts_repo'],
+                'scripts/spidermonkey_builds/spidermonkey.sh',
+                interpreter=interpreter,
+                log_eval_func=rc_eval_func({1: WARNINGS}),
+                extra_args=tuple(extra_args),
+                script_timeout=3600,
+                **factory_kwargs
+            )
 
             # Fill in interpolated variables in pf['base_name'], which is currently only
             # "%(branch)s"
@@ -2516,15 +2641,15 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             prettyNames[platform] = prettyName
 
             builder = {'name': name,
-                    'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
-                    'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
-                    'slavenames': pf['slaves'],
-                    'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
-                    'factory': f,
-                    'category': branch,
-                    'env': env,
-                    'properties': {'branch': branch, 'platform': platform, 'product': 'spidermonkey'},
-                    }
+                       'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
+                       'slavebuilddir': reallyShort('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
+                       'slavenames': pf['slaves'],
+                       'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                       'factory': f,
+                       'category': branch,
+                       'env': env,
+                       'properties': {'branch': branch, 'platform': platform, 'product': 'spidermonkey'},
+                       }
             builders.append(builder)
             if not bconfig.get('enable_merging', True):
                 nomergeBuilders.append(name)
@@ -2542,7 +2667,8 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
     extra_args = {}
     scheduler_class = None
     if config.get('enable_try'):
-        scheduler_class = makePropertiesScheduler(BuilderChooserScheduler, [buildUIDSchedFunc])
+        scheduler_class = makePropertiesScheduler(
+            BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
         extra_args['prettyNames'] = prettyNames
@@ -2551,18 +2677,20 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
         scheduler_class = Scheduler
 
     scheduler = scheduler_class(
-            name="%s_spidermonkey" % branch,
-            treeStableTimer=None,
-            builderNames=[b['name'] for b in builders],
-            fileIsImportant=isImportant,
-            change_filter=ChangeFilter(branch=config['repo_path'], filter_fn=isImportant),
-            **extra_args
-            )
+        name="%s_spidermonkey" % branch,
+        treeStableTimer=None,
+        builderNames=[b['name'] for b in builders],
+        fileIsImportant=isImportant,
+        change_filter=ChangeFilter(
+            branch=config['repo_path'], filter_fn=isImportant),
+        **extra_args
+    )
 
     return {
-            'builders': builders,
-            'schedulers': [scheduler],
-            }
+        'builders': builders,
+        'schedulers': [scheduler],
+    }
+
 
 def generateJetpackObjects(config, SLAVES):
     builders = []
@@ -2570,20 +2698,22 @@ def generateJetpackObjects(config, SLAVES):
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
-            jetpackTarball = "%s/%s/%s" % (config['hgurl'] , config['repo_path'], config['jetpack_tarball'])
+            jetpackTarball = "%s/%s/%s" % (config['hgurl'], config['repo_path'], config['jetpack_tarball'])
             ftp_url = config['ftp_url']
-            types = ['opt','debug']
+            types = ['opt', 'debug']
             for type in types:
                 if type == 'debug':
                     ftp_url = ftp_url + "-debug"
                 f = ScriptFactory(
-                        config['scripts_repo'],
-                        'buildfarm/utils/run_jetpack.py',
-                        extra_args=("-p", platform, "-t", jetpackTarball, "-b", branch,
-                                   "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
-                        interpreter='python',
-                        log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE, 4: EXCEPTION, 5: RETRY}),
-                        )
+                    config['scripts_repo'],
+                    'buildfarm/utils/run_jetpack.py',
+                    extra_args=(
+                    "-p", platform, "-t", jetpackTarball, "-b", branch,
+                        "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
+                    interpreter='python',
+                    log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE,
+                                                4: EXCEPTION, 5: RETRY}),
+                )
 
                 builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
                            'builddir': 'jetpack-%s-%s-%s' % (branch, platform, type),
@@ -2593,30 +2723,31 @@ def generateJetpackObjects(config, SLAVES):
                            'category': 'jetpack',
                            'properties': {'branch': project_branch, 'platform': platform, 'product': 'jetpack'},
                            'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
-                          }
+                           }
                 builders.append(builder)
                 nomergeBuilders.append(builder)
 
     # Set up polling
     poller = HgPoller(
-            hgURL=config['hgurl'],
-            branch=config['repo_path'],
-            pollInterval=5*60,
-            )
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        pollInterval=5 * 60,
+    )
 
     # Set up scheduler
     scheduler = Scheduler(
-            name="jetpack",
-            branch=config['repo_path'],
-            treeStableTimer=None,
-            builderNames=[b['name'] for b in builders],
-            )
+        name="jetpack",
+        branch=config['repo_path'],
+        treeStableTimer=None,
+        builderNames=[b['name'] for b in builders],
+    )
 
     return {
-            'builders': builders,
-            'change_source': [poller],
-            'schedulers': [scheduler],
-            }
+        'builders': builders,
+        'change_source': [poller],
+        'schedulers': [scheduler],
+    }
+
 
 def generateDXRObjects(config, SLAVES):
     builders = []
@@ -2627,41 +2758,42 @@ def generateDXRObjects(config, SLAVES):
     script = 'scripts/dxr/dxr.sh'
 
     f = ScriptFactory(
-            config['scripts_repo'],
-            script,
-            log_eval_func=rc_eval_func({1: WARNINGS}),
-            script_timeout=7200,
-            )
+        config['scripts_repo'],
+        script,
+        log_eval_func=rc_eval_func({1: WARNINGS}),
+        script_timeout=7200,
+    )
 
     builder = {'name': 'dxr-%s' % branch,
-                'env': config['env'],
-                'builddir': 'dxr-%s' % branch,
-                'slavenames': slaves,
-                'factory': f,
-                'category': 'idle',
-                'properties': {
-                    'branch': branch,
-                    'platform': platform,
-                    'product': 'dxr',
-                    'upload_host': config['upload_host'],
-                    'upload_user': config['upload_user'],
-                    'upload_sshkey': config['upload_sshkey'],
-                },
-              }
+               'env': config['env'],
+               'builddir': 'dxr-%s' % branch,
+               'slavenames': slaves,
+               'factory': f,
+               'category': 'idle',
+               'properties': {
+                   'branch': branch,
+                   'platform': platform,
+                   'product': 'dxr',
+                   'upload_host': config['upload_host'],
+                   'upload_user': config['upload_user'],
+                   'upload_sshkey': config['upload_sshkey'],
+               },
+               }
     builders.append(builder)
 
     # Set up scheduler
     scheduler = Nightly(
-            name="dxr-%s" % branch,
-            branch=config['repo_path'],
-            hour=[3], minute=[05],
-            builderNames=[b['name'] for b in builders],
-            )
+        name="dxr-%s" % branch,
+        branch=config['repo_path'],
+        hour=[3], minute=[05],
+        builderNames=[b['name'] for b in builders],
+    )
 
     return {
-            'builders': builders,
-            'schedulers': [scheduler],
-            }
+        'builders': builders,
+        'schedulers': [scheduler],
+    }
+
 
 def generateProjectObjects(project, config, SLAVES):
     builders = []
@@ -2669,11 +2801,11 @@ def generateProjectObjects(project, config, SLAVES):
     change_sources = []
     status = []
     buildObjects = {
-            'builders': builders,
-            'schedulers': schedulers,
-            'status': status,
-            'change_source': change_sources,
-            }
+        'builders': builders,
+        'schedulers': schedulers,
+        'status': status,
+        'change_source': change_sources,
+    }
 
     # Fuzzing
     if project.startswith('fuzzing'):
@@ -2692,7 +2824,8 @@ def generateProjectObjects(project, config, SLAVES):
 
     # Spidermonkey
     elif project.startswith('spidermonkey'):
-        spiderMonkeyObjects = generateSpiderMonkeyObjects(project, config, SLAVES)
+        spiderMonkeyObjects = generateSpiderMonkeyObjects(
+            project, config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
 
     # DXR
@@ -2702,8 +2835,9 @@ def generateProjectObjects(project, config, SLAVES):
 
     return buildObjects
 
+
 def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
-        platform_prop="platform", product_prop=None, product=None):
+                         platform_prop="platform", product_prop=None, product=None):
     extra_args = []
     if config.get('enable_mail_notifier'):
         if config.get('notify_real_author'):
@@ -2723,12 +2857,13 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
         upload_cmd = 'log_uploader.py'
 
     logUploadCmd = [sys.executable,
-         '%s/bin/%s' % (buildbotcustom.__path__[0], upload_cmd),
-         config['stage_server'],
-         '-u', config['stage_username'],
-         '-i', os.path.expanduser("~/.ssh/%s" % config['stage_ssh_key']),
-         '-b', branch_name,
-         ]
+                    '%s/bin/%s' % (buildbotcustom.__path__[0], upload_cmd),
+                    config['stage_server'],
+                    '-u', config['stage_username'],
+                    '-i', os.path.expanduser(
+                        "~/.ssh/%s" % config['stage_ssh_key']),
+                    '-b', branch_name,
+                    ]
 
     if platform_prop:
         logUploadCmd += ['-p', WithProperties("%%(%s)s" % platform_prop)]

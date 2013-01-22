@@ -8,8 +8,10 @@ from twisted.internet import defer, reactor
 
 from buildbot.status import base
 
+
 class ThreadedLogHandler(base.StatusReceiverMultiService):
     compare_attrs = ['categories', 'builders']
+
     def __init__(self, categories=None, builders=None):
         base.StatusReceiverMultiService.__init__(self)
 
@@ -46,7 +48,7 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
             return None
 
         self.watched.append(builder)
-        return self # subscribe to this builder
+        return self  # subscribe to this builder
 
     def buildStarted(self, builderName, build):
         pass
@@ -54,18 +56,20 @@ class ThreadedLogHandler(base.StatusReceiverMultiService):
     def buildFinished(self, builderName, build, results):
         builder = build.getBuilder()
         if self.builders is not None and builderName not in self.builders:
-            return # ignore this build
+            return  # ignore this build
         if self.categories is not None and \
-               builder.category not in self.categories:
-            return # ignore this build
+                builder.category not in self.categories:
+            return  # ignore this build
 
         reactor.callInThread(self.handleLogs, builder, build, results)
 
     def handleLogs(self, builder, build, results):
         pass
 
+
 class SubprocessLogHandler(ThreadedLogHandler):
     compare_attrs = ['command', 'categories', 'builders']
+
     def __init__(self, command, categories=None, builders=None):
         ThreadedLogHandler.__init__(self, categories, builders)
         self.command = command
@@ -76,8 +80,8 @@ class SubprocessLogHandler(ThreadedLogHandler):
         else:
             cmd = self.command[:]
         cmd.extend([
-               os.path.join(self.master_status.basedir, builder.basedir),
-               str(build.number)])
+                   os.path.join(self.master_status.basedir, builder.basedir),
+                   str(build.number)])
 
         properties = build.getProperties()
         cmd = properties.render(cmd)

@@ -35,35 +35,35 @@ MozillaEnvironments['win32-ref-platform'] = {
     "FrameworkSDKDir": 'D:\\msvs8\\SDK\\v2.0',
     "DevEnvDir": "D:\\msvs8\\VC\\Common7\\IDE",
     "MSVCDir": 'D:\\msvs8\\VC',
-    "PATH": 'd:\\sdks\\v6.0\\bin;' + \
-            'D:\\msvs8\\Common7\\IDE;' + \
-            'D:\\msvs8\\VC\\bin;' + \
-            'C:\\msvs8\\SDK\\bin;' + \
-            'D:\\msvs8\\VC;' + \
-            'D:\\msvs8\\Common7\\Tools;' + \
-            'D:\\msvs8\\Common7\\Tools\\bin;' + \
-            'D:\\mozilla-build\\buildbotve\\scripts;' +\
-            'd:\\mozilla-build\\hg;' + \
-            'd:\\mozilla-build\\moztools\\bin;' + \
-            'd:\\mozilla-build\\msys\\local\\bin;' + \
-            'd:\\mozilla-build\\msys\\bin;' + \
-            'd:\\mozilla-build\\7zip;' + \
-            'd:\\mozilla-build\\upx203w;' + \
-            'd:\\mozilla-build\\python25;' + \
-            'd:\\mozilla-build\\blat261\\full;' + \
-            'd:\\mozilla-build\\info-zip;' + \
-            'd:\\mozilla-build\\wget;' + \
+    "PATH": 'd:\\sdks\\v6.0\\bin;' +
+            'D:\\msvs8\\Common7\\IDE;' +
+            'D:\\msvs8\\VC\\bin;' +
+            'C:\\msvs8\\SDK\\bin;' +
+            'D:\\msvs8\\VC;' +
+            'D:\\msvs8\\Common7\\Tools;' +
+            'D:\\msvs8\\Common7\\Tools\\bin;' +
+            'D:\\mozilla-build\\buildbotve\\scripts;' +
+            'd:\\mozilla-build\\hg;' +
+            'd:\\mozilla-build\\moztools\\bin;' +
+            'd:\\mozilla-build\\msys\\local\\bin;' +
+            'd:\\mozilla-build\\msys\\bin;' +
+            'd:\\mozilla-build\\7zip;' +
+            'd:\\mozilla-build\\upx203w;' +
+            'd:\\mozilla-build\\python25;' +
+            'd:\\mozilla-build\\blat261\\full;' +
+            'd:\\mozilla-build\\info-zip;' +
+            'd:\\mozilla-build\\wget;' +
             'd:\\mozilla-build\\nsis-2.22;',
-            'D:\\mozilla-build\\nsis-2.33u;' + \
+            'D:\\mozilla-build\\nsis-2.33u;' +
             'd:\\sdks\\v6.0\\bin'
-    "INCLUDE": 'D:\\sdks\\v6.0\\include;' + \
-               'D:\\sdks\\v6.0\\include\\atl;' + \
-               'D:\\msvs8\\VC\\ATLMFC\\INCLUDE;' + \
-               'D:\\msvs8\\VC\\INCLUDE;' + \
+    "INCLUDE": 'D:\\sdks\\v6.0\\include;' +
+               'D:\\sdks\\v6.0\\include\\atl;' +
+               'D:\\msvs8\\VC\\ATLMFC\\INCLUDE;' +
+               'D:\\msvs8\\VC\\INCLUDE;' +
                'D:\\msvs8\\VC\\PlatformSDK\\include',
-    "LIB": 'D:\\sdks\\v6.0\\lib;' + \
-           'D:\\msvs8\\VC\\ATLMFC\\LIB;' + \
-           'D:\\msvs8\\VC\\LIB;' + \
+    "LIB": 'D:\\sdks\\v6.0\\lib;' +
+           'D:\\msvs8\\VC\\ATLMFC\\LIB;' +
+           'D:\\msvs8\\VC\\LIB;' +
            'D:\\msvs8\\VC\\PlatformSDK\\lib',
     "SDKDIR": 'D:\\sdks\\v6.0'
 }
@@ -80,9 +80,11 @@ MozillaEnvironments['linux-unittest'] = {
     "MOZ_NODE_PATH": "/home/cltbld/bin/node.exe"
 }
 
-MozillaEnvironments['linux64-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
+MozillaEnvironments['linux64-unittest'] = MozillaEnvironments[
+    'linux-unittest'].copy()
 # Not sure if I need this environment or not :(
-MozillaEnvironments['linux-mobile-unittest'] = MozillaEnvironments['linux-unittest'].copy() 
+MozillaEnvironments['linux-mobile-unittest'] = MozillaEnvironments[
+    'linux-unittest'].copy()
 
 MozillaEnvironments['macosx-unittest'] = {
     "MOZ_NO_REMOTE": '1',
@@ -92,7 +94,8 @@ MozillaEnvironments['macosx-unittest'] = {
     "MOZ_HIDE_RESULTS_TABLE": '1'
 }
 
-MozillaEnvironments['macosx64-unittest'] = MozillaEnvironments['macosx-unittest'].copy() 
+MozillaEnvironments['macosx64-unittest'] = MozillaEnvironments[
+    'macosx-unittest'].copy()
 
 MozillaEnvironments['win32-unittest'] = {
     "MOZ_NO_REMOTE": '1',
@@ -114,7 +117,7 @@ MozillaEnvironments['win32-unittest'] = {
     "FrameworkSDKDir": 'D:\\msvs8\\SDK\\v2.0',
     "MSVCDir": 'D:\\msvs8\\VC',
     "DevEnvDir": "D:\\msvs8\\Common7\\IDE",
-    "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' + \
+    "LIBPATH": 'C:\\WINDOWS\\Microsoft.NET\\Framework\\v2.0.50727;' +
                'D:\\msvs8\\VC\\ATLMFC\\LIB',
     "MOZ_HIDE_RESULTS_TABLE": '1'
 }
@@ -137,11 +140,11 @@ MozillaEnvironments['win32-perf'] = {
     "NO_EM_RESTART": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
     "CYGWINBASE": 'C:\\cygwin',
-    "PATH": 'C:\\Python24;' + \
-            'C:\\Python24\\Scripts;' + \
-            'C:\\cygwin\\bin;' + \
-            'C:\\WINDOWS\\System32;' + \
-            'C:\\program files\\gnuwin32\\bin;' + \
+    "PATH": 'C:\\Python24;' +
+            'C:\\Python24\\Scripts;' +
+            'C:\\cygwin\\bin;' +
+            'C:\\WINDOWS\\System32;' +
+            'C:\\program files\\gnuwin32\\bin;' +
             'C:\\WINDOWS;'
 }
 
@@ -150,18 +153,18 @@ MozillaEnvironments['win32-perf-unittest'] = {
     "MOZ_NO_REMOTE": '1',
     "NO_EM_RESTART": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
-    "PATH": 'C:\\mozilla-build;' + \
-            'C:\\mozilla-build\\msys\\bin;' + \
-            'C:\\mozilla-build\\msys\\local\\bin;' + \
-            'C:\\mozilla-build\\buildbotve\\scripts;' +\
-            'C:\\mozilla-build\\Python25;' + \
-            'C:\\mozilla-build\\Python25\\Scripts;' + \
-            'C:\\mozilla-build\\hg;' + \
-            'C:\\mozilla-build\\7zip;' + \
-            'C:\\mozilla-build\\upx203w;' + \
+    "PATH": 'C:\\mozilla-build;' +
+            'C:\\mozilla-build\\msys\\bin;' +
+            'C:\\mozilla-build\\msys\\local\\bin;' +
+            'C:\\mozilla-build\\buildbotve\\scripts;' +
+            'C:\\mozilla-build\\Python25;' +
+            'C:\\mozilla-build\\Python25\\Scripts;' +
+            'C:\\mozilla-build\\hg;' +
+            'C:\\mozilla-build\\7zip;' +
+            'C:\\mozilla-build\\upx203w;' +
             # Needed for taskkil.exe to find framedyn.dll
-            'C:\\WINDOWS\\System32\\Wbem;' + \
-            'C:\\WINDOWS\\System32;' + \
+            'C:\\WINDOWS\\System32\\Wbem;' +
+            'C:\\WINDOWS\\System32;' +
             'C:\\WINDOWS;'
 }
 
@@ -195,4 +198,3 @@ MozillaEnvironments['android-unittest'] = {
 
 MozillaEnvironments['android-perf'] = {
 }
-

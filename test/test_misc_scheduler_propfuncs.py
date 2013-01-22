@@ -1,5 +1,6 @@
 from __future__ import with_statement
-import os, shutil
+import os
+import shutil
 from twisted.trial import unittest
 
 from buildbot.schedulers.basic import Scheduler
@@ -11,8 +12,10 @@ import mock
 
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
 
+
 class TestPropFuncs(unittest.TestCase):
     basedir = "test_misc_scheduler_propfuncs"
+
     def setUp(self):
         if os.path.exists(self.basedir):
             shutil.rmtree(self.basedir)
@@ -41,32 +44,42 @@ class TestPropFuncs(unittest.TestCase):
             # timezone issues near our default of 19700101000000
             time_method.return_value = 86458
 
-            self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
+            self.dbc.runInteractionNow(
+                lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(86458)))
+            self.assertEquals(state['last_buildid'], time.strftime(
+                "%Y%m%d%H%M%S", time.localtime(86458)))
 
-            # Running this again at the same time should increment our buildid by 1
-            self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
+            # Running this again at the same time should increment our buildid
+            # by 1
+            self.dbc.runInteractionNow(
+                lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(86459)))
+            self.assertEquals(state['last_buildid'], time.strftime(
+                "%Y%m%d%H%M%S", time.localtime(86459)))
 
             # Running this again at the same time should increment our buildid by 1
             # and cross the minute boundary properly
-            self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
+            self.dbc.runInteractionNow(
+                lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
             self.assertEquals(state['last_buildid'][-3:], '100')
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(86460)))
+            self.assertEquals(state['last_buildid'], time.strftime(
+                "%Y%m%d%H%M%S", time.localtime(86460)))
 
             # If time happens to go backwards, our buildid shouldn't
             time_method.return_value = 8
-            self.dbc.runInteractionNow(lambda t: buildIDSchedFunc(self.s, t, None))
+            self.dbc.runInteractionNow(
+                lambda t: buildIDSchedFunc(self.s, t, None))
             state = self.dbc.runInteractionNow(lambda t: self.s.get_state(t))
             self.assertEquals(state['last_buildid'][-3:], '101')
-            self.assertEquals(state['last_buildid'], time.strftime("%Y%m%d%H%M%S", time.localtime(86461)))
+            self.assertEquals(state['last_buildid'], time.strftime(
+                "%Y%m%d%H%M%S", time.localtime(86461)))
 
     def test_buildUIDSchedFunc(self):
         import uuid
         with mock.patch.object(uuid, 'uuid4') as uuid4_method:
             uuid4_method.return_value.hex = '1234567890abcdef'
-            props = self.dbc.runInteractionNow(lambda t: buildUIDSchedFunc(self.s, t, None))
+            props = self.dbc.runInteractionNow(
+                lambda t: buildUIDSchedFunc(self.s, t, None))
             self.assertEquals(props['builduid'], '1234567890abcdef')

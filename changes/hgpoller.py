@@ -116,19 +116,23 @@ class Pluggable(object):
         self.d = defer.Deferred()
         self.dead = False
         d.addCallbacks(self.succeeded, self.failed)
+
     def succeeded(self, result):
         if self.dead:
             log.msg("Dead pluggable got called")
         else:
             self.d.callback(result)
-    def failed(self, fail = None):
+
+    def failed(self, fail=None):
         if self.dead:
             log.msg("Dead pluggable got errbacked")
         else:
             self.d.errback(fail)
 
+
 class BasePoller(object):
     attemptLimit = 3
+
     def __init__(self):
         self.attempts = 0
         self.startLoad = 0
@@ -142,7 +146,8 @@ class BasePoller(object):
                 log.msg("dropping the ball on %s, starting new" % self)
             else:
                 self.attempts += 1
-                log.msg("Not polling %s because last poll is still working" % self)
+                log.msg("Not polling %s because last poll is still working" %
+                        self)
                 reactor.callLater(0, self.pollDone, None)
                 return
         self.attempts = 1
@@ -238,15 +243,15 @@ class BaseHgPoller(BasePoller):
 
     def dataFailed(self, res):
         # XXX: disabled for bug 774862
-        #if hasattr(res.value, 'status') and res.value.status == '500' and \
+        # if hasattr(res.value, 'status') and res.value.status == '500' and \
                 #'unknown revision' in res.value.response:
             ## Indicates that the revision can't be found.  The repo has most
             ## likely been reset.  Forget about our lastChangeset, and set
             ## emptyRepo to True so we can trigger builds for new changes there
-            #if self.verbose:
-                #log.msg("%s has been reset" % self.baseURL)
-            #self.lastChangeset = None
-            #self.emptyRepo = True
+            # if self.verbose:
+                # log.msg("%s has been reset" % self.baseURL)
+            # self.lastChangeset = None
+            # self.emptyRepo = True
         return self.super_class.dataFailed(self, res)
 
     def processData(self, query):
@@ -434,7 +439,9 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
 
     def changeHook(self, change):
         if self.storeRev:
-            change.properties.setProperty(self.storeRev, change.revision, 'HgPoller')
+            change.properties.setProperty(
+                self.storeRev, change.revision, 'HgPoller')
+
 
 class HgLocalePoller(BaseHgPoller):
     """This helper class for HgAllLocalesPoller polls a single locale and
@@ -444,20 +451,22 @@ class HgLocalePoller(BaseHgPoller):
     verbose = False
 
     def __init__(self, locale, parent, branch, hgURL):
-        BaseHgPoller.__init__(self, hgURL, branch, tree = locale)
+        BaseHgPoller.__init__(self, hgURL, branch, tree=locale)
         self.locale = locale
         self.parent = parent
         self.branch = branch
 
     def changeHook(self, change):
         change.properties.setProperty('locale', self.locale, 'HgLocalePoller')
-        change.properties.setProperty('l10n_revision', change.revision, 'HgLocalePoller')
+        change.properties.setProperty(
+            'l10n_revision', change.revision, 'HgLocalePoller')
 
     def pollDone(self, res):
         self.parent.localeDone(self.locale)
 
     def __str__(self):
         return "<HgLocalePoller for %s>" % self.baseURL
+
 
 class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     """Poll all localization repositories from an index page.
@@ -518,9 +527,9 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
 
     def getData(self):
         log.msg("Polling all locales at %s/%s/" % (self.hgURL,
-                                                  self.repositoryIndex))
+                                                   self.repositoryIndex))
         return getPage(self.hgURL + '/' + self.repositoryIndex + '/?style=raw',
-                       timeout = self.timeout)
+                       timeout=self.timeout)
 
     def getLocalePoller(self, locale, branch):
         if (locale, branch) not in self.localePollers:
@@ -533,6 +542,7 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     def processData(self, data):
         locales = filter(None, data.split())
         # get locales and branches
+
         def brancher(link):
             steps = filter(None, link.split('/'))
             loc = steps.pop()
@@ -559,7 +569,8 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
             self.activeRequests -= 1
             if not self.activeRequests:
                 msg = "%s done with all locales" % str(self)
-                loadTimes = map(lambda p: p.loadTime, self.localePollers.values())
+                loadTimes = map(
+                    lambda p: p.loadTime, self.localePollers.values())
                 goodTimes = filter(lambda t: t is not None, loadTimes)
                 if not goodTimes:
                     msg += ". All %d locale pollers failed" % len(loadTimes)
@@ -568,7 +579,8 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
                         (min(goodTimes), max(goodTimes),
                          sum(goodTimes) / len(goodTimes))
                     if len(loadTimes) > len(goodTimes):
-                        msg += ", %d failed" % (len(loadTimes) - len(goodTimes))
+                        msg += ", %d failed" % (
+                            len(loadTimes) - len(goodTimes))
                 log.msg(msg)
                 log.msg("Total time: %.1f" % (time.time() - self.startLoad))
             return
@@ -583,4 +595,4 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
 
     def __str__(self):
         return "<HgAllLocalesPoller for %s/%s/>" % (self.hgURL,
-                                                   self.repositoryIndex)
+                                                    self.repositoryIndex)

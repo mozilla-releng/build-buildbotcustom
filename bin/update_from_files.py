@@ -1,16 +1,24 @@
 import buildbotcustom.status.db.model as model
-import cPickle, os, re, time, sys
+import cPickle
+import os
+import re
+import time
+import sys
 from datetime import datetime
 from buildbot.status.builder import BuilderStatus, BuildStepStatus
 
 # Monkey patching!
 # These are various replacement functions for __setstate__, which is
 # called when unpickling files.
+
+
 def monkeypatch(orig, new):
     orig_setstate = orig.__setstate__
+
     def wrapper(self, state):
         return new(self, orig_setstate, state)
     orig.__setstate__ = wrapper
+
 
 def builder_setstate_noevents(self, orig, state):
     slaves = state['slavenames']
@@ -18,17 +26,21 @@ def builder_setstate_noevents(self, orig, state):
     orig(self, state)
     self.slavenames = slaves
 
+
 def builder_setstate_events(self, orig, state):
     slaves = state['slavenames']
     orig(self, state)
     self.slavenames = slaves
 
+
 def buildstep_setstate(self, orig, state):
     state['logs'] = []
     orig(self, state)
 
+
 def getBuildNumbers(builder, last_time):
     files = os.listdir(builder)
+
     def _sortfunc(x):
         try:
             return int(x)
@@ -45,15 +57,18 @@ def getBuildNumbers(builder, last_time):
             retval.append(f)
     return retval
 
+
 def getBuild(builder, number):
     try:
         return cPickle.load(open(os.path.join(builder, number)))
     except:
         return None
 
+
 def getBuilder(builder):
     builder = cPickle.load(open(os.path.join(builder, 'builder')))
     return builder
+
 
 def updateBuilderSlaves(session, builder, db_builder):
     bb_slaves = set(s for s in builder.slavenames)
@@ -69,7 +84,8 @@ def updateBuilderSlaves(session, builder, db_builder):
     old_slaves = db_slaves - bb_slaves
 
     for s in new_slaves:
-        bs = model.BuilderSlave(added=datetime.now(), slave=model.Slave.get(session, s))
+        bs = model.BuilderSlave(
+            added=datetime.now(), slave=model.Slave.get(session, s))
         db_builder.slaves.append(bs)
         session.add(bs)
 
@@ -80,6 +96,7 @@ def updateBuilderSlaves(session, builder, db_builder):
 
     session.commit()
 
+
 def updateSlaveTimes(session, master, builder, db_builder, last_time):
     db_slaves = {}
     for builder_slave in db_builder.slaves:
@@ -87,10 +104,12 @@ def updateSlaveTimes(session, master, builder, db_builder, last_time):
 
     # Fetch all the events from the database for these slaves
     events = session.query(model.MasterSlave).\
-                filter(model.MasterSlave.slave_id.in_([slave.slave.id for slave in db_builder.slaves]))
+        filter(model.MasterSlave.slave_id.in_(
+               [slave.slave.id for slave in db_builder.slaves]))
 
     if last_time:
-        events = events.filter(model.MasterSlave.connected > datetime.utcfromtimestamp(last_time))
+        events = events.filter(model.MasterSlave.connected >
+                               datetime.utcfromtimestamp(last_time))
 
     events = events.order_by(model.MasterSlave.connected.asc()).all()
 
@@ -114,7 +133,8 @@ def updateSlaveTimes(session, master, builder, db_builder, last_time):
             t = datetime.utcfromtimestamp(int(e.started))
             if e.text[0] == "connect":
                 # This slave just connected to this builder
-                # Check if we've got an entry earlier than this that hasn't been disconnected yet
+                # Check if we've got an entry earlier than this that hasn't
+                # been disconnected yet
                 found = False
                 for event in reversed(slave_events):
                     if event.connected < t and not event.disconnected:
@@ -130,17 +150,19 @@ def updateSlaveTimes(session, master, builder, db_builder, last_time):
                     if event:
                         print t
                         for e in reversed(slave_events):
-                            print e.connected, e.connected-t, e.connected == t
+                            print e.connected, e.connected - t, e.connected == t
                         raise ValueError("Shouldn't be here!")
-                    event = model.MasterSlave(connected=t, slave=db_slaves[name].slave, master=master)
+                    event = model.MasterSlave(connected=t, slave=db_slaves[
+                                              name].slave, master=master)
                     session.add(event)
 
                     slave_events.append(event)
                     events.append(event)
-                    slave_events.sort(key=lambda x:x.connected)
-                    events.sort(key=lambda x:x.connected)
+                    slave_events.sort(key=lambda x: x.connected)
+                    events.sort(key=lambda x: x.connected)
             else:
-                # If this is a disconnect event, find the last connect event and mark it as disconnected
+                # If this is a disconnect event, find the last connect event
+                # and mark it as disconnected
                 found = False
                 for event in reversed(slave_events):
                     if event.connected < t:
@@ -186,7 +208,8 @@ def updateFromFiles(session, master_url, master_name, builders, last_time, updat
 
         updateBuilderSlaves(session, bb_builder, db_builder)
         if update_times:
-            updateSlaveTimes(session, master, bb_builder, db_builder, last_time)
+            updateSlaveTimes(
+                session, master, bb_builder, db_builder, last_time)
 
         for j, buildNumber in enumerate(builds):
             master = session.merge(master)
@@ -196,8 +219,8 @@ def updateFromFiles(session, master_url, master_name, builders, last_time, updat
                 eta = 0
             else:
                 eta = (time.time() - s) / (complete)
-                eta = (1-complete) * eta
-            print builder, buildNumber, "%i/%i" % (j+1, bn), "%.2f%% complete" % (100* complete), "ETA in %i seconds" % eta
+                eta = (1 - complete) * eta
+            print builder, buildNumber, "%i/%i" % (j + 1, bn), "%.2f%% complete" % (100 * complete), "ETA in %i seconds" % eta
             i += 1
             build = getBuild(builder, buildNumber)
             if not build:
@@ -207,14 +230,15 @@ def updateFromFiles(session, master_url, master_name, builders, last_time, updat
                 starttime = datetime.utcfromtimestamp(build.started)
 
             q = session.query(model.Build).filter_by(
-                    master_id=master.id,
-                    builder=db_builder,
-                    buildnumber=build.number,
-                    starttime=starttime,
-                    )
+                master_id=master.id,
+                builder=db_builder,
+                buildnumber=build.number,
+                starttime=starttime,
+            )
             db_build = q.first()
             if not db_build:
-                db_build = model.Build.fromBBBuild(session, build, builder_name, master.id)
+                db_build = model.Build.fromBBBuild(
+                    session, build, builder_name, master.id)
             else:
                 db_build.updateFromBBBuild(session, build)
             session.commit()
@@ -226,10 +250,12 @@ if __name__ == "__main__":
 
     parser = OptionParser("%prog [options] builders")
     parser.add_option("-d", "--database", dest="database", help="database url")
-    parser.add_option("-m", "--master", dest="master", help="master url (buildbotURL in the master.cfg file)")
-    parser.add_option("-n", "--description", dest="name", help="human friendly name for master")
+    parser.add_option("-m", "--master", dest="master",
+                      help="master url (buildbotURL in the master.cfg file)")
+    parser.add_option("-n", "--description", dest="name",
+                      help="human friendly name for master")
     parser.add_option("", "--times", dest="times", help="update slave connect/disconnect times", action="store_true", default=False)
-    parser.add_option("-c", "--config", dest="config", 
+    parser.add_option("-c", "--config", dest="config",
                       help="read configurations from a file")
 
     options, args = parser.parse_args()
@@ -249,7 +275,7 @@ if __name__ == "__main__":
             for param in supported_params:
                 # Rewrite empty CLI params if we have them in config
                 if not getattr(options, param, None) and \
-                   config.has_option('DEFAULT', param):
+                        config.has_option('DEFAULT', param):
                     setattr(options, param, config.get('DEFAULT', param))
 
         except (ParsingError, MissingSectionHeaderError):
@@ -294,10 +320,11 @@ if __name__ == "__main__":
     except:
         last_time = 0
 
-    print "\n" + "-"*75
+    print "\n" + "-" * 75
     print "Starting update at", time.ctime(started)
 
-    updated = updateFromFiles(session, options.master, options.name, builders, last_time, options.times)
+    updated = updateFromFiles(session, options.master, options.name,
+                              builders, last_time, options.times)
 
     print "Updated", updated, "builds in:"
 

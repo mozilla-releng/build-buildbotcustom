@@ -13,6 +13,7 @@ import buildbot.scripts.checkconfig as checkconfig
 import model
 reload(model)
 
+
 class DBBuildStatus(base.StatusReceiver):
     """This class monitors the status for an individual build.  It receives
     stepStarted, stepFinished, logStarted, logFinished and logChunk
@@ -39,7 +40,8 @@ class DBBuildStatus(base.StatusReceiver):
         """Create this step in the database, and give it a start time"""
         session = self.Session()
         try:
-            b = session.query(model.Build).options(model.eagerload('steps')).get(self.build_id)
+            b = session.query(model.Build).options(
+                model.eagerload('steps')).get(self.build_id)
             s = model.Step.get(session, name=step.name, build_id=self.build_id)
             s.starttime = datetime.utcfromtimestamp(step.started)
             s.description = step.text
@@ -57,7 +59,8 @@ class DBBuildStatus(base.StatusReceiver):
                         log.err()
             return self
         except:
-            log.msg("DBERROR: Couldn't add step: name=%s, build_id=%s" % (step.name, self.build_id))
+            log.msg("DBERROR: Couldn't add step: name=%s, build_id=%s" %
+                    (step.name, self.build_id))
             log.err()
         finally:
             session.close()
@@ -72,7 +75,8 @@ class DBBuildStatus(base.StatusReceiver):
             # does.  This can happen if the master is reconfigured while steps
             # are currently active.
             if not self.current_step:
-                s = model.Step.get(session, name=step.name, build_id=self.build_id)
+                s = model.Step.get(
+                    session, name=step.name, build_id=self.build_id)
                 # This may not be set
                 if s.starttime:
                     s.starttime = datetime.utcfromtimestamp(step.started)
@@ -87,7 +91,8 @@ class DBBuildStatus(base.StatusReceiver):
             # Update the properties
             b = session.query(model.Build).get(self.build_id)
             if b:
-                b.properties = model.Property.fromBBProperties(session, build.getProperties())
+                b.properties = model.Property.fromBBProperties(
+                    session, build.getProperties())
 
             session.commit()
             # Notify our subscribers that the step is done
@@ -163,13 +168,15 @@ class DBBuildStatus(base.StatusReceiver):
                 for sub in self.subscribers:
                     if hasattr(sub, 'logChunk'):
                         try:
-                            sub.logChunk(build, step, l, channel, text, self.current_step_id)
+                            sub.logChunk(build, step, l,
+                                         channel, text, self.current_step_id)
                         except:
                             log.msg("DBERROR: Couldn't notify subscriber %s of log chunk" % sub)
                             log.err()
             except:
                 log.msg("DBERROR: logChunk")
                 log.err()
+
 
 class DBStatus(base.StatusReceiverMultiService):
     """Database Status plugin for Buildbot.
@@ -248,7 +255,8 @@ class DBStatus(base.StatusReceiverMultiService):
             try:
                 builder.unsubscribe(self)
             except:
-                log.msg("DBERROR: Couldn't unsubscribe from builder %s" % builder.name)
+                log.msg("DBERROR: Couldn't unsubscribe from builder %s" %
+                        builder.name)
                 log.err()
 
     def setup(self):
@@ -279,17 +287,20 @@ class DBStatus(base.StatusReceiverMultiService):
                     master_build = self.status.getBuilder(build.builder.name).getBuildByNumber(build.buildnumber)
                     if master_build.finished:
                         force_done = True
-                        end_time = datetime.utcfromtimestamp(master_build.finished)
+                        end_time = datetime.utcfromtimestamp(
+                            master_build.finished)
                         result = master_build.results
                 except (IOError, IndexError, KeyError):
                     # The master doesn't have information about this build, so
-                    # that means it's not active.  Mark it as finished as of now, and FAILED
+                    # that means it's not active.  Mark it as finished as of
+                    # now, and FAILED
                     force_done = True
                     end_time = datetime.now()
                     lost = True
 
                 if force_done:
-                    log.msg("DBMSG: Marking build %s %i as done" % (build.builder.name, build.buildnumber))
+                    log.msg("DBMSG: Marking build %s %i as done" %
+                            (build.builder.name, build.buildnumber))
                     build.endtime = end_time
                     if lost:
                         build.lost = True
@@ -303,7 +314,8 @@ class DBStatus(base.StatusReceiverMultiService):
                     if master_build:
                         build.updateFromBBBuild(session, master_build)
                     else:
-                        # TODO: Run this as an update query where build_id = ?, step.endtime = NULL
+                        # TODO: Run this as an update query where build_id = ?,
+                        # step.endtime = NULL
                         for step in build.steps:
                             if step.endtime is None:
                                 step.endtime = end_time
@@ -317,11 +329,13 @@ class DBStatus(base.StatusReceiverMultiService):
             # requests, so we won't find any to store in self.request_mapper
             for builderName in self.status.getBuilderNames():
                 master_builder = self.status.getBuilder(builderName)
-                db_builder = model.Builder.get(session, builderName, self.master_id)
+                db_builder = model.Builder.get(
+                    session, builderName, self.master_id)
                 for p in master_builder.getPendingBuilds():
                     r = model.Request.get(session, builder=db_builder,
-                            submittime=datetime.utcfromtimestamp(p.getSubmitTime()),
-                            source=p.source)
+                                          submittime=datetime.utcfromtimestamp(
+                                          p.getSubmitTime()),
+                                          source=p.source)
                     if r:
                         log.msg("DBMSG: Found matching request for db request %i" % r.id)
                         self.request_mapping[p] = r
@@ -365,7 +379,8 @@ class DBStatus(base.StatusReceiverMultiService):
             old_slaves = db_slaves - bb_slaves
 
             for s in new_slaves:
-                bs = model.BuilderSlave(added=datetime.now(), slave=model.Slave.get(session, s))
+                bs = model.BuilderSlave(
+                    added=datetime.now(), slave=model.Slave.get(session, s))
                 b.slaves.append(bs)
                 session.add(bs)
 
@@ -398,8 +413,8 @@ class DBStatus(base.StatusReceiverMultiService):
         session = self.Session()
         try:
             b = model.Build.fromBBBuild(session, build, builderName,
-                    self.master_id,
-                    self.request_mapping)
+                                        self.master_id,
+                                        self.request_mapping)
 
             for s in build.steps:
                 b.steps.append(model.Step(name=s.name, description=s.text))
@@ -417,7 +432,8 @@ class DBStatus(base.StatusReceiverMultiService):
             if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
                 self.lostConnection()
             else:
-                log.msg("DBERROR: Couldn't start build %s on builder %s" % (build.number, builderName))
+                log.msg("DBERROR: Couldn't start build %s on builder %s" %
+                        (build.number, builderName))
                 log.err()
         finally:
             session.close()
@@ -427,20 +443,22 @@ class DBStatus(base.StatusReceiverMultiService):
         try:
             builder = model.Builder.get(session, builderName, self.master_id)
 
-            b = session.query(model.Build).filter_by(buildnumber=build.number, builder_id=builder.id, endtime=None).first()
+            b = session.query(model.Build).filter_by(buildnumber=build.number,
+                                                     builder_id=builder.id, endtime=None).first()
             # This build may not exist yet in the database.  This can happen if
             # the DB status plugin isn't active when the build started.  If we
             # can't find the build in the database, we should create it.
             if not b:
                 b = model.Build.fromBBBuild(session, build, builderName,
-                        self.master_id, self.request_mapping)
+                                            self.master_id, self.request_mapping)
 
             finished = datetime.utcfromtimestamp(build.finished)
             b.endtime = finished
             b.result = results
 
             # Add the properties
-            b.properties = model.Property.fromBBProperties(session, build.getProperties())
+            b.properties = model.Property.fromBBProperties(
+                session, build.getProperties())
 
             session.commit()
             for sub in self.subscribers:
@@ -454,7 +472,8 @@ class DBStatus(base.StatusReceiverMultiService):
             if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
                 self.lostConnection()
             else:
-                log.msg("DBERROR: Couldn't stop build %s on builder %s" % (build.number, builderName))
+                log.msg("DBERROR: Couldn't stop build %s on builder %s" %
+                        (build.number, builderName))
                 log.err()
         finally:
             session.close()
@@ -464,7 +483,8 @@ class DBStatus(base.StatusReceiverMultiService):
         try:
             # Add any new request into the database, as well as into our
             # internal mapping of build requests to database objects
-            builder = model.Builder.get(session, request.builderName, self.master_id)
+            builder = model.Builder.get(
+                session, request.builderName, self.master_id)
             r = model.Request.fromBBRequest(session, builder, request)
             session.add(r)
             session.commit()
@@ -474,7 +494,8 @@ class DBStatus(base.StatusReceiverMultiService):
             if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
                 self.lostConnection()
             else:
-                log.msg("DBERROR: Couldn't record new request on builder %s" % request.builderName)
+                log.msg("DBERROR: Couldn't record new request on builder %s" %
+                        request.builderName)
                 log.err()
         finally:
             session.close()
@@ -510,7 +531,8 @@ class DBStatus(base.StatusReceiverMultiService):
             if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
                 self.lostConnection()
             else:
-                log.msg("DBERROR: Couldn't mark slave %s as connected" % slaveName)
+                log.msg("DBERROR: Couldn't mark slave %s as connected" %
+                        slaveName)
                 log.err()
         finally:
             session.close()
@@ -518,13 +540,15 @@ class DBStatus(base.StatusReceiverMultiService):
     def slaveDisconnected(self, slaveName):
         session = self.Session()
         try:
-            model.MasterSlave.setDisconnected(session, self.master_id, slaveName)
+            model.MasterSlave.setDisconnected(
+                session, self.master_id, slaveName)
             session.commit()
         except:
             if sys.exc_info()[0] is sqlalchemy.exc.OperationalError:
                 self.lostConnection()
             else:
-                log.msg("DBERROR: Couldn't mark slave %s as disconnected" % slaveName)
+                log.msg("DBERROR: Couldn't mark slave %s as disconnected" %
+                        slaveName)
                 log.err()
         finally:
             session.close()

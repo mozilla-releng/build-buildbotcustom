@@ -1,7 +1,9 @@
-import time, uuid
+import time
+import uuid
+
 
 def getSupportedPlatforms():
-    return ('linux', 'linuxqt','linux64',
+    return ('linux', 'linuxqt', 'linux64',
             'win32', 'macosx', 'macosx64',
             'win64', 'android',
             'ics_armv7a_gecko',
@@ -10,6 +12,7 @@ def getSupportedPlatforms():
             'linux64_gecko', 'linux32_gecko_localizer',
             'macosx64_gecko_localizer', 'win32_gecko_localizer',
             'linux64_gecko_localizer')
+
 
 def getPlatformFtpDir(platform):
     platform_ftp_map = {
@@ -23,20 +26,24 @@ def getPlatformFtpDir(platform):
     }
     return platform_ftp_map.get(platform)
 
+
 def genBuildID(now=None):
     """Return a buildid based on the current time"""
     if not now:
         now = time.time()
     return time.strftime("%Y%m%d%H%M%S", time.localtime(now))
 
+
 def genBuildUID():
     """Return a unique build uid"""
     return uuid.uuid4().hex
 
+
 def incrementBuildID(buildID):
     """Add 1 second to a buildID, handling rollovers to next minute/hour/etc"""
     epoch = time.mktime(time.strptime(buildID, "%Y%m%d%H%M%S"))
-    return genBuildID(epoch+1)
+    return genBuildID(epoch + 1)
+
 
 def reallyShort(name, product=None):
     # FIXME: hacky workaround to fix thunderbird windows builds
@@ -85,6 +92,7 @@ def reallyShort(name, product=None):
         'snowleopard': 'snow',
         'fedora': 'fed',
         'fedora64': 'fed64',
+        'ubuntu64': 'ub64',
         'repack': 'rpk',
         'alder': 'a',
         'holly': 'h',
@@ -111,4 +119,3 @@ def reallyShort(name, product=None):
         else:
             new_words.append(word)
     return prefix + '-'.join(new_words)
-

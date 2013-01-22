@@ -2,7 +2,8 @@
 # Contributor(s):
 #   Chris AtLee <catlee@mozilla.com>
 #   Lukas Blakk <lsblakk@mozilla.com>
-import re, time
+import re
+import time
 from twisted.python import log
 from twisted.internet import defer
 from twisted.web.client import getPage
@@ -17,6 +18,7 @@ from buildbotcustom.common import genBuildID, genBuildUID, incrementBuildID
 
 from buildbot.process.properties import Properties
 from buildbot.util import json
+
 
 def tryChooser(s, all_changes):
     log.msg("Looking at changes: %s" % all_changes)
@@ -41,38 +43,41 @@ def tryChooser(s, all_changes):
             # still need to parse a comment string to get the default set
             log.msg("No comments, passing empty string which will result in default set")
             comments = ""
-        customBuilders = TryParser(comments, s.builderNames, s.prettyNames, s.unittestPrettyNames,
-                          s.unittestSuites, s.talosSuites, s.buildbotBranch)
+        customBuilders = TryParser(
+            comments, s.builderNames, s.prettyNames, s.unittestPrettyNames,
+            s.unittestSuites, s.talosSuites, s.buildbotBranch)
         buildersPerChange[c] = customBuilders
 
     def parseDataError(failure, c):
-        log.msg("Couldn't parse data: Requesting default try set. %s" % failure)
+        log.msg(
+            "Couldn't parse data: Requesting default try set. %s" % failure)
         parseData("", c)
 
     for c in all_changes:
-      try:
-        match = re.search("try", c.branch)
-        if not match:
-            log.msg("Ignoring off-branch %s" % c.branch)
-            continue
-        # Look in comments first for try: syntax
-        match = re.search("try:", c.comments)
-        if match:
-            log.msg("Found try message in the change comments, ignoring push comments")
-            d = defer.succeed(c.comments)
-        # otherwise getPage from hg.m.o
-        else:
-            d = getPage(str("http://hg.mozilla.org/try/json-pushes?full=1&changeset=%s" % c.revision))
-            d.addCallback(getJSON)
-      except:
-        log.msg("Error in all_changes loop: sending default try set")
-        d = defer.succeed("")
-      d.addCallback(parseData, c)
-      d.addErrback(parseDataError, c)
-      dl.append(d)
+        try:
+            match = re.search("try", c.branch)
+            if not match:
+                log.msg("Ignoring off-branch %s" % c.branch)
+                continue
+            # Look in comments first for try: syntax
+            match = re.search("try:", c.comments)
+            if match:
+                log.msg("Found try message in the change comments, ignoring push comments")
+                d = defer.succeed(c.comments)
+            # otherwise getPage from hg.m.o
+            else:
+                d = getPage(str("http://hg.mozilla.org/try/json-pushes?full=1&changeset=%s" % c.revision))
+                d.addCallback(getJSON)
+        except:
+            log.msg("Error in all_changes loop: sending default try set")
+            d = defer.succeed("")
+        d.addCallback(parseData, c)
+        d.addErrback(parseDataError, c)
+        dl.append(d)
     d = defer.DeferredList(dl)
     d.addCallback(lambda res: buildersPerChange)
     return d
+
 
 def buildIDSchedFunc(sched, t, ssid):
     """Generates a unique buildid for this change.
@@ -100,6 +105,7 @@ def buildIDSchedFunc(sched, t, ssid):
     props.setProperty('buildid', newid, 'buildIDSchedFunc')
     return props
 
+
 def buildUIDSchedFunc(sched, t, ssid):
     """Return a Properties instance with 'builduid' set to a randomly generated
     id."""
@@ -109,8 +115,10 @@ def buildUIDSchedFunc(sched, t, ssid):
 
 # A version of changeEventGenerator that can be used within a db connector
 # thread.  Copied from buildbot/db/connector.py.
+
+
 def changeEventGeneratorInTransaction(dbconn, t, branches=[],
-        categories=[], committers=[], minTime=0):
+                                      categories=[], committers=[], minTime=0):
     q = "SELECT changeid FROM changes"
     args = []
     if branches or categories or committers:
@@ -133,6 +141,7 @@ def changeEventGeneratorInTransaction(dbconn, t, branches=[],
     for (changeid,) in t.fetchall():
         yield dbconn._txn_getChangeNumberedNow(t, changeid)
 
+
 def lastChange(db, t, branch):
     """Returns the revision for the last changeset on the given branch"""
     #### NOTE: called in a thread!
@@ -146,13 +155,14 @@ def lastChange(db, t, branch):
         return c
     return None
 
+
 def lastGoodRev(db, t, branch, builderNames, starttime, endtime):
     """Returns the revision for the latest green build among builders.  If no
     revision is all green, None is returned."""
 
     # Get a list of branch, revision, buildername tuples from builds on
     # `branch` that completed successfully or with warnings within [starttime,
-    # endtime] (a closed interval) 
+    # endtime] (a closed interval)
     q = db.quoteq("""SELECT branch, revision, buildername FROM
                 sourcestamps,
                 buildsets,
@@ -196,6 +206,7 @@ def lastGoodRev(db, t, branch, builderNames, starttime, endtime):
             return revision
     return None
 
+
 def getLatestRev(db, t, branch, r1, r2):
     """Returns whichever of r1, r2 has the latest when_timestamp"""
     if r1 == r2:
@@ -211,6 +222,7 @@ def getLatestRev(db, t, branch, r1, r2):
                      LIMIT 1""")
     t.execute(q, (branch, r1, r2))
     return t.fetchone()[0]
+
 
 def getLastBuiltRevision(db, t, branch, builderNames):
     """Returns the latest revision that was built on builderNames"""
@@ -240,15 +252,16 @@ def getLastBuiltRevision(db, t, branch, builderNames):
             ORDER BY
                 changes.when_timestamp DESC
             LIMIT 1""" % (
-                concat('sourcestamps.revision', "'%'"),
-                db.parmlist(len(builderNames)))
-            )
+        concat('sourcestamps.revision', "'%'"),
+        db.parmlist(len(builderNames)))
+    )
 
     t.execute(q, (branch,) + tuple(builderNames))
     result = t.fetchone()
     if result:
         return result[0]
     return None
+
 
 def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=None):
     """Returns a function that returns the latest revision on branch that was
@@ -267,10 +280,11 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
 
         # Look back 24 hours for a good revision to build
         start = time.time()
-        rev = lastGoodRev(db, t, branch, builderNames, start-(24*3600), start)
+        rev = lastGoodRev(
+            db, t, branch, builderNames, start - (24 * 3600), start)
         end = time.time()
         log.msg("lastGoodRev: took %.2f seconds to run; returned %s" %
-                (end-start, rev))
+                (end - start, rev))
 
         if rev is None:
             # Check if there are any recent l10n changes
@@ -288,7 +302,7 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
             # None, indicating that no build should be scheduled
             if not triggerBuildIfNoChanges:
                 if l10nBranch:
-                    if (start-lastL10nChange) > (24*3600):
+                    if (start - lastL10nChange) > (24 * 3600):
                         return None
                 else:
                     return None
@@ -303,7 +317,7 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
         # Find the last revision our scheduler's builders have built.  This can
         # include forced builds.
         last_built_rev = getLastBuiltRevision(db, t, branch,
-                scheduler.builderNames)
+                                              scheduler.builderNames)
         log.msg("lastNightlyRevision was %s" % last_built_rev)
 
         if last_built_rev is not None:
@@ -315,6 +329,7 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
                 rev = later_rev
         return SourceStamp(branch=scheduler.branch, revision=rev)
     return ssFunc
+
 
 def lastRevFunc(branch, triggerBuildIfNoChanges=True):
     """Returns a function that returns the latest revision on branch."""
@@ -332,7 +347,7 @@ def lastRevFunc(branch, triggerBuildIfNoChanges=True):
         # Find the last revision our scheduler's builders have built.  This can
         # include forced builds.
         last_built_rev = getLastBuiltRevision(db, t, branch,
-                scheduler.builderNames)
+                                              scheduler.builderNames)
         log.msg("lastBuiltRevision was %s" % last_built_rev)
 
         if last_built_rev is not None:

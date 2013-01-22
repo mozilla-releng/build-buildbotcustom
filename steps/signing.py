@@ -2,7 +2,7 @@ from urllib import urlencode
 from random import shuffle
 
 from OpenSSL.SSL import Context, TLSv1_METHOD, VERIFY_PEER,\
-     VERIFY_FAIL_IF_NO_PEER_CERT, OP_NO_SSLv2
+    VERIFY_FAIL_IF_NO_PEER_CERT, OP_NO_SSLv2
 from OpenSSL.crypto import load_certificate, FILETYPE_PEM
 
 from twisted.python.urlpath import URLPath
@@ -47,7 +47,7 @@ class SigningServerAuthenication(StringDownload):
     d = None
     interrupted = False
 
-    def __init__(self, servers, server_cert, duration=6*3600, attempts=5,
+    def __init__(self, servers, server_cert, duration=6 * 3600, attempts=5,
                  sleeptime=60, **kwargs):
         kwargs['s'] = ''
         StringDownload.__init__(self, **kwargs)
@@ -122,7 +122,7 @@ class SigningServerAuthenication(StringDownload):
 
     def requestFailed(self, err):
         msg = "%s: token generation failed, error message: %s" \
-                % (self, err.getErrorMessage())
+            % (self, err.getErrorMessage())
         log.msg(msg)
         if self.stdio_log:
             self.stdio_log.addStdout('%s\n' % msg)

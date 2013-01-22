@@ -6,12 +6,14 @@ from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, worst_status
 from buildbotcustom.steps.base import ShellCommand
 from buildbotcustom.steps.misc import TinderboxShellCommand
 
+
 class SnippetComparison(ShellCommand):
     # Alphas/Betas are WARN'ed about in a releasetest vs release comparison
     # because they were shipped on the 'beta' channel, which means patcher
     # will not generate release channel snippets for them. This is OK, but we
     # need to ensure we don't fail the whole comparison because of it
-    acceptable_warnings_regex = re.compile('WARN: [\w.]+/\w+/[0-9.]+[ab][0-9]+/.*release.* exists')
+    acceptable_warnings_regex = re.compile(
+        'WARN: [\w.]+/\w+/[0-9.]+[ab][0-9]+/.*release.* exists')
     # If we find +++ at the start of a line, let's assume it's output from
     # 'diff', which is always cause for concern.
     diff_regex = re.compile('^---')
@@ -19,7 +21,7 @@ class SnippetComparison(ShellCommand):
     # command and name get overridden at runtime with whatever is passed to
     # ShellCommand.__init__
     def __init__(self, chan1, chan2, dir1, dir2, name=None, command=None,
-                 timeout=10*60, description=['snippet', 'compare'],
+                 timeout=10 * 60, description=['snippet', 'compare'],
                  warnOnFailure=True, warnOnWarnings=True, flunkOnFailure=False,
                  **kwargs):
         self.super_class = ShellCommand
@@ -38,7 +40,8 @@ class SnippetComparison(ShellCommand):
                                   warnOnWarnings=warnOnWarnings,
                                   flunkOnFailure=flunkOnFailure,
                                   **kwargs)
-        self.addFactoryArguments(chan1=chan1, chan2=chan2, dir1=dir1, dir2=dir2)
+        self.addFactoryArguments(
+            chan1=chan1, chan2=chan2, dir1=dir1, dir2=dir2)
         self.warnings = False
 
     def createSummary(self, stdio):
@@ -49,10 +52,10 @@ class SnippetComparison(ShellCommand):
         while i < len(lines):
             line = lines[i]
             if line.startswith('WARN') and \
-              not self.acceptable_warnings_regex.search(line):
-                unacceptable_warnings.extend(lines[i:i+2])
+                    not self.acceptable_warnings_regex.search(line):
+                unacceptable_warnings.extend(lines[i:i + 2])
             if self.diff_regex.search(line):
-                diffs.extend(lines[i:i+2])
+                diffs.extend(lines[i:i + 2])
             i += 1
 
         if len(unacceptable_warnings) > 0:
