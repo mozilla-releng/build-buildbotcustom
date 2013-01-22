@@ -12,11 +12,13 @@ from buildbot.status import mail
 
 ENCODING = 'utf8'
 
+
 class MercurialEmailLookup:
     implements(interfaces.IEmailLookup)
 
     def getAddress(self, user):
         return user
+
 
 def defaultChangeMessage(change):
     revision = change.revision
@@ -24,18 +26,19 @@ def defaultChangeMessage(change):
     msgdict["body"] = "Thanks for your submission (%s)."
     return msgdict
 
+
 class ChangeNotifier(base.StatusReceiverMultiService):
     compare_attrs = ('fromaddr', 'categories', 'branches', 'subject',
-            'relayhost', 'lookup', 'extraRecipients', 'sendToInterestedUsers',
-            'messageFormatter', 'extraHeaders', 'smtpUser', 'smtpPassword',
-            'smtpPort', 'changeIsImportant')
+                     'relayhost', 'lookup', 'extraRecipients', 'sendToInterestedUsers',
+                     'messageFormatter', 'extraHeaders', 'smtpUser', 'smtpPassword',
+                     'smtpPort', 'changeIsImportant')
 
     def __init__(self, fromaddr, categories=None, branches=None,
-            subject="Notifcation of change %(revision)s on branch %(branch)s",
-            relayhost="localhost", lookup=None, extraRecipients=None,
-            sendToInterestedUsers=True, messageFormatter=defaultChangeMessage,
-            extraHeaders=None, smtpUser=None, smtpPassword=None, smtpPort=25,
-            changeIsImportant=None):
+                 subject="Notifcation of change %(revision)s on branch %(branch)s",
+                 relayhost="localhost", lookup=None, extraRecipients=None,
+                 sendToInterestedUsers=True, messageFormatter=defaultChangeMessage,
+                 extraHeaders=None, smtpUser=None, smtpPassword=None, smtpPort=25,
+                 changeIsImportant=None):
 
         base.StatusReceiverMultiService.__init__(self)
 
@@ -65,7 +68,8 @@ class ChangeNotifier(base.StatusReceiverMultiService):
             assert isinstance(extraRecipients, (list, tuple))
             for r in extraRecipients:
                 assert isinstance(r, str)
-                assert mail.VALID_EMAIL.search(r) # require full email addresses, not User names
+                assert mail.VALID_EMAIL.search(
+                    r)  # require full email addresses, not User names
             self.extraRecipients = extraRecipients
         else:
             self.extraRecipients = []
@@ -129,23 +133,23 @@ class ChangeNotifier(base.StatusReceiverMultiService):
         # interpolation if necessary
         if self.extraHeaders:
             d = change.asDict()
-            for k,v in self.extraHeaders.items():
+            for k, v in self.extraHeaders.items():
                 k = k % d
                 if k in m:
                     twlog.msg("Warning: Got header " + k + " in self.extraHeaders "
-                          "but it already exists in the Message - "
-                          "not adding it.")
+                              "but it already exists in the Message - "
+                              "not adding it.")
                     continue
                 m[k] = v % d
 
         if 'headers' in msgdict:
             d = change.asDict()
-            for k,v in msgdict['headers'].items():
+            for k, v in msgdict['headers'].items():
                 k = k % d
                 if k in m:
                     twlog.msg("Warning: Got header " + k + " in self.extraHeaders "
-                          "but it already exists in the Message - "
-                          "not adding it.")
+                              "but it already exists in the Message - "
+                              "not adding it.")
                     continue
                 m[k] = v % d
 
@@ -171,7 +175,7 @@ class ChangeNotifier(base.StatusReceiverMultiService):
         recipients = set()
 
         for r in rlist:
-            if r is None: # getAddress didn't like this address
+            if r is None:  # getAddress didn't like this address
                 continue
 
             # Git can give emails like 'User' <user@foo.com>@foo.com so check

@@ -9,7 +9,7 @@ else:
     JSONDecodeError = json.JSONDecodeError
 
 from buildbotcustom.changes.hgpoller import BasePoller, BaseHgPoller, HgPoller, \
-  HgLocalePoller, HgAllLocalesPoller, _parse_changes
+    HgLocalePoller, HgAllLocalesPoller, _parse_changes
 
 
 class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -22,7 +22,8 @@ class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(self.contents)
         return
 
-    def log_message(self, fmt, *args): pass
+    def log_message(self, fmt, *args):
+        pass
 
 
 def startHTTPServer(contents):
@@ -45,21 +46,24 @@ def startHTTPServer(contents):
 class UrlCreation(unittest.TestCase):
     def testSimpleUrl(self):
         correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1'
-        poller = BaseHgPoller(hgURL='http://hg.mozilla.org', branch='mozilla-central')
+        poller = BaseHgPoller(
+            hgURL='http://hg.mozilla.org', branch='mozilla-central')
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithLastChangeset(self):
         correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
-        poller = BaseHgPoller(hgURL='http://hg.mozilla.org', branch='mozilla-central')
+        poller = BaseHgPoller(
+            hgURL='http://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = '123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testTipsOnlyUrl(self):
         correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1&tipsonly=1'
-        poller = BaseHgPoller(hgURL='http://hg.mozilla.org', branch='mozilla-central',
-                              tipsOnly=True)
+        poller = BaseHgPoller(
+            hgURL='http://hg.mozilla.org', branch='mozilla-central',
+            tipsOnly=True)
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
@@ -77,15 +81,17 @@ class UrlCreation(unittest.TestCase):
 
     def testOverrideUrl(self):
         correctUrl = 'http://hg.mozilla.org/other_repo/json-pushes?full=1&fromchange=123456'
-        poller = BaseHgPoller(hgURL='http://hg.mozilla.org', branch='mozilla-central',
-                              pushlogUrlOverride='http://hg.mozilla.org/other_repo/json-pushes?full=1')
+        poller = BaseHgPoller(
+            hgURL='http://hg.mozilla.org', branch='mozilla-central',
+            pushlogUrlOverride='http://hg.mozilla.org/other_repo/json-pushes?full=1')
         poller.lastChangeset = '123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithUnicodeLastChangeset(self):
         correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
-        poller = BaseHgPoller(hgURL='http://hg.mozilla.org', branch='mozilla-central')
+        poller = BaseHgPoller(
+            hgURL='http://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = u'123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
@@ -102,7 +108,8 @@ fakeLocalesFile = """/l10n-central/af/
 
 class FakeHgAllLocalesPoller(HgAllLocalesPoller):
     def __init__(self):
-        HgAllLocalesPoller.__init__(self, hgURL='fake', repositoryIndex='fake', branch='fake')
+        HgAllLocalesPoller.__init__(
+            self, hgURL='fake', repositoryIndex='fake', branch='fake')
 
     def pollNextLocale(self):
         pass
@@ -139,12 +146,21 @@ class TestPolling(unittest.TestCase):
             def __init__(self):
                 poller.__init__(self, **kwargs)
                 self.success = False
+
             def stopLoad(self, res):
                 self.success = True
-            def processData(self, res): pass
-            def dataFinished(self, res): pass
-            def dataFailed(self, res): pass
-            def pollDone(self, res): pass
+
+            def processData(self, res):
+                pass
+
+            def dataFinished(self, res):
+                pass
+
+            def dataFailed(self, res):
+                pass
+
+            def pollDone(self, res):
+                pass
 
         self.fp = FakePoller()
         d = self.fp.poll()
@@ -244,35 +260,45 @@ malformedPushlog = """
   "user": "dougt@mozilla.com"
 """
 
+
 class PushlogParsing(unittest.TestCase):
     def testValidPushlog(self):
         pushes = _parse_changes(validPushlog)
         self.failUnlessEqual(len(pushes), 2)
 
-        self.failUnlessEqual(pushes[0]['changesets'][0]['node'], '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.failUnlessEqual(pushes[0]['changesets'][0]['node'],
+                             '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
         self.failUnlessEqual(pushes[0]['date'], 1282358416)
         self.failUnlessEqual(len(pushes[0]['changesets'][0]['files']), 4)
-        self.failUnlessEqual(pushes[0]['changesets'][0]['branch'], 'GECKO20b5pre_20100820_RELBRANCH')
-        self.failUnlessEqual(pushes[0]['changesets'][0]['author'], 'Jim Chen <jchen@mozilla.com>')
+        self.failUnlessEqual(pushes[0]['changesets'][0]['branch'],
+                             'GECKO20b5pre_20100820_RELBRANCH')
+        self.failUnlessEqual(pushes[0]['changesets'][0]['author'],
+                             'Jim Chen <jchen@mozilla.com>')
         self.failUnlessEqual(pushes[0]['user'], 'dougt@mozilla.com')
 
-        self.failUnlessEqual(pushes[1]['changesets'][0]['node'], 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.failUnlessEqual(pushes[1]['changesets'][0]['node'],
+                             'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
         self.failUnlessEqual(pushes[1]['date'], 1282362551)
         self.failUnlessEqual(len(pushes[1]['changesets'][0]['files']), 7)
         self.failUnlessEqual(pushes[1]['changesets'][0]['branch'], 'default')
         self.failUnlessEqual(pushes[1]['user'], 'bobbyholley@stanford.edu')
-        self.failUnlessEqual(pushes[1]['changesets'][0]['author'], 'Bobby Holley <bobbyholley@gmail.com>')
+        self.failUnlessEqual(pushes[1]['changesets'][0]['author'],
+                             'Bobby Holley <bobbyholley@gmail.com>')
 
-        self.failUnlessEqual(pushes[1]['changesets'][1]['node'], '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.failUnlessEqual(pushes[1]['changesets'][1]['node'],
+                             '33be08836cb164f9e546231fc59e9e4cf98ed991')
         self.failUnlessEqual(len(pushes[1]['changesets'][1]['files']), 1)
         self.failUnlessEqual(pushes[1]['changesets'][1]['branch'], 'default')
-        self.failUnlessEqual(pushes[1]['changesets'][1]['author'], 'Bobby Holley <bobbyholley@gmail.com>')
+        self.failUnlessEqual(pushes[1]['changesets'][1]['author'],
+                             'Bobby Holley <bobbyholley@gmail.com>')
 
     def testMalformedPushlog(self):
-        self.failUnlessRaises(JSONDecodeError, _parse_changes, malformedPushlog)
+        self.failUnlessRaises(
+            JSONDecodeError, _parse_changes, malformedPushlog)
 
     def testEmptyPushlog(self):
         self.failUnlessRaises(JSONDecodeError, _parse_changes, "")
+
 
 class RepoBranchHandling(unittest.TestCase):
     def setUp(self):
@@ -280,10 +306,11 @@ class RepoBranchHandling(unittest.TestCase):
 
     def doTest(self, repo_branch):
         changes = self.changes
+
         class TestPoller(BaseHgPoller):
             def __init__(self):
                 BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
-                        repo_branch=repo_branch)
+                                      repo_branch=repo_branch)
                 self.emptyRepo = True
 
         class parent:
@@ -305,13 +332,15 @@ class RepoBranchHandling(unittest.TestCase):
         # mergePushChanges is on by default, so we end up with a single change
         # here
         self.assertEquals(len(self.changes), 1)
-        self.assertEquals(self.changes[0].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[0].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testRelbranch(self):
         self.doTest('GECKO20b5pre_20100820_RELBRANCH')
 
         self.assertEquals(len(self.changes), 1)
-        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[0].revision,
+                          '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
 
 
 class MaxChangesHandling(unittest.TestCase):
@@ -320,10 +349,11 @@ class MaxChangesHandling(unittest.TestCase):
 
     def doTest(self, repo_branch, maxChanges, mergePushChanges):
         changes = self.changes
+
         class TestPoller(BaseHgPoller):
             def __init__(self):
                 BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
-                        repo_branch=repo_branch, maxChanges=maxChanges, mergePushChanges=mergePushChanges)
+                                      repo_branch=repo_branch, maxChanges=maxChanges, mergePushChanges=mergePushChanges)
                 self.emptyRepo = True
 
         class parent:
@@ -340,9 +370,12 @@ class MaxChangesHandling(unittest.TestCase):
 
         self.assertEquals(len(self.changes), 3)
         # Check that we got the right changes
-        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
-        self.assertEquals(self.changes[1].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
-        self.assertEquals(self.changes[2].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[0].revision,
+                          '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[1].revision,
+                          'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[2].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testMergingNoRepoBigMax(self):
         # Test that we get all of the changes when maxChanges is large enough
@@ -350,8 +383,10 @@ class MaxChangesHandling(unittest.TestCase):
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
-        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
-        self.assertEquals(self.changes[1].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[0].revision,
+                          '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[1].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testNoRepoUnlimited(self):
         # Test that we get all of the changes when maxChanges is large enough
@@ -359,9 +394,12 @@ class MaxChangesHandling(unittest.TestCase):
 
         self.assertEquals(len(self.changes), 3)
         # Check that we got the right changes
-        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
-        self.assertEquals(self.changes[1].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
-        self.assertEquals(self.changes[2].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[0].revision,
+                          '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[1].revision,
+                          'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[2].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testMergingNoRepoUnlimited(self):
         # Test that we get all of the changes when maxChanges is large enough
@@ -369,8 +407,10 @@ class MaxChangesHandling(unittest.TestCase):
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
-        self.assertEquals(self.changes[0].revision, '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
-        self.assertEquals(self.changes[1].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[0].revision,
+                          '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
+        self.assertEquals(self.changes[1].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testNoRepoSmallMax(self):
         # Test that we get only 2 changes if maxChanges is set to 2
@@ -381,8 +421,10 @@ class MaxChangesHandling(unittest.TestCase):
         # Check that we got the right changes
         self.assertEquals(self.changes[0].revision, None)
         self.assertEquals(self.changes[0].files, ['overflow'])
-        self.assertEquals(self.changes[1].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
-        self.assertEquals(self.changes[2].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[1].revision,
+                          'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[2].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testMergingNoRepoSmallMax(self):
         # Test that we get only 1 change if maxChanges is set to 1
@@ -390,17 +432,22 @@ class MaxChangesHandling(unittest.TestCase):
 
         self.assertEquals(len(self.changes), 1)
         # Check that we got the right changes
-        self.assertEquals(self.changes[0].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
-        self.assert_('overflow' in self.changes[0].files, self.changes[0].files)
-        self.assert_('widget/src/android/nsWindow.h' not in self.changes[0].files, self.changes[0].files)
+        self.assertEquals(self.changes[0].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assert_(
+            'overflow' in self.changes[0].files, self.changes[0].files)
+        self.assert_('widget/src/android/nsWindow.h' not in self.changes[
+                     0].files, self.changes[0].files)
 
     def testDefaultRepoBigMax(self):
         self.doTest('default', 10, False)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
-        self.assertEquals(self.changes[0].revision, 'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
-        self.assertEquals(self.changes[1].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[0].revision,
+                          'ee6fb954cbc3de0f76e84cad6bdff452116e1b03')
+        self.assertEquals(self.changes[1].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testDefaultRepoSmallMax(self):
         self.doTest('default', 1, False)
@@ -409,7 +456,8 @@ class MaxChangesHandling(unittest.TestCase):
         # Check that we got the right changes
         self.assertEquals(self.changes[0].revision, None)
         self.assertEquals(self.changes[0].files, ['overflow'])
-        self.assertEquals(self.changes[1].revision, '33be08836cb164f9e546231fc59e9e4cf98ed991')
+        self.assertEquals(self.changes[1].revision,
+                          '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testRelbranchSmallMax(self):
         self.doTest('GECKO20b5pre_20100820_RELBRANCH', 1, False)

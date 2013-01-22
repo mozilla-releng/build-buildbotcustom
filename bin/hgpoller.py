@@ -1,15 +1,21 @@
 #!/usr/bin/env python
-import urlparse, urllib, time
+import urlparse
+import urllib
+import time
 try:
     import json
 except:
     import simplejson as json
 
-import httplib, urllib2, socket, ssl
+import httplib
+import urllib2
+import socket
+import ssl
 
 import subprocess
 from buildbotcustom.changes.hgpoller import _parse_changes
 import logging as log
+
 
 def buildValidatingOpener(ca_certs):
     class VerifiedHTTPSConnection(httplib.HTTPSConnection):
@@ -45,6 +51,7 @@ def buildValidatingOpener(ca_certs):
 
     return url_opener
 
+
 def validating_https_open(url, ca_certs, username=None, password=None):
     url_opener = buildValidatingOpener(ca_certs)
     req = urllib2.Request(url)
@@ -55,17 +62,18 @@ def validating_https_open(url, ca_certs, username=None, password=None):
         req.add_header("Authorization", "Basic %s" % pw)
     return url_opener.open(req)
 
+
 def getChanges(base_url, last_changeset=None, tips_only=False, ca_certs=None,
-        username=None, password=None):
+               username=None, password=None):
     bits = urlparse.urlparse(base_url)
     if bits.scheme == 'https':
         assert ca_certs, "you must specify ca_certs"
 
     params = [('full', '1')]
     if last_changeset:
-        params.append( ('fromchange', last_changeset) )
+        params.append(('fromchange', last_changeset))
     if tips_only:
-        params.append( ('tipsonly', '1') )
+        params.append(('tipsonly', '1'))
     url = "%s/json-pushes?%s" % (base_url, urllib.urlencode(params))
 
     log.debug("Fetching %s", url)
@@ -78,21 +86,24 @@ def getChanges(base_url, last_changeset=None, tips_only=False, ca_certs=None,
     data = handle.read()
     return _parse_changes(data)
 
+
 def sendchange(master, branch, change):
-    log.info("Sendchange %s to %s on branch %s", change['changeset'], master, branch)
+    log.info("Sendchange %s to %s on branch %s", change['changeset'],
+             master, branch)
     cmd = ['retry.py', '-r', '5', '-s', '5', '-t', '30',
-            '--stdout-regexp', 'change sent successfully']
+           '--stdout-regexp', 'change sent successfully']
     cmd.extend(
-          ['buildbot', 'sendchange',
+        ['buildbot', 'sendchange',
             '--master', master,
             '--branch', branch,
             '--comments', change['comments'].encode('ascii', 'replace'),
             '--revision', change['changeset'],
             '--user', change['author'].encode('ascii', 'replace'),
             '--when', str(change['updated']),
-            ])
+         ])
     cmd.extend(change['files'])
     subprocess.check_call(cmd)
+
 
 def processBranch(branch, state, config):
     log.debug("Processing %s", branch)
@@ -116,13 +127,14 @@ def processBranch(branch, state, config):
 
     try:
         changes = getChanges(url, tips_only=tips_only,
-                last_changeset=last_changeset, ca_certs=ca_certs,
-                username=username, password=password)
+                             last_changeset=last_changeset, ca_certs=ca_certs,
+                             username=username, password=password)
         # Do sendchanges!
         for c in changes:
             # Ignore off-default branches
             if c['branch'] != 'default' and config.getboolean(branch, 'default_branch_only'):
-                log.info("Skipping %s on branch %s", c['changeset'], c['branch'])
+                log.info(
+                    "Skipping %s on branch %s", c['changeset'], c['branch'])
                 continue
             # Change the comments to include the url to the revision
             c['comments'] += ' %s/rev/%s' % (url, c['changeset'])
@@ -150,11 +162,12 @@ if __name__ == '__main__':
 
     parser = OptionParser()
     parser.set_defaults(
-            config_file="hgpoller.ini",
-            verbosity=log.INFO,
-            )
+        config_file="hgpoller.ini",
+        verbosity=log.INFO,
+    )
     parser.add_option("-f", "--config-file", dest="config_file")
-    parser.add_option("-v", "--verbose", dest="verbosity", action="store_const", const=log.DEBUG)
+    parser.add_option("-v", "--verbose", dest="verbosity",
+                      action="store_const", const=log.DEBUG)
 
     options, args = parser.parse_args()
 
@@ -168,7 +181,7 @@ if __name__ == '__main__':
         'interval': 300,
         'state_file': 'state.json',
         'default_branch_only': "yes",
-        })
+    })
     config.read(options.config_file)
 
     try:

@@ -7,6 +7,7 @@ from buildbot.status.builder import worst_status, SUCCESS
 
 from buildbotcustom.status.errors import global_errors, hg_errors
 
+
 def addErrorCatching(obj):
     class C(obj):
         def evaluateCommand(self, cmd):
@@ -26,17 +27,20 @@ SetProperty = addErrorCatching(SetProperty)
 Trigger = addErrorCatching(Trigger)
 ErrorCatchingMercurial = addErrorCatching(UpstreamMercurial)
 
+
 class Mercurial(ErrorCatchingMercurial):
     def __init__(self, log_eval_func=None, **kwargs):
         self.super_class = ErrorCatchingMercurial
         if not log_eval_func:
-            log_eval_func = lambda c,s: regex_log_evaluator(c, s, hg_errors)
+            log_eval_func = lambda c, s: regex_log_evaluator(c, s, hg_errors)
         self.super_class.__init__(self, log_eval_func=log_eval_func, **kwargs)
+
 
 def addRetryEvaluateCommand(obj):
     class C(obj):
         retryCommand = ['python', WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
                         '-s', '1', '-r', '5']
+
         def __init__(self, command, retry=True, **kwargs):
             self.super_class = obj
             timeout = kwargs.get('timeout', 1200)
@@ -45,8 +49,8 @@ def addRetryEvaluateCommand(obj):
             kwargs['timeout'] = timeout + 60
             if retry:
                 wrappedCommand = self.retryCommand + \
-                               ['-t', str(timeout)] + \
-                               command
+                    ['-t', str(timeout)] + \
+                    command
             else:
                 wrappedCommand = command
             self.super_class.__init__(self, command=wrappedCommand, **kwargs)

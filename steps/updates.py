@@ -8,6 +8,7 @@ from buildbot.status.builder import SUCCESS, FAILURE, SKIPPED
 from buildbot.steps.shell import WithProperties
 from buildbot.steps.transfer import _FileReader, StatusRemoteCommand
 
+
 class CreateUpdateSnippet(BuildStep):
     def __init__(self, objdir, milestone, baseurl, appendDatedDir=True,
                  snippetType='complete', hashType='sha512', doStepIf=True,
@@ -15,10 +16,10 @@ class CreateUpdateSnippet(BuildStep):
         BuildStep.__init__(self, name=name, doStepIf=doStepIf)
 
         self.addFactoryArguments(
-          objdir=objdir,
-          milestone=milestone,
-          baseurl=baseurl,
-          appendDatedDir=appendDatedDir
+            objdir=objdir,
+            milestone=milestone,
+            baseurl=baseurl,
+            appendDatedDir=appendDatedDir
         )
 
         # This seems like a reasonable place to store snippets
@@ -29,7 +30,7 @@ class CreateUpdateSnippet(BuildStep):
         self.appendDatedDir = appendDatedDir
         assert snippetType in ['complete', 'partial']
         self.snippetType = snippetType
-        assert hashType in ['md5','sha1','sha256','sha384','sha512']
+        assert hashType in ['md5', 'sha1', 'sha256', 'sha384', 'sha512']
         self.hashType = hashType
         self.maxsize = 16384
         self.mode = None
@@ -40,10 +41,10 @@ class CreateUpdateSnippet(BuildStep):
 
     def _getDatedDirPath(self):
         buildid = self.getProperty('buildid')
-        year   = buildid[0:4]
-        month  = buildid[4:6]
-        day    = buildid[6:8]
-        hour   = buildid[8:10]
+        year = buildid[0:4]
+        month = buildid[4:6]
+        day = buildid[6:8]
+        hour = buildid[8:10]
         minute = buildid[10:12]
         second = buildid[12:14]
         datedDir = "%s-%s-%s-%s-%s-%s-%s" % (year,
@@ -73,11 +74,13 @@ class CreateUpdateSnippet(BuildStep):
         # hash type
         snippet += "hashFunction=%s\n" % self.hashType
         # hash of mar
-        snippet += "hashValue=%s\n" % self.getProperty(self.snippetType + 'MarHash')
+        snippet += "hashValue=%s\n" % self.getProperty(
+            self.snippetType + 'MarHash')
         # size (bytes) of mar
         snippet += "size=%s\n" % self.getProperty(self.snippetType + 'MarSize')
         # buildid
-        snippet += "build=%s\n" % self.getProperty('buildid') # double check case
+        snippet += "build=%s\n" % self.getProperty(
+            'buildid')  # double check case
         # version in user interface
         snippet += "displayVersion=%s\n" % self.getProperty('appVersion')
         # actual version of application
@@ -136,7 +139,7 @@ class CreateUpdateSnippet(BuildStep):
             if self.cmd.rc is None or self.cmd.rc == 0:
                 # Other BuildSteps will probably want this data.
                 self.setProperty(self.snippetType + 'snippetFilename',
-                  path.join(self.updateDir, self.snippetFilename))
+                                 path.join(self.updateDir, self.snippetFilename))
 
                 return BuildStep.finished(self, SUCCESS)
         return BuildStep.finished(self, result)
@@ -145,7 +148,7 @@ class CreateUpdateSnippet(BuildStep):
 class CreateCompleteUpdateSnippet(CreateUpdateSnippet):
     def __init__(self, **kwargs):
         CreateUpdateSnippet.__init__(self, snippetType='complete', **kwargs)
-        
+
 
 class CreatePartialUpdateSnippet(CreateUpdateSnippet):
     def __init__(self, **kwargs):

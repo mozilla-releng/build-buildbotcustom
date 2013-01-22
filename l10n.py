@@ -45,6 +45,7 @@ from buildbot.sourcestamp import SourceStamp
 from buildbot.process import properties
 from buildbot.status.builder import SUCCESS, WARNINGS
 
+
 def ParseLocalesFile(data):
     """
     @type  data: string
@@ -68,6 +69,7 @@ def ParseLocalesFile(data):
             locales[locale] = buildPlatforms
     return locales
 
+
 class L10nMixin(object):
     """
     This class helps any of the L10n custom made schedulers
@@ -79,8 +81,8 @@ class L10nMixin(object):
     """
 
     def __init__(self, platform, repo='http://hg.mozilla.org/', branch=None,
-            baseTag='default', localesFile="browser/locales/all-locales",
-            locales=None, localesURL=None):
+                 baseTag='default', localesFile="browser/locales/all-locales",
+                 locales=None, localesURL=None):
         """
         You can call this class with either a defined list of locales or
         a URL that contains the list of locales
@@ -94,7 +96,7 @@ class L10nMixin(object):
             assert branch != None
             # revision will be expanded later
             self.localesURL = "%s%s/raw-file/%%(revision)s/%s" % \
-                                      (repo, branch, localesFile)
+                (repo, branch, localesFile)
 
         # if the user wants to use something different than all locales
         # check ParseLocalesFile function to note that we now need a dictionary
@@ -104,7 +106,7 @@ class L10nMixin(object):
         # Make sure a supported platform is passed. Allow variations, but make
         # sure to convert them to the form the locales files ues.
         assert platform in ('linux', 'linux64', 'win32', 'win64',
-                'macosx', 'macosx64', 'osx', 'osx64')
+                            'macosx', 'macosx64', 'osx', 'osx64')
 
         self.platform = platform
         if self.platform.startswith('macosx'):
@@ -121,7 +123,8 @@ class L10nMixin(object):
         log.msg("L10nMixin:: loaded locales' list")
         db = self.parent.db
         for locale in locales:
-            # Ignore en-US. It appears in locales files but we do not repack it.
+            # Ignore en-US. It appears in locales files but we do not repack
+            # it.
             if locale == "en-US":
                 continue
             # Some locales should only be built on certain platforms, make sure to
@@ -133,11 +136,11 @@ class L10nMixin(object):
             props.updateFromProperties(self.properties)
             if set_props:
                 props.updateFromProperties(set_props)
-            #I do not know exactly what to pass as the source parameter
+            # I do not know exactly what to pass as the source parameter
             props.update(dict(locale=locale), "Scheduler")
             props.setProperty("en_revision", self.baseTag, "L10nMixin")
             props.setProperty("l10n_revision", self.baseTag, "L10nMixin")
-            log.msg('Submitted '+locale+' locale')
+            log.msg('Submitted ' + locale + ' locale')
             # let's submit the BuildSet for this locale
             # Create a sourcestamp
             ss = SourceStamp(branch=self.branch)
@@ -152,16 +155,18 @@ class L10nMixin(object):
         You want to call this method via defer.maybeDeferred().
         """
         if self.locales:
-            log.msg('L10nMixin.getLocales():: The user has set a list of locales')
+            log.msg(
+                'L10nMixin.getLocales():: The user has set a list of locales')
             return self.locales
         else:
-            localePage = self.localesURL % {'revision': revision or self.baseTag}
-            log.msg("L10nMixin:: Getting locales from: "+localePage)
+            localePage = self.localesURL % {'revision':
+                                            revision or self.baseTag}
+            log.msg("L10nMixin:: Getting locales from: " + localePage)
             # we expect that getPage will return the output of "all-locales"
             # or "shipped-locales" or any file that contains a locale per line
             # in the begining of the line e.g. "en-GB" or "ja linux win32"
             # getPage returns a defered that will return a string
-            d = getPage(localePage, timeout = 5 * 60)
+            d = getPage(localePage, timeout=5 * 60)
             d.addCallback(lambda data: ParseLocalesFile(data))
             return d
 
@@ -176,6 +181,7 @@ class L10nMixin(object):
             self._cbLoadedLocales, locales, reason, set_props))
         return d
 
+
 class TriggerableL10n(Triggerable, L10nMixin):
     """
     TriggerableL10n is used to paralellize the generation of l10n builds.
@@ -186,10 +192,11 @@ class TriggerableL10n(Triggerable, L10nMixin):
 
     compare_attrs = ('name', 'builderNames', 'branch')
 
-    def __init__(self, name,  builderNames, **kwargs):
+    def __init__(self, name, builderNames, **kwargs):
         L10nMixin.__init__(self, **kwargs)
         Triggerable.__init__(self, name, builderNames)
 
     def trigger(self, ss, set_props=None):
         reason = "This build was triggered by the successful completion of the en-US nightly."
-        self.createL10nBuilds(revision=ss.revision, reason=reason, set_props=set_props)
+        self.createL10nBuilds(
+            revision=ss.revision, reason=reason, set_props=set_props)

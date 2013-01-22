@@ -6,6 +6,7 @@ except ImportError:
     # Use simplejson if we can't find the built-in module
     import simplejson as json
 
+
 class JSONColumn(types.TypeDecorator):
     """Simple type that encodes/decodes JSON data in a SQL Text column"""
     impl = types.Text

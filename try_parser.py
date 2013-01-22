@@ -2,12 +2,14 @@
 # Contributor(s):
 #   Lukas Blakk <lsblakk@mozilla.com>
 
-import argparse, re
+import argparse
+import re
 
 from twisted.python import log
 
 '''Given a list of arguments from commit message or info file
    returns only those builder names that should be built.'''
+
 
 def testSuiteMatches(v, u):
     '''Check whether test suite v matches a user-requested test suite spec u'''
@@ -25,32 +27,37 @@ def testSuiteMatches(v, u):
         # validate other test names
         return u == v
 
+
 def expandTestSuites(user_suites, valid_suites):
     '''Grab out all of the test suites from valid_suites that match something
        requested by the user'''
-    return [ v for v in valid_suites for u in user_suites if testSuiteMatches(v, u) ]
+    return [v for v in valid_suites for u in user_suites if testSuiteMatches(v, u)]
+
 
 def processMessage(message):
     for line in message.split('\n'):
-        match = re.search('try: ',str(line))
+        match = re.search('try: ', str(line))
         if match:
             line = line.strip().split('try: ', 1)
             line = line[1].split(' ')
             return line
     return [""]
 
+
 def expandPlatforms(user_platforms, buildTypes):
     platforms = set()
     if 'opt' in buildTypes:
         platforms.update(user_platforms)
     if 'debug' in buildTypes:
-        platforms.update([ p + '-debug' for p in user_platforms ])
+        platforms.update([p + '-debug' for p in user_platforms])
     return platforms
+
 
 def basePlatform(platform):
     '''Platform name without any 'try-nondefault' markers, whether at the
     beginning or in the middle of the string'''
     return platform.replace(' try-nondefault', '').replace('try-nondefault ', '')
+
 
 def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
     '''Return builder names that are found in both prettyNames[p] for some
@@ -63,9 +70,10 @@ def getPlatformBuilders(user_platforms, builderNames, buildTypes, prettyNames):
         return []
 
     platforms = expandPlatforms(user_platforms, buildTypes)
-    builders = [ basePlatform(prettyNames[p])
-                 for p in platforms.intersection(prettyNames) ]
+    builders = [basePlatform(prettyNames[p])
+                for p in platforms.intersection(prettyNames)]
     return list(set(builders).intersection(builderNames))
+
 
 def passesFilter(testFilters, test, pretty, isDefault):
     if test not in testFilters:
@@ -98,8 +106,10 @@ def passesFilter(testFilters, test, pretty, isDefault):
 
     return matchedInclusion or not sawInclusion
 
-def getTestBuilders(platforms, testType, tests, testFilters, builderNames, buildTypes, buildbotBranch,
-                    prettyNames, unittestPrettyNames):
+
+def getTestBuilders(
+    platforms, testType, tests, testFilters, builderNames, buildTypes, buildbotBranch,
+        prettyNames, unittestPrettyNames):
     if tests == 'none':
         return []
 
@@ -119,14 +129,14 @@ def getTestBuilders(platforms, testType, tests, testFilters, builderNames, build
                         # where slave_platforms are used
                         pretties = prettyNames[platform]
                         if not isinstance(pretties, list):
-                            pretties = [ pretties ]
+                            pretties = [pretties]
                         for pretty in pretties:
                             base_pretty = basePlatform(pretty)
                             custom_builder = "%s %s %s %s %s" % (base_pretty, buildbotBranch, buildType, testType, test)
                             if passesFilter(testFilters, test, custom_builder, base_pretty == pretty):
                                 testBuilders.add(custom_builder)
 
-        # we do all but debug win32 over on test masters so have to check the 
+        # we do all but debug win32 over on test masters so have to check the
         # unittestPrettyNames platforms for local builder master unittests
         for platform in builder_test_platforms.intersection(unittestPrettyNames or {}):
             assert platform.endswith('-debug')
@@ -143,11 +153,13 @@ def getTestBuilders(platforms, testType, tests, testFilters, builderNames, build
             for slave_platform in prettyNames[platform]:
                 base_slave_platform = basePlatform(slave_platform)
                 for test in tests:
-                    custom_builder = "%s %s talos %s" % (base_slave_platform, buildbotBranch, test)
+                    custom_builder = "%s %s talos %s" % (
+                        base_slave_platform, buildbotBranch, test)
                     if passesFilter(testFilters, test, custom_builder, base_slave_platform == slave_platform):
                         testBuilders.add(custom_builder)
 
     return list(testBuilders.intersection(builderNames))
+
 
 def parseTestOptions(s, unittestSuites):
     '''parse a comma-separated list of tests, each optionally followed by a
@@ -213,6 +225,7 @@ def parseTestOptions(s, unittestSuites):
     # filters are involved.)
     #
     restrictions = []
+
     def grab_restrictions(m):
         n = len(restrictions)
         s = m.group(1)
@@ -228,9 +241,9 @@ def parseTestOptions(s, unittestSuites):
         # Grab out the stuff before and after the square brackets
         m = re.match(r'(.*?)(?:\[(\d+)\])?$', t)
         if not m:
-            return [] # Bad syntax
+            return []  # Bad syntax
 
-        tests = expandTestSuites([ m.group(1) ], unittestSuites)
+        tests = expandTestSuites([m.group(1)], unittestSuites)
         if m.group(2):
             for test in tests:
                 restrictions_map[test] = restrictions[int(m.group(2))]
@@ -239,8 +252,10 @@ def parseTestOptions(s, unittestSuites):
 
     return list(all_tests), restrictions_map
 
-def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
-              buildbotBranch='try'):
+
+def TryParser(
+    message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
+        buildbotBranch='try'):
 
     parser = argparse.ArgumentParser(description='Pass in a commit message and a list \
                                      and tryParse populates the list with the builderNames\
@@ -265,7 +280,8 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
 
     (options, unknown_args) = parser.parse_known_args(processMessage(message))
 
-    # Build options include a possible override of 'all' to get a buildset that matches m-c
+    # Build options include a possible override of 'all' to get a buildset
+    # that matches m-c
     if options.build == 'do' or options.build == 'od':
         options.build = ['opt', 'debug']
     elif options.build == 'd':
@@ -274,7 +290,7 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         options.build = ['opt']
     else:
         # for any input other than do/od, d, o, all set to default
-        options.build = ['opt','debug']
+        options.build = ['opt', 'debug']
 
     if unittestSuites:
         all_platforms = prettyNames.keys()
@@ -283,23 +299,28 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         # prettyNames for -debug
         all_platforms = set()
         if 'debug' in options.build:
-            all_platforms.update([ p for p in prettyNames.keys() if p.endswith('debug') ])
+            all_platforms.update(
+                [p for p in prettyNames.keys() if p.endswith('debug')])
         if 'opt' in options.build:
-            all_platforms.update([ p for p in prettyNames.keys() if not p.endswith('debug') ])
+            all_platforms.update(
+                [p for p in prettyNames.keys() if not p.endswith('debug')])
 
         # Strip off -debug. It gets tacked on in the getPlatformBuilders for
         # buildType == debug
-        all_platforms = list(set([ p.replace('-debug', '') for p in all_platforms ]))
+        all_platforms = list(
+            set([p.replace('-debug', '') for p in all_platforms]))
 
-    # Platforms whose prettyNames all have 'try-nondefault' in them are not included in -p all
+    # Platforms whose prettyNames all have 'try-nondefault' in them are not
+    # included in -p all
     default_platforms = set()
     if unittestSuites:
         for p in all_platforms:
-            default_platforms.update([ p for n in prettyNames[p] if 'try-nondefault' not in n ])
+            default_platforms.update(
+                [p for n in prettyNames[p] if 'try-nondefault' not in n])
     else:
-        defaultPrettyNames = dict([ (k,v)
-                                    for k,v in prettyNames.items()
-                                    if 'try-nondefault' not in v ])
+        defaultPrettyNames = dict([(k, v)
+                                   for k, v in prettyNames.items()
+                                   if 'try-nondefault' not in v])
         for p in all_platforms:
             if p in defaultPrettyNames:
                 default_platforms.add(p)
@@ -320,7 +341,8 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
     testFilters = None
     if unittestSuites:
         orig = options.test
-        options.test, testFilters = parseTestOptions(options.test, unittestSuites)
+        options.test, testFilters = parseTestOptions(
+            options.test, unittestSuites)
 
     if talosSuites:
         if options.talos == 'all':
@@ -330,22 +352,31 @@ def TryParser(message, builderNames, prettyNames, unittestPrettyNames=None, unit
         else:
             options.talos = options.talos.split(',')
 
-    # List for the custom builder names that match prettyNames passed in from misc.py
+    # List for the custom builder names that match prettyNames passed in from
+    # misc.py
     customBuilderNames = []
     if options.user_platforms:
         log.msg("TryChooser OPTIONS : MESSAGE %s : %s" % (options, message))
-        customBuilderNames = getPlatformBuilders(options.user_platforms, builderNames, options.build, prettyNames)
+        customBuilderNames = getPlatformBuilders(
+            options.user_platforms, builderNames, options.build, prettyNames)
 
         if options.test and unittestSuites:
             # get test builders for test_master first
-            customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, testFilters,
-                                      builderNames, options.build, buildbotBranch, prettyNames, None))
+            customBuilderNames.extend(
+                getTestBuilders(
+                    options.user_platforms, "test", options.test, testFilters,
+                    builderNames, options.build, buildbotBranch, prettyNames, None))
             # then add any builder_master test builders
             if unittestPrettyNames:
-                customBuilderNames.extend(getTestBuilders(options.user_platforms, "test", options.test, testFilters,
-                                      builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
+                customBuilderNames.extend(
+                    getTestBuilders(
+                        options.user_platforms, "test", options.test, testFilters,
+                        builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
         if options.talos and talosSuites is not None:
-            customBuilderNames.extend(getTestBuilders(options.user_platforms, "talos", options.talos, {}, builderNames,
-                                      options.build, buildbotBranch, prettyNames, None))
+            customBuilderNames.extend(
+                getTestBuilders(
+                    options.user_platforms, "talos", options.talos, {
+                    }, builderNames,
+                    options.build, buildbotBranch, prettyNames, None))
 
     return customBuilderNames

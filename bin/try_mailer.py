@@ -3,12 +3,16 @@
 
 Uploads logs to the given host, and then sends an email to the build's owner
 """
-import subprocess, sys, os, re
+import subprocess
+import sys
+import os
+import re
 import cPickle
 from email.message import Message
 from email.utils import formatdate
 
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION, RETRY
+
 
 def getBuild(builder_path, build_number):
     build_path = os.path.join(builder_path, build_number)
@@ -24,6 +28,7 @@ def getBuild(builder_path, build_number):
     build.builder = FakeBuilder()
     return build
 
+
 def uploadLog(args):
     """Uploads the build log, and returns the URL to it"""
     my_dir = os.path.abspath(os.path.dirname(__file__))
@@ -33,9 +38,9 @@ def uploadLog(args):
     print "Running", cmd
 
     proc = subprocess.Popen(cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=devnull,)
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            stdin=devnull,)
 
     retcode = proc.wait()
     output = proc.stdout.read().strip()
@@ -46,6 +51,7 @@ def uploadLog(args):
     if url:
         return url.group(), retcode
     return None, retcode
+
 
 def makeTryMessage(build, log_url):
     builder = build.builder.name
@@ -64,7 +70,7 @@ def makeTryMessage(build, log_url):
     branch = props['branch']
     tree = "Try"
     if 'comm' in branch:
-       tree = "Thunderbird-Try" 
+        tree = "Thunderbird-Try"
 
     if 'got_revision' in props:
         revision = props['got_revision'][:12]
@@ -125,8 +131,8 @@ Your %(tree)s Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder
     text = re.sub("\n", "<br>\n", text)
 
     headers = {"In-Reply-To": "<%(branch)s-%(revision)s>" % locals(),
-                "References": "<%(branch)s-%(revision)s>" % locals(),
-              }
+               "References": "<%(branch)s-%(revision)s>" % locals(),
+               }
 
     return dict(
         subject=subject,
@@ -134,7 +140,8 @@ Your %(tree)s Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder
         headers=headers,
         author=who,
         type='html',
-        )
+    )
+
 
 def formatMessage(msgdict, from_, to):
     m = Message()
@@ -144,7 +151,7 @@ def formatMessage(msgdict, from_, to):
     m['Subject'] = msgdict['subject']
     m['From'] = from_
     m['To'] = ", ".join(to)
-    for k,v in msgdict['headers'].items():
+    for k, v in msgdict['headers'].items():
         if k not in m:
             m[k] = v
     return m
@@ -153,16 +160,19 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
     from smtplib import SMTP
     parser = ArgumentParser()
-    parser.add_argument("-f", "--from", dest="from_", help="from email address", required=True)
-    parser.add_argument("-t", "--to", dest="to", help="to email address", action='append')
+    parser.add_argument("-f", "--from", dest="from_",
+                        help="from email address", required=True)
+    parser.add_argument(
+        "-t", "--to", dest="to", help="to email address", action='append')
     parser.add_argument("--to-author", dest="to_author", help="send mail to build's owner", action="store_true")
-    parser.add_argument("--log-url", dest="log_url", help="url to uploaded log")
+    parser.add_argument(
+        "--log-url", dest="log_url", help="url to uploaded log")
     parser.set_defaults(
         to_author=False,
         to=[],
         from_=None,
         log_url=None
-        )
+    )
 
     options, args = parser.parse_known_args()
 
@@ -177,12 +187,13 @@ if __name__ == '__main__':
     print
 
     tm_parser = ArgumentParser()
-    tm_parser.add_argument("-e", "--all-emails", dest="all_emails", help="request all emails", action="store_true")
+    tm_parser.add_argument("-e", "--all-emails", dest="all_emails",
+                           help="request all emails", action="store_true")
     tm_parser.add_argument("-f", "--failure-emails", dest="failure", help="request failure emails only", action="store_true")
     tm_parser.set_defaults(
         all_emails=False,
         failure=False,
-        )
+    )
 
     builder_path, build_number = args[-2:]
     build = getBuild(builder_path, build_number)
@@ -191,7 +202,8 @@ if __name__ == '__main__':
     match = re.search("try: ", build.source.changes[-1].comments)
     comment_args = ""
     if match:
-        comment_args = build.source.changes[-1].comments.split("try: ")[1].split()
+        comment_args = build.source.changes[-1].comments.split(
+            "try: ")[1].split()
     tm_options, args = tm_parser.parse_known_args(comment_args)
 
     # Let's check the results to see if we need the message

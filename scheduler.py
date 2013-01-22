@@ -24,15 +24,17 @@ from util.tuxedo import get_release_uptake
 
 import time
 
+
 class MultiScheduler(Scheduler):
     """Trigger N (default three) build requests based upon the same change request"""
     def __init__(self, numberOfBuildsToTrigger=3, **kwargs):
         self.numberOfBuildsToTrigger = numberOfBuildsToTrigger
         Scheduler.__init__(self, **kwargs)
 
-    # NOTE: this is overriding an internal scheduler method and may break unexpectedly!
+    # NOTE: this is overriding an internal scheduler method and may break
+    # unexpectedly!
     def _add_build_and_remove_changes(self, t, important, unimportant):
-        all_changes = sorted(important + unimportant, key=lambda c : c.number)
+        all_changes = sorted(important + unimportant, key=lambda c: c.number)
         db = self.parent.db
         for i in range(self.numberOfBuildsToTrigger):
             if self.treeStableTimer is None:
@@ -50,6 +52,7 @@ class MultiScheduler(Scheduler):
         # and finally retire the changes from scheduler_changes
         changeids = [c.number for c in all_changes]
         db.scheduler_retire_changes(self.schedulerid, changeids, t)
+
 
 class SpecificNightly(Nightly):
     """Subclass of regular Nightly scheduler that allows you to specify a function
@@ -75,18 +78,21 @@ class SpecificNightly(Nightly):
         if ss is None:
             log.msg("%s: No sourcestamp returned from ssfunc; not scheduling a build" % self.name)
             return
-        log.msg("%s: Creating buildset with sourcestamp %s" % (self.name, ss.getText()))
+        log.msg("%s: Creating buildset with sourcestamp %s" % (
+            self.name, ss.getText()))
         db = self.parent.db
         ssid = db.get_sourcestampid(ss, t)
         self.create_buildset(ssid, self.reason, t)
 
+
 class PersistentScheduler(BaseScheduler):
     """Make sure at least numPending builds are pending on each of builderNames"""
 
-    compare_attrs = ['name', 'numPending', 'pollInterval', 'ssFunc', 'builderNames', 'properties']
+    compare_attrs = ['name', 'numPending', 'pollInterval', 'ssFunc',
+                     'builderNames', 'properties']
 
     def __init__(self, numPending, pollInterval=60, ssFunc=None, properties={},
-            **kwargs):
+                 **kwargs):
         self.numPending = numPending
         self.pollInterval = pollInterval
         self.lastCheck = 0
@@ -112,7 +118,7 @@ class PersistentScheduler(BaseScheduler):
             num_to_create = self.numPending - n
             if num_to_create <= 0:
                 continue
-            to_create.append( (builderName, num_to_create) )
+            to_create.append((builderName, num_to_create))
 
         d = db.runInteraction(lambda t: self.create_builds(to_create, t))
         return d
@@ -123,17 +129,22 @@ class PersistentScheduler(BaseScheduler):
             ss = self.ssFunc(builderName)
             ssid = db.get_sourcestampid(ss, t)
             for i in range(0, count):
-                self.create_buildset(ssid, "scheduler", t, builderNames=[builderName])
+                self.create_buildset(
+                    ssid, "scheduler", t, builderNames=[builderName])
 
         # Try again in a bit
         self.lastCheck = now()
         return now() + self.pollInterval
 
+
 class BuilderChooserScheduler(MultiScheduler):
-    compare_attrs = MultiScheduler.compare_attrs + ('chooserFunc', 'prettyNames',
-                     'unittestPrettyNames', 'unittestSuites', 'talosSuites', 'buildbotBranch')
-    def __init__(self, chooserFunc, prettyNames=None, unittestPrettyNames=None, unittestSuites=None,
-                 talosSuites=None, buildbotBranch=None, **kwargs):
+    compare_attrs = MultiScheduler.compare_attrs + (
+        'chooserFunc', 'prettyNames',
+        'unittestPrettyNames', 'unittestSuites', 'talosSuites', 'buildbotBranch')
+
+    def __init__(
+        self, chooserFunc, prettyNames=None, unittestPrettyNames=None, unittestSuites=None,
+            talosSuites=None, buildbotBranch=None, **kwargs):
         self.chooserFunc = chooserFunc
         self.prettyNames = prettyNames
         self.unittestPrettyNames = unittestPrettyNames
@@ -141,6 +152,7 @@ class BuilderChooserScheduler(MultiScheduler):
         self.talosSuites = talosSuites
         self.buildbotBranch = buildbotBranch
         MultiScheduler.__init__(self, **kwargs)
+
     def run(self):
         db = self.parent.db
         d = db.runInteraction(self.classify_changes)
@@ -219,22 +231,24 @@ class BuilderChooserScheduler(MultiScheduler):
                     builderNames = list(builderNames)
                     ss = SourceStamp(changes=all_changes)
                     ssid = db.get_sourcestampid(ss, t)
-                    self.create_buildset(ssid, "scheduler", t, builderNames=builderNames)
+                    self.create_buildset(
+                        ssid, "scheduler", t, builderNames=builderNames)
 
             # and finally retire the changes from scheduler_changes
             changeids = [c.number for c in all_changes]
             db.scheduler_retire_changes(self.schedulerid, changeids, t)
             return None
 
-        d.addCallback(lambda buildersPerChange: self.parent.db.runInteraction(do_add_build_and_remove_changes, buildersPerChange))
+        d.addCallback(lambda buildersPerChange: self.parent.db.runInteraction(
+            do_add_build_and_remove_changes, buildersPerChange))
         return d
 
 
 class TriggerBouncerCheck(Triggerable):
 
     compare_attrs = Triggerable.compare_attrs + \
-                  ('minUptake', 'configRepo', 'checkMARs', 'username',
-                   'password', 'pollInterval', 'pollTimeout')
+        ('minUptake', 'configRepo', 'checkMARs', 'username',
+         'password', 'pollInterval', 'pollTimeout')
     working = False
     loop = None
     release_config = None
@@ -242,8 +256,8 @@ class TriggerBouncerCheck(Triggerable):
     configRepo = None
 
     def __init__(self, minUptake, configRepo, checkMARs=True,
-                 username=None, password=None, pollInterval=5*60,
-                 pollTimeout=12*60*60, **kwargs):
+                 username=None, password=None, pollInterval=5 * 60,
+                 pollTimeout=12 * 60 * 60, **kwargs):
         self.minUptake = minUptake
         self.configRepo = configRepo
         self.checkMARs = checkMARs
@@ -254,7 +268,6 @@ class TriggerBouncerCheck(Triggerable):
         self.ss = None
         self.set_props = None
         Triggerable.__init__(self, **kwargs)
-
 
     def trigger(self, ss, set_props=None):
         self.ss = ss
@@ -274,7 +287,7 @@ class TriggerBouncerCheck(Triggerable):
             self.loop = LoopingCall(self.poll)
             reactor.callLater(0, self.loop.start, self.pollInterval)
             reactor.callLater(self.pollTimeout, self.stopLoop,
-                              'Timeout after %s' %  self.pollTimeout)
+                              'Timeout after %s' % self.pollTimeout)
 
         d = self.getReleaseConfig()
         d.addCallback(_run_loop)
@@ -311,7 +324,7 @@ class TriggerBouncerCheck(Triggerable):
         self.working = True
         log.msg('%s: polling' % self.__class__.__name__)
         bouncerProductName = self.release_config.get('bouncerProductName') or \
-                           self.release_config.get('productName').capitalize()
+            self.release_config.get('productName').capitalize()
         d = get_release_uptake(
             tuxedoServerUrl=self.release_config.get('tuxedoServerUrl'),
             bouncerProductName=bouncerProductName,
@@ -341,7 +354,8 @@ class TriggerBouncerCheck(Triggerable):
         log.msg('%s failed:\n%s' % (self.__class__.__name__, f.getTraceback()))
         assert self.working
         self.working = False
-        return None # eat the failure
+        return None  # eat the failure
+
 
 class AggregatingScheduler(BaseScheduler, Triggerable):
     """This scheduler waits until at least one build of each of
@@ -376,10 +390,10 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         # and operate on remainingBuilders to simplify comparison
         # on reconfig
         return {
-                "upstreamBuilders": self.upstreamBuilders,
-                "remainingBuilders": self.upstreamBuilders,
-                "lastCheck": now(),
-                }
+            "upstreamBuilders": self.upstreamBuilders,
+            "remainingBuilders": self.upstreamBuilders,
+            "lastCheck": now(),
+        }
 
     def startService(self):
         if not self.enable_service:
@@ -413,7 +427,8 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
     def trigger(self, ss, set_props=None):
         """Reset scheduler state"""
         d = self.lock.acquire()
-        d.addCallback(lambda _: self.parent.db.runInteractionNow(self._trigger))
+        d.addCallback(
+            lambda _: self.parent.db.runInteractionNow(self._trigger))
         d.addBoth(lambda _: self.lock.release())
 
     def _trigger(self, t):
@@ -442,16 +457,17 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                buildrequests.results IN %s AND
                buildrequests.complete_at > ?
             """ % (
-                    db.parmlist(len(self.upstreamBuilders)),
-                    db.parmlist(len(self.okResults)),
-                    )
+            db.parmlist(len(self.upstreamBuilders)),
+            db.parmlist(len(self.okResults)),
+        )
         q = db.quoteq(q)
         t.execute(q, tuple(self.upstreamBuilders) + tuple(self.okResults) +
                   (lastCheck,))
         newBuilds = t.fetchall()
         if newBuilds:
-            log.msg('%s: new builds: %s since %s' % (self.log_prefix, newBuilds,
-                                                    lastCheck))
+            log.msg(
+                '%s: new builds: %s since %s' % (self.log_prefix, newBuilds,
+                                                 lastCheck))
         return newBuilds
 
     def _run(self, t):
@@ -478,7 +494,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
             # Start a build!
             log.msg(
-                '%s: new buildset: branch=%s, ssid=%s, builders: %s' \
+                '%s: new buildset: branch=%s, ssid=%s, builders: %s'
                 % (self.log_prefix, self.branch, ssid,
                    ', '.join(self.builderNames)))
             self.create_buildset(ssid, "downstream", t)
@@ -498,6 +514,7 @@ def makePropertiesScheduler(base_class, propfuncs, *args, **kw):
     transaction, sourcestamp id) and must return a Properties instance.  These
     properties will be added to any new buildsets this scheduler creates."""
     pf = propfuncs
+
     class S(base_class):
         compare_attrs = base_class.compare_attrs + ('propfuncs',)
         propfuncs = pf
@@ -516,7 +533,8 @@ def makePropertiesScheduler(base_class, propfuncs, *args, **kw):
                 for func in propfuncs:
                     try:
                         request_props = func(self, t, ssid)
-                        log.msg("%s: propfunc returned %s" % (self.name, request_props))
+                        log.msg("%s: propfunc returned %s" %
+                                (self.name, request_props))
                         my_props.updateFromProperties(request_props)
                     except:
                         log.msg("Error running %s" % func)

@@ -2,14 +2,17 @@ import unittest
 
 from buildbotcustom.process.factory import ReleaseUpdatesFactory
 
+
 class SimpleUpdatesFactory(ReleaseUpdatesFactory):
     def __init__(self, version, releaseChannel, useBetaChannelForRelease):
         self.version = version
         self.releaseChannel = releaseChannel
         self.useBetaChannelForRelease = useBetaChannelForRelease
         self.setChannelData()
+
     def getSnippetDir(self):
         return 'foo'
+
 
 class TestReleaseUpdatesFactory(unittest.TestCase):
     def testSetChannelDataWithBetaAndReleaseChannel(self):

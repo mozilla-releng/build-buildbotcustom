@@ -1,8 +1,8 @@
 import datetime
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, Unicode, UnicodeText, \
-        Boolean, Text, DateTime, ForeignKey, Table, UniqueConstraint, \
-        and_, or_
+    Boolean, Text, DateTime, ForeignKey, Table, UniqueConstraint, \
+    and_, or_
 from sqlalchemy.orm import sessionmaker, relation, mapper, eagerload
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.orderinglist import ordering_list
@@ -13,6 +13,7 @@ from twisted.python import log
 Base = declarative_base()
 metadata = Base.metadata
 Session = None
+
 
 def connect(url, drop_all=False, **kwargs):
     Base.metadata.bind = sqlalchemy.create_engine(url, **kwargs)
@@ -25,25 +26,40 @@ def connect(url, drop_all=False, **kwargs):
     return Session
 
 file_changes = Table('file_changes', Base.metadata,
-    Column('file_id', Integer, ForeignKey('files.id'), nullable=False, index=True),
-    Column('change_id', Integer, ForeignKey('changes.id'), nullable=False, index=True),
-    )
+                     Column(
+                     'file_id', Integer, ForeignKey('files.id'), nullable=False,
+                     index=True),
+                     Column('change_id', Integer, ForeignKey('changes.id'),
+                            nullable=False, index=True),
+                     )
 
 build_properties = Table('build_properties', Base.metadata,
-    Column('property_id', Integer, ForeignKey('properties.id'), nullable=False, index=True),
-    Column('build_id', Integer, ForeignKey('builds.id'), nullable=False, index=True),
-    )
+                         Column(
+                         'property_id', Integer, ForeignKey(
+                             'properties.id'),
+                         nullable=False, index=True),
+                         Column('build_id', Integer, ForeignKey('builds.id'),
+                                nullable=False, index=True),
+                         )
 
 request_properties = Table('request_properties', Base.metadata,
-    Column('property_id', Integer, ForeignKey('properties.id'), nullable=False, index=True),
-    Column('request_id', Integer, ForeignKey('requests.id'), nullable=False, index=True),
-    )
+                           Column(
+                           'property_id', Integer, ForeignKey(
+                               'properties.id'),
+                           nullable=False, index=True),
+                           Column(
+                           'request_id', Integer, ForeignKey('requests.id'),
+                           nullable=False, index=True),
+                           )
 
 # TODO: track ordering?
 build_requests = Table('build_requests', Base.metadata,
-    Column('build_id', Integer, ForeignKey('builds.id'), nullable=False, index=True),
-    Column('request_id', Integer, ForeignKey('requests.id'), nullable=False, index=True),
-    )
+                       Column('build_id', Integer, ForeignKey('builds.id'),
+                              nullable=False, index=True),
+                       Column('request_id', Integer, ForeignKey('requests.id'),
+                              nullable=False, index=True),
+                       )
+
 
 class File(Base):
     __tablename__ = "files"
@@ -62,6 +78,7 @@ class File(Base):
             session.add(f)
         return f
 
+
 class Property(Base):
     __tablename__ = "properties"
     id = Column(Integer, primary_key=True)
@@ -73,7 +90,8 @@ class Property(Base):
     def equals(dbprops, bbprops):
         """Returns True if the list of database Property objects `dbprops`
         matches the buildbot Properties `bbprops`"""
-        dbprops = sorted((p.name, p.value, p.source) for p in dbprops.properties)
+        dbprops = sorted(
+            (p.name, p.value, p.source) for p in dbprops.properties)
         bbprops = sorted((p[0], p[1], p[2]) for p in bbprops.asList())
         return dbprops == bbprops
 
@@ -84,7 +102,8 @@ class Property(Base):
         but not committed."""
         name = unicode(name)
         source = unicode(source)
-        p = session.query(cls).filter_by(name=name, source=source, value=value).first()
+        p = session.query(
+            cls).filter_by(name=name, source=source, value=value).first()
         if not p:
             p = cls(name=name, source=source, value=value)
             session.add(p)
@@ -101,7 +120,7 @@ class Property(Base):
 
         retval = []
         for prop in all:
-            if props.has_key(prop.name) and props[prop.name] == prop.value and \
+            if prop.name in props and props[prop.name] == prop.value and \
                     props.getPropertySource(prop.name) == prop.source:
                 retval.append(prop)
 
@@ -111,6 +130,7 @@ class Property(Base):
                     source=unicode(props.getPropertySource(name)))
             retval.append(p)
         return retval
+
 
 class Master(Base):
     __tablename__ = "masters"
@@ -126,12 +146,15 @@ class Master(Base):
             session.add(master)
         return master
 
+
 class MasterSlave(Base):
     __tablename__ = "master_slaves"
     id = Column(Integer, primary_key=True)
-    slave_id = Column(Integer, ForeignKey('slaves.id'), nullable=False, index=True)
+    slave_id = Column(
+        Integer, ForeignKey('slaves.id'), nullable=False, index=True)
     slave = relation("Slave")
-    master_id = Column(Integer, ForeignKey(Master.id), nullable=False, index=True)
+    master_id = Column(
+        Integer, ForeignKey(Master.id), nullable=False, index=True)
     master = relation(Master)
     connected = Column(DateTime, nullable=False, index=True)
     disconnected = Column(DateTime, nullable=True, index=True)
@@ -139,7 +162,8 @@ class MasterSlave(Base):
     @classmethod
     def setConnected(cls, session, master_id, name, t=None):
         slave = Slave.get(session, name)
-        s = session.query(cls).filter_by(slave=slave, master_id=master_id, disconnected=None).first()
+        s = session.query(cls).filter_by(
+            slave=slave, master_id=master_id, disconnected=None).first()
         if not s:
             s = cls(slave_id=slave.id, master_id=master_id)
             session.add(s)
@@ -151,7 +175,8 @@ class MasterSlave(Base):
     @classmethod
     def setDisconnected(cls, session, master_id, name, t=None):
         slave = Slave.get(session, name)
-        s = session.query(cls).filter_by(slave=slave, master_id=master_id, disconnected=None).first()
+        s = session.query(cls).filter_by(
+            slave=slave, master_id=master_id, disconnected=None).first()
         if not s:
             raise ValueError("So such slave")
         if not s.connected:
@@ -160,6 +185,7 @@ class MasterSlave(Base):
         if not t:
             t = datetime.datetime.now()
         s.disconnected = t
+
 
 class Slave(Base):
     __tablename__ = "slaves"
@@ -177,21 +203,26 @@ class Slave(Base):
             session.add(s)
         return s
 
+
 class BuilderSlave(Base):
     __tablename__ = "builder_slaves"
     id = Column(Integer, primary_key=True)
-    builder_id = Column(Integer, ForeignKey('builders.id'), nullable=False, index=True)
+    builder_id = Column(
+        Integer, ForeignKey('builders.id'), nullable=False, index=True)
     builder = relation("Builder")
-    slave_id = Column(Integer, ForeignKey('slaves.id'), nullable=False, index=True)
+    slave_id = Column(
+        Integer, ForeignKey('slaves.id'), nullable=False, index=True)
     slave = relation(Slave)
     added = Column(DateTime, nullable=False, index=True)
     removed = Column(DateTime, nullable=True, index=True)
+
 
 class Builder(Base):
     __tablename__ = "builders"
     id = Column(Integer, primary_key=True)
     name = Column(Unicode(200), index=True, nullable=False)
-    master_id = Column(Integer, ForeignKey(Master.id), nullable=False, index=True)
+    master_id = Column(
+        Integer, ForeignKey(Master.id), nullable=False, index=True)
     master = relation(Master, backref='builders')
     category = Column(Unicode(30), index=True)
     __table_args__ = (UniqueConstraint('name', 'master_id'), {})
@@ -202,15 +233,17 @@ class Builder(Base):
         builder doesn't exist, it will be created and added to the session, but
         not committed."""
         name = unicode(name)
-        b = session.query(cls).filter_by(name=name, master_id=master_id).first()
+        b = session.query(
+            cls).filter_by(name=name, master_id=master_id).first()
         if not b:
             b = cls(name=name, master_id=master_id)
             session.add(b)
         return b
 
 Builder.slaves = relation(BuilderSlave, primaryjoin=
-        and_(BuilderSlave.builder_id == Builder.id,
-             BuilderSlave.removed == None))
+                          and_(BuilderSlave.builder_id == Builder.id,
+                               BuilderSlave.removed == None))
+
 
 class Change(Base):
     __tablename__ = "changes"
@@ -261,13 +294,13 @@ class Change(Base):
         else:
             revision = unicode(change.revision)
         possible_changes_q = session.query(cls).filter_by(
-                number=change.number,
-                branch=unicode(change.branch),
-                revision=revision,
-                who=unicode(change.who),
-                comments=unicode(change.comments),
-                when=when,
-                )
+            number=change.number,
+            branch=unicode(change.branch),
+            revision=revision,
+            who=unicode(change.who),
+            comments=unicode(change.comments),
+            when=when,
+        )
         possible_changes = possible_changes_q.all()
 
         # Look at files
@@ -294,19 +327,24 @@ class Change(Base):
         c.files = [File.get(session, path) for path in change.files]
         return c
 
+
 class SourceChange(Base):
     __tablename__ = "source_changes"
     id = Column(Integer, primary_key=True)
-    source_id = Column(Integer, ForeignKey('sourcestamps.id'), nullable=False, index=True)
-    change_id = Column(Integer, ForeignKey('changes.id'), nullable=False, index=True)
+    source_id = Column(
+        Integer, ForeignKey('sourcestamps.id'), nullable=False, index=True)
+    change_id = Column(
+        Integer, ForeignKey('changes.id'), nullable=False, index=True)
     order = Column(Integer, nullable=False)
     change = relation(Change)
+
 
 class Patch(Base):
     __tablename__ = "patches"
     id = Column(Integer, primary_key=True)
     patch = Column(Text, nullable=True)
     patchlevel = Column(Integer, nullable=True)
+
 
 class SourceStamp(Base):
     __tablename__ = "sourcestamps"
@@ -350,15 +388,16 @@ class SourceStamp(Base):
     def fromBBSourcestamp(cls, session, ss):
         """Return a database SourceStamp object that reflect a buildbot SourceStamp"""
         changes = [Change.fromBBChange(session, c) for c in ss.changes]
-        changes = [SourceChange(change=change, order=i) for i,change in enumerate(changes)]
+        changes = [SourceChange(
+            change=change, order=i) for i, change in enumerate(changes)]
         if ss.patch:
             patchlevel, patchdata = ss.patch
             patch = Patch(patch=patchdata, patchlevel=patchlevel)
         else:
             patch = None
         s = session.query(cls).filter_by(branch=unicode(ss.branch),
-                revision=unicode(ss.revision),
-                patch=patch).first()
+                                         revision=unicode(ss.revision),
+                                         patch=patch).first()
         # Compare list of changes
         if s:
             if sorted([c.change.id for c in s.changes]) == sorted([c.change.id for c in changes]):
@@ -371,11 +410,13 @@ class SourceStamp(Base):
                     changes=changes)
         return s
 
+
 class Request(Base):
     __tablename__ = "requests"
     id = Column(Integer, primary_key=True)
     submittime = Column(DateTime, index=True)
-    builder_id = Column(Integer, ForeignKey(Builder.id), index=True, nullable=True)
+    builder_id = Column(
+        Integer, ForeignKey(Builder.id), index=True, nullable=True)
     builder = relation(Builder, backref='requests')
     startcount = Column(Integer, index=True, nullable=False, default=0)
     source_id = Column(Integer, ForeignKey(SourceStamp.id), nullable=True)
@@ -389,11 +430,11 @@ class Request(Base):
         """Retrieve a Request for the given builder and submittime. If the
         request doesn't exist, None is returned"""
         r = session.query(cls).filter_by(
-                builder=builder,
-                submittime=submittime,
-                lost=False,
-                cancelled=False,
-                startcount=0).first()
+            builder=builder,
+            submittime=submittime,
+            lost=False,
+            cancelled=False,
+            startcount=0).first()
 
         if not r:
             return None
@@ -408,22 +449,25 @@ class Request(Base):
         """Create a database Request object from a buildbot Request"""
         ss = SourceStamp.fromBBSourcestamp(session, req.source)
         r = cls(
-                submittime=datetime.datetime.utcfromtimestamp(req.getSubmitTime()),
-                builder=builder,
-                startcount=0,
-                lost=False,
-                cancelled=False,
-                source=ss,
-                )
+            submittime=datetime.datetime.utcfromtimestamp(
+                req.getSubmitTime()),
+            builder=builder,
+            startcount=0,
+            lost=False,
+            cancelled=False,
+            source=ss,
+        )
         # TODO: Get properties from request once buildbot lets us
         return r
+
 
 class Step(Base):
     __tablename__ = "steps"
     id = Column(Integer, primary_key=True)
     name = Column(String(256), nullable=False, index=True)
     description = Column(JSONColumn, nullable=True)
-    build_id = Column(Integer, ForeignKey('builds.id'), index=True, nullable=False)
+    build_id = Column(
+        Integer, ForeignKey('builds.id'), index=True, nullable=False)
     order = Column(Integer, nullable=False)
     starttime = Column(DateTime)
     endtime = Column(DateTime)
@@ -443,18 +487,21 @@ class Step(Base):
                 else:
                     break
 
-            b.steps.insert(last_done+1, s)
+            b.steps.insert(last_done + 1, s)
             session.add(s)
         return s
+
 
 class Build(Base):
     __tablename__ = "builds"
     id = Column(Integer, primary_key=True)
     buildnumber = Column(Integer, index=True, nullable=False)
     properties = relation(Property, secondary=build_properties)
-    builder_id = Column(Integer, ForeignKey(Builder.id), index=True, nullable=False)
+    builder_id = Column(
+        Integer, ForeignKey(Builder.id), index=True, nullable=False)
     builder = relation(Builder, backref='builds')
-    slave_id = Column(Integer, ForeignKey(Slave.id), index=True, nullable=False)
+    slave_id = Column(
+        Integer, ForeignKey(Slave.id), index=True, nullable=False)
     slave = relation(Slave, backref='builds')
     master_id = Column(Integer, ForeignKey(Master.id), nullable=False)
     master = relation(Master, backref='builds')
@@ -465,11 +512,13 @@ class Build(Base):
     requests = relation(Request, secondary=build_requests, backref='builds')
     source_id = Column(Integer, ForeignKey(SourceStamp.id), nullable=True)
     source = relation(SourceStamp)
-    steps = relation(Step, order_by=Step.order, collection_class=ordering_list('order'), backref='build')
+    steps = relation(Step, order_by=Step.order,
+                     collection_class=ordering_list('order'), backref='build')
     lost = Column(Boolean, nullable=False, default=False)
 
     def updateFromBBBuild(self, session, build):
-        self.properties = Property.fromBBProperties(session, build.getProperties())
+        self.properties = Property.fromBBProperties(
+            session, build.getProperties())
 
         if build.started:
             self.starttime = datetime.datetime.utcfromtimestamp(build.started)
@@ -481,11 +530,11 @@ class Build(Base):
 
         if build.steps:
             mysteps = dict((s.name, s) for s in self.steps)
-            for i,step in enumerate(build.steps):
+            for i, step in enumerate(build.steps):
                 s = mysteps.get(step.name)
                 if not s:
                     s = Step(name=step.name, build_id=self.id)
-                    self.steps.insert(i,s)
+                    self.steps.insert(i, s)
                 else:
                     del mysteps[step.name]
                 s.description = step.text
@@ -500,9 +549,11 @@ class Build(Base):
                         s.status = None
                 # This may not be set yet
                 if step.started:
-                    s.starttime = datetime.datetime.utcfromtimestamp(step.started)
+                    s.starttime = datetime.datetime.utcfromtimestamp(
+                        step.started)
                 if step.finished:
-                    s.endtime = datetime.datetime.utcfromtimestamp(step.finished)
+                    s.endtime = datetime.datetime.utcfromtimestamp(
+                        step.finished)
 
             # Get rid of any steps that are left over
             for s in mysteps.values():
@@ -517,7 +568,8 @@ class Build(Base):
         b = cls(buildnumber=build.number, builder=builder,
                 slave=slave, master_id=master_id, reason=unicode(build.reason),
                 result=build.results)
-        b.source = SourceStamp.fromBBSourcestamp(session, build.getSourceStamp())
+        b.source = SourceStamp.fromBBSourcestamp(
+            session, build.getSourceStamp())
 
         if hasattr(build, 'getRequests'):
             for req in build.getRequests():
@@ -539,7 +591,10 @@ class Build(Base):
         return b
 
 schedulerdb_requests = Table('schedulerdb_requests', Base.metadata,
-    Column('status_build_id', Integer, nullable=False, index=True),
-    Column('scheduler_request_id', Integer, nullable=False, index=True),
-    Column('scheduler_build_id', Integer, nullable=False, index=True),
-    )
+                             Column('status_build_id',
+                                    Integer, nullable=False, index=True),
+                             Column('scheduler_request_id',
+                                    Integer, nullable=False, index=True),
+                             Column('scheduler_build_id',
+                                    Integer, nullable=False, index=True),
+                             )

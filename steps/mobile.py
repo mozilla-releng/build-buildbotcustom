@@ -1,7 +1,7 @@
 import re
 
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, SKIPPED, \
-  EXCEPTION
+    EXCEPTION
 
 from buildbotcustom.steps.base import ShellCommand
 import buildbotcustom.steps.unittest
@@ -10,6 +10,8 @@ from buildbotcustom.steps.unittest import emphasizeFailureText, summaryText
 
 # Wasn't able to get ShellCommandReportTimeout working; may try again
 # later.
+
+
 class MobileParseTestLog(ShellCommand):
     warnOnFailure = True
     warnOnWarnings = True
@@ -22,9 +24,10 @@ class MobileParseTestLog(ShellCommand):
 
         if not command:
             command = ['python', 'maemkit-chunked.py',
-                          '--testtype=%s' % name],
+                       '--testtype=%s' % name],
 
-        self.super_class.__init__(self, timeout=timeout, command=command, **kwargs)
+        self.super_class.__init__(
+            self, timeout=timeout, command=command, **kwargs)
 
         self.addFactoryArguments(command=command, timeout=timeout,
                                  knownFailCount=knownFailCount)
@@ -64,7 +67,7 @@ class MobileParseTestLog(ShellCommand):
 
         if (failCount):
             summary = "Orig fail count: %d\nOrig known count: %d\n" % (
-                    failCount, knownCount)
+                failCount, knownCount)
             if failCount > self.knownFailCount:
                 failCount = failCount - self.knownFailCount
                 knownCount = knownCount + self.knownFailCount
@@ -75,10 +78,10 @@ class MobileParseTestLog(ShellCommand):
         # Add the summary.
         if (passCount > 0):
             summary = "%sTinderboxPrint: %s<br/>%s [%d]\n" % (summary,
-                    self.name, summaryText(passCount, failCount,
-                                           knownCount, crashed=crashed,
-                                           leaked=leaked),
-                    self.knownFailCount)
+                                                              self.name, summaryText(passCount, failCount,
+                                                                                     knownCount, crashed=crashed,
+                                                                                     leaked=leaked),
+                                                              self.knownFailCount)
         else:
             summary = emphasizeFailureText("T-FAIL")
 

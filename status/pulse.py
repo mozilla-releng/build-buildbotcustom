@@ -15,11 +15,14 @@ from twisted.python import log
 from buildbot.status.status_push import StatusPush
 from buildbot.util import json
 
+
 def escape(name):
     return name.replace(".", "_").replace(" ", "_")
 
+
 def hexid(obj):
     return '<%s>' % hex(id(obj))
+
 
 class PulseStatus(StatusPush):
     """
@@ -37,10 +40,10 @@ class PulseStatus(StatusPush):
     """
 
     compare_attrs = StatusPush.compare_attrs + ['queuedir', 'ignoreBuilders',
-            'send_logs']
+                                                'send_logs']
 
     def __init__(self, queuedir, ignoreBuilders=None, send_logs=False,
-            heartbeat_time=900):
+                 heartbeat_time=900):
         self.queuedir = queuedir
         self.send_logs = send_logs
 
@@ -74,9 +77,9 @@ class PulseStatus(StatusPush):
         self._heartbeat_loop.start(self.heartbeat_time)
 
     # Stubbed out for later
-    #def startService(self):
-        #self._heartbeat_loop.start(self.heartbeat_time)
-        #return StatusPush.startService(self)
+    # def startService(self):
+        # self._heartbeat_loop.start(self.heartbeat_time)
+        # return StatusPush.startService(self)
 
     def stopService(self):
         log.msg("Pulse %s: shutting down" % (hexid(self),))
@@ -99,7 +102,8 @@ class PulseStatus(StatusPush):
     def pushEvents(self):
         """Trigger a push"""
         if not self.delayed_push:
-            self.delayed_push = reactor.callLater(self.push_delay, self._do_push)
+            self.delayed_push = reactor.callLater(
+                self.push_delay, self._do_push)
 
     def _do_push(self):
         """Push some events to pulse"""
@@ -124,14 +128,14 @@ class PulseStatus(StatusPush):
 
             e['master_name'] = self.status.botmaster.master_name
             e['master_incarnation'] = \
-                    self.status.botmaster.master_incarnation
+                self.status.botmaster.master_incarnation
 
             # Transform time tuples to standard pulse time format
             to_write.append(e)
         end = time.time()
         log.msg("Pulse %s: Processed %i events (%i heartbeats) "
-                    "in %.2f seconds" %
-                    (hexid(self), count, heartbeats, (end-start)))
+                "in %.2f seconds" %
+               (hexid(self), count, heartbeats, (end - start)))
         try:
             self.queuedir.add(json.dumps(to_write))
         except:
@@ -154,7 +158,7 @@ class PulseStatus(StatusPush):
             except:
                 log.msg("Exception matching builderName with %s" % str(i))
                 log.msg("Shutting down PulseStatus - "
-                    "not sure if we're ignoring the right stuff!")
+                        "not sure if we're ignoring the right stuff!")
                 log.err()
                 self.stopService()
                 if self.parent:
@@ -183,21 +187,21 @@ class PulseStatus(StatusPush):
     def buildStarted(self, builderName, build):
         builderName = escape(self._translateBuilderName(builderName))
         self.push("build.%s.%i.started" % (builderName, build.number),
-                build=build)
+                  build=build)
         return self
 
     def buildFinished(self, builderName, build, results):
         builderName = escape(self._translateBuilderName(builderName))
         self.push("build.%s.%i.finished" % (builderName, build.number),
-                build=build, results=results)
+                  build=build, results=results)
 
     def slaveConnected(self, slavename):
         self.push("slave.%s.connected" % escape(slavename),
-                slave=self.status.getSlave(slavename))
+                  slave=self.status.getSlave(slavename))
 
     def slaveDisconnected(self, slavename):
         self.push("slave.%s.disconnected" % escape(slavename),
-                slavename=slavename)
+                  slavename=slavename)
 
     def changeAdded(self, change):
         self.push("change.%i.added" % change.number, change=change)
@@ -214,9 +218,9 @@ class PulseStatus(StatusPush):
     def stepStarted(self, build, step):
         builderName = escape(self._translateBuilderName(build.builder.name))
         self.push("build.%s.%i.step.%s.started" %
-                (builderName, build.number, escape(step.name)),
-                properties=build.getProperties().asList(),
-                step=step)
+                 (builderName, build.number, escape(step.name)),
+                  properties=build.getProperties().asList(),
+                  step=step)
         # If logging is enabled, return ourself to subscribe to log events for
         # this step
         if self.send_logs:
@@ -225,32 +229,32 @@ class PulseStatus(StatusPush):
     def stepFinished(self, build, step, results):
         builderName = escape(self._translateBuilderName(build.builder.name))
         self.push("build.%s.%i.step.%s.finished" %
-                (builderName, build.number, escape(step.name)),
-                properties=build.getProperties().asList(),
-                step=step,
-                results=results)
+                 (builderName, build.number, escape(step.name)),
+                  properties=build.getProperties().asList(),
+                  step=step,
+                  results=results)
 
     ### Optional logging events
 
     def logStarted(self, build, step, log):
         builderName = escape(self._translateBuilderName(build.builder.name))
         self.push("build.%s.%i.step.%s.log.%s.started" %
-                (builderName, build.number, escape(step.name), log.name))
+                 (builderName, build.number, escape(step.name), log.name))
         return self
 
     def logChunk(self, build, step, log, channel, text):
         # TODO: Strip out bad UTF-8 characters
         builderName = escape(self._translateBuilderName(build.builder.name))
         self.push("build.%s.%i.step.%s.log.%s.chunk" %
-                (builderName, build.number, escape(step.name), log.name),
-                channel=channel,
-                text=text,
-                )
+                 (builderName, build.number, escape(step.name), log.name),
+                  channel=channel,
+                  text=text,
+                  )
 
     def logFinished(self, build, step, log):
         builderName = escape(self._translateBuilderName(build.builder.name))
         self.push("build.%s.%i.step.%s.log.%s.finished" %
-                (builderName, build.number, escape(step.name), log.name))
+                 (builderName, build.number, escape(step.name), log.name))
         return self
 
     ### Events we ignore
@@ -272,4 +276,3 @@ class PulseStatus(StatusPush):
 
     def stepText2Changed(self, build, step, text2):
         pass
-
