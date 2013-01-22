@@ -916,14 +916,12 @@ def generateBranchObjects(config, name, secrets=None):
             binaryURL=l10n_binaryURL
         ))
 
+    tipsOnly = False
+    maxChanges = 100
     if config.get('enable_try', False):
-        tipsOnly = True
-        maxChanges = 100
         # Pay attention to all branches for pushes to try
         repo_branch = None
     else:
-        tipsOnly = False
-        maxChanges = 100
         # Other branches should only pay attention to the default branch
         repo_branch = "default"
 
