@@ -34,7 +34,9 @@ def genBuildUID():
 def reallyShort(name):
     mappings = {
         'mozilla': 'm',
+        'comm': 'c',
         'central': 'cen',
+        'trunk': 't',
         '1.9.1': '191',
         '1.9.2': '192',
         'places': 'plc',
