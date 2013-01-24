@@ -4118,7 +4118,7 @@ class SingleSourceFactory(ReleaseFactory):
             mock=self.use_mock,
             target=self.mock_target,
             haltOnFailure=True,
-            timeout=60 * 60  # 60 minutes
+            timeout=60 * 60 * 2  # 2 hours
         ))
         self.addStep(RetryingMockCommand(
             name='upload_files',
