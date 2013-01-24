@@ -1404,6 +1404,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             command=['cat', '%s\\toolkit\\library\\linker-vsize' % self.mozillaObjdir],
             extract_fn=get_linker_vsize,
             ))
+        self.addBuildInfoSteps()
         self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
         gs_env = self.env.copy()
         gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
