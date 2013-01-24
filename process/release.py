@@ -91,10 +91,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mock_slaves = [x for x in set(mock_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
-    manuallySignedPlatforms = ()
-    if not releaseConfig.get('enableSigningAtBuildTime', True):
-        manuallySignedPlatforms = releaseConfig.get('manuallySignedPlatforms',
-                                                    ('win32',))
     if secrets is None:
         secrets = {}
 
@@ -183,9 +179,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platformDir = buildbot2ftp(bare_platform)
             if 'xulrunner' in platform:
                 platformDir = ''
-            if bare_platform in manuallySignedPlatforms:
-                platformDir = 'unsigned/%s' % platformDir
-                isPlatformUnsigned = True
             ftpURL = '/'.join([
                 ftpURL.strip('/'),
                 platformDir])
@@ -1043,17 +1036,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
 
-    if 'win32' in manuallySignedPlatforms:
-        builders.append(makeDummyBuilder(
-            name=builderPrefix('signing_done'),
-            slaves=all_slaves,
-            category=builderPrefix(''),
-            properties={
-                'platform': 'win32',
-                'branch': 'release-%s' % sourceRepoInfo['name'],
-            },
-        ))
-
     if releaseConfig.get('enableSigningAtBuildTime', True) and \
             releaseConfig.get('autoGenerateChecksums', True):
         pf = branchConfig['platforms']['linux']
@@ -1572,49 +1554,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     ##### Change sources and Schedulers
 
-    if 'win32' in manuallySignedPlatforms:
-        change_source.append(UrlPoller(
-            branch=builderPrefix('post_signing'),
-            url='%s/win32_signing_build%s.log' % (
-                makeCandidatesDir(
-                    releaseConfig['productName'],
-                    releaseConfig['version'],
-                    releaseConfig['buildNumber'],
-                    protocol='http',
-                    server=releaseConfig['ftpServer']),
-                releaseConfig['buildNumber']),
-            pollInterval=60 * 10,
-        ))
-        signing_done_scheduler = Scheduler(
-            name=builderPrefix('signing_done'),
-            treeStableTimer=0,
-            branch=builderPrefix('post_signing'),
-            builderNames=[builderPrefix('signing_done')]
-        )
-        schedulers.append(signing_done_scheduler)
-        important_builders.append(builderPrefix('signing_done'))
-
-    if hasPlatformSubstring(manuallySignedPlatforms, 'android'):
-        # Watch only armv7 en-US APK
-        platform = 'android'
-        locale = 'en-US'
-        candidatesDir = makeCandidatesDir(
-            releaseConfig['productName'],
-            releaseConfig['version'],
-            releaseConfig['buildNumber'],
-            protocol='http',
-            server=releaseConfig['ftpServer'])
-        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-            (candidatesDir,
-             buildbot2ftp(platform),
-             locale, releaseConfig['productName'], releaseConfig['version'],
-             locale)
-        change_source.append(UrlPoller(
-            branch=builderPrefix('android_post_signing'),
-            url=enUS_signed_apk_url,
-            pollInterval=60 * 10
-        ))
-
     reset_schedulers_scheduler = Scheduler(
         name=builderPrefix(
             '%s_reset_schedulers' % releaseConfig['productName']),
@@ -1679,6 +1618,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if platform in releaseConfig['notifyPlatforms']:
             important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
+            if platform in releaseConfig.get('l10nNotifyPlatforms', []):
+                important_builders.append(builderPrefix('%s_repack_complete' % platform))
             l10nBuilderNames = l10nBuilders(platform).values()
             repack_scheduler = Triggerable(
                 name=builderPrefix('%s_repack' % platform),
@@ -1784,8 +1725,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             post_antivirus_builders.append(builderPrefix('push_to_mirrors'))
 
     if not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
-        if 'win32' in manuallySignedPlatforms:
-            updates_upstream_builders = [builderPrefix('signing_done')]
         schedulers.append(AggregatingScheduler(
             name=builderPrefix(
                 '%s_signing_done' % releaseConfig['productName']),
