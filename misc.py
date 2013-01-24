@@ -768,7 +768,7 @@ def generateBranchObjects(config, name, secrets=None):
             continue
 
         values = {'basename': base_name,
-                  'trystatus': '' if pf.get('try-by-default', True) else 'try-nondefault ',
+                  'trystatus': '' if pf.get('try_by_default', True) else 'try-nondefault ',
                   }
         pretty_name = PRETTY_NAME % values
         builder_id = NAME % values
