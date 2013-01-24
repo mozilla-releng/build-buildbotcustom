@@ -1162,6 +1162,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_target=pf.get('mock_target'),
             mock_packages=pf.get('mock_packages'),
             mock_copyin_files=pf.get('mock_copyin_files'),
+            promptWaitTime=releaseConfig.get(
+                'promptWaitTime', None),
         )
 
         builders.append({

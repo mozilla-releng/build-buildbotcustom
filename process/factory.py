@@ -4193,7 +4193,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  releaseNotesUrl=None, python='python',
                  testOlderPartials=False,
                  longVersion=None, schema=None,
-                 useBetaChannelForRelease=False, useChecksums=False, **kwargs):
+                 useBetaChannelForRelease=False, useChecksums=False,
+                 promptWaitTime=None, **kwargs):
         """patcherConfig: The filename of the patcher config file to bump,
                           and pass to patcher.
            mozRepoPath: The path for the Mozilla repo to hand patcher as the
@@ -4236,6 +4237,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.useChecksums = useChecksums
         self.python = python
         self.configRepoPath = configRepoPath
+        self.promptWaitTime = promptWaitTime
 
         # The patcher config bumper needs to know the exact previous version
         self.previousVersion = str(
@@ -4325,6 +4327,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.extend(['--platform', platform])
         if self.useBetaChannelForRelease:
             bumpCommand.append('-u')
+        if self.promptWaitTime:
+            bumpCommand.extend(['--prompt-wait-time', self.promptWaitTime])
         if self.releaseNotesUrl:
             rnurl = self.releaseNotesUrl
             if self.use_mock:
