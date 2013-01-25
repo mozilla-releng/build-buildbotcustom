@@ -443,10 +443,10 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         stagePlatform=None, stageProduct=None,
                         mozharness=False, mozharness_python=None,
                         mozharness_suite_config=None,
-                        mozharness_repo=None):
+                        mozharness_repo=None, mozharness_tag='production'):
     builders = []
     pf = config['platforms'].get(platform, {})
-    if slaves == None:
+    if slaves is None:
         slavenames = config['platforms'][platform]['slaves']
     else:
         slavenames = slaves
@@ -499,6 +499,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'reboot_command', suites.get('reboot_command', None))
         hg_bin = mozharness_suite_config.get(
             'hg_bin', suites.get('hg_bin', 'hg'))
+        properties['script_repo_revision'] = mozharness_tag
         factory = ScriptFactory(
             interpreter=mozharness_python,
             scriptRepo=mozharness_repo,
@@ -1070,6 +1071,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'platform': platform,
                     'product': pf['stage_product'],
                     'repo_path': config['repo_path'],
+                    'script_repo_revision': config['mozharness_tag'],
                 }
             }
             if pf.get('enable_dep', True):
@@ -1094,6 +1096,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'product': pf['stage_product'],
                         'repo_path': config['repo_path'],
                         'nightly_build': True,
+                        'script_repo_revision': config['mozharness_tag'],
                     }
                 }
                 branchObjects['builders'].append(builder)
@@ -1167,7 +1170,7 @@ def generateBranchObjects(config, name, secrets=None):
         # For the 'per-checkin' pgo strategy, we want PGO
         # enabled on what would be 'opt' builds.
         if platform in config['pgo_platforms']:
-            if config['pgo_strategy'] in ('periodic', 'try') or config['pgo_strategy'] == None:
+            if config['pgo_strategy'] in ('periodic', 'try') or config['pgo_strategy'] is None:
                 per_checkin_build_uses_pgo = False
             elif config['pgo_strategy'] == 'per-checkin':
                 per_checkin_build_uses_pgo = True
@@ -1405,7 +1408,9 @@ def generateBranchObjects(config, name, secrets=None):
                                        'stage_platform': stage_platform,
                                        'product': pf['stage_product'],
                                        'platform': platform,
-                                       'slavebuilddir': slavebuilddir},
+                                       'slavebuilddir': slavebuilddir,
+                                       'script_repo_revision': config['mozharness_tag'],
+                                       },
                         'env': builder_env
                     })
 
@@ -1993,6 +1998,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     builddir = "%s_%s_test-%s" % (
                         branch, slave_platform, suite)
                     slavebuilddir = 'test'
+                    properties = {
+                        'branch': branchProperty,
+                        'platform': slave_platform,
+                        'stage_platform': stage_platform,
+                        'product': stage_product,
+                        'builddir': builddir,
+                        'slavebuilddir': slavebuilddir,
+                    }
                     if branch_config.get('mozharness_talos') and not platform_config.get('is_mobile'):
                         extra_args = ['--suite', suite,
                                       '--add-option',
@@ -2017,7 +2030,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             extra_args.append('--use-talos-json')
                         factory = generateMozharnessTalosBuilder(
                             platform=platform,
-                            mozharness_repo=branch_config.get('mozharness_repo', platform_config['mozharness_config']['mozharness_repo']),
+                            mozharness_repo=branch_config['mozharness_repo'],
                             script_path="scripts/talos_script.py",
                             hg_bin=platform_config[
                                 'mozharness_config']['hg_bin'],
@@ -2031,6 +2044,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             reboot_command=platform_config[
                                 'mozharness_config'].get('reboot_command'),
                         )
+                        properties['script_repo_revision'] = branch_config['mozharness_tag']
                     else:
                         factory = factory_class(**factory_kwargs)
 
@@ -2041,14 +2055,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
                         'category': branch,
-                        'properties': {
-                            'branch': branchProperty,
-                            'platform': slave_platform,
-                            'stage_platform': stage_platform,
-                            'product': stage_product,
-                            'builddir': builddir,
-                            'slavebuilddir': slavebuilddir,
-                        },
+                        'properties': properties,
                     }
 
                     if not merge:
@@ -2166,8 +2173,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "stagePlatform": stage_platform,
                                 "stageProduct": stage_product
                             }
-                            if isinstance(suites, dict) and "mozharness_repo" in suites:
-                                test_builder_kwargs['mozharness_repo'] = branch_config.get('mozharness_repo', suites['mozharness_repo'])
+                            if isinstance(suites, dict) and "use_mozharness" in suites:
+                                test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
+                                test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):

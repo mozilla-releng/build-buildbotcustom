@@ -803,6 +803,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 })
 
             for n, builderName in l10nBuilders(platform).iteritems():
+                builddir = builderPrefix('%s_repack' % platform) + \
+                           '_' + str(n)
+                properties = {
+                    'builddir': builddir,
+                    'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
+                    'release_config': releaseConfigFile,
+                    'platform': platform,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                }
                 if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
                     repack_factory = SigningScriptFactory(
@@ -812,6 +821,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args=extra_args,
                         env=env,
                     )
+                    properties['script_repo_revision'] = releaseTag
                 else:
                     extra_args = [platform, branchConfigFile]
                     extra_args.extend([
@@ -841,9 +851,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         mock_copyin_files=pf.get('mock_copyin_files'),
                     )
 
-                builddir = builderPrefix('%s_repack' % platform) + \
-                    '_' + str(n)
-
                 builders.append({
                     'name': builderName,
                     'slavenames': pf.get('l10n_slaves', pf['slaves']),
@@ -853,13 +860,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'factory': repack_factory,
                     'nextSlave': _nextFastSlave,
                     'env': env,
-                    'properties': {
-                        'builddir': builddir,
-                        'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
-                        'release_config': releaseConfigFile,
-                        'platform': platform,
-                        'branch': 'release-%s' % sourceRepoInfo['name'],
-                    }
+                    'properties': properties,
                 })
 
             builders.append(makeDummyBuilder(
