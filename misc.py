@@ -289,14 +289,17 @@ def _nextSlowSlave(builder, available_slaves):
 
 def _nextFastSlave(builder, available_slaves, only_fast=False):
     try:
+        if only_fast:
+            # Check that the builder has some fast slaves configured.  We do
+            # this because some machines classes don't have a fast/slow
+            # distinction, and so they default to 'slow'
+            fast, slow = _partitionSlaves(builder.slaves)
+            if not fast:
+                log.msg("Builder '%s' has no fast slaves configured, but only_fast"
+                        " is enabled; disabling only_fast" % builder.name)
+                only_fast = False
+
         fast, slow = _partitionSlaves(available_slaves)
-        # Check that the builder has some fast slaves configured.  We do
-        # this because some machines classes don't have a fast/slow
-        # distinction, and so they default to 'slow'
-        if only_fast and not fast:
-            log.msg("Builder '%s' has no fast slaves configured, but only_fast"
-                    " is enabled; disabling only_fast" % builder.name)
-            only_fast = False
 
         # Choose the fast slave that was most recently on this builder
         # If there aren't any fast slaves, choose the slow slave that was most
