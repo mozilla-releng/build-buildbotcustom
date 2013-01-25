@@ -225,7 +225,6 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
     return test_builders
 
 fastRegexes = []
-nReservedSlaves = 0
 
 
 def _partitionSlaves(slaves):
@@ -243,46 +242,6 @@ def _partitionSlaves(slaves):
         else:
             slow.append(s)
     return fast, slow
-
-
-def _partitionUnreservedSlaves(slaves):
-    fast, slow = _partitionSlaves(slaves)
-    fast = fast[nReservedSlaves:]
-    reserved_fast = len(fast)
-    # If we don't have enough fast slaves to satisfy us, set aside some slow slaves too
-    # If nReservedSlaves > len(fast), then we need to reserve some slow slaves,
-    # and reserved_slow will be > 0
-    # If nReservedSlaves <= len(fast), then we have enough fast slaves, and
-    # reserved_slow will be 0
-    reserved_slow = max(0, nReservedSlaves - reserved_fast)
-    slow = slow[reserved_slow:]
-    return fast, slow
-
-
-def _readReservedFile(filename):
-    if not filename or not os.path.exists(filename):
-        n = 0
-    else:
-        try:
-            data = open(filename).read().strip()
-            if data == '':
-                n = 0
-            else:
-                n = int(data)
-        except IOError:
-            log.msg("Unable to open '%s' for reading" % filename)
-            log.err()
-            return
-        except ValueError:
-            log.msg("Unable to read '%s' as an integer" % filename)
-            log.err()
-            return
-
-    global nReservedSlaves
-    if n != nReservedSlaves:
-        log.msg("Setting nReservedFastSlaves to %i (was %i)" % (n,
-                nReservedSlaves))
-        nReservedSlaves = n
 
 
 def _getLastTimeOnBuilder(builder, slavename):
@@ -312,7 +271,7 @@ def _recentSort(builder):
 
 def _nextSlowSlave(builder, available_slaves):
     try:
-        fast, slow = _partitionUnreservedSlaves(available_slaves)
+        fast, slow = _partitionSlaves(available_slaves)
         # Choose the slow slave that was most recently on this builder
         # If there aren't any slow slaves, choose the slow slave that was most
         # recently on this builder
@@ -328,32 +287,16 @@ def _nextSlowSlave(builder, available_slaves):
         return random.choice(available_slaves)
 
 
-def _nextFastSlave(builder, available_slaves, only_fast=False, reserved=False):
-    # Check if our reserved slaves count needs updating
-    global _checkedReservedSlaveFile, _reservedFileName
-    if int(time.time() - _checkedReservedSlaveFile) > 60:
-        _readReservedFile(_reservedFileName)
-        _checkedReservedSlaveFile = int(time.time())
-
+def _nextFastSlave(builder, available_slaves, only_fast=False):
     try:
-        if only_fast:
-            # Check that the builder has some fast slaves configured.  We do
-            # this because some machines classes don't have a fast/slow
-            # distinction, and so they default to 'slow'
-            # We should look at the full set of slaves here regardless of if
-            # we're only supposed to be returning unreserved slaves so we get
-            # the full set of slaves on the builder.
-            fast, slow = _partitionSlaves(builder.slaves)
-            if not fast:
-                log.msg("Builder '%s' has no fast slaves configured, but only_fast is enabled; disabling only_fast" % builder.name)
-                only_fast = False
-
-        if reserved:
-            # We have access to the full set of slaves!
-            fast, slow = _partitionSlaves(available_slaves)
-        else:
-            # We only have access to unreserved slaves
-            fast, slow = _partitionUnreservedSlaves(available_slaves)
+        fast, slow = _partitionSlaves(available_slaves)
+        # Check that the builder has some fast slaves configured.  We do
+        # this because some machines classes don't have a fast/slow
+        # distinction, and so they default to 'slow'
+        if only_fast and not fast:
+            log.msg("Builder '%s' has no fast slaves configured, but only_fast"
+                    " is enabled; disabling only_fast" % builder.name)
+            only_fast = False
 
         # Choose the fast slave that was most recently on this builder
         # If there aren't any fast slaves, choose the slow slave that was most
@@ -371,18 +314,6 @@ def _nextFastSlave(builder, available_slaves, only_fast=False, reserved=False):
         log.err()
         return random.choice(available_slaves)
 
-_checkedReservedSlaveFile = 0
-_reservedFileName = None
-
-
-def setReservedFileName(filename):
-    global _reservedFileName
-    _reservedFileName = filename
-
-
-def _nextFastReservedSlave(builder, available_slaves, only_fast=True):
-    return _nextFastSlave(builder, available_slaves, only_fast, reserved=True)
-
 
 def _nextL10nSlave(n=4):
     """Return a nextSlave function that restricts itself to choosing amongst
@@ -395,7 +326,7 @@ def _nextL10nSlave(n=4):
             connected_slaves = [s for s in builder.slaves if s.slave.slave_status.isConnected()]
             # Sort the list so we're stable across reconfigs
             connected_slaves.sort(key=lambda s: s.slave.slavename)
-            fast, slow = _partitionUnreservedSlaves(connected_slaves)
+            fast, slow = _partitionSlaves(connected_slaves)
             slow = slow[:n]
             # Choose enough fast slaves so that we're considering a total of n
             # slaves
@@ -424,7 +355,7 @@ def _nextSlowIdleSlave(nReserved):
     """Return a nextSlave function that will only return a slave to run a build
     if there are at least nReserved slaves available."""
     def _nextslave(builder, available_slaves):
-        fast, slow = _partitionUnreservedSlaves(available_slaves)
+        fast, slow = _partitionSlaves(available_slaves)
         if len(slow) <= nReserved:
             return None
         return sorted(slow, _recentSort(builder))[-1]
