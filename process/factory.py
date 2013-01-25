@@ -6556,6 +6556,20 @@ class ScriptFactory(BuildFactory):
             haltOnFailure=True,
             workdir='scripts'
         ))
+        self.addStep(SetProperty(
+            name='get_script_repo_revision',
+            property='script_repo_revision',
+            command=['hg', 'id', '-i'],
+            workdir='scripts',
+            haltOnFailure=False,
+        ))
+        self.addStep(ShellCommand(
+            name='print_url_to_script_revision_used',
+            command=['echo', 'TinderboxPrint:',
+                "%s_revlink" % scriptRepo.split('/')[-1],
+                WithProperties("%s/rev/%%(script_repo_revision)s" % scriptRepo)],
+            haltOnFailure=False,
+        ))
         self.runScript()
         self.reboot()
 
