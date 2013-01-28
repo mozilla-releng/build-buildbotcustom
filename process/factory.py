@@ -5543,8 +5543,8 @@ class TalosFactory(RequestSortingBuildFactory):
         Return path to a python version that eithers has "simplejson" or
         it is 2.6 or higher (which includes the json module)
         '''
-        if (platform in ("fedora", "fedora64", "ubuntu64", "leopard",
-                         "snowleopard", "lion", "mountainlion")):
+        if (platform in ("fedora", "fedora64", "ubuntu32", "ubuntu64",
+                         "leopard", "snowleopard", "lion", "mountainlion")):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
@@ -5993,10 +5993,10 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             # 32 bit (includes mac browsers)
-            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android',
-                           'tegra_android-armv6', 'tegra_android-noion', 'panda_android',
-                           'leopard', 'snowleopard', 'leopard-o', 'lion',
-                           'mountainlion'):
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'ubuntu32',
+                           'tegra_android', 'tegra_android-armv6',
+                           'tegra_android-noion', 'panda_android', 'leopard',
+                           'snowleopard', 'leopard-o', 'lion', 'mountainlion'):
                 self.addStep(DownloadFile(
                              url=WithProperties(
                              "%s/%s" % (self.supportUrlBase, self.plugins['32'])),

@@ -93,6 +93,7 @@ def reallyShort(name, product=None):
         'fedora': 'fed',
         'fedora64': 'fed64',
         'ubuntu64': 'ub64',
+        'ubuntu32': 'ub32',
         'repack': 'rpk',
         'alder': 'a',
         'holly': 'h',
