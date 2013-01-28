@@ -77,7 +77,7 @@ MozillaEnvironments['linux-unittest'] = {
     "CCACHE_DIR": '/builds/ccache',
     "CCACHE_UMASK": '002',
     "MOZ_HIDE_RESULTS_TABLE": '1',
-    "MOZ_NODE_PATH": "/home/cltbld/bin/node.exe"
+    "MOZ_NODE_PATH": "/usr/bin/node"
 }
 
 MozillaEnvironments['linux64-unittest'] = MozillaEnvironments[

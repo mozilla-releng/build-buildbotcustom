@@ -26,7 +26,7 @@ reload(release.info)
 
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, \
-    generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
+    generateTestBuilderNames, generateTestBuilder, _nextFastSlave, \
     changeContainsProduct, nomergeBuilders, changeContainsProperties
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
@@ -91,10 +91,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mock_slaves = [x for x in set(mock_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
-    manuallySignedPlatforms = ()
-    if not releaseConfig.get('enableSigningAtBuildTime', True):
-        manuallySignedPlatforms = releaseConfig.get('manuallySignedPlatforms',
-                                                    ('win32',))
     if secrets is None:
         secrets = {}
 
@@ -183,9 +179,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platformDir = buildbot2ftp(bare_platform)
             if 'xulrunner' in platform:
                 platformDir = ''
-            if bare_platform in manuallySignedPlatforms:
-                platformDir = 'unsigned/%s' % platformDir
-                isPlatformUnsigned = True
             ftpURL = '/'.join([
                 ftpURL.strip('/'),
                 platformDir])
@@ -469,7 +462,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavebuilddir': reallyShort(
                 builderPrefix('%s_tag' % releaseConfig['productName'])),
             'factory': tag_factory,
-            'nextSlave': _nextFastReservedSlave,
+            'nextSlave': _nextFastSlave,
             'env': tag_env,
             'properties': {
                 'builddir': builderPrefix(
@@ -544,7 +537,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                 '%s_source' % releaseConfig['productName']), releaseConfig['productName']),
                         'factory': source_factory,
                         'env': builder_env,
-                        'nextSlave': _nextFastReservedSlave,
+                        'nextSlave': _nextFastSlave,
                         'properties': {
                             'slavebuilddir': reallyShort(
                                 builderPrefix(
@@ -738,7 +731,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'builddir': builderPrefix('%s_build' % platform),
                 'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform), releaseConfig['productName']),
                 'factory': build_factory,
-                'nextSlave': _nextFastReservedSlave,
+                'nextSlave': _nextFastSlave,
                 'env': builder_env,
                 'properties': {
                     'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform), releaseConfig['productName']),
@@ -798,7 +791,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'category': builderPrefix(''),
                     'builddir': builderPrefix("standalone_repack", platform),
                     'factory': standalone_factory,
-                    'nextSlave': _nextFastReservedSlave,
+                    'nextSlave': _nextFastSlave,
                     'env': env,
                     'properties': {
                         'builddir': builderPrefix("standalone_repack", platform),
@@ -810,6 +803,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 })
 
             for n, builderName in l10nBuilders(platform).iteritems():
+                builddir = builderPrefix('%s_repack' % platform) + \
+                           '_' + str(n)
+                properties = {
+                    'builddir': builddir,
+                    'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
+                    'release_config': releaseConfigFile,
+                    'platform': platform,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                }
                 if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
                     repack_factory = SigningScriptFactory(
@@ -819,6 +821,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args=extra_args,
                         env=env,
                     )
+                    properties['script_repo_revision'] = releaseTag
                 else:
                     extra_args = [platform, branchConfigFile]
                     extra_args.extend([
@@ -848,9 +851,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         mock_copyin_files=pf.get('mock_copyin_files'),
                     )
 
-                builddir = builderPrefix('%s_repack' % platform) + \
-                    '_' + str(n)
-
                 builders.append({
                     'name': builderName,
                     'slavenames': pf.get('l10n_slaves', pf['slaves']),
@@ -858,15 +858,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'builddir': builddir,
                     'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
                     'factory': repack_factory,
-                    'nextSlave': _nextFastReservedSlave,
+                    'nextSlave': _nextFastSlave,
                     'env': env,
-                    'properties': {
-                        'builddir': builddir,
-                        'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
-                        'release_config': releaseConfigFile,
-                        'platform': platform,
-                        'branch': 'release-%s' % sourceRepoInfo['name'],
-                    }
+                    'properties': properties,
                 })
 
             builders.append(makeDummyBuilder(
@@ -1032,7 +1026,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavebuilddir': reallyShort(builderPrefix(
                     'partner_repack', platform), releaseConfig['productName']),
                 'factory': partner_repack_factory,
-                'nextSlave': _nextFastReservedSlave,
+                'nextSlave': _nextFastSlave,
                 'env': builder_env,
                 'properties': {
                     'slavebuilddir': reallyShort(builderPrefix('partner_repack', platform), releaseConfig['productName']),
@@ -1042,17 +1036,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             })
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
-
-    if 'win32' in manuallySignedPlatforms:
-        builders.append(makeDummyBuilder(
-            name=builderPrefix('signing_done'),
-            slaves=all_slaves,
-            category=builderPrefix(''),
-            properties={
-                'platform': 'win32',
-                'branch': 'release-%s' % sourceRepoInfo['name'],
-            },
-        ))
 
     if releaseConfig.get('enableSigningAtBuildTime', True) and \
             releaseConfig.get('autoGenerateChecksums', True):
@@ -1180,6 +1163,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_target=pf.get('mock_target'),
             mock_packages=pf.get('mock_packages'),
             mock_copyin_files=pf.get('mock_copyin_files'),
+            promptWaitTime=releaseConfig.get(
+                'promptWaitTime', None),
         )
 
         builders.append({
@@ -1189,7 +1174,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'builddir': builderPrefix('updates'),
             'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
             'factory': updates_factory,
-            'nextSlave': _nextFastReservedSlave,
+            'nextSlave': _nextFastSlave,
             'env': builder_env,
             'properties': {
                 'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
@@ -1245,7 +1230,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'builddir': builddir,
                 'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
                 'factory': uv_factory,
-                'nextSlave': _nextFastReservedSlave,
+                'nextSlave': _nextFastSlave,
                 'env': env,
                 'properties': {'builddir': builddir,
                                'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
@@ -1455,7 +1440,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'builddir': builderPrefix('final_verification', platform),
             'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
             'factory': final_verification_factory,
-            'nextSlave': _nextFastReservedSlave,
+            'nextSlave': _nextFastSlave,
             'env': builder_env,
             'properties': {
                 'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
@@ -1572,49 +1557,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     ##### Change sources and Schedulers
 
-    if 'win32' in manuallySignedPlatforms:
-        change_source.append(UrlPoller(
-            branch=builderPrefix('post_signing'),
-            url='%s/win32_signing_build%s.log' % (
-                makeCandidatesDir(
-                    releaseConfig['productName'],
-                    releaseConfig['version'],
-                    releaseConfig['buildNumber'],
-                    protocol='http',
-                    server=releaseConfig['ftpServer']),
-                releaseConfig['buildNumber']),
-            pollInterval=60 * 10,
-        ))
-        signing_done_scheduler = Scheduler(
-            name=builderPrefix('signing_done'),
-            treeStableTimer=0,
-            branch=builderPrefix('post_signing'),
-            builderNames=[builderPrefix('signing_done')]
-        )
-        schedulers.append(signing_done_scheduler)
-        important_builders.append(builderPrefix('signing_done'))
-
-    if hasPlatformSubstring(manuallySignedPlatforms, 'android'):
-        # Watch only armv7 en-US APK
-        platform = 'android'
-        locale = 'en-US'
-        candidatesDir = makeCandidatesDir(
-            releaseConfig['productName'],
-            releaseConfig['version'],
-            releaseConfig['buildNumber'],
-            protocol='http',
-            server=releaseConfig['ftpServer'])
-        enUS_signed_apk_url = '%s%s/%s/%s-%s.%s.android-arm.apk' % \
-            (candidatesDir,
-             buildbot2ftp(platform),
-             locale, releaseConfig['productName'], releaseConfig['version'],
-             locale)
-        change_source.append(UrlPoller(
-            branch=builderPrefix('android_post_signing'),
-            url=enUS_signed_apk_url,
-            pollInterval=60 * 10
-        ))
-
     reset_schedulers_scheduler = Scheduler(
         name=builderPrefix(
             '%s_reset_schedulers' % releaseConfig['productName']),
@@ -1679,6 +1621,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if platform in releaseConfig['notifyPlatforms']:
             important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
+            if platform in releaseConfig.get('l10nNotifyPlatforms', []):
+                important_builders.append(builderPrefix('%s_repack_complete' % platform))
             l10nBuilderNames = l10nBuilders(platform).values()
             repack_scheduler = Triggerable(
                 name=builderPrefix('%s_repack' % platform),
@@ -1784,8 +1728,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             post_antivirus_builders.append(builderPrefix('push_to_mirrors'))
 
     if not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
-        if 'win32' in manuallySignedPlatforms:
-            updates_upstream_builders = [builderPrefix('signing_done')]
         schedulers.append(AggregatingScheduler(
             name=builderPrefix(
                 '%s_signing_done' % releaseConfig['productName']),

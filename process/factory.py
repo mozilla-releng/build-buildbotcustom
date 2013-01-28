@@ -4193,7 +4193,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  releaseNotesUrl=None, python='python',
                  testOlderPartials=False,
                  longVersion=None, schema=None,
-                 useBetaChannelForRelease=False, useChecksums=False, **kwargs):
+                 useBetaChannelForRelease=False, useChecksums=False,
+                 promptWaitTime=None, **kwargs):
         """patcherConfig: The filename of the patcher config file to bump,
                           and pass to patcher.
            mozRepoPath: The path for the Mozilla repo to hand patcher as the
@@ -4236,6 +4237,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.useChecksums = useChecksums
         self.python = python
         self.configRepoPath = configRepoPath
+        self.promptWaitTime = promptWaitTime
 
         # The patcher config bumper needs to know the exact previous version
         self.previousVersion = str(
@@ -4325,6 +4327,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.extend(['--platform', platform])
         if self.useBetaChannelForRelease:
             bumpCommand.append('-u')
+        if self.promptWaitTime:
+            bumpCommand.extend(['--prompt-wait-time', self.promptWaitTime])
         if self.releaseNotesUrl:
             rnurl = self.releaseNotesUrl
             if self.use_mock:
@@ -5539,8 +5543,8 @@ class TalosFactory(RequestSortingBuildFactory):
         Return path to a python version that eithers has "simplejson" or
         it is 2.6 or higher (which includes the json module)
         '''
-        if (platform in ("fedora", "fedora64", "ubuntu64", "leopard",
-                         "snowleopard", "lion", "mountainlion")):
+        if (platform in ("fedora", "fedora64", "ubuntu32", "ubuntu64",
+                         "leopard", "snowleopard", "lion", "mountainlion")):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
@@ -5989,10 +5993,10 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             # 32 bit (includes mac browsers)
-            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'tegra_android',
-                           'tegra_android-armv6', 'tegra_android-noion', 'panda_android',
-                           'leopard', 'snowleopard', 'leopard-o', 'lion',
-                           'mountainlion'):
+            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'ubuntu32',
+                           'tegra_android', 'tegra_android-armv6',
+                           'tegra_android-noion', 'panda_android', 'leopard',
+                           'snowleopard', 'leopard-o', 'lion', 'mountainlion'):
                 self.addStep(DownloadFile(
                              url=WithProperties(
                              "%s/%s" % (self.supportUrlBase, self.plugins['32'])),
@@ -6551,6 +6555,20 @@ class ScriptFactory(BuildFactory):
                      WithProperties('%(script_repo_revision:-default)s')],
             haltOnFailure=True,
             workdir='scripts'
+        ))
+        self.addStep(SetProperty(
+            name='get_script_repo_revision',
+            property='script_repo_revision',
+            command=['hg', 'id', '-i'],
+            workdir='scripts',
+            haltOnFailure=False,
+        ))
+        self.addStep(ShellCommand(
+            name='print_url_to_script_revision_used',
+            command=['echo', 'TinderboxPrint:',
+                "%s_revlink" % scriptRepo.split('/')[-1],
+                WithProperties("%s/rev/%%(script_repo_revision)s" % scriptRepo)],
+            haltOnFailure=False,
         ))
         self.runScript()
         self.reboot()
