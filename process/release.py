@@ -28,7 +28,7 @@ from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, \
     generateTestBuilderNames, generateTestBuilder, _nextFastSlave, \
     changeContainsProduct, nomergeBuilders, changeContainsProperties
-from buildbotcustom.common import reallyShort
+from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
     ReleaseUpdatesFactory, ReleaseFinalVerification, \
@@ -382,12 +382,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix(
                     '%s_repo_setup' % releaseConfig['productName']),
-                'slavebuilddir': reallyShort(builderPrefix(
+                'slavebuilddir': normalizeName(builderPrefix(
                     '%s_repo_setup' % releaseConfig['productName']), releaseConfig['productName']),
                 'factory': repository_setup_factory,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(builderPrefix(
+                    'slavebuilddir': normalizeName(builderPrefix(
                         '%s_repo_setup' % releaseConfig['productName']), releaseConfig['productName']),
                     'release_config': releaseConfigFile,
                     'platform': None,
@@ -420,7 +420,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix(
                     '%s_release_downloader' % releaseConfig['productName']),
-                'slavebuilddir': reallyShort(builderPrefix(
+                'slavebuilddir': normalizeName(builderPrefix(
                     '%s_release_downloader' % releaseConfig['productName']), releaseConfig['productName']),
                 'factory': release_downloader_factory,
                 'env': builder_env,
@@ -428,7 +428,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'release_config': releaseConfigFile,
                     'builddir': builderPrefix('%s_release_downloader' %
                                               releaseConfig['productName']),
-                    'slavebuilddir': reallyShort(builderPrefix(
+                    'slavebuilddir': normalizeName(builderPrefix(
                         '%s_release_downloader' %
                         releaseConfig['productName'])),
                     'platform': None,
@@ -459,7 +459,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': pf['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('%s_tag' % releaseConfig['productName']),
-            'slavebuilddir': reallyShort(
+            'slavebuilddir': normalizeName(
                 builderPrefix('%s_tag' % releaseConfig['productName'])),
             'factory': tag_factory,
             'nextSlave': _nextFastSlave,
@@ -467,7 +467,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'properties': {
                 'builddir': builderPrefix(
                     '%s_tag' % releaseConfig['productName']),
-                'slavebuilddir': reallyShort(
+                'slavebuilddir': normalizeName(
                     builderPrefix('%s_tag' % releaseConfig['productName'])),
                 'release_config': releaseConfigFile,
                 'platform': None,
@@ -532,14 +532,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         'category': builderPrefix(''),
                         'builddir': builderPrefix(
                             '%s_source' % releaseConfig['productName']),
-                        'slavebuilddir': reallyShort(
+                        'slavebuilddir': normalizeName(
                             builderPrefix(
                                 '%s_source' % releaseConfig['productName']), releaseConfig['productName']),
                         'factory': source_factory,
                         'env': builder_env,
                         'nextSlave': _nextFastSlave,
                         'properties': {
-                            'slavebuilddir': reallyShort(
+                            'slavebuilddir': normalizeName(
                                 builderPrefix(
                                     '%s_source' % releaseConfig['productName']), releaseConfig['productName']),
                             'platform': None,
@@ -587,11 +587,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             branchConfig['platforms']['linux64']['slaves'],
                             'category': builderPrefix(''),
                             'builddir': builderPrefix('xulrunner_source'),
-                            'slavebuilddir': reallyShort(builderPrefix('xulrunner_source'), releaseConfig['productName']),
+                            'slavebuilddir': normalizeName(builderPrefix('xulrunner_source'), releaseConfig['productName']),
                             'factory': xulrunner_source_factory,
                             'env': builder_env,
                             'properties': {
-                                'slavebuilddir': reallyShort(builderPrefix('xulrunner_source'), releaseConfig['productName']),
+                                'slavebuilddir': normalizeName(builderPrefix('xulrunner_source'), releaseConfig['productName']),
                                 'platform': None,
                                 'branch': 'release-%s' % sourceRepoInfo['name'],
                                 'product': 'xulrunner',
@@ -655,6 +655,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
                 'multilocale_config', {}).get('multilocaleOptions')
+            # Turn pymake on by default for Windows, and off by default for
+            # other platforms.
+            if 'win' in platform:
+                enable_pymake = pf.get('enable_pymake', True)
+            else:
+                enable_pymake = pf.get('enable_pymake', False)
             build_factory = ReleaseBuildFactory(
                 env=platform_env,
                 objdir=pf['platform_objdir'],
@@ -722,6 +728,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                enable_pymake=enable_pymake,
             )
 
             builders.append({
@@ -729,12 +736,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavenames': pf['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('%s_build' % platform),
-                'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('%s_build' % platform), releaseConfig['productName']),
                 'factory': build_factory,
                 'nextSlave': _nextFastSlave,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform), releaseConfig['productName']),
+                    'slavebuilddir': normalizeName(builderPrefix('%s_build' % platform), releaseConfig['productName']),
                 'platform': platform,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
@@ -795,7 +802,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'env': env,
                     'properties': {
                         'builddir': builderPrefix("standalone_repack", platform),
-                        'slavebuilddir': reallyShort(builderPrefix(
+                        'slavebuilddir': normalizeName(builderPrefix(
                             "standalone_repack", platform)),
                         'platform': platform,
                         'branch': 'release-%s' % sourceRepoInfo['name'],
@@ -807,7 +814,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                            '_' + str(n)
                 properties = {
                     'builddir': builddir,
-                    'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
+                    'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
                     'release_config': releaseConfigFile,
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
@@ -856,7 +863,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'slavenames': pf.get('l10n_slaves', pf['slaves']),
                     'category': builderPrefix(''),
                     'builddir': builddir,
-                    'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
+                    'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
                     'factory': repack_factory,
                     'nextSlave': _nextFastSlave,
                     'env': env,
@@ -903,6 +910,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         xr_env['SYMBOL_SERVER_SSH_KEY'] = \
             xr_env['SYMBOL_SERVER_SSH_KEY'].replace(branchConfig['stage_ssh_key'],
                                                     branchConfig['stage_ssh_xulrunner_key'])
+        # Turn pymake on by default for Windows, and off by default for
+        # other platforms.
+        if 'win' in platform:
+            enable_pymake = pf.get('enable_pymake', True)
+        else:
+            enable_pymake = pf.get('enable_pymake', False)
+
         if not releaseConfig.get('skip_build'):
             xulrunner_build_factory = XulrunnerReleaseBuildFactory(
                 env=xr_env,
@@ -948,17 +962,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                enable_pymake=enable_pymake,
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
                 'slavenames': pf['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_%s_build' % platform),
-                'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
                 'factory': xulrunner_build_factory,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
+                    'slavebuilddir': normalizeName(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                     'product': 'xulrunner',
@@ -1023,13 +1038,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavenames': slaves,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('partner_repack', platform),
-                'slavebuilddir': reallyShort(builderPrefix(
+                'slavebuilddir': normalizeName(builderPrefix(
                     'partner_repack', platform), releaseConfig['productName']),
                 'factory': partner_repack_factory,
                 'nextSlave': _nextFastSlave,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(builderPrefix('partner_repack', platform), releaseConfig['productName']),
+                    'slavebuilddir': normalizeName(builderPrefix('partner_repack', platform), releaseConfig['productName']),
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                 }
@@ -1062,13 +1077,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'category': builderPrefix(''),
             'builddir': builderPrefix(
                 '%s_checksums' % releaseConfig['productName']),
-            'slavebuilddir': reallyShort(
+            'slavebuilddir': normalizeName(
                 builderPrefix(
                     '%s_checksums' % releaseConfig['productName']), releaseConfig['productName']),
             'factory': checksums_factory,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix(
+                'slavebuilddir': normalizeName(builderPrefix(
                     '%s_checksums' % releaseConfig['productName'])),
                 'script_repo_revision': releaseTag,
                 'release_config': releaseConfigFile,
@@ -1097,11 +1112,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 branchConfig['platforms']['linux64']['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_checksums'),
-                'slavebuilddir': reallyShort(builderPrefix('xulrunner_checksums')),
+                'slavebuilddir': normalizeName(builderPrefix('xulrunner_checksums')),
                 'factory': xr_checksums_factory,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(
+                    'slavebuilddir': normalizeName(
                         builderPrefix('xulrunner_checksums')),
                     'script_repo_revision': releaseTag,
                     'release_config': releaseConfigFile,
@@ -1172,12 +1187,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': branchConfig['platforms']['linux']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('updates'),
-            'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('updates'), releaseConfig['productName']),
             'factory': updates_factory,
             'nextSlave': _nextFastSlave,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('updates'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('updates'), releaseConfig['productName']),
                 'platform': platform,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'release_config': releaseConfigFile,
@@ -1228,12 +1243,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavenames': branchConfig['platforms'][platform]['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builddir,
-                'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
                 'factory': uv_factory,
                 'nextSlave': _nextFastSlave,
                 'env': env,
                 'properties': {'builddir': builddir,
-                               'slavebuilddir': reallyShort(builddir, releaseConfig['productName']),
+                               'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
                                'script_repo_revision': runtimeTag,
                                'release_tag': releaseTag,
                                'release_config': releaseConfigFile,
@@ -1263,10 +1278,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': unix_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('check_permissions'),
-            'slavebuilddir': reallyShort(builderPrefix('chk_prms'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('chk_prms'), releaseConfig['productName']),
             'factory': check_permissions_factory,
             'env': builder_env,
-            'properties': {'slavebuilddir': reallyShort(builderPrefix('chk_prms'), releaseConfig['productName']),
+            'properties': {'slavebuilddir': normalizeName(builderPrefix('chk_prms'), releaseConfig['productName']),
                            'script_repo_revision': releaseTag,
                            'release_config': releaseConfigFile,
                            'platform': None,
@@ -1293,10 +1308,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': unix_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('antivirus'),
-            'slavebuilddir': reallyShort(builderPrefix('av'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('av'), releaseConfig['productName']),
             'factory': antivirus_factory,
             'env': builder_env,
-            'properties': {'slavebuilddir': reallyShort(builderPrefix('av'), releaseConfig['productName']),
+            'properties': {'slavebuilddir': normalizeName(builderPrefix('av'), releaseConfig['productName']),
                            'script_repo_revision': releaseTag,
                            'release_config': releaseConfigFile,
                            'platform': None,
@@ -1323,11 +1338,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': unix_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('push_to_mirrors'),
-            'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('psh_mrrrs'), releaseConfig['productName']),
             'factory': push_to_mirrors_factory,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('psh_mrrrs'), releaseConfig['productName']),
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
                 'platform': None,
@@ -1351,11 +1366,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': unix_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('postrelease'),
-            'slavebuilddir': reallyShort(builderPrefix('postrelease'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('postrelease'), releaseConfig['productName']),
             'factory': postrelease_factory,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('postrelease'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('postrelease'), releaseConfig['productName']),
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
                 'platform': None,
@@ -1380,11 +1395,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavenames': unix_slaves,
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('xulrunner_push_to_mirrors'),
-                'slavebuilddir': reallyShort(builderPrefix('xr_psh_mrrrs')),
+                'slavebuilddir': normalizeName(builderPrefix('xr_psh_mrrrs')),
                 'factory': xr_push_to_mirrors_factory,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(builderPrefix('xr_psh_mrrrs')),
+                    'slavebuilddir': normalizeName(builderPrefix('xr_psh_mrrrs')),
                     'release_config': releaseConfigFile,
                     'script_repo_revision': releaseTag,
                     'platform': None,
@@ -1409,11 +1424,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavenames': all_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('start_uptake_monitoring'),
-            'slavebuilddir': reallyShort(builderPrefix('st_uptake'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('st_uptake'), releaseConfig['productName']),
             'factory': trigger_uptake_factory,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('st_uptake'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('st_uptake'), releaseConfig['productName']),
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
                 'platform': None,
@@ -1438,12 +1453,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('final_verification', platform),
-            'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
             'factory': final_verification_factory,
             'nextSlave': _nextFastSlave,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             },
@@ -1508,11 +1523,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix('bouncer_submitter'),
-            'slavebuilddir': reallyShort(builderPrefix('bncr_sub'), releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('bncr_sub'), releaseConfig['productName']),
             'factory': bouncer_submitter_factory,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': reallyShort(builderPrefix('bncr_sub'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('bncr_sub'), releaseConfig['productName']),
                 'release_config': releaseConfigFile,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
@@ -1544,11 +1559,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 branchConfig['platforms']['linux64']['slaves'],
                 'category': builderPrefix(''),
                 'builddir': builderPrefix('euballot_bouncer_submitter'),
-                'slavebuilddir': reallyShort(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
                 'factory': euballot_bouncer_submitter_factory,
                 'env': builder_env,
                 'properties': {
-                    'slavebuilddir': reallyShort(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
+                    'slavebuilddir': normalizeName(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
                     'release_config': releaseConfigFile,
                     'platform': None,
                     'branch': 'release-%s' % sourceRepoInfo['name'],

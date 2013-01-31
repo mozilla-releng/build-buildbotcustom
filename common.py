@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 
@@ -45,13 +46,7 @@ def incrementBuildID(buildID):
     return genBuildID(epoch + 1)
 
 
-def reallyShort(name, product=None):
-    # FIXME: hacky workaround to fix thunderbird windows builds
-    if name in ('release-comm-esr17-win32_build',
-                'release-comm-beta-win32_build',
-                'release-comm-release-win32_build'):
-        return 'zzz-%s' % name.split('-')[2]
-
+def normalizeName(name, product=None):
     prefix = ''
     if product != None and 'thunderbird' in product:
         prefix = 'tb-'
@@ -67,7 +62,7 @@ def reallyShort(name, product=None):
         'jaegermonkey': 'jm',
         'shadow': 'sh',
         'mobile': 'mb',
-        'desktop': None,
+        'desktop': '',
         'debug': 'dbg',
         'xulrunner': 'xr',
         'build': 'bld',
@@ -106,17 +101,19 @@ def reallyShort(name, product=None):
         'gecko': 'g',
         'localizer': 'lz',
     }
-    hyphen_seperated_words = name.split('-')
-    words = []
-    for word in hyphen_seperated_words:
-        space_seperated_words = word.split('_')
-        for word in space_seperated_words:
-            words.extend(word.split(' '))
-    new_words = []
-    for word in words:
-        if word in mappings.keys():
-            if mappings[word]:
-                new_words.append(mappings[word])
-        else:
-            new_words.append(word)
-    return prefix + '-'.join(new_words)
+    for word, replacement in mappings.iteritems():
+        # Regexes are slow, so make sure the word is there at all before
+        # trying to do a substitution.
+        if word in name:
+            # Match strings that...
+            regex = re.compile(
+                r'(-|_|\A)' +   # Are the start of the string or after a separator
+                ('%s' % word) + # Contain the word we're looking
+                r'(-|_|\Z)'     # And don't have anything other the end of the string
+                                # or a separator atfer them
+            )
+            name = regex.sub(r'\1%s\2' % replacement, name)
+    # Not sure why we do this, but apparently we replace all the underscores
+    # with hyphens...
+    name = name.replace('_', '-')
+    return prefix + name
