@@ -388,7 +388,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
                  balrog_api_root=None, balrog_credentials_file=None,
                  use_mock=False, mock_target=None,
                  mock_packages=None, mock_copyin_files=None,
-                 makeCmd=['make'], **kwargs):
+                 enable_pymake=False, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -414,7 +414,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
-        self.makeCmd = makeCmd
+        self.enable_pymake = enable_pymake
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -425,6 +425,11 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             self.clobberBranch = self.branchName
         else:
             self.clobberBranch = clobberBranch
+
+        if self.enable_pymake:
+            self.makeCmd = ['python', WithProperties("%(basedir)s/build/build/pymake/make.py")]
+        else:
+            self.makeCmd = ['make']
 
         if self.signingServers and self.enableSigning:
             self.signing_command = get_signing_cmd(

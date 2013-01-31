@@ -1104,6 +1104,12 @@ def generateBranchObjects(config, name, secrets=None):
         clobberTime = pf.get('clobber_time', config['default_clobber_time'])
         checkTest = pf.get('enable_checktests', False)
         valgrindCheck = pf.get('enable_valgrind_checktests', False)
+        # Turn pymake on by default for Windows, and off by default for
+        # other platforms.
+        if 'win' in platform:
+            enable_pymake = pf.get('enable_pymake', True)
+        else:
+            enable_pymake = pf.get('enable_pymake', False)
 
         extra_args = {}
         if config.get('enable_try'):
@@ -1115,10 +1121,6 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             factory_class = NightlyBuildFactory
             uploadSymbols = False
-
-        if pf.get('enable_pymake'):
-            extra_args['makeCmd'] = ['python',
-                                     WithProperties("%(basedir)s/build/build/pymake/make.py")]
 
         stageBasePath = '%s/%s' % (config['stage_base_path'],
                                    pf['stage_product'])
@@ -1236,6 +1238,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozharnessTag': config.get('mozharness_tag'),
                 'geckoL10nRoot': config.get('gecko_l10n_root'),
                 'geckoLanguagesFile': pf.get('gecko_languages_file'),
+                'enable_pymake': enable_pymake,
             }
             factory_kwargs.update(extra_args)
             if pf.get('product_name') == 'b2g':
@@ -1390,10 +1393,6 @@ def generateBranchObjects(config, name, secrets=None):
             nightly_kwargs.update(multiargs)
             nightly_kwargs.update(ausargs)
 
-            if pf.get('enable_pymake'):
-                nightly_kwargs['makeCmd'] = ['python',
-                                             WithProperties("%(basedir)s/build/build/pymake/make.py")]
-
             # We make the assumption that *all* nightly builds
             # are to be done with PGO.  This is to ensure that all
             # branches get some PGO coverage
@@ -1485,6 +1484,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mozharnessTag=config.get('mozharness_tag'),
                 geckoL10nRoot=config.get('gecko_l10n_root'),
                 geckoLanguagesFile=pf.get('gecko_languages_file'),
+                enable_pymake=enable_pymake,
                 **nightly_kwargs
             )
 
@@ -1739,6 +1739,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                enable_pymake=enable_pymake,
             )
             mozilla2_xulrunner_builder = {
                 'name': '%s xulrunner' % pf['base_name'],

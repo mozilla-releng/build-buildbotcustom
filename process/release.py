@@ -655,6 +655,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
                 'multilocale_config', {}).get('multilocaleOptions')
+            # Turn pymake on by default for Windows, and off by default for
+            # other platforms.
+            if 'win' in platform:
+                enable_pymake = pf.get('enable_pymake', True)
+            else:
+                enable_pymake = pf.get('enable_pymake', False)
             build_factory = ReleaseBuildFactory(
                 env=platform_env,
                 objdir=pf['platform_objdir'],
@@ -722,6 +728,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                enable_pymake=enable_pymake,
             )
 
             builders.append({
@@ -903,6 +910,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         xr_env['SYMBOL_SERVER_SSH_KEY'] = \
             xr_env['SYMBOL_SERVER_SSH_KEY'].replace(branchConfig['stage_ssh_key'],
                                                     branchConfig['stage_ssh_xulrunner_key'])
+        # Turn pymake on by default for Windows, and off by default for
+        # other platforms.
+        if 'win' in platform:
+            enable_pymake = pf.get('enable_pymake', True)
+        else:
+            enable_pymake = pf.get('enable_pymake', False)
+
         if not releaseConfig.get('skip_build'):
             xulrunner_build_factory = XulrunnerReleaseBuildFactory(
                 env=xr_env,
@@ -948,6 +962,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                enable_pymake=enable_pymake,
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
