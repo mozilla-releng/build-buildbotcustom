@@ -66,7 +66,7 @@ from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
 from buildbotcustom.steps.signing import SigningServerAuthenication
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
-    genBuildID, reallyShort
+    genBuildID, normalizeName
 from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, MockInstall, \
     MockMozillaCheck, MockProperty, RetryingMockProperty, RetryingMockCommand, \
     MockAliveTest, MockCompareLeakLogs
@@ -3078,7 +3078,7 @@ def identToProperties(default_prop=None):
 class BaseRepackFactory(MozillaBuildFactory):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
-    ignore_dirs = MozillaBuildFactory.ignore_dirs + [reallyShort('*-nightly')]
+    ignore_dirs = MozillaBuildFactory.ignore_dirs + [normalizeName('*-nightly')]
 
     extraConfigureArgs = []
 
