@@ -6563,12 +6563,11 @@ class ScriptFactory(BuildFactory):
             workdir='scripts',
             haltOnFailure=False,
         ))
-        self.addStep(ShellCommand(
-            name='print_url_to_script_revision_used',
-            command=['echo', 'TinderboxPrint:',
-                "%s_revlink" % scriptRepo.split('/')[-1],
-                WithProperties("%s/rev/%%(script_repo_revision)s" % scriptRepo)],
-            haltOnFailure=False,
+        self.addStep(OutputStep(
+            name='tinderboxprint_script_revlink',
+            data=WithProperties(
+                'TinderboxPrint: %s_revlink: %s/rev/%%(script_repo_revision)s' % \
+                        (scriptRepo.split('/')[-1], scriptRepo)),
         ))
         self.runScript()
         self.reboot()
