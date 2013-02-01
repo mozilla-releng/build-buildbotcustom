@@ -5,7 +5,7 @@ import mock
 from twisted.trial import unittest
 
 import buildbotcustom.misc
-from buildbotcustom.misc import _nextSlowIdleSlave, _nextL10nSlave,\
+from buildbotcustom.misc import _nextSlowIdleSlave, \
     _nextFastSlave, _nextSlowSlave
 
 
@@ -78,20 +78,4 @@ class TestNextSlaveFuncs(unittest.TestCase):
         slaves are available."""
         func = _nextSlowIdleSlave(5)
         slave = func(self.builder, self.slaves)
-        self.assert_(slave is None)
-
-    def test_nextL10nSlave_avail(self):
-        """Test that _nextL10nSlave returns a slow slave if the first slow
-        slave is available."""
-        func = _nextL10nSlave(1)
-        slave = func(self.builder, self.slaves)
-        self.assert_(slave.slave.slavename == 'slow1')
-
-    def test_nextL10nSlave_unavail(self):
-        """Test that _nextL10nSlave returns None if the first slow slave is not
-        available."""
-        func = _nextL10nSlave(1)
-        available_slaves = [
-            s for s in self.slaves if s.slave.slavename != 'slow1']
-        slave = func(self.builder, available_slaves)
         self.assert_(slave is None)

@@ -317,42 +317,6 @@ def _nextFastSlave(builder, available_slaves, only_fast=False):
         return random.choice(available_slaves)
 
 
-def _nextL10nSlave(n=4):
-    """Return a nextSlave function that restricts itself to choosing amongst
-    the first n connnected slaves.  If there aren't enough slow slaves,
-    fallback to using fast slaves."""
-    def _nextslave(builder, available_slaves):
-        try:
-            # Determine our list of the first n connected slaves, preferring to use slow slaves
-            # if available.
-            connected_slaves = [s for s in builder.slaves if s.slave.slave_status.isConnected()]
-            # Sort the list so we're stable across reconfigs
-            connected_slaves.sort(key=lambda s: s.slave.slavename)
-            fast, slow = _partitionSlaves(connected_slaves)
-            slow = slow[:n]
-            # Choose enough fast slaves so that we're considering a total of n
-            # slaves
-            fast = fast[:n - (len(slow))]
-
-            # Now keep only those that are in available_slaves
-            slow = [s for s in slow if s in available_slaves]
-            fast = [s for s in fast if s in available_slaves]
-
-            # Now prefer slaves that most recently did this repack
-            if slow:
-                return sorted(slow, _recentSort(builder))[-1]
-            elif fast:
-                return sorted(fast, _recentSort(builder))[-1]
-            else:
-                # That's ok!
-                return None
-        except:
-            log.msg("Error choosing l10n slave for builder '%s', choosing randomly instead" % builder.name)
-            log.err()
-            return random.choice(available_slaves)
-    return _nextslave
-
-
 def _nextSlowIdleSlave(nReserved):
     """Return a nextSlave function that will only return a slave to run a build
     if there are at least nReserved slaves available."""
@@ -1341,7 +1305,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
                         'category': name,
-                        'nextSlave': _nextL10nSlave(),
+                        'nextSlave': _nextSlowSlave,
                         'properties': {'branch': '%s' % config['repo_path'],
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                        'stage_platform': stage_platform,
@@ -1580,7 +1544,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'slavebuilddir': normalizeName('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
-                        'nextSlave': _nextL10nSlave(),
+                        'nextSlave': _nextSlowSlave,
                         'properties': {'branch': name,
                                        'platform': platform,
                                        'product': pf['stage_product'],
@@ -1678,7 +1642,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
-                'nextSlave': _nextL10nSlave(),
+                'nextSlave': _nextSlowSlave,
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
