@@ -5887,6 +5887,7 @@ class TalosFactory(RequestSortingBuildFactory):
                     haltOnFailure=True,
                     log_eval_func=lambda c, s: regex_log_evaluator(
                         c, s, talos_hgweb_errors),
+                    timeout=60,
                 ))
             else:
                 self.addStep(DownloadFile(
