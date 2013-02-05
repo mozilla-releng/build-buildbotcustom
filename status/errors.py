@@ -30,6 +30,7 @@ upload_errors = ((re.compile("Connection timed out"), RETRY),
 
 talos_hgweb_errors = ((re.compile("ERROR 500: Internal Server Error"), RETRY),
                       (re.compile("ERROR: We tried to download the talos.json file but something failed"), RETRY),
+                      (re.compile("command timed out:"), RETRY),
                       )
 
 tegra_errors = (
