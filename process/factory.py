@@ -6555,6 +6555,7 @@ class ScriptFactory(BuildFactory):
             workdir=".",
             haltOnFailure=True,
             retry=False,
+            log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
         ))
         self.addStep(ShellCommand(
             name="update_scripts",
