@@ -6547,6 +6547,7 @@ class ScriptFactory(BuildFactory):
             command=['rm', '-rf', 'scripts'],
             workdir=".",
             haltOnFailure=True,
+            log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
         ))
         self.addStep(MercurialCloneCommand(
             name="clone_scripts",
