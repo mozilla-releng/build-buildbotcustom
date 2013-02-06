@@ -6565,7 +6565,7 @@ class ScriptFactory(BuildFactory):
         self.addStep(SetProperty(
             name='get_script_repo_revision',
             property='script_repo_revision',
-            command=['hg', 'id', '-i'],
+            command=[hg_bin, 'id', '-i'],
             workdir='scripts',
             haltOnFailure=False,
         ))
