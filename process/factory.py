@@ -763,7 +763,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
     def __init__(self, objdir, platform, configRepoPath, configSubDir,
                  profiledBuild, mozconfig, srcMozconfig=None,
                  productName=None,
-                 android_signing=False,
                  buildRevision=None, stageServer=None, stageUsername=None,
                  stageGroup=None, stageSshKey=None, stageBasePath=None,
                  stageProduct=None, post_upload_include_platform=False,
@@ -867,7 +866,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
-        self.android_signing = android_signing
         self.post_upload_include_platform = post_upload_include_platform
         self.useSharedCheckouts = useSharedCheckouts
         self.testPrettyNames = testPrettyNames
@@ -1744,9 +1742,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             pkg_env = self.env.copy()
         else:
             pkg_env = {}
-        if self.android_signing:
-            pkg_env['JARSIGNER'] = WithProperties(
-                '%(toolsdir)s/release/signing/mozpass.py')
 
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
@@ -6547,6 +6542,7 @@ class ScriptFactory(BuildFactory):
             command=['rm', '-rf', 'scripts'],
             workdir=".",
             haltOnFailure=True,
+            log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
         ))
         self.addStep(MercurialCloneCommand(
             name="clone_scripts",
@@ -6554,6 +6550,7 @@ class ScriptFactory(BuildFactory):
             workdir=".",
             haltOnFailure=True,
             retry=False,
+            log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
         ))
         self.addStep(ShellCommand(
             name="update_scripts",
@@ -6565,7 +6562,7 @@ class ScriptFactory(BuildFactory):
         self.addStep(SetProperty(
             name='get_script_repo_revision',
             property='script_repo_revision',
-            command=['hg', 'id', '-i'],
+            command=[hg_bin, 'id', '-i'],
             workdir='scripts',
             haltOnFailure=False,
         ))

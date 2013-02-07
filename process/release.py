@@ -700,7 +700,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 triggerBuilds=True,
                 triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
-                android_signing=pf.get('android_signing', False),
                 multiLocale=bool(releaseConfig.get('enableMultiLocale', False) and
                                  pf.get('multi_locale', False)),
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
