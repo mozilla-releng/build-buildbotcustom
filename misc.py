@@ -1184,7 +1184,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'useSharedCheckouts': pf.get('enable_shared_checkouts', False),
                 'testPrettyNames': pf.get('test_pretty_names', False),
                 'l10nCheckTest': pf.get('l10n_check_test', False),
-                'android_signing': pf.get('android_signing', False),
                 'post_upload_include_platform': pf.get('post_upload_include_platform', False),
                 'signingServers': secrets.get(pf.get('dep_signing_servers')),
                 'baseMirrorUrls': config.get('base_mirror_urls'),
@@ -1430,7 +1429,6 @@ def generateBranchObjects(config, name, secrets=None):
                 useSharedCheckouts=pf.get('enable_shared_checkouts', False),
                 testPrettyNames=pf.get('test_pretty_names', False),
                 l10nCheckTest=pf.get('l10n_check_test', False),
-                android_signing=pf.get('android_signing', False),
                 post_upload_include_platform=pf.get(
                     'post_upload_include_platform', False),
                 signingServers=secrets.get(pf.get('nightly_signing_servers')),
