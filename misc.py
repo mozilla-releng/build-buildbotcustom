@@ -1107,8 +1107,8 @@ def generateBranchObjects(config, name, secrets=None):
 
         if config.get('mozilla_dir'):
             extra_args['mozillaDir'] = config['mozilla_dir']
-        if pf.get('leak_target'):
-            extra_args['leakTarget'] = pf['leak_target']
+        if config.get('leak_target'):
+            extra_args['leakTarget'] = config['leak_target']
 
         multiargs = {}
         if pf.get('product_name') == 'b2g':
