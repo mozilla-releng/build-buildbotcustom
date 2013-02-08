@@ -1943,8 +1943,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         testTypes.append('opt')
                     if branch_config['platforms'][platform].get('enable_debug_unittests'):
                         testTypes.append('debug')
-                    if branch_config['platforms'][platform].get('enable_mobile_unittests'):
-                        testTypes.append('mobile')
 
                     merge_tests = branch_config.get('enable_merging', True)
 
