@@ -46,7 +46,13 @@ def incrementBuildID(buildID):
     return genBuildID(epoch + 1)
 
 
-def normalizeName(name, product=None):
+def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
+    """Shortens names and normalizes them within specified minimum
+       and maximum lengths. If names need lengthening, 'filler' is
+       appended until they reach the minimum length.
+       See https://bugzilla.mozilla.org/show_bug.cgi?id=827306 for background.
+    """
+    origName = name
     prefix = ''
     if product != None and 'thunderbird' in product:
         prefix = 'tb-'
@@ -63,16 +69,16 @@ def normalizeName(name, product=None):
         'shadow': 'sh',
         'mobile': 'mb',
         'desktop': '',
-        'debug': 'dbg',
+        'debug': 'd',
         'xulrunner': 'xr',
         'build': 'bld',
-        'linux': 'lnx',
+        'linux': 'lx',
         'win32': 'w32',
         'win64': 'w64',
         'macosx': 'osx',
         'macosx64': 'osx64',
-        'linux64': 'lnx64',
-        'android': 'andrd',
+        'linux64': 'l64',
+        'android': 'and',
         'release': 'rel',
         'mochitest': 'm',
         'browser-chrome': 'b-c',
@@ -100,6 +106,19 @@ def normalizeName(name, product=None):
         'private-browsing': 'pb',
         'gecko': 'g',
         'localizer': 'lz',
+        'blocklistupdate': 'blu',
+        'armv6': 'a6',
+        'armv7a': 'a7',
+        'ionmonkey': 'ion',
+        'system': 'sys',
+        'panda': 'p',
+        'b2g18': 'b18',
+        'v1_0_0': '100',
+        'v1_0_1': '101',
+        'standalone': 'sa',
+        'thunderbird': 'tb',
+        'checksums': 'sums',
+        'update_verify': 'uv',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before
@@ -113,7 +132,14 @@ def normalizeName(name, product=None):
                                 # or a separator atfer them
             )
             name = regex.sub(r'\1%s\2' % replacement, name)
-    # Not sure why we do this, but apparently we replace all the underscores
-    # with hyphens...
-    name = name.replace('_', '-')
-    return prefix + name
+    name = prefix + name
+    if len(name) > max_:
+        msg = 'Cannot shorten "%s" to maximum length (%d). Got to: %s' % (
+            origName, max_, name)
+        raise ValueError(msg)
+    # Add a seperator before the padding if necessary
+    if len(name) < min_:
+        name += '-'
+    while len(name) < min_:
+        name += filler
+    return name

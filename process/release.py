@@ -796,13 +796,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'slavenames': pf.get('l10n_slaves', pf['slaves']),
                     'category': builderPrefix(''),
                     'builddir': builderPrefix("standalone_repack", platform),
+                    'slavebuilddir': normalizeName(builderPrefix(
+                        'standalone_repack', platform), releaseConfig['productName']),
                     'factory': standalone_factory,
                     'nextSlave': _nextFastSlave,
                     'env': env,
                     'properties': {
                         'builddir': builderPrefix("standalone_repack", platform),
                         'slavebuilddir': normalizeName(builderPrefix(
-                            "standalone_repack", platform)),
+                            "standalone_repack", platform), releaseConfig['productName']),
                         'platform': platform,
                         'branch': 'release-%s' % sourceRepoInfo['name'],
                     }
