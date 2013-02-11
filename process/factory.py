@@ -33,7 +33,6 @@ import buildbotcustom.misc_scheduler
 import build.paths
 import release.info
 import release.paths
-reload(buildbotcustom.common)
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
 reload(buildbotcustom.steps.misc)

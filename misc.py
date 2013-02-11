@@ -33,6 +33,7 @@ import buildbotcustom.status.log_handlers
 import buildbotcustom.misc_scheduler
 import build.paths
 import mozilla_buildtools.queuedir
+reload(buildbotcustom.common)
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
 reload(buildbotcustom.log)
@@ -1107,8 +1108,8 @@ def generateBranchObjects(config, name, secrets=None):
 
         if config.get('mozilla_dir'):
             extra_args['mozillaDir'] = config['mozilla_dir']
-        if pf.get('leak_target'):
-            extra_args['leakTarget'] = pf['leak_target']
+        if config.get('leak_target'):
+            extra_args['leakTarget'] = config['leak_target']
 
         multiargs = {}
         if pf.get('product_name') == 'b2g':
@@ -1535,11 +1536,12 @@ def generateBranchObjects(config, name, secrets=None):
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
+                    slavebuilddir = normalizeName('%s-%s-l10n-nightly' % (name, platform), pf['stage_product'], max_=50)
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
                         'slavenames': pf.get('l10n_slaves', pf['slaves']),
                         'builddir': '%s-%s-l10n-nightly' % (name, platform),
-                        'slavebuilddir': normalizeName('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']),
+                        'slavebuilddir': slavebuilddir,
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
                         'nextSlave': _nextSlowSlave,
@@ -1547,7 +1549,7 @@ def generateBranchObjects(config, name, secrets=None):
                                        'platform': platform,
                                        'product': pf['stage_product'],
                                        'stage_platform': stage_platform,
-                                       'slavebuilddir': normalizeName('%s-%s-l10n-nightly' % (name, platform), pf['stage_product']), },
+                                       'slavebuilddir': slavebuilddir},
                     }
                     branchObjects['builders'].append(
                         mozilla2_l10n_nightly_builder)
@@ -1633,11 +1635,12 @@ def generateBranchObjects(config, name, secrets=None):
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
+            slavebuilddir = normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product'], max_=50)
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
                 'slavenames': pf.get('l10n_slaves', pf['slaves']),
                 'builddir': '%s-%s-l10n-dep' % (name, platform),
-                'slavebuilddir': normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product']),
+                'slavebuilddir': slavebuilddir,
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
                 'nextSlave': _nextSlowSlave,
@@ -1645,7 +1648,7 @@ def generateBranchObjects(config, name, secrets=None):
                                'platform': platform,
                                'stage_platform': stage_platform,
                                'product': pf['stage_product'],
-                               'slavebuilddir': normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product'])},
+                               'slavebuilddir': slavebuilddir},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
@@ -1943,8 +1946,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         testTypes.append('opt')
                     if branch_config['platforms'][platform].get('enable_debug_unittests'):
                         testTypes.append('debug')
-                    if branch_config['platforms'][platform].get('enable_mobile_unittests'):
-                        testTypes.append('mobile')
 
                     merge_tests = branch_config.get('enable_merging', True)
 
@@ -2420,7 +2421,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
 
             builder = {'name': name,
                        'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
-                       'slavebuilddir': normalizeName('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
+                       'slavebuilddir': normalizeName('%s_%s_spidermonkey-%s' % (branch, platform, variant), max_=50),
                        'slavenames': pf['slaves'],
                        'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                        'factory': f,
