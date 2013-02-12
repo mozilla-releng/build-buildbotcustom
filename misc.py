@@ -834,7 +834,7 @@ def generateBranchObjects(config, name, secrets=None):
 
     branchObjects['change_source'].append(HgPoller(
         hgURL=config['hgurl'],
-        branch=config['repo_path'],
+        branch=config.get("poll_repo", config['repo_path']),
         tipsOnly=tipsOnly,
         maxChanges=maxChanges,
         repo_branch=repo_branch,
@@ -891,7 +891,7 @@ def generateBranchObjects(config, name, secrets=None):
 
         branchObjects['schedulers'].append(scheduler_class(
             name=scheduler_name_prefix + "-" + product,
-            branch=config['repo_path'],
+            branch=config.get("poll_repo", config['repo_path']),
             builderNames=product_builders,
             fileIsImportant=fileIsImportant,
             **extra_args
