@@ -2025,7 +2025,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_suite_config']['hg_bin'] = platform_config['mozharness_config']['hg_bin']
                                 test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
                                 test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
-                                test_builder_kwargs['mozharness_suite_config']['env'].update(platform_config.get('unittest-env', {}))
+                                test_builder_kwargs['mozharness_suite_config']['env'].update(branch_config['platforms'][platform].get('unittest-env', {}))
                             branchObjects['builders'].extend(
                                 generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
