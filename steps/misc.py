@@ -271,7 +271,9 @@ class UnpackTest(ShellCommand):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
         if filename.endswith(".zip"):
-            args = ['unzip', '-oq', filename, 'mozbase*', 'bin*', 'certs*', 'modules*']
+            args = ['unzip', '-oq', filename, 'bin*', 'certs*', 'modules*']
+            if not filename.startswith("thunderbird"):
+                args.append('mozbase*')
 
             # modify the commands to extract only the files we need - the test
             # directory and bin/ and certs/
