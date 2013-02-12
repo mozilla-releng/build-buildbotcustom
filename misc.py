@@ -511,6 +511,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             script_maxtime=suites.get('script_maxtime', 7200),
             reboot_command=reboot_command,
             platform=platform,
+            env=mozharness_suite_config.get('env', {}),
             log_eval_func=lambda c, s: regex_log_evaluator(c, s, (
                                                            (re.compile('# TBPL WARNING #'), WARNINGS),
                                                            (re.compile('# TBPL FAILURE #'), FAILURE),
@@ -1895,6 +1896,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         'factory': factory,
                         'category': branch,
                         'properties': properties,
+                        'env': MozillaEnvironments[platform_config['env_name']],
                     }
 
                     if not merge:
@@ -2022,6 +2024,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                         'mozharness_suite_config'] = {}
                                 test_builder_kwargs['mozharness_suite_config']['hg_bin'] = platform_config['mozharness_config']['hg_bin']
                                 test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
+                                test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
+                                test_builder_kwargs['mozharness_suite_config']['env'].update(platform_config.get('unittest-env', {}))
                             branchObjects['builders'].extend(
                                 generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
