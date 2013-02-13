@@ -2425,7 +2425,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
 
             builder = {'name': name,
                        'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
-                       'slavebuilddir': normalizeName('%s_%s_spidermonkey-%s' % (branch, platform, variant), max_=50),
+                       'slavebuilddir': normalizeName('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
                        'slavenames': pf['slaves'],
                        'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
                        'factory': f,
