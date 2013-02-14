@@ -506,8 +506,12 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         # suites is a dict!
         if mozharness_suite_config is None:
             mozharness_suite_config = {}
-        extra_args = mozharness_suite_config.get(
-            'extra_args', suites.get('extra_args', []))
+        extra_args = []
+        if mozharness_suite_config.get('config_files'):
+            extra_args.extend(['--cfg', ','.join(mozharness_suite_config['config_files'])])
+        extra_args.extend(mozharness_suite_config.get('extra_args', suites.get('extra_args', [])))
+        if mozharness_suite_config.get('download_symbols'):
+            extra_args.extend(['--download-symbols', mozharness_suite_config['download_symbols']])
         reboot_command = mozharness_suite_config.get(
             'reboot_command', suites.get('reboot_command', None))
         hg_bin = mozharness_suite_config.get(
@@ -2033,7 +2037,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
-                                    test_builder_kwargs['mozharness_suite_config'] = branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name].copy()
+                                    test_builder_kwargs['mozharness_suite_config'] = deepcopy(branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name])
                                 else:
                                     test_builder_kwargs[
                                         'mozharness_suite_config'] = {}
@@ -2041,6 +2045,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
                                 test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
                                 test_builder_kwargs['mozharness_suite_config']['env'].update(branch_config['platforms'][platform].get('unittest-env', {}))
+                                if suites.get('download_symbols', True) and branch_config['fetch_symbols'] and \
+                                        branch_config['platforms'][platform][slave_platform].get('download_symbols', True):
+                                    if test_type == 'opt':
+                                        test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'ondemand'
+                                    else:
+                                        test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'true'
                             branchObjects['builders'].extend(
                                 generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
