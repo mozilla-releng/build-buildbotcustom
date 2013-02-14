@@ -1956,7 +1956,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             cmd = [
                 self.env.get('PYTHON26', 'python'),
                 WithProperties(
-                    '%(toolsdir)s/scripts/updates/balrog-client.py'),
+                    '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
                 '--build-properties', 'buildprops_balrog.json',
                 '--api-root', self.balrog_api_root,
                 '--verbose',
