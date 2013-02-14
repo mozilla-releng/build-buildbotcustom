@@ -52,16 +52,16 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
        appended until they reach the minimum length.
        See https://bugzilla.mozilla.org/show_bug.cgi?id=827306 for background.
     """
-    # XXX: Remove me when comm-esr17 dies.
+    # XXX: Remove me when esr17 dies.
     # We need a very very short directory name here because:
-    # 1) Thunderbird builds have especially long paths (both because they have
-    #    "tb" in their build dir normally and also because their Gecko clone
-    #    is in "mozilla", inside of comm checkout).
+    # 1) ESR builds have especially long paths compared to other branches.
     # 2) Pymake doesn't work on esr17 which makes it possible to hit maximum
     #    path length issues when working with certain mochitests.
     # https://bugzilla.mozilla.org/show_bug.cgi?id=799095#c7
     if name == 'release-comm-esr17-win32_build':
         return 'zzz'
+    elif name == 'release-mozilla-esr17-win32_build':
+        return 'yyy'
     origName = name
     prefix = ''
     if product != None and 'thunderbird' in product:
@@ -129,6 +129,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'thunderbird': 'tb',
         'checksums': 'sums',
         'update_verify': 'uv',
+        'spidermonkey': 'sm',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before
@@ -143,12 +144,10 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
             )
             name = regex.sub(r'\1%s\2' % replacement, name)
     name = prefix + name
-    # XXX: Remove me when comm-esr17 is dead. Nasty hack to avoid shortening
+    # XXX: Remove me when esr17 is dead. Nasty hack to avoid shortening
     # this branches' directories because the build system can't handle the
     # padded version. Can also be removed if we manage to turn pymake on for it.
-    # Do NOT add more hacks like this unless under extreme time pressure.
-    # Talk to bhearsum, he will help find a proper fix.
-    if 'comm-esr17' in origName:
+    if 'esr17' in origName:
         return name
 
     if len(name) > max_:
