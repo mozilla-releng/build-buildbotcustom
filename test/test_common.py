@@ -24,5 +24,5 @@ class TestNormalizeName(unittest.TestCase):
         self.assertEquals(got, 'tb-c-beta')
 
     def testPrefixDelimeterOnly(self):
-        got = normalizeName('mozilla-esr17', min_=8, max_=8)
-        self.assertEquals(got, 'm-esr17-')
+        got = normalizeName('mozilla-release', min_=6, max_=6)
+        self.assertEquals(got, 'm-rel-')
