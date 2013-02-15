@@ -62,6 +62,8 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         return 'zzz'
     elif name == 'release-mozilla-esr17-win32_build':
         return 'yyy'
+    elif name == 'release-comm-release-win32_build':
+        return 'ggg'
     origName = name
     prefix = ''
     if product != None and 'thunderbird' in product:
@@ -147,7 +149,10 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
     # XXX: Remove me when esr17 is dead. Nasty hack to avoid shortening
     # this branches' directories because the build system can't handle the
     # padded version. Can also be removed if we manage to turn pymake on for it.
-    if 'esr17' in origName:
+    # comm-release is in here because we had to turn pymake off for it in
+    # bug 841898, because we do releases for "comm-release" off of esr17
+    # and can't flip it just for those. this should be fixed before tb17.0.4 builds
+    if 'esr17' in origName or 'comm-release' in origName:
         return name
 
     if len(name) > max_:
