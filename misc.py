@@ -205,6 +205,17 @@ def changeContainsProduct(change, productName):
     return False
 
 
+def changeBaseTagContainsScriptRepoRevision(change, baseTag):
+    script_repo_revision = change.properties.getProperty("script_repo_revision")
+    baseTag = baseTag + "_"
+    if isinstance(script_repo_revision, basestring) and \
+            baseTag in script_repo_revision:
+            log.msg("baseTag '%s' IS in script_repo_revision '%s'" % (baseTag, script_repo_revision))
+            return True
+    log.msg("baseTag '%s' IS NOT in script_repo_revision '%s'" % (baseTag, script_repo_revision))
+    return False
+
+
 def changeContainsProperties(change, props={}):
     for prop, value in props.iteritems():
         if change.properties.getProperty(prop) != value:

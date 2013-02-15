@@ -27,7 +27,8 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, \
     generateTestBuilderNames, generateTestBuilder, _nextFastSlave, \
-    changeContainsProduct, nomergeBuilders, changeContainsProperties
+    changeContainsProduct, nomergeBuilders, changeContainsProperties, \
+    changeBaseTagContainsScriptRepoRevision
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -1581,7 +1582,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         builderNames=[builderPrefix(
             '%s_reset_schedulers' % releaseConfig['productName'])],
         fileIsImportant=lambda c: changeContainsProduct(c,
-                                                        releaseConfig['productName'])
+                                                        releaseConfig['productName']) \
+            and changeBaseTagContainsScriptRepoRevision(c, releaseConfig['baseTag']),
     )
     schedulers.append(reset_schedulers_scheduler)
     if releaseConfig.get('enable_repo_setup'):
