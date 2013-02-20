@@ -1287,6 +1287,7 @@ def generateBranchObjects(config, name, secrets=None):
                 platform_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
 
             triggeredSchedulers = None
+            l10n_objdir = pf['platform_objdir']
             if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
                 mobile_l10n_scheduler_name = '%s-%s-l10n' % (name, platform)
                 mobile_l10n_builders = []
@@ -1500,7 +1501,7 @@ def generateBranchObjects(config, name, secrets=None):
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=platform_env,
-                        objdir=objdir,
+                        objdir=l10n_objdir,
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],
@@ -1545,6 +1546,7 @@ def generateBranchObjects(config, name, secrets=None):
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
+                        enable_pymake=enable_pymake,
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -1615,6 +1617,7 @@ def generateBranchObjects(config, name, secrets=None):
                 os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
+                objdir=l10n_objdir,
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
@@ -1644,6 +1647,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 mozconfig=mozconfig,
+                enable_pymake=enable_pymake,
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
