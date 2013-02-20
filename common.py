@@ -101,7 +101,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'cedar': 'ced',
         'birch': 'bir',
         'maple': 'map',
-        'leopard': 'leo',
         'snowleopard': 'snow',
         'fedora': 'fed',
         'fedora64': 'fed64',
