@@ -2249,6 +2249,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
         '''
         pass
 
+    def downloadMarTools(self):
+        '''The mar and bsdiff tools are created by default when
+           --enable-update-packaging is specified. The latest version should
+           always be available latest-${branch}/mar-tools/${platform}
+           on the ftp server.
+        '''
+        pass
+
     def getCompleteMarPatternMatch(self):
         marPattern = getPlatformFtpDir(self.platform)
         if not marPattern:
@@ -2263,8 +2271,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         '''This function expects that the following build properties are
            already set: buildid, completeMarFilename
         '''
-        self.makePartialTools()
-        # These tools (mar+mbsdiff) should now be built.
+        # These tools (mar+mbsdiff) should now be built (or downloaded).
         mar = '../dist/host/bin/mar'
         mbsdiff = '../dist/host/bin/mbsdiff'
         # Unpack the current complete mar we just made.
@@ -3114,6 +3121,11 @@ class BaseRepackFactory(MozillaBuildFactory):
 
         self.origSrcDir = self.branchName
 
+        if self.enable_pymake:
+            self.makeCmd = ['python', WithProperties("%(basedir)s/build/" + "%s/build/pymake/make.py" % self.origSrcDir)]
+        else:
+            self.makeCmd = ['make']
+
         # Mozilla subdir
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
@@ -3134,8 +3146,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         # do that everywhere.
         self.absMozillaSrcDir = "%s/%s" % (
             self.baseWorkDir, self.mozillaSrcDir)
-        self.absMozillaObjDir = '%s/%s' % (
-            self.baseWorkDir, self.mozillaObjdir)
+        self.absMozillaObjDir = '%s/%s/%s' % (
+            self.baseWorkDir, self.origSrcDir, self.mozillaObjdir)
 
         self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
                          '/nightly/latest-%s-l10n' % self.branchName
@@ -3235,64 +3247,33 @@ class BaseRepackFactory(MozillaBuildFactory):
         ))
 
     def configure(self):
-        self.addStep(MockCommand(
-                     name='autoconf',
-                     command=['bash', '-c', 'autoconf-2.13'],
-                     haltOnFailure=True,
-                     descriptionDone=['autoconf'],
-                     workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
-        if (self.mozillaDir):
-            self.addStep(MockCommand(
-                         name='autoconf_mozilla',
-                         command=['bash', '-c', 'autoconf-2.13'],
-                         haltOnFailure=True,
-                         descriptionDone=['autoconf mozilla'],
-                         workdir='%s/%s' % (
-                         self.baseWorkDir, self.mozillaSrcDir),
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         ))
-        self.addStep(MockCommand(
-                     name='autoconf_js_src',
-                     command=['bash', '-c', 'autoconf-2.13'],
-                     haltOnFailure=True,
-                     descriptionDone=['autoconf js/src'],
-                     workdir='%s/%s/js/src' % (
-                     self.baseWorkDir, self.mozillaSrcDir),
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
-        # WinCE is the only platform that will do repackages with
-        # a mozconfig for now. This will be fixed in bug 518359
-        # For backward compatibility where there is no mozconfig
+        if self.platform.startswith('win'):
+            self.addStep(SetProperty(
+                command=['bash', '-c', 'pwd -W'],
+                property='basedir',
+                workdir='.'
+            ))
         self.addStep(MockCommand(**self.processCommand(
-                                 name='configure',
-                                 command=['sh', '--',
-                                          './configure', '--enable-application=%s' % self.appName,
-                                          '--with-l10n-base=../%s' % self.l10nRepoPath] +
-                                 self.extraConfigureArgs,
-                                 description='configure',
-                                 descriptionDone='configure done',
+                                 name='make_configure',
                                  env=self.env,
-                                 haltOnFailure=True,
-                                 workdir='%s/%s' % (
-                                     self.baseWorkDir, self.origSrcDir),
-                                 mock=self.use_mock,
-                                 target=self.mock_target,
-                                 )))
-        self.addStep(MockCommand(**self.processCommand(
-                                 name='make_config',
-                                 command=self.makeCmd,
-                                 workdir='%s/%s/config' % (
-                                 self.baseWorkDir, self.mozillaObjdir),
+                                 command=self.makeCmd + ['-f', 'client.mk', 'configure'],
+                                 workdir=self.absMozillaSrcDir,
                                  description=['make config'],
                                  haltOnFailure=True,
                                  mock=self.use_mock,
                                  target=self.mock_target,
-                                 )))
+        )))
+        # nsinstall isn't created unless we do this.
+        self.addStep(MockCommand(**self.processCommand(
+                                 name='compile_nsinstall',
+                                 env=self.env,
+                                 command=self.makeCmd,
+                                 workdir='%s/config' % self.absMozillaObjDir,
+                                 description=['compile nsinstall'],
+                                 haltOnFailure=True,
+                                 mock=self.use_mock,
+                                 target=self.mock_target,
+        )))
 
     def tinderboxPrint(self, propName, propValue):
         self.addStep(OutputStep(
@@ -3316,8 +3297,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                                              WithProperties(
                                                  'AB_CD=%(locale)s')],
                      env=self.uploadEnv,
-                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
-                                                   self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                      haltOnFailure=True,
                      flunkOnFailure=True,
                      log_eval_func=lambda c, s: regex_log_evaluator(
@@ -3518,8 +3498,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                      description='wget en-US',
                      env=self.env,
                      haltOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (
-                     self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
@@ -3529,8 +3508,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                      description='unpack en-US',
                      haltOnFailure=True,
                      env=self.env,
-                     workdir='%s/%s/%s/locales' % (
-                     self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
@@ -3541,8 +3519,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                                              'echo-variable-ZIP_IN'],
                      property='zip_in',
                      env=self.env,
-                     workdir='%s/%s/%s/locales' % (
-                     self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                      haltOnFailure=True,
                      mock=self.use_mock,
                      target=self.mock_target,
@@ -3556,8 +3533,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                                                  'echo-variable-WIN32_INSTALLER_IN'],
                          property='win32_installer_in',
                          env=self.env,
-                         workdir='%s/%s/%s/locales' % (
-                         self.baseWorkDir, self.objdir, self.appName),
+                         workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                          haltOnFailure=True,
                          mock=self.use_mock,
                          target=self.mock_target,
@@ -3574,8 +3550,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                      haltOnFailure=False,
                      flunkOnFailure=False,
                      warnOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (
-                     self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
@@ -3717,8 +3692,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      descriptionDone='wget en-US',
                      env=self.env,
                      haltOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (
-                     self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir,
+                                                self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
@@ -3734,16 +3709,16 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
                      env=self.env,
-                     workdir='%s/%s/%s/locales' % (
-                         self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir,
+                                                self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
         self.addStep(MockProperty(
                      command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (
-                         self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir,
+                                                self.appName),
                      extract_fn=identToProperties(),
                      mock=self.use_mock,
                      target=self.mock_target,
@@ -3765,8 +3740,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                   WithProperties('%(moz_revision)s')],
                          haltOnFailure=True,
                          env=self.env,
-                         workdir='%s/%s' % (
-                             self.baseWorkDir, self.mozillaSrcDir),
+                         workdir=self.absMozillaSrcDir,
                          mock=self.use_mock,
                          target=self.mock_target,
                          ))
@@ -3777,7 +3751,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                   WithProperties('%(fx_revision)s')],
                          haltOnFailure=True,
                          env=self.env,
-                         workdir='build/' + self.origSrcDir,
+                         workdir=self.absMozillaSrcDir,
                          mock=self.use_mock,
                          target=self.mock_target,
                          ))
@@ -3796,19 +3770,42 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             self.tinderboxPrint(
                 'l10n_revision', WithProperties('%(l10n_revision)s'))
 
-    def makePartialTools(self):
-        # Build the tools we need for update-packaging, specifically bsdiff.
-        # Configure can take a while.
-        self.addStep(MockCommand(
-            name='make_bsdiff',
-            command=['sh', '-c',
-                     'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
-                     'make tier_base; make tier_nspr; make -C config;' +
-                     'make -C modules/libmar; make -C modules/libbz2;' +
-                     'make -C other-licenses/bsdiff;'
-                     'fi'],
-            description=['make', 'bsdiff'],
-            workdir=self.absMozillaObjDir,
+    def downloadMarTools(self):
+        mar = 'mar'
+        mbsdiff = 'mbsdiff'
+        if self.platform.startswith('win'):
+            mar += '.exe'
+            mbsdiff += '.exe'
+
+        baseURL = 'http://%s' % self.stageServer + \
+                  '/pub/mozilla.org/%s' % self.productName + \
+                  '/nightly/latest-%s' % self.branchName + \
+                  '/mar-tools/%s' % self.platform
+        marURL = '%s/%s' % (baseURL, mar)
+        mbsdiffURL = '%s/%s' % (baseURL, mbsdiff)
+
+        self.addStep(RetryingMockCommand(
+            name='get_mar',
+            description=['get', 'mar'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     chmod 755 %s'''.replace("\n", "") % (mar, mar, marURL, mar)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
+        ))
+        self.addStep(RetryingMockCommand(
+            name='get_mbsdiff',
+            description=['get', 'mbsdiff'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     chmod 755 %s'''.replace("\n", "") % (mbsdiff, mbsdiff, mbsdiffURL, mbsdiff)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
             haltOnFailure=True,
             mock=self.use_mock,
             target=self.mock_target,
@@ -3820,47 +3817,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         return '.%(locale)s.' + NightlyBuildFactory.getCompleteMarPatternMatch(self)
 
     def doRepack(self):
-        self.addStep(MockCommand(
-                     name='make_tier_base',
-                     command=self.makeCmd + ['tier_base'],
-                     workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
-                     description=['make tier_base'],
-                     haltOnFailure=True,
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
-        self.addStep(MockCommand(
-                     name='make_tier_nspr',
-                     command=self.makeCmd + ['tier_nspr'],
-                     workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
-                     description=['make tier_nspr'],
-                     haltOnFailure=True,
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
-        if self.l10nNightlyUpdate:
-            # Because we're generating updates we need to build the libmar
-            # tools
-            self.addStep(MockCommand(
-                         name='make_libmar',
-                         command=self.makeCmd,
-                         workdir='%s/%s/modules/libmar' % (
-                         self.baseWorkDir, self.mozillaObjdir),
-                         description=self.makeCmd + ['modules/libmar'],
-                         haltOnFailure=True,
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         ))
+        self.downloadMarTools()
         self.addStep(MockCommand(
                      name='repack_installers',
                      description=['repack', 'installers'],
-                     command=['sh', '-c',
-                              WithProperties(
-                              'make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+                     command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
                      env=self.env,
                      haltOnFailure=True,
-                     workdir='%s/%s/%s/locales' % (
-                     self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
@@ -3875,33 +3839,36 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             haltOnFailure=True,
         ))
         self.addStep(SetProperty(
-            command=['python', 'config/printconfigsetting.py',
-                     WithProperties('%(inipath)s'),
+            command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'BuildID'],
             name='get_build_id',
-            workdir=self.absMozillaSrcDir,
+            workdir='.',
+            env=self.env,
             property='buildid',
         ))
         if self.l10nNightlyUpdate:
             # We need the appVersion to create snippets
             self.addStep(SetProperty(
-                command=['python', 'config/printconfigsetting.py',
-                         WithProperties('%(inipath)s'),
+                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                          'App', 'Version'],
                 property='appVersion',
                 name='get_app_version',
-                workdir=self.absMozillaSrcDir,
+                workdir='.',
+                env=self.env,
             ))
             self.addStep(SetProperty(
-                command=['python', 'config/printconfigsetting.py',
-                         WithProperties('%(inipath)s'),
+                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                          'App', 'Name'],
                 property='appName',
                 name='get_app_name',
-                workdir=self.absMozillaSrcDir,
+                workdir='.',
+                env=self.env,
             ))
             self.addFilePropertiesSteps(filename='*.complete.mar',
-                                        directory='%s/dist/update' % self.absMozillaSrcDir,
+                                        directory='%s/dist/update' % self.absMozillaObjDir,
                                         fileType='completeMar',
                                         haltOnFailure=True)
 

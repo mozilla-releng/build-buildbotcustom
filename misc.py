@@ -506,8 +506,12 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         # suites is a dict!
         if mozharness_suite_config is None:
             mozharness_suite_config = {}
-        extra_args = mozharness_suite_config.get(
-            'extra_args', suites.get('extra_args', []))
+        extra_args = []
+        if mozharness_suite_config.get('config_files'):
+            extra_args.extend(['--cfg', ','.join(mozharness_suite_config['config_files'])])
+        extra_args.extend(mozharness_suite_config.get('extra_args', suites.get('extra_args', [])))
+        if mozharness_suite_config.get('download_symbols'):
+            extra_args.extend(['--download-symbols', mozharness_suite_config['download_symbols']])
         reboot_command = mozharness_suite_config.get(
             'reboot_command', suites.get('reboot_command', None))
         hg_bin = mozharness_suite_config.get(
@@ -1287,6 +1291,7 @@ def generateBranchObjects(config, name, secrets=None):
                 platform_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
 
             triggeredSchedulers = None
+            l10n_objdir = pf['platform_objdir']
             if config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
                 mobile_l10n_scheduler_name = '%s-%s-l10n' % (name, platform)
                 mobile_l10n_builders = []
@@ -1500,7 +1505,7 @@ def generateBranchObjects(config, name, secrets=None):
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=platform_env,
-                        objdir=objdir,
+                        objdir=l10n_objdir,
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],
@@ -1545,6 +1550,7 @@ def generateBranchObjects(config, name, secrets=None):
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
+                        enable_pymake=enable_pymake,
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -1615,6 +1621,7 @@ def generateBranchObjects(config, name, secrets=None):
                 os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
+                objdir=l10n_objdir,
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
@@ -1644,6 +1651,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 mozconfig=mozconfig,
+                enable_pymake=enable_pymake,
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
@@ -2029,7 +2037,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
-                                    test_builder_kwargs['mozharness_suite_config'] = branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name].copy()
+                                    test_builder_kwargs['mozharness_suite_config'] = deepcopy(branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name])
                                 else:
                                     test_builder_kwargs[
                                         'mozharness_suite_config'] = {}
@@ -2037,6 +2045,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
                                 test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
                                 test_builder_kwargs['mozharness_suite_config']['env'].update(branch_config['platforms'][platform].get('unittest-env', {}))
+                                if suites.get('download_symbols', True) and branch_config['fetch_symbols'] and \
+                                        branch_config['platforms'][platform][slave_platform].get('download_symbols', True):
+                                    if test_type == 'opt':
+                                        test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'ondemand'
+                                    else:
+                                        test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'true'
                             branchObjects['builders'].extend(
                                 generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
