@@ -2674,8 +2674,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                         branchName=name,
-                        tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
-                        tooltool_url_list=config.get('tooltool_url_list', []),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2803,8 +2801,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 branchName=name,
                 mozconfig=mozconfig,
-                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
-                tooltool_url_list=config.get('tooltool_url_list', []),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
