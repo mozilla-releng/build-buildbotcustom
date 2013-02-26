@@ -663,7 +663,11 @@ def generateBranchObjects(config, name, secrets=None):
     }
     if secrets is None:
         secrets = {}
+    # List of all the per-checkin builders
     builders = []
+    # Which builders should we consider when looking at per-checkin results and
+    # determining what revision we should do a nightly build on
+    buildersForNightly = []
     buildersByProduct = {}
     nightlyBuilders = []
     xulrunnerNightlyBuilders = []
@@ -707,6 +711,8 @@ def generateBranchObjects(config, name, secrets=None):
             if pf.get('enable_dep', True):
                 buildername = '%s_dep' % pf['base_name']
                 builders.append(buildername)
+                if pf.get('consider_for_nightly', True):
+                    buildersForNightly.append(buildername)
                 buildersByProduct.setdefault(
                     pf['stage_product'], []).append(buildername)
                 prettyNames[platform] = buildername
@@ -720,12 +726,14 @@ def generateBranchObjects(config, name, secrets=None):
                   'trystatus': '' if pf.get('try_by_default', True) else 'try-nondefault ',
                   }
         pretty_name = PRETTY_NAME % values
-        builder_id = NAME % values
+        buildername = NAME % values
 
         if pf.get('enable_dep', True):
-            builders.append(builder_id)
+            builders.append(buildername)
+            if pf.get('consider_for_nightly', True):
+                buildersForNightly.append(buildername)
             buildersByProduct.setdefault(
-                pf['stage_product'], []).append(builder_id)
+                pf['stage_product'], []).append(buildername)
             prettyNames[platform] = pretty_name
 
         # Fill the l10n dep dict
@@ -936,7 +944,7 @@ def generateBranchObjects(config, name, secrets=None):
         if config.get('enable_nightly_lastgood', True):
             goodFunc = lastGoodFunc(
                 branch=config['repo_path'],
-                builderNames=builders,
+                builderNames=buildersForNightly,
                 triggerBuildIfNoChanges=False,
                 l10nBranch=config.get('l10n_repo_path')
             )
