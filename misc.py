@@ -771,7 +771,7 @@ def generateBranchObjects(config, name, secrets=None):
         if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
-            xulrunnerNightlyBuilders.append('%s xulrunner' % base_name)
+            xulrunnerNightlyBuilders.append('%s xulrunner nightly' % base_name)
 
     if config['enable_weekly_bundle']:
         bundle_builder = makeBundleBuilder(config, name)
@@ -1723,14 +1723,14 @@ def generateBranchObjects(config, name, secrets=None):
                 enable_pymake=enable_pymake,
             )
             mozilla2_xulrunner_builder = {
-                'name': '%s xulrunner' % pf['base_name'],
+                'name': '%s xulrunner nightly' % pf['base_name'],
                 'slavenames': pf['slaves'],
-                'builddir': '%s-%s-xulrunner' % (name, platform),
-                'slavebuilddir': normalizeName('%s-%s-xulrunner' % (name, platform), pf['stage_product']),
+                'builddir': '%s-%s-xulrunner-nightly' % (name, platform),
+                'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_xulrunner_factory,
                 'category': name,
                 'nextSlave': _nextSlowSlave,
-                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-xulrunner' % (name, platform)), 'product': 'xulrunner'},
+                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform)), 'product': 'xulrunner'},
             }
             branchObjects['builders'].append(mozilla2_xulrunner_builder)
 
