@@ -377,7 +377,7 @@ class MockMixin(object):
 
 
 class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
-    ignore_dirs = ['info', 'rel-*']
+    ignore_dirs = ['info', 'rel-*', 'tb-rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberBranch=None, clobberTime=None,
