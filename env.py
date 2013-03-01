@@ -145,7 +145,13 @@ MozillaEnvironments['win32-perf'] = {
             'C:\\cygwin\\bin;' +
             'C:\\WINDOWS\\System32;' +
             'C:\\program files\\gnuwin32\\bin;' +
-            'C:\\WINDOWS;'
+            'C:\\WINDOWS;' +
+            'C:\\mozilla-build\\msys\\bin;' +
+            'C:\\mozilla-build\\python27;' +
+            'C:\\mozilla-build\\python27\\Scripts;' +
+            'C:\\mozilla-build\\info-zip;' +
+            'C:\\mozilla-build\\wget;' +
+            'C:\\Program Files (x86)\\GnuWin32\\bin;'
 }
 
 MozillaEnvironments['win32-perf-unittest'] = {
@@ -162,6 +168,8 @@ MozillaEnvironments['win32-perf-unittest'] = {
             'C:\\mozilla-build\\hg;' +
             'C:\\mozilla-build\\7zip;' +
             'C:\\mozilla-build\\upx203w;' +
+            'C:\\mozilla-build\\info-zip;' +
+            'C:\\mozilla-build\\wget;' +
             # Needed for taskkil.exe to find framedyn.dll
             'C:\\WINDOWS\\System32\\Wbem;' +
             'C:\\WINDOWS\\System32;' +

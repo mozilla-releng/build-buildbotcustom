@@ -377,7 +377,7 @@ class MockMixin(object):
 
 
 class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
-    ignore_dirs = ['info', 'rel-*']
+    ignore_dirs = ['info', 'rel-*', 'tb-rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberBranch=None, clobberTime=None,
@@ -4933,7 +4933,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         if self.platform.startswith('win32'):
             self.addStep(ShellCommand(
                 name='run mouse & screen adjustment script',
-                command=['C:\\mozilla-build\\python25\\python.exe',
+                command=['python.exe',
                          WithProperties('%(toolsdir)s/scripts/support/mouse_and_screen_resolution.py'),
                          '--configuration-url',
                          WithProperties("http://%s/%s" % (self.hgHost, self.repoPath) +
@@ -5547,6 +5547,8 @@ class TalosFactory(RequestSortingBuildFactory):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
+        elif (platform in ('win8',)):
+            return "C:\\mozilla-build\\python27\\python.exe"
         elif (platform.find("android") > -1):
             # path in the foopies
             return "/usr/local/bin/python2.6"
@@ -5574,7 +5576,7 @@ class TalosFactory(RequestSortingBuildFactory):
                      ))
 
     def addCleanupSteps(self):
-        if self.OS in ('xp', 'vista', 'win7', 'w764'):
+        if self.OS in ('xp', 'win7', 'w764'):
             # required step due to long filename length in tp4
             self.addStep(ShellCommand(
                          name='mv tp4',
@@ -5710,7 +5712,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          ))
 
     def addUnpackBuildSteps(self):
-        if (self.releaseTester and (self.OS in ('xp', 'vista', 'win7', 'w764'))):
+        if (self.releaseTester and (self.OS in ('xp', 'win7', 'w764'))):
             # build is packaged in a windows installer
             self.addStep(DownloadFile(
                          url=WithProperties("%s/tools/buildfarm/utils/firefoxInstallConfig.ini" % self.supportUrlBase),
@@ -5746,7 +5748,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          name="Unpack build",
                          haltOnFailure=True,
                          ))
-        if self.OS in ('xp', 'vista', 'win7', 'w764'):
+        if self.OS in ('xp', 'win7', 'w764'):
             self.addStep(ShellCommand(
                          name='chmod_files',
                          workdir=os.path.join(
@@ -5766,7 +5768,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          property_name="exepath",
                          name="Find executable",
                          ))
-        elif self.OS in ('xp', 'vista', 'win7', 'w764'):
+        elif self.OS in ('xp', 'win7', 'w764', 'win8'):
             self.addStep(SetBuildProperty(
                          property_name="exepath",
                          value="../%s/%s" % (
@@ -5993,7 +5995,7 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             # 32 bit (includes mac browsers)
-            if self.OS in ('xp', 'vista', 'win7', 'fedora', 'ubuntu32',
+            if self.OS in ('xp', 'win7', 'fedora', 'ubuntu32',
                            'tegra_android', 'tegra_android-armv6',
                            'tegra_android-noion', 'panda_android',
                            'snowleopard', 'lion', 'mountainlion'):
@@ -6489,7 +6491,7 @@ class ScriptFactory(BuildFactory):
         self.get_basedir_cmd = ['bash', '-c', 'pwd']
         self.env = env.copy()
         if platform and 'win' in platform:
-            self.get_basedir_cmd = ['cmd', '/C', 'pwd']
+            self.get_basedir_cmd = ['cd']
         if scriptName[0] == '/':
             script_path = scriptName
         else:
