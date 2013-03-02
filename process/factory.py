@@ -925,6 +925,11 @@ class MercurialBuildFactory(MozillaBuildFactory):
                 property='toolsdir',
                 workdir='tools'
             ))
+            self.addStep(SetProperty(
+                command=['bash', '-c', 'pwd -W'],
+                property='basedir',
+                workdir='.'
+            ))
         if self.use_scratchbox:
             self.addStep(ScratchboxCommand(
                 command=["sb-conf", "select", self.scratchbox_target],
@@ -3125,7 +3130,11 @@ class BaseRepackFactory(MozillaBuildFactory):
                 property='toolsdir',
                 workdir='tools'
             ))
-
+            self.addStep(SetProperty(
+                command=['bash', '-c', 'pwd -W'],
+                property='basedir',
+                workdir='.'
+            ))
         self.addStep(ShellCommand(
          name='mkdir_l10nrepopath',
          command=['sh', '-c', 'mkdir -p %s' % self.l10nRepoPath],
