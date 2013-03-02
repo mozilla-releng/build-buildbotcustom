@@ -385,7 +385,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             clobberURL=None, clobberTime=None, buildsBeforeReboot=None,
             branchName=None, baseWorkDir='build', hashType='sha512',
             baseMirrorUrls=None, baseBundleUrls=None, signingServers=None,
-            enableSigning=True, env={}, **kwargs):
+            enableSigning=True, env={}, enable_pymake=False, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -405,6 +405,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
         self.signingServers = signingServers
         self.enableSigning = enableSigning
         self.env = env.copy()
+        self.enable_pymake = enable_pymake
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -416,6 +417,11 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             self.signing_command = get_signing_cmd(
                 self.signingServers, self.env.get('PYTHON26'))
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
+
+        if self.enable_pymake:
+          self.makeCmd = ['python', WithProperties("%(basedir)s/build/build/pymake/make.py")]
+        else:
+          self.makeCmd = ['make']
 
         self.addStep(OutputStep(
          name='get_buildername',
@@ -1197,7 +1203,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         else:
             bldtgt = 'build'
 
-        command = ['make', '-f', 'client.mk', bldtgt,
+        command = self.makeCmd + ['-f', 'client.mk', bldtgt,
                    WithProperties('MOZ_BUILD_DATE=%(buildid:-)s')]
 
         if self.profiledBuild:
@@ -1437,6 +1443,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         self.addStep(unittest_steps.MozillaCheck,
          test_name="check",
+         makeCMD=self.makeCmd,
          warnOnWarnings=True,
          workdir="build/%s" % self.objdir,
          timeout=5*60, # 5 minutes.
@@ -1453,7 +1460,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
 
         self.addStep(ShellCommand(
          name='make l10n check',
-         command=['make', 'l10n-check'],
+         command=self.makeCmd + ['l10n-check'],
          workdir='build/%s' % self.objdir,
          env=env,
          haltOnFailure=False,
@@ -1476,7 +1483,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
     def addCreateUpdateSteps(self):
         self.addStep(ShellCommand(
             name='make_complete_mar',
-            command=['make', '-C',
+            command=self.makeCmd + ['-C',
                      '%s/tools/update-packaging' % self.mozillaObjdir],
             env=self.env,
             haltOnFailure=True,
@@ -1500,7 +1507,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             # fail.
             self.addStep(ShellCommand(
              name='postflight_all',
-             command=['make', '-f', 'client.mk', 'postflight_all'],
+             command=self.makeCmd + ['-f', 'client.mk', 'postflight_all'],
              env=env,
              haltOnFailure=False,
              flunkOnFailure=False,
@@ -1512,7 +1519,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         for t in pkg_targets:
             self.addStep(ShellCommand(
              name='make %s pretty' % t,
-             command=['make', t, 'MOZ_PKG_PRETTYNAMES=1'],
+             command=self.makeCmd + [t, 'MOZ_PKG_PRETTYNAMES=1'],
              env=env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=False,
@@ -1521,7 +1528,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             ))
         self.addStep(ShellCommand(
              name='make update pretty',
-             command=['make', '-C',
+             command=self.makeCmd  +['-C',
                       '%s/tools/update-packaging' % self.mozillaObjdir,
                       'MOZ_PKG_PRETTYNAMES=1'],
              env=env,
@@ -1532,7 +1539,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.l10nCheckTest:
             self.addStep(ShellCommand(
                  name='make l10n check pretty',
-                command=['make', 'l10n-check', 'MOZ_PKG_PRETTYNAMES=1'],
+                command=self.makeCmd + ['l10n-check', 'MOZ_PKG_PRETTYNAMES=1'],
                 workdir='build/%s' % self.objdir,
                 env=env,
                 haltOnFailure=False,
@@ -1562,7 +1569,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.packageSDK:
             self.addStep(ScratchboxCommand(
              name='make_sdk',
-             command=['make', '-f', 'client.mk', 'sdk'],
+             command=self.makeCmd + ['-f', 'client.mk', 'sdk'],
              env=pkg_env,
              workdir=workdir,
              sb=self.use_scratchbox,
@@ -1571,7 +1578,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if self.packageTests:
             self.addStep(ScratchboxCommand(
              name='make_pkg_tests',
-             command=['make', 'package-tests'] + pkgTestArgs,
+             command=self.makeCmd + ['package-tests'] + pkgTestArgs,
              env=pkg_env,
              workdir=objdir,
              sb=self.use_scratchbox,
@@ -1579,7 +1586,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             ))
         self.addStep(ScratchboxCommand(
             name='make_pkg',
-            command=['make', 'package'] + pkgArgs,
+            command=self.makeCmd + ['package'] + pkgArgs,
             env=pkg_env,
             workdir=objdir,
             sb=self.use_scratchbox,
@@ -1597,7 +1604,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         if 'maemo' in self.complete_platform:
             self.addStep(ScratchboxCommand(
                 name='make_deb',
-                command=['make','deb'] + pkgArgs,
+                command=self.makeCmd + ['deb'] + pkgArgs,
                 env=pkg_env,
                 workdir=WithProperties('%(basedir)s/build/' + self.objdir),
                 sb=self.use_scratchbox,
@@ -1609,7 +1616,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
            self.productName != 'xulrunner':
             self.addStep(ShellCommand(
                 name='make_installer',
-                command=['make', 'installer'] + pkgArgs,
+                command=self.makeCmd + ['installer'] + pkgArgs,
                 env=pkg_env,
                 workdir='build/%s' % self.objdir,
                 haltOnFailure=True
@@ -1679,7 +1686,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             codesighs_dir = 'build/%s/tools/codesighs' % self.mozillaObjdir
         self.addStep(ScratchboxCommand(
          name='make_codesighs',
-         command=['make'],
+         command=self.makeCmd,
          workdir=codesighs_dir,
          sb=self.use_scratchbox,
         ))
@@ -1809,7 +1816,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             objdir = 'build/%s' % self.objdir
         self.addStep(ScratchboxCommand(
          name='make_buildsymbols',
-         command=['make', 'buildsymbols'],
+         command=self.makeCmd + ['buildsymbols'],
          env=self.env,
          workdir=objdir,
          sb=self.use_scratchbox,
@@ -1823,7 +1830,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
             objdir = 'build/%s' % self.objdir
         self.addStep(ScratchboxCommand(
          name='make_uploadsymbols',
-         command=['make', 'uploadsymbols'],
+         command=self.makeCmd + ['uploadsymbols'],
          env=self.env,
          workdir=objdir,
          sb=self.use_scratchbox,
@@ -1949,7 +1956,7 @@ class TryBuildFactory(MercurialBuildFactory):
     def addCodesighsSteps(self):
         self.addStep(ShellCommand(
          name='make_codesighs',
-         command=['make'],
+         command=self.makeCmd,
          workdir='build/%s/tools/codesighs' % self.mozillaObjdir
         ))
         self.addStep(RetryingShellCommand(
@@ -2017,7 +2024,7 @@ class TryBuildFactory(MercurialBuildFactory):
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
         self.addStep(RetryingScratchboxProperty(
-             command=['make', 'upload'],
+             command=self.makeCmd + ['upload'],
              env=uploadEnv,
              workdir=objdir,
              sb=self.use_scratchbox,
@@ -2197,7 +2204,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
     def addUploadSteps(self, pkgArgs=None):
         MercurialBuildFactory.addUploadSteps(self, pkgArgs)
         self.addStep(ShellCommand(
-         command=['make', 'package-compare'],
+         command=self.makeCmd + ['package-compare'],
          workdir='build/%s' % self.objdir,
          haltOnFailure=False
         ))
@@ -2361,7 +2368,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             haltOnFailure=True,
         ))
         # Generate the partial patch from the two unpacked complete mars.
-        partialMarCommand=['make', '-C',
+        partialMarCommand=self.makeCmd + ['-C',
                            'tools/update-packaging', 'partial-patch',
                            'STAGE_DIR=../../dist/update',
                            'SRC_BUILD=../../previous',
@@ -2575,7 +2582,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         if self.productName == 'xulrunner':
             self.addStep(RetryingSetProperty(
-             command=['make', '-f', 'client.mk', 'upload'],
+             command=self.makeCmd + ['-f', 'client.mk', 'upload'],
              env=uploadEnv,
              workdir='build',
              extract_fn = parse_make_upload,
@@ -2591,7 +2598,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 objdir = '%s/%s' % (self.baseWorkDir, self.objdir)
             self.addStep(RetryingScratchboxProperty(
                 name='make_upload',
-                command=['make', 'upload'] + upload_vars,
+                command=self.makeCmd + ['upload'] + upload_vars,
                 env=uploadEnv,
                 workdir=objdir,
                 extract_fn = parse_make_upload,
@@ -2785,7 +2792,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         ))
         self.addStep(ShellCommand(
             name='make_partial_mar',
-            description=['make', 'partial', 'mar'],
+            description=self.makeCmd + ['partial', 'mar'],
             command=['bash', partial_mar_cmd,
                      '%s/%s' % (update_dir, partial_mar_name),
                      '../previous', '../current'],
@@ -2826,7 +2833,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         if self.enableUpdatePackaging:
             self.addStep(ShellCommand(
                 name='make_update_pkg',
-                command=['make', '-C',
+                command=self.makeCmd + ['-C',
                          '%s/tools/update-packaging' % self.mozillaObjdir],
                 env=self.env,
                 haltOnFailure=True
@@ -2878,7 +2885,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             objdir = 'build/%s' % self.objdir
         self.addStep(RetryingScratchboxProperty(
          name='make_upload',
-         command=['make', 'upload'] + upload_vars,
+         command=self.makeCmd + ['upload'] + upload_vars,
          env=uploadEnv,
          workdir=objdir,
          extract_fn=parse_make_upload,
@@ -2964,7 +2971,7 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
             return {'packageUrl': ''}
 
         self.addStep(RetryingSetProperty(
-         command=['make', '-f', 'client.mk', 'upload'],
+         command=self.makeCmd + ['-f', 'client.mk', 'upload'],
          env=uploadEnv,
          workdir='build',
          extract_fn = get_url,
@@ -3233,7 +3240,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         )))
         self.addStep(ShellCommand( **self.processCommand(
          name='make_config',
-         command=['make'],
+         command=self.makeCmd,
          workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make config'],
          haltOnFailure=True
@@ -3257,7 +3264,7 @@ class BaseRepackFactory(MozillaBuildFactory):
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         self.addStep(RetryingShellCommand(
          name='make_upload',
-         command=['make', 'upload', WithProperties('AB_CD=%(locale)s')],
+         command=self.makeCmd + ['upload', WithProperties('AB_CD=%(locale)s')],
          env=self.uploadEnv,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
                                        self.appName),
@@ -3401,7 +3408,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         # Need to re-download this file because it gets removed earlier
         self.addStep(ShellCommand(
          name='wget_enUS',
-         command=['make', 'wget-en-US'],
+         command=self.makeCmd + ['wget-en-US'],
          description='wget en-US',
          env=self.env,
          haltOnFailure=True,
@@ -3409,7 +3416,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         ))
         self.addStep(ShellCommand(
          name='make_unpack',
-         command=['make', 'unpack'],
+         command=self.makeCmd + ['unpack'],
          description='unpack en-US',
          haltOnFailure=True,
          env=self.env,
@@ -3418,7 +3425,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         # We need to override ZIP_IN because it defaults to $(PACKAGE), which
         # will be the pretty name version here.
         self.addStep(SetProperty(
-         command=['make', '--no-print-directory', 'echo-variable-ZIP_IN'],
+         command=self.makeCmd + ['--no-print-directory', 'echo-variable-ZIP_IN'],
          property='zip_in',
          env=self.env,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
@@ -3429,7 +3436,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         prettyEnv['ZIP_IN'] = WithProperties('%(zip_in)s')
         if self.platform.startswith('win'):
             self.addStep(SetProperty(
-             command=['make', '--no-print-directory', 'echo-variable-WIN32_INSTALLER_IN'],
+             command=self.makeCmd + ['--no-print-directory', 'echo-variable-WIN32_INSTALLER_IN'],
              property='win32_installer_in',
              env=self.env,
              workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
@@ -3440,7 +3447,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='repack_installers_pretty',
          description=['repack', 'installers', 'pretty'],
          command=['sh', '-c',
-                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+                  WithProperties(' '.join(self.makeCmd) + ' installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env=prettyEnv,
          haltOnFailure=False,
          flunkOnFailure=False,
@@ -3631,7 +3638,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     def downloadBuilds(self):
         self.addStep(RetryingShellCommand(
          name='wget_enUS',
-         command=['make', 'wget-en-US'],
+         command=self.makeCmd + ['wget-en-US'],
          descriptionDone='wget en-US',
          env=self.env,
          haltOnFailure=True,
@@ -3645,14 +3652,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         '''
         self.addStep(ShellCommand(
                      name='make_unpack',
-                     command=['make', 'unpack'],
+                     command=self.makeCmd + ['unpack'],
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
                      env=self.env,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      ))
         self.addStep(SetProperty(
-                     command=['make', 'ident'],
+                     command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      extract_fn=identToProperties('fx_revision')
@@ -3671,14 +3678,22 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     def makePartialTools(self):
         # Build the tools we need for update-packaging, specifically bsdiff.
         # Configure can take a while.
+        if self.makeCmd[0] == 'make':
+           makeCmd = 'make '
+        else:
+           # pymake - we can't use self.makeCmd due to embedded WithProperties
+           makeCmd = 'python %(basedir)s/build/build/pymake/make.py '
+        # now build the command
+        command = 'if [ ! -e dist/host/bin/mbsdiff ]; then ' +\
+                  makeCmd + 'tier_base;' + makeCmd + 'tier_nspr; '+\
+                  makeCmd + '-C config;' +\
+                  makeCmd + '-C modules/libmar;' +\
+                  makeCmd + '-C modules/libbz2;' +\
+                  makeCmd + '-C other-licenses/bsdiff;' +\
+                  'fi'
         self.addStep(ShellCommand(
             name='make_bsdiff',
-            command=['sh', '-c',
-                     'if [ ! -e dist/host/bin/mbsdiff ]; then ' +
-                     'make tier_base; make tier_nspr; make -C config;' +
-                     'make -C modules/libmar; make -C modules/libbz2;' +
-                     'make -C other-licenses/bsdiff;'
-                     'fi'],
+            command=['sh', '-c', WithProperties(command)],
             description=['make', 'bsdiff'],
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
@@ -3692,14 +3707,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     def doRepack(self):
         self.addStep(ShellCommand(
          name='make_tier_base',
-         command=['make', 'tier_base'],
+         command=self.makeCmd + ['tier_base'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_base'],
          haltOnFailure=True
         ))
         self.addStep(ShellCommand(
          name='make_tier_nspr',
-         command=['make', 'tier_nspr'],
+         command=self.makeCmd + ['tier_nspr'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_nspr'],
          haltOnFailure=True
@@ -3708,7 +3723,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             # Because we're generating updates we need to build the libmar tools
             self.addStep(ShellCommand(
              name='make_libmar',
-             command=['make'],
+             command=self.makeCmd,
              workdir='%s/%s/modules/libmar' % (self.baseWorkDir, self.mozillaObjdir),
              description=['make', 'modules/libmar'],
              haltOnFailure=True
@@ -3716,8 +3731,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=['sh','-c',
-                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+         command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
          env = self.env,
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
@@ -3791,7 +3805,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         '''
         self.addStep(ShellCommand(
                      name='make_unpack',
-                     command=['make', 'unpack'],
+                     command=self.makeCmd + ['unpack'],
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
                      env=self.env,
@@ -3799,7 +3813,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         ))
         
         self.addStep(SetProperty(
-                     command=['make', 'ident'],
+                     command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      extract_fn=identToProperties()
@@ -4071,7 +4085,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
     def doRepack(self):
         self.addStep(ShellCommand(
          name='make_tier_base',
-         command=['make', 'tier_base'],
+         command=self.makeCmd + ['tier_base'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_base'],
          haltOnFailure=True
@@ -4079,14 +4093,14 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         # Because we're generating updates we need to build the libmar tools
         self.addStep(ShellCommand(
             name='make_tier_nspr',
-            command=['make','tier_nspr'],
+            command=self.makeCmd + ['tier_nspr'],
             workdir='build/'+self.mozillaObjdir,
             description=['make tier_nspr'],
             haltOnFailure=True
             ))
         self.addStep(ShellCommand(
              name='make_libmar',
-             command=['make'],
+             command=self.makeCmd,
              workdir='build/'+self.mozillaObjdir+'/modules/libmar',
              description=['make libmar'],
              haltOnFailure=True
@@ -4095,8 +4109,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=['sh','-c',
-                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+         command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
          env=self.env,
          haltOnFailure=True,
          workdir='build/'+self.objdir+'/'+self.appName+'/locales'
@@ -4561,7 +4574,7 @@ class SingleSourceFactory(ReleaseFactory):
         self.addConfigSteps(workdir=self.mozillaSrcDir)
         self.addStep(ShellCommand(
          name='configure',
-         command=['make', '-f', 'client.mk', 'configure'],
+         command=self.makeCmd + ['-f', 'client.mk', 'configure'],
          workdir=self.mozillaSrcDir,
          env=self.env,
          description=['configure'],
@@ -4569,7 +4582,7 @@ class SingleSourceFactory(ReleaseFactory):
         ))
         self.addStep(ShellCommand(
          name='make_source-package',
-         command=['make','source-package'],
+         command=self.makeCmd + ['source-package'],
          workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
          env=self.env,
          description=['make source-package'],
@@ -5670,7 +5683,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.addStep(ShellCommand(
          name='compile',
-         command=["make", "-f", "client.mk", "build"],
+         command=self.makeCmd + ["-f", "client.mk", "build"],
          description=['compile'],
          timeout=60*60, # 1 hour
          haltOnFailure=1,
@@ -5679,7 +5692,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
 
         self.addStep(ShellCommand(
          name='make_buildsymbols',
-         command=['make', 'buildsymbols'],
+         command=self.makeCmd + ['buildsymbols'],
          workdir='build/%s' % self.objdir,
          timeout=60*60,
          env=self.env,
@@ -5712,14 +5725,14 @@ class UnittestBuildFactory(MozillaBuildFactory):
         if self.uploadPackages:
             self.addStep(ShellCommand(
              name='make_pkg',
-             command=['make', 'package'],
+             command=self.makeCmd + ['package'],
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
             ))
             self.addStep(ShellCommand(
              name='make_pkg_tests',
-             command=['make', 'package-tests'],
+             command=self.makeCmd + ['package-tests'],
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
@@ -5746,7 +5759,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
                     )
             self.addStep(SetProperty(
              name='make_upload',
-             command=['make', 'upload'],
+             command=self.makeCmd + ['upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
@@ -5826,14 +5839,14 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
         if self.uploadPackages:
             self.addStep(ShellCommand(
              name='make_pkg',
-             command=['make', 'package'],
+             command=self.makeCmd + ['package'],
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
             ))
             self.addStep(ShellCommand(
              name='make_pkg_tests',
-             command=['make', 'package-tests'],
+             command=self.makeCmd + ['package-tests'],
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
@@ -5867,7 +5880,7 @@ class TryUnittestBuildFactory(UnittestBuildFactory):
                     )
 
             self.addStep(SetProperty(
-             command=['make', 'upload'],
+             command=self.makeCmd + ['upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
@@ -6032,7 +6045,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         self.addStep(ShellCommand(
          name='compile',
-         command=["make", "-f", "client.mk", "build"],
+         command=self.makeCmd + ["-f", "client.mk", "build"],
          description=['compile'],
          timeout=60*60, # 1 hour
          haltOnFailure=1,
@@ -6041,7 +6054,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
 
         self.addStep(ShellCommand(
          name='make_buildsymbols',
-         command=['make', 'buildsymbols'],
+         command=self.makeCmd + ['buildsymbols'],
          workdir='build/%s' % self.objdir,
          env=self.env,
         ))
@@ -6073,14 +6086,14 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         if self.uploadPackages:
             self.addStep(ShellCommand(
              name='make_pkg',
-             command=['make', 'package'],
+             command=self.makeCmd + ['package'],
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
             ))
             self.addStep(ShellCommand(
              name='make_pkg_tests',
-             command=['make', 'package-tests'],
+             command=self.makeCmd + ['package-tests'],
              env=self.env,
              workdir='build/%s' % self.objdir,
              haltOnFailure=True
@@ -6111,7 +6124,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                     )
             self.addStep(SetProperty(
              name='make_upload',
-             command=['make', 'upload'],
+             command=self.makeCmd + ['upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,

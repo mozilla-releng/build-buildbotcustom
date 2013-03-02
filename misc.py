@@ -998,6 +998,13 @@ def generateBranchObjects(config, name, secrets=None):
         checkTest = pf.get('enable_checktests', False)
         valgrindCheck = pf.get('enable_valgrind_checktests', False)
 
+        # Turn pymake on by default for Windows, and off by default
+        # for other platforms.
+        if 'win' in platform:
+           enable_pymake = pf.get('enable_pymake', True)
+        else:
+           enable_pymake = pf.get('enable_pymake', False)
+
         extra_args = {}
         if config.get('enable_try'):
             factory_class = TryBuildFactory
@@ -1084,6 +1091,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozillaDir': config.get('mozilla_dir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
+                'enable_pymake': enable_pymake,
             }
             factory_kwargs.update(extra_args)
 
@@ -1339,6 +1347,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mozillaDir=config.get('mozilla_dir', None),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=config.get('tooltool_url_list', []),
+                enable_pymake=enable_pymake,
                 **nightly_kwargs
             )
 
@@ -1707,6 +1716,7 @@ def generateBranchObjects(config, name, secrets=None):
                  signingServers=secrets.get(pf.get('nightly_signing_servers')),
                  tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                  tooltool_url_list=config.get('tooltool_url_list', []),
+                 enable_pymake=enable_pymake,
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],
@@ -2256,6 +2266,13 @@ def generateCCBranchObjects(config, name, secrets=None):
         if platform.find('win') > -1:
             codesighs = False
 
+        # Turn pymake on by default for Windows, and off by default
+        # for other platforms.
+        if 'win' in platform:
+           enable_pymake = pf.get('enable_pymake', True)
+        else:
+           enable_pymake = pf.get('enable_pymake', False)
+
         doBuildAnalysis = pf.get('enable_build_analysis', False)
 
         buildSpace = pf.get('build_space', config['default_build_space'])
@@ -2356,6 +2373,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'branchName': name,
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
+                'enable_pymake': enable_pymake,
             }
             factory_kwargs.update(extra_args)
 
@@ -2612,6 +2630,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 branchName=name,
                 tooltool_manifest_src= pf.get('tooltool_manifest_src', None),
                 tooltool_url_list= config.get('tooltool_url_list', []),
+                enable_pymake=enable_pymake,
                 **nightly_kwargs
             )
 
@@ -2674,6 +2693,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                         branchName=name,
+                        enable_pymake=enable_pymake,
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2801,6 +2821,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 branchName=name,
                 mozconfig=mozconfig,
+                enable_pymake=enable_pymake,
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
@@ -2861,6 +2882,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 mochichrome_leak_threshold=mochichromeLeakThreshold,
                 mochibrowser_leak_threshold=mochibrowserLeakThreshold,
                 branchName=name,
+                enable_pymake=enable_pymake,
                 **extra_args
             )
             unittest_builder = {
@@ -2994,6 +3016,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                  signingServers=secrets.get(pf.get('nightly_signing_servers')),
                  tooltool_manifest_src= pf.get('tooltool_manifest_src', None),
                  tooltool_url_list= config.get('tooltool_url_list', []),
+                 enable_pymake=enable_pymake,
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],

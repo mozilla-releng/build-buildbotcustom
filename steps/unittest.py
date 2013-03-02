@@ -599,15 +599,15 @@ class MozillaClobberWin(ShellCommandReportTimeout):
 class MozillaCheck(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, **kwargs):
+    def __init__(self, test_name, makeCmd=["make"], **kwargs):
         self.name = test_name
         if test_name == "check":
             # Target executing recursively in all (sub)directories.
             # "-k: Keep going when some targets can't be made."
-            self.command = ["make", "-k", test_name]
+            self.command = makeCmd + ["-k", test_name]
         else:
             # Target calling a python script.
-            self.command = ["make", test_name]
+            self.command = makeCmd + [test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
@@ -648,9 +648,9 @@ class MozillaCheck(ShellCommandReportTimeout):
 class MozillaReftest(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, leakThreshold=None, env={}, **kwargs):
+    def __init__(self, test_name, makeCmd=["make"], leakThreshold=None, env={}, **kwargs):
         self.name = test_name
-        self.command = ["make", test_name]
+        self.command = makeCmd + [test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
@@ -690,9 +690,9 @@ class MozillaReftest(ShellCommandReportTimeout):
 class MozillaMochitest(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, leakThreshold=None, env={}, **kwargs):
+    def __init__(self, test_name, makeCmd=["make"], leakThreshold=None, env={}, **kwargs):
         self.name = test_name
-        self.command = ["make", test_name]
+        self.command = makeCmd + [test_name]
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
