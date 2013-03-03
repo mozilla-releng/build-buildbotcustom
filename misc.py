@@ -2693,7 +2693,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                         branchName=name,
-                        enable_pymake=enable_pymake,
+                        enable_pymake=False,
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2821,7 +2821,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 branchName=name,
                 mozconfig=mozconfig,
-                enable_pymake=enable_pymake,
+                enable_pymake=False,
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
