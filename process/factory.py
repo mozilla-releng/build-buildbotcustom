@@ -2211,6 +2211,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         self.addStep(ShellCommand(
          command=self.makeCmd + ['package-compare'],
          workdir='build/%s' % self.objdir,
+         env=self.env,
          haltOnFailure=False
         ))
 
