@@ -1692,6 +1692,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.addStep(ScratchboxCommand(
          name='make_codesighs',
          command=self.makeCmd,
+         env=self.env,
          workdir=codesighs_dir,
          sb=self.use_scratchbox,
         ))
@@ -1962,6 +1963,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(ShellCommand(
          name='make_codesighs',
          command=self.makeCmd,
+         env=self.env,
          workdir='build/%s/tools/codesighs' % self.mozillaObjdir
         ))
         self.addStep(RetryingShellCommand(
@@ -3253,6 +3255,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          command=self.makeCmd,
          workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make config'],
+         env=self.env,
          haltOnFailure=True
         )))
 
@@ -3456,8 +3459,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand(
          name='repack_installers_pretty',
          description=['repack', 'installers', 'pretty'],
-         command=['sh', '-c',
-                  WithProperties(' '.join(self.makeCmd) + ' installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+         command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
          env=prettyEnv,
          haltOnFailure=False,
          flunkOnFailure=False,
@@ -3671,6 +3673,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(SetProperty(
                      command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
+                     env=self.env,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      extract_fn=identToProperties('fx_revision')
         ))
@@ -3705,6 +3708,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='make_bsdiff',
             command=['sh', '-c', WithProperties(command)],
             description=['make', 'bsdiff'],
+            env=self.env,
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
         ))
@@ -3720,6 +3724,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
          command=self.makeCmd + ['tier_base'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_base'],
+         env=self.env,
          haltOnFailure=True
         ))
         self.addStep(ShellCommand(
@@ -3727,6 +3732,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
          command=self.makeCmd + ['tier_nspr'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_nspr'],
+         env=self.env,
          haltOnFailure=True
         ))
         if self.l10nNightlyUpdate:
@@ -3734,6 +3740,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             self.addStep(ShellCommand(
              name='make_libmar',
              command=self.makeCmd,
+             env=self.env,
              workdir='%s/%s/modules/libmar' % (self.baseWorkDir, self.mozillaObjdir),
              description=['make', 'modules/libmar'],
              haltOnFailure=True
@@ -3825,6 +3832,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.addStep(SetProperty(
                      command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
+                     env=self.env,
                      workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
                      extract_fn=identToProperties()
         ))
@@ -4098,6 +4106,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
          command=self.makeCmd + ['tier_base'],
          workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
          description=['make tier_base'],
+         env=self.env,
          haltOnFailure=True
         ))
         # Because we're generating updates we need to build the libmar tools
@@ -4106,6 +4115,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             command=self.makeCmd + ['tier_nspr'],
             workdir='build/'+self.mozillaObjdir,
             description=['make tier_nspr'],
+            env=self.env,
             haltOnFailure=True
             ))
         self.addStep(ShellCommand(
@@ -4113,6 +4123,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
              command=self.makeCmd,
              workdir='build/'+self.mozillaObjdir+'/modules/libmar',
              description=['make libmar'],
+             env=self.env,
              haltOnFailure=True
             ))
 
