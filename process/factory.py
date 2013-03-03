@@ -419,7 +419,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory):
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
 
         if self.enable_pymake:
-          self.makeCmd = ['python', WithProperties("%(basedir)s/build/build/pymake/make.py")]
+          self.makeCmd = ['python2.7', WithProperties("%(basedir)s/build/build/pymake/make.py")]
         else:
           self.makeCmd = ['make']
 
@@ -3691,7 +3691,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
            makeCmd = 'make '
         else:
            # pymake - we can't use self.makeCmd due to embedded WithProperties
-           makeCmd = 'python %(basedir)s/build/build/pymake/make.py '
+           makeCmd = 'python2.7 %(basedir)s/build/build/pymake/make.py '
         # now build the command
         command = 'if [ ! -e dist/host/bin/mbsdiff ]; then ' +\
                   makeCmd + 'tier_base;' + makeCmd + 'tier_nspr; '+\
