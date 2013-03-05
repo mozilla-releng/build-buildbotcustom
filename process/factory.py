@@ -3598,7 +3598,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.ausSshKey = ausSshKey
         self.ausHost = ausHost
         self.createPartial = createPartial
-        self.geriatricMasters = []
         self.extraConfigureArgs = extraConfigureArgs
 
         # This is required because this __init__ doesn't call the
