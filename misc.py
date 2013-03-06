@@ -1226,6 +1226,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozharnessTag': config.get('mozharness_tag'),
                 'geckoL10nRoot': config.get('gecko_l10n_root'),
                 'geckoLanguagesFile': pf.get('gecko_languages_file'),
+                'runMakeAliveTests': config.get('run_make_alive_tests'),
                 'enable_pymake': enable_pymake,
             }
             factory_kwargs.update(extra_args)
@@ -1472,6 +1473,7 @@ def generateBranchObjects(config, name, secrets=None):
                 geckoL10nRoot=config.get('gecko_l10n_root'),
                 geckoLanguagesFile=pf.get('gecko_languages_file'),
                 enable_pymake=enable_pymake,
+                runMakeAliveTests=config.get('run_make_alive_tests'),
                 **nightly_kwargs
             )
 
