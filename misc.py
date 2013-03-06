@@ -778,6 +778,8 @@ def generateBranchObjects(config, name, secrets=None):
                 nightlyBuilders.append('%s valgrind' % base_name)
         if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
+        if config.get('enable_hsts_update', False) and platform in ('linux64',):
+            weeklyBuilders.append('%s hsts preload update' % base_name)
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
             xulrunnerNightlyBuilders.append('%s xulrunner nightly' % base_name)
 
@@ -1684,6 +1686,12 @@ def generateBranchObjects(config, name, secrets=None):
                     config, name, platform, pf['base_name'], pf['slaves'])
                 branchObjects['builders'].append(blocklistBuilder)
 
+        if config.get('enable_hsts_update', False):
+            if platform == 'linux64':
+                hstsBuilder = generateHSTSBuilder(
+                    config, name, platform, pf['base_name'], pf['slaves'])
+                branchObjects['builders'].append(hstsBuilder)
+
         if pf.get('enable_xulrunner', config['enable_xulrunner']):
             xr_env = pf['env'].copy()
             xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
@@ -2282,6 +2290,53 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves):
     }
     return blocklistupdate_builder
 
+def generateHSTSBuilder(config, branch_name, platform, base_name, slaves):
+    pf = config['platforms'].get(platform, {})
+    extra_args = ['-b', config['repo_path'],
+                  '--hgtool', 'scripts/buildfarm/utils/hgtool.py']
+
+    mirrors = None
+    if config['base_mirror_urls']:
+        mirrors = ["%s/%s" % (url, config['repo_path'])
+                   for url in config['base_mirror_urls']]
+    if mirrors:
+        for mirror in mirrors:
+            extra_args.extend(["--mirror", mirror])
+    bundles = None
+    if config['base_bundle_urls']:
+        bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip(
+            '/').split('/')[-1]) for url in config['base_bundle_urls']]
+    if bundles:
+        for bundle in bundles:
+            extra_args.extend(["--bundle", bundle])
+
+    if pf['product_name'] is not None:
+        extra_args.extend(['-p', pf['product_name']])
+    if config['hg_username'] is not None:
+        extra_args.extend(['-u', config['hg_username']])
+    if config['hg_ssh_key'] is not None:
+        extra_args.extend(['-k', config['hg_ssh_key']])
+    if config['hsts_update_on_closed_tree'] is True:
+        extra_args.extend(['-c'])
+    if config['hsts_update_set_approval'] is True:
+        extra_args.extend(['-a'])
+    hsts_update_factory = ScriptFactory(
+        "%s%s" % (config['hgurl'],
+        config['build_tools_repo_path']),
+        'scripts/hsts/update_hsts_preload_list.sh',
+        interpreter='bash',
+        extra_args=extra_args,
+    )
+    hsts_update_builder = {
+        'name': '%s hsts preload update' % base_name,
+        'slavenames': slaves,
+        'builddir': '%s-%s-hsts' % (branch_name, platform),
+        'slavebuilddir': normalizeName('%s-%s-hsts' % (branch_name, platform)),
+        'factory': hsts_update_factory,
+        'category': branch_name,
+        'properties': {'branch': branch_name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-hsts' % (branch_name, platform)), 'product': 'firefox'},
+    }
+    return hsts_update_builder
 
 def generateFuzzingObjects(config, SLAVES):
     builders = []
