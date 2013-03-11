@@ -3749,7 +3749,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=['sh','-c',
+         command=['sh', '-c',
                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env = self.env,
          haltOnFailure=True,
@@ -4132,7 +4132,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
+         command=['sh', '-c', 
+                   WithProperties('make installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
          env=self.env,
          haltOnFailure=True,
          workdir='build/'+self.objdir+'/'+self.appName+'/locales'
