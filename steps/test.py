@@ -69,6 +69,33 @@ class AliveTest(ShellCommand):
             self.command.append('--')
             self.command.extend(extraArgs)
 
+class AliveMakeTest(ShellCommand):
+    name = "alive test"
+    description = ["alive test"]
+    haltOnFailure = True
+    flunkOnFailure = False
+    warnOnFailure = True
+
+    def __init__(self, extraArgs=None, logfile=None, **kwargs):
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
+
+        self.addFactoryArguments(extraArgs=extraArgs,
+                                 logfile=logfile)
+        self.extraArgs = extraArgs
+        self.logfile = logfile
+
+        # build the command
+        leakargs = []
+        if extraArgs:
+            leakargs.append('--')
+            leakargs.extend(extraArgs)
+        if logfile:
+            leakargs.append('-l')
+            leakargs.append(logfile)
+        self.command = ['bash', '-c',
+            WithProperties("LEAKTEST_ARGS='" + ' '.join(leakargs) + \
+                          "' python %(basedir)s/build/build/pymake/make.py leaktest")]
 
 def formatBytes(bytes, sigDigits=3):
     # Force a float calculation

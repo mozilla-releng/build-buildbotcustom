@@ -68,7 +68,7 @@ from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
     genBuildID, normalizeName
 from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, MockInstall, \
     MockMozillaCheck, MockProperty, RetryingMockProperty, RetryingMockCommand, \
-    MockAliveTest, MockCompareLeakLogs
+    MockAliveTest, MockAliveMakeTest, MockCompareLeakLogs
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -804,6 +804,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  gaiaL10nRoot=None,
                  geckoL10nRoot=None,
                  geckoLanguagesFile=None,
+                 runMakeAliveTests=False,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -887,6 +888,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.multiLocaleScript = multiLocaleScript
         self.multiLocaleConfig = multiLocaleConfig
         self.multiLocaleMerge = multiLocaleMerge
+        self.runMakeAliveTests = runMakeAliveTests
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1439,35 +1441,66 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             ))
 
         if self.runAliveTests:
-            self.addStep(MockAliveTest(
-                         env=leakEnv,
-                         workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                         extraArgs=['-register'],
-                         warnOnFailure=True,
-                         haltOnFailure=True,
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         ))
-            self.addStep(MockAliveTest(
-                         env=leakEnv,
-                         workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                         warnOnFailure=True,
-                         haltOnFailure=True,
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         ))
-            self.addStep(MockAliveTest(
-                         env=leakEnv,
-                         workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                         extraArgs=['--trace-malloc', 'malloc.log',
-                         '--shutdown-leaks=sdleak.log'],
-                         timeout=3600,
-                         # 1 hour, because this takes a long time on win32
-                         warnOnFailure=True,
-                         haltOnFailure=True,
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         ))
+            if self.runMakeAliveTests:
+                self.addStep(MockAliveMakeTest(
+                             env=leakEnv,
+                             workdir='build/%s' % self.mozillaObjdir,
+                             extraArgs=['-register'],
+                             warnOnFailure=True,
+                             haltOnFailure=True,
+                             mock=self.use_mock,
+                             target=self.mock_target,
+                             ))
+                self.addStep(MockAliveMakeTest(
+                             env=leakEnv,
+                             workdir='build/%s' % self.mozillaObjdir,
+                             warnOnFailure=True,
+                             haltOnFailure=True,
+                             mock=self.use_mock,
+                             target=self.mock_target,
+                             ))
+                self.addStep(MockAliveMakeTest(
+                             env=leakEnv,
+                             workdir='build/%s' % self.mozillaObjdir,
+                             extraArgs=['--trace-malloc', 'malloc.log',
+                             '--shutdown-leaks=sdleak.log'],
+                             timeout=3600,
+                             # 1 hour, because this takes a long time on win32
+                             warnOnFailure=True,
+                             haltOnFailure=True,
+                             mock=self.use_mock,
+                             target=self.mock_target,
+                             ))
+            else:
+                self.addStep(MockAliveTest(
+                             env=leakEnv,
+                             workdir='build/%s/_leaktest' % self.mozillaObjdir,
+                             extraArgs=['-register'],
+                             warnOnFailure=True,
+                             haltOnFailure=True,
+                             mock=self.use_mock,
+                             target=self.mock_target,
+                             ))
+                self.addStep(MockAliveTest(
+                             env=leakEnv,
+                             workdir='build/%s/_leaktest' % self.mozillaObjdir,
+                             warnOnFailure=True,
+                             haltOnFailure=True,
+                             mock=self.use_mock,
+                             target=self.mock_target,
+                             ))
+                self.addStep(MockAliveTest(
+                             env=leakEnv,
+                             workdir='build/%s/_leaktest' % self.mozillaObjdir,
+                             extraArgs=['--trace-malloc', 'malloc.log',
+                             '--shutdown-leaks=sdleak.log'],
+                             timeout=3600,
+                             # 1 hour, because this takes a long time on win32
+                             warnOnFailure=True,
+                             haltOnFailure=True,
+                             mock=self.use_mock,
+                             target=self.mock_target,
+                             ))
 
         # Download and unpack the old versions of malloc.log and sdleak.tree
         cmd = ['bash', '-c',
@@ -3598,7 +3631,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.ausSshKey = ausSshKey
         self.ausHost = ausHost
         self.createPartial = createPartial
-        self.geriatricMasters = []
         self.extraConfigureArgs = extraConfigureArgs
 
         # This is required because this __init__ doesn't call the
