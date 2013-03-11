@@ -3459,7 +3459,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand(
          name='repack_installers_pretty',
          description=['repack', 'installers', 'pretty'],
-         command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
+         command=['sh', '-c',
+                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env=prettyEnv,
          haltOnFailure=False,
          flunkOnFailure=False,
@@ -3748,7 +3749,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
+         command=['sh','-c',
+                 WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env = self.env,
          haltOnFailure=True,
          workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
