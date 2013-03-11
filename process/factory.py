@@ -4133,7 +4133,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
          name='repack_installers',
          description=['repack', 'installers'],
          command=['sh', '-c', 
-                   WithProperties('make installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
+                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
          env=self.env,
          haltOnFailure=True,
          workdir='build/'+self.objdir+'/'+self.appName+'/locales'
