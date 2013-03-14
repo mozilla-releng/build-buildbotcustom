@@ -2550,7 +2550,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
         scheduler_class = Scheduler
 
     scheduler = scheduler_class(
-        name="%s_spidermonkey" % branch,
+        name=project,
         treeStableTimer=None,
         builderNames=[b['name'] for b in builders],
         fileIsImportant=isImportant,
