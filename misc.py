@@ -1294,6 +1294,7 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             do_nightly = False
 
+        l10n_objdir = pf['platform_objdir']
         if do_nightly:
             nightly_builder = '%s nightly' % pf['base_name']
 
@@ -1516,7 +1517,7 @@ def generateBranchObjects(config, name, secrets=None):
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
                         env=platform_env,
-                        objdir=objdir,
+                        objdir=l10n_objdir,
                         platform=platform,
                         hgHost=config['hghost'],
                         tree=config['l10n_tree'],
@@ -1561,6 +1562,7 @@ def generateBranchObjects(config, name, secrets=None):
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
+                        enable_pymake=enable_pymake,
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -1631,6 +1633,7 @@ def generateBranchObjects(config, name, secrets=None):
                 os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
             mozilla2_l10n_dep_factory = NightlyRepackFactory(
                 env=platform_env,
+                objdir=l10n_objdir,
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
@@ -1660,6 +1663,7 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 mozconfig=mozconfig,
+                enable_pymake=enable_pymake,
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep
