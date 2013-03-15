@@ -3540,22 +3540,22 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(ShellCommand(
                      name='rm_dist_upload',
                      command=['sh', '-c',
-                              'if [ -d ' + self.mozillaObjdir + '/dist/upload ]; then ' +
-                              'rm -rf ' + self.mozillaObjdir + '/dist/upload; ' +
+                              'if [ -d ' + self.absMozillaObjDir + '/dist/upload ]; then ' +
+                              'rm -rf ' + self.absMozillaObjDir + '/dist/upload; ' +
                               'fi'],
                      description="rm dist/upload",
-                     workdir=self.baseWorkDir,
+                     workdir='.',
                      haltOnFailure=True
                      ))
 
         self.addStep(ShellCommand(
                      name='rm_dist_update',
                      command=['sh', '-c',
-                              'if [ -d ' + self.mozillaObjdir + '/dist/update ]; then ' +
-                              'rm -rf ' + self.mozillaObjdir + '/dist/update; ' +
+                              'if [ -d ' + self.absMozillaObjDir + '/dist/update ]; then ' +
+                              'rm -rf ' + self.absMozillaObjDir + '/dist/update; ' +
                               'fi'],
                      description="rm dist/update",
-                     workdir=self.baseWorkDir,
+                     workdir='.',
                      haltOnFailure=True
                      ))
 
