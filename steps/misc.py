@@ -502,6 +502,11 @@ class DisconnectStep(ShellCommand):
             self._deferred_death = None
             log.msg("Forcibly disconnecting %s" % self.getSlaveName())
             self.buildslave.disconnect()
+            try:
+                # Try to close the socket too
+                self.buildslave.slave.broker.transport._closeSocket()
+            except:
+                log.err()
         self._deferred_death = reactor.callLater(60, die)
         return self.super_class.start(self)
 
