@@ -304,7 +304,7 @@ if __name__ == "__main__":
                     if options.shadowbuild:
                         uploadArgs['to_shadow'] = True
                         uploadArgs['to_tinderbox_dated'] = False
-                    elsif buildid:
+                    elif buildid:
                         uploadArgs['to_shadow'] = False
                         uploadArgs['to_tinderbox_dated'] = True
                         uploadArgs['buildid'] = buildid
