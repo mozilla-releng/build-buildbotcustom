@@ -3321,17 +3321,16 @@ class BaseRepackFactory(MozillaBuildFactory):
                                  mock=self.use_mock,
                                  target=self.mock_target,
         )))
-        if self.mozillaDir:
-            self.addStep(MockCommand(**self.processCommand(
-                name='rm_CLOBBER_files',
-                env=self.env,
-                command=['rm','-rf', '%s/CLOBBER' % self.absMozillaObjDir,
-                         '%s/CLOBBER' % self.absMozillaSrcDir,],
-                workdir='.',
-                description=['remove CLOBBER files'],
-                haltOnFailure=True,
-                mock=self.use_mock,
-                target=self.mock_target,
+        self.addStep(MockCommand(**self.processCommand(
+            name='rm_CLOBBER_files',
+            env=self.env,
+            command=['rm','-rf', '%s/CLOBBER' % self.absMozillaObjDir,
+                     '%s/CLOBBER' % self.absMozillaSrcDir,],
+            workdir='.',
+            description=['remove CLOBBER files'],
+            haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
             )))
         self.addStep(MockCommand(**self.processCommand(
                                  name='compile_nsinstall',
@@ -3493,7 +3492,9 @@ class BaseRepackFactory(MozillaBuildFactory):
 
     def compareLocales(self):
         if self.mergeLocales:
-            mergeLocaleOptions = ['-m', 'merged']
+            mergeLocaleOptions = ['-m',
+                                  WithProperties('%(basedir)s/' + \
+                                                 "%s/merged" % self.baseWorkDir)]
             flunkOnFailure = False
             haltOnFailure = False
             warnOnFailure = True
@@ -3506,9 +3507,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                      name='rm_merged',
                      command=['rm', '-rf', 'merged'],
                      description=['remove', 'merged'],
-                     workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                                   self.origSrcDir,
-                                                   self.appName),
+                     workdir=self.baseWorkDir,
                      haltOnFailure=True
                      ))
         self.addStep(ShellCommand(
@@ -3524,9 +3523,8 @@ class BaseRepackFactory(MozillaBuildFactory):
                      flunkOnFailure=flunkOnFailure,
                      warnOnFailure=warnOnFailure,
                      haltOnFailure=haltOnFailure,
-                     workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                                   self.origSrcDir,
-                                                   self.appName),
+                     workdir="%s/%s/locales" % (self.absSrcDir,
+                                                self.appName),
                      ))
 
     def doRepack(self):
@@ -3612,14 +3610,14 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.addStep(MockCommand(
                      name='repack_installers_pretty',
                      description=['repack', 'installers', 'pretty'],
-                     command=['sh', '-c',
-                              WithProperties(
-                              'make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+                     command=self.makeCmd + [WithProperties('installers-%(locale)s'),
+                                             WithProperties('LOCALE_MERGEDIR=%(basedir)s/' + \
+                                                            "%s/merged" % self.baseWorkDir)],
                      env=prettyEnv,
                      haltOnFailure=False,
                      flunkOnFailure=False,
                      warnOnFailure=True,
-                     workdir='%s/%s/locales' % (self.absMozillaObjDir, self.appName),
+                     workdir='%s/%s/locales' % (self.absObjDir, self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
@@ -3896,7 +3894,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(MockCommand(
                      name='repack_installers',
                      description=['repack', 'installers'],
-                     command=self.makeCmd + [WithProperties('installers-%(locale)s'), 'LOCALE_MERGEDIR=$PWD/merged'],
+                     command=self.makeCmd + [WithProperties('installers-%(locale)s'),
+                                             WithProperties('LOCALE_MERGEDIR=%(basedir)s/' + \
+                                                            "%s/merged" % self.baseWorkDir)],
                      env=self.env,
                      haltOnFailure=True,
                      workdir='%s/%s/locales' % (self.absObjDir, self.appName),
