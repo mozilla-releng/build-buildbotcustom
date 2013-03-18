@@ -27,8 +27,7 @@ reload(release.info)
 from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, \
   generateTestBuilderNames, generateTestBuilder, _nextFastReservedSlave, \
-  makeLogUploadCommand, changeContainsProduct, nomergeBuilders, \
-  changeContainsProperties
+  changeContainsProduct, nomergeBuilders, changeContainsProperties
 from buildbotcustom.common import reallyShort
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
   ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -44,10 +43,8 @@ from buildbotcustom.scheduler import TriggerBouncerCheck, \
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
 from buildbotcustom.status.errors import update_verify_error, \
      permission_check_error
-from buildbotcustom.status.queued_command import QueuedCommandHandler
 from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
-from mozilla_buildtools.queuedir import QueueDir
 import BuildSlaves
 
 DEFAULT_PARALLELIZATION = 3
@@ -345,6 +342,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'slavebuilddir': reallyShort(builderPrefix(
                         '%s_repo_setup' % releaseConfig['productName'])),
                     'release_config': releaseConfigFile,
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
                     },
             })
         else:
@@ -379,7 +378,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                               releaseConfig['productName']),
                     'slavebuilddir': reallyShort(builderPrefix(
                         '%s_release_downloader' % \
-                        releaseConfig['productName']))
+                        releaseConfig['productName'])),
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
                 }
             })
 
@@ -411,6 +412,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavebuilddir': reallyShort(
                     builderPrefix('%s_tag' % releaseConfig['productName'])),
                 'release_config': releaseConfigFile,
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
             }
         })
     else:
@@ -458,9 +461,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
            'factory': source_factory,
            'env': builder_env,
            'nextSlave': _nextFastReservedSlave,
-           'properties': { 'slavebuilddir':
-               reallyShort(
-                   builderPrefix('%s_source' % releaseConfig['productName']))}
+           'properties': { 'slavebuilddir': reallyShort(
+                             builderPrefix('%s_source' % releaseConfig['productName'])),
+                           'platform': None,
+                           'branch': 'release-%s' % sourceRepoInfo['name'],
+                         }
         })
         deliverables_builders.append(
                 builderPrefix('%s_source' % releaseConfig['productName']))
@@ -499,8 +504,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                'slavebuilddir': reallyShort(builderPrefix('xulrunner_source')),
                'factory': xulrunner_source_factory,
                'env': builder_env,
-               'properties': { 'slavebuilddir':
-                   reallyShort(builderPrefix('xulrunner_source'))}
+               'properties': {
+                  'slavebuilddir': reallyShort(builderPrefix('xulrunner_source')),
+                  'platform': None,
+                  'branch': 'release-%s' % sourceRepoInfo['name'],
+                  'product': 'xulrunner',
+                  }
             })
     else:
         builders.append(makeDummyBuilder(
@@ -614,8 +623,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'factory': build_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
-                'properties': { 'slavebuilddir':
-                    reallyShort(builderPrefix('%s_build' % platform))}
+                'properties': {
+                  'slavebuilddir': reallyShort(builderPrefix('%s_build' % platform)),
+                  'platform': platform,
+                  'branch': 'release-%s' % sourceRepoInfo['name'],
+                },
             })
         else:
             builders.append(makeDummyBuilder(
@@ -653,8 +665,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'factory': standalone_factory,
                     'nextSlave': _nextFastReservedSlave,
                     'env': env,
-                    'properties': {'builddir':
-                                   builderPrefix("standalone_repack", platform)}
+                    'properties': {
+                      'builddir': builderPrefix("standalone_repack", platform),
+                      'platform': platform,
+                      'branch': 'release-%s' % sourceRepoInfo['name'],
+                    }
                 })
 
             for n, builderName in l10nBuilders(platform).iteritems():
@@ -697,6 +712,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         'builddir': builddir,
                         'slavebuilddir': reallyShort(builddir),
                         'release_config': releaseConfigFile,
+                        'platform': platform,
+                        'branch': 'release-%s' % sourceRepoInfo['name'],
                     }
                 })
 
@@ -704,6 +721,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 name=builderPrefix('repack_complete', platform),
                 slaves=all_slaves,
                 category=builderPrefix(''),
+                properties={
+                            'platform': platform,
+                            'branch': 'release-%s' % sourceRepoInfo['name'],
+                           },
             ))
             updates_upstream_builders.append(
                 builderPrefix('repack_complete', platform))
@@ -774,8 +795,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform)),
                 'factory': xulrunner_build_factory,
                 'env': builder_env,
-                'properties': {'slavebuilddir':
-                    reallyShort(builderPrefix('xulrunner_%s_build' % platform))}
+                'properties': {
+                  'slavebuilddir': reallyShort(builderPrefix('xulrunner_%s_build' % platform)),
+                  'platform': platform,
+                  'branch': 'release-%s' % sourceRepoInfo['name'],
+                }
             })
         else:
             builders.append(makeDummyBuilder(
@@ -828,9 +852,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'factory': partner_repack_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
-                'properties': {'slavebuilddir':
-                               reallyShort(builderPrefix(
-                                   'partner_repack', platform))}
+                'properties': {
+                  'slavebuilddir': reallyShort(builderPrefix('partner_repack', platform)),
+                  'platform': platform,
+                  'branch': 'release-%s' % sourceRepoInfo['name'],
+                }
             })
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
@@ -864,8 +890,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'factory': l10n_verification_factory,
                 'nextSlave': _nextFastReservedSlave,
                 'env': builder_env,
-                'properties': {'slavebuilddir':reallyShort(
-                    builderPrefix('l10n_verification', platform))}
+                'properties': {
+                  'slavebuilddir': reallyShort(builderPrefix('l10n_verification', platform)),
+                  'platform': platform,
+                  'branch': 'release-%s' % sourceRepoInfo['name'],
+                }
             })
             post_signing_builders.append(
                 builderPrefix('l10n_verification', platform))
@@ -971,7 +1000,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'factory': updates_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
-            'properties': {'slavebuilddir': reallyShort(builderPrefix('updates'))}
+            'properties': {
+              'slavebuilddir': reallyShort(builderPrefix('updates')),
+              'platform': platform,
+              'branch': 'release-%s' % sourceRepoInfo['name'],
+            }
         })
         post_signing_builders.append(builderPrefix('updates'))
         important_builders.append(builderPrefix('updates'))
@@ -1018,6 +1051,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                'script_repo_revision': runtimeTag,
                                'release_tag': releaseTag,
                                'release_config': releaseConfigFile},
+                               'platform': platform,
+                               'branch': 'release-%s' % sourceRepoInfo['name'],
+                              },
             })
             post_update_builders.append(builderName)
 
@@ -1041,7 +1077,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'env': builder_env,
             'properties': {'slavebuilddir': reallyShort(builderPrefix('chk_prms')),
                            'script_repo_revision': releaseTag,
-                           'release_config': releaseConfigFile},
+                           'release_config': releaseConfigFile,
+                           'platform': None,
+                           'branch': 'release-%s' % sourceRepoInfo['name'],
+                          },
         })
         post_deliverables_builders.append(builderPrefix('check_permissions'))
 
@@ -1063,7 +1102,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'env': builder_env,
             'properties': {'slavebuilddir': reallyShort(builderPrefix('av')),
                            'script_repo_revision': releaseTag,
-                           'release_config': releaseConfigFile},
+                           'release_config': releaseConfigFile,
+                           'platform': None,
+                           'branch': 'release-%s' % sourceRepoInfo['name'],
+                          },
         })
         post_deliverables_builders.append(builderPrefix('antivirus'))
 
@@ -1087,6 +1129,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'slavebuilddir': reallyShort(builderPrefix('psh_mrrrs')),
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
         })
 
@@ -1133,8 +1177,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'factory': final_verification_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
-            'properties': {'slavebuilddir':
-                           reallyShort(builderPrefix('fnl_verf', platform))}
+            'properties': {
+              'slavebuilddir': reallyShort(builderPrefix('fnl_verf', platform)),
+              'platform': None,
+              'branch': 'release-%s' % sourceRepoInfo['name'],
+             },
         })
 
     if not releaseConfig.get('disableBouncerEntries'):
@@ -1142,6 +1189,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             name=builderPrefix('ready_for_releasetest_testing'),
             slaves=all_slaves,
             category=builderPrefix(''),
+            properties={
+              'platform': None,
+              'branch': 'release-%s' % sourceRepoInfo['name'],
+              },
             ))
         important_builders.append(builderPrefix('ready_for_releasetest_testing'))
 
@@ -1149,6 +1200,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             name=builderPrefix('ready_for_release'),
             slaves=all_slaves,
             category=builderPrefix(''),
+            properties={
+              'platform': None,
+              'branch': 'release-%s' % sourceRepoInfo['name'],
+              },
             ))
         important_builders.append(builderPrefix('ready_for_release'))
 
@@ -1204,7 +1259,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'factory': major_update_factory,
             'nextSlave': _nextFastReservedSlave,
             'env': builder_env,
-            'properties': {'slavebuilddir': reallyShort(builderPrefix('mu'))}
+            'properties': {
+              'slavebuilddir': reallyShort(builderPrefix('mu')),
+              'platform': None,
+              'branch': 'release-%s' % sourceRepoInfo['name'],
+             },
         })
         important_builders.append(builderPrefix('major_update'))
 
@@ -1239,7 +1298,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                    'slavebuilddir': reallyShort(builddir),
                                    'script_repo_revision': mu_runtimeTag,
                                    'release_tag': releaseTag,
-                                   'release_config': releaseConfigFile},
+                                   'release_config': releaseConfigFile,
+                                   'platform': platform,
+                                   'branch': 'release-%s' % sourceRepoInfo['name'],
+                                  },
                 })
 
     if not releaseConfig.get('disableBouncerEntries'):
@@ -1273,6 +1335,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'properties': {
                 'slavebuilddir': reallyShort(builderPrefix('bncr_sub')),
                 'release_config': releaseConfigFile,
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
             }
         })
 
@@ -1307,6 +1371,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'properties': {
                     'slavebuilddir': reallyShort(builderPrefix('eu_bncr_sub')),
                     'release_config': releaseConfigFile,
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
                 }
             })
 
@@ -1684,21 +1750,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         )
 
     builders.extend(test_builders)
-
-    product = releaseConfig['productName']
-    if product == 'fennec':
-        product = 'mobile'
-    logUploadCmd = makeLogUploadCommand(sourceRepoInfo['name'], branchConfig,
-            platform_prop=None, product=product)
-
-    status.append(QueuedCommandHandler(
-        logUploadCmd + [
-            '--release', '%s/%s' % (
-                releaseConfig['version'], releaseConfig['buildNumber'])
-            ],
-        QueueDir.getQueue('commands'),
-        builders=[b['name'] for b in builders + test_builders],
-    ))
 
     # Don't merge release builder requests
     nomergeBuilders.extend([b['name'] for b in builders + test_builders])
