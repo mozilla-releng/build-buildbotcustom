@@ -1176,6 +1176,42 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                          flunkOnFailure=False
                          ))
 
+    def addGaiaSourceSteps(self):
+        self.addStep(self.makeHgtoolStep(
+            name="gaia_sources",
+            rev=self.gaiaRevision or 'default',
+            repo_url="http://%s/%s" % (self.hgHost, self.gaiaRepo),
+            workdir="build/",
+            use_properties=False,
+            mirrors=['%s/%s' % (url, self.gaiaRepo)
+                    for url in self.baseMirrorUrls],
+            bundles=[],
+            wc='gaia',
+        ))
+        if self.gaiaLanguagesFile:
+            languagesFile = '%(basedir)s/build/gaia/' + \
+                self.gaiaLanguagesFile
+            cmd = ['python', 'mozharness/%s' % self.gaiaLanguagesScript,
+                   '--pull',
+                   '--gaia-languages-file', WithProperties(languagesFile),
+                   '--gaia-l10n-root', self.gaiaL10nRoot,
+                   '--gaia-l10n-base-dir', self.gaiaL10nBaseDir,
+                   '--config-file', self.multiLocaleConfig,
+                   '--gecko-l10n-root', self.geckoL10nRoot]
+            if self.geckoLanguagesFile:
+                cmd.extend(
+                    ['--gecko-languages-file', self.geckoLanguagesFile])
+            self.addStep(MockCommand(
+                name='clone_gaia_l10n_repos',
+                command=cmd,
+                env=self.env,
+                workdir=WithProperties('%(basedir)s'),
+                haltOnFailure=True,
+                mock=self.use_mock,
+                target=self.mock_target,
+                mock_workdir_prefix=None,
+            ))
+
     def addSourceSteps(self):
         if self.useSharedCheckouts:
             self.addStep(JSONPropertiesDownload(
@@ -1213,40 +1249,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                          ))
 
         if self.gaiaRepo:
-            self.addStep(self.makeHgtoolStep(
-                name="gaia_sources",
-                rev=self.gaiaRevision or 'default',
-                repo_url="http://%s/%s" % (self.hgHost, self.gaiaRepo),
-                workdir="build/",
-                use_properties=False,
-                mirrors=['%s/%s' % (url, self.gaiaRepo)
-                        for url in self.baseMirrorUrls],
-                bundles=[],
-                wc='gaia',
-            ))
-            if self.gaiaLanguagesFile:
-                languagesFile = '%(basedir)s/build/gaia/' + \
-                    self.gaiaLanguagesFile
-                cmd = ['python', 'mozharness/%s' % self.gaiaLanguagesScript,
-                       '--pull',
-                       '--gaia-languages-file', WithProperties(languagesFile),
-                       '--gaia-l10n-root', self.gaiaL10nRoot,
-                       '--gaia-l10n-base-dir', self.gaiaL10nBaseDir,
-                       '--config-file', self.multiLocaleConfig,
-                       '--gecko-l10n-root', self.geckoL10nRoot]
-                if self.geckoLanguagesFile:
-                    cmd.extend(
-                        ['--gecko-languages-file', self.geckoLanguagesFile])
-                self.addStep(MockCommand(
-                    name='clone_gaia_l10n_repos',
-                    command=cmd,
-                    env=self.env,
-                    workdir=WithProperties('%(basedir)s'),
-                    haltOnFailure=True,
-                    mock=self.use_mock,
-                    target=self.mock_target,
-                    mock_workdir_prefix=None,
-                ))
+            self.addGaiaSourceSteps()
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",
@@ -2136,6 +2139,8 @@ class TryBuildFactory(MercurialBuildFactory):
                      command=['hg', 'parent', '--template={node}'],
                      extract_fn=short_hash
                      ))
+        if self.gaiaRepo:
+            self.addGaiaSourceSteps()
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",
