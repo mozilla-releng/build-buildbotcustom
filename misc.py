@@ -1821,9 +1821,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             talos_pgo_builders = {}
 
             try_default = True
-            if not branch_config['platforms'][platform].get('try-by-default', True):
+            if not branch_config['platforms'][platform].get('try_by_default', True):
                 try_default = False
-            elif not platform_config.get('try-by-default', True):
+            elif not platform_config.get('try_by_default', True):
                 try_default = False
 
             for slave_platform in slave_platforms:
@@ -1831,7 +1831,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 # this is to handle how a platform has more than one slave
                 # platform
                 slave_platform_try_default = try_default
-                if not platform_config[slave_platform].get('try-by-default', True):
+                if not platform_config[slave_platform].get('try_by_default', True):
                     slave_platform_try_default = False
                 platformPrettyName = platform_name
                 if not slave_platform_try_default:
@@ -2509,7 +2509,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
 
             prettyName = PRETTY_NAME % (base_name, project, variant)
             name = prettyName
-            if not config.get('try-by-default', True):
+            if not config.get('try_by_default', True):
                 prettyName += ' try-nondefault'
             prettyNames[platform] = prettyName
 
@@ -2550,7 +2550,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
         scheduler_class = Scheduler
 
     scheduler = scheduler_class(
-        name="%s_spidermonkey" % branch,
+        name=project,
         treeStableTimer=None,
         builderNames=[b['name'] for b in builders],
         fileIsImportant=isImportant,
