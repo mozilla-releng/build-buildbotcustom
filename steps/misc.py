@@ -543,7 +543,7 @@ class UnpackTest(ShellCommand):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
         if filename.endswith(".zip"):
-            args = ['unzip', '-o', filename, 'bin*', 'certs*', 'modules*']
+            args = ['unzip', '-o', filename, 'bin*', 'mozbase*', 'certs*', 'modules*']
             # modify the commands to extract only the files we need - the test directory and bin/ and certs/
             if self.testtype == "mochitest":
                 args.append('mochitest*')
