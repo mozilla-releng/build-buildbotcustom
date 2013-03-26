@@ -382,7 +382,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberBranch=None, clobberTime=None,
                  buildsBeforeReboot=None, branchName=None, baseWorkDir='build',
-                 hashType='SHA512', baseMirrorUrls=None, baseBundleUrls=None,
+                 hashType='sha512', baseMirrorUrls=None, baseBundleUrls=None,
                  signingServers=None, enableSigning=True, env={},
                  balrog_api_root=None, balrog_credentials_file=None,
                  use_mock=False, mock_target=None,

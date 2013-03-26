@@ -11,7 +11,7 @@ from buildbot.steps.transfer import _FileReader, StatusRemoteCommand
 
 class CreateUpdateSnippet(BuildStep):
     def __init__(self, objdir, milestone, baseurl, appendDatedDir=True,
-                 snippetType='complete', hashType='SHA512', doStepIf=True,
+                 snippetType='complete', hashType='sha512', doStepIf=True,
                  name='create_update_snippet'):
         BuildStep.__init__(self, name=name, doStepIf=doStepIf)
 
@@ -30,7 +30,7 @@ class CreateUpdateSnippet(BuildStep):
         self.appendDatedDir = appendDatedDir
         assert snippetType in ['complete', 'partial']
         self.snippetType = snippetType
-        assert hashType in ['SHA512']
+        assert hashType in ['sha512']
         self.hashType = hashType
         self.maxsize = 16384
         self.mode = None
