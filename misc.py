@@ -1815,6 +1815,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         if branch_config['platforms'].get(platform):
             slave_platforms = branch_config['platforms'][platform].get(
                 'slave_platforms', platform_config.get('slave_platforms', []))
+            talos_slave_platforms = branch_config['platforms'][platform].get(
+                'talos_slave_platforms', platform_config.get('talos_slave_platforms', []))
 
             # Map of # of test runs to builder names
             talos_builders = {}
@@ -1826,7 +1828,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             elif not platform_config.get('try_by_default', True):
                 try_default = False
 
-            for slave_platform in slave_platforms:
+            for slave_platform in set(slave_platforms + talos_slave_platforms):
                 platform_name = platform_config[slave_platform]['name']
                 # this is to handle how a platform has more than one slave
                 # platform
@@ -1976,7 +1978,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             tinderboxTree].append(pgo_builder['name'])
                         all_builders.append(pgo_builder['name'])
 
-                if platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
+                # Skip talos only platforms, not active platforms, branches
+                # with disabled unittests
+                if slave_platform in slave_platforms and platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
                     testTypes = []
                     # unittestSuites are gathered up for each platform from
                     # config.py

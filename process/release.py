@@ -1409,6 +1409,33 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 },
             })
 
+            xr_postrelease_factory = ScriptFactory(
+                scriptRepo=tools_repo,
+                scriptName='scripts/release/stage-tasks.sh',
+                extra_args=[branchConfigFile, 'postrelease',
+                           '--product', 'xulrunner',
+                           '--ssh-user', branchConfig['stage_username_xulrunner'],
+                           '--ssh-key', branchConfig['stage_ssh_xulrunner_key'],
+                            ],
+            )
+
+            builders.append({
+                'name': builderPrefix('xr_postrelease'),
+                'slavenames': unix_slaves,
+                'category': builderPrefix(''),
+                'builddir': builderPrefix('xr_postrelease'),
+                'slavebuilddir': normalizeName(builderPrefix('xr_postrelease')),
+                'factory': xr_postrelease_factory,
+                'env': builder_env,
+                'properties': {
+                    'slavebuilddir': normalizeName(builderPrefix('xr_postrelease')),
+                    'release_config': releaseConfigFile,
+                    'script_repo_revision': releaseTag,
+                    'platform': None,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                },
+            })
+
     if not releaseConfig.get('disableBouncerEntries'):
         trigger_uptake_factory = BuildFactory()
         schedulerNames = [builderPrefix('almost-ready-for-release')]
@@ -1966,3 +1993,4 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         "change_source": change_source,
         "schedulers": schedulers,
     }
+
