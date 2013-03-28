@@ -2362,6 +2362,7 @@ def generateFuzzingObjects(config, SLAVES):
     )
     for platform in config['platforms']:
         env = MozillaEnvironments.get("%s-unittest" % platform, {}).copy()
+        env['HG_BUNDLE'] = config['fuzzing_bundle']
         env['HG_REPO'] = config['fuzzing_repo']
         env['FUZZ_REMOTE_HOST'] = config['fuzzing_remote_host']
         env['FUZZ_BASE_DIR'] = config['fuzzing_base_dir']
