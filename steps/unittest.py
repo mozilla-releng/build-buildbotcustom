@@ -325,6 +325,36 @@ class MochitestMixin(object):
                                  superResult)
 
 
+class XPCShellMixin(object):
+    warnOnFailure = True
+    warnOnWarnings = True
+
+    def createSummary(self, log):
+        self.addCompleteLog(
+            'summary', summarizeLogXpcshelltests(self.name, log))
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        # When a unittest fails we mark it orange, indicating with the
+        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
+        # However, we don't want to override EXCEPTION or RETRY, so we still
+        # need to use worst_status in further status decisions.
+        if superResult == FAILURE:
+            superResult = WARNINGS
+
+        if superResult != SUCCESS:
+            return superResult
+
+        # Assume that having the "Failed: 0" line
+        # means the tests run completed (successfully).
+        # Also check for "^TEST-UNEXPECTED-" for harness errors.
+        if not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE) or \
+                re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
+            return worst_status(superResult, WARNINGS)
+
+        return worst_status(superResult, SUCCESS)
+
+
 class ReftestMixin(object):
     warnOnFailure = True
     warnOnWarnings = True
@@ -454,9 +484,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         return worst_status(superResult, SUCCESS)
 
 
-class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
-    warnOnFailure = True
-    warnOnWarnings = True
+class MozillaPackagedXPCShellTests(XPCShellMixin, ShellCommandReportTimeout):
     name = "xpcshell"
 
     def __init__(self, platform, symbols_path=None, **kwargs):
@@ -483,31 +511,6 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
         script += " --manifest=xpcshell/tests/all-test-dirs.list %(exedir)s/xpcshell" + bin_extension
 
         self.command = ['bash', '-c', WithProperties(script)]
-
-    def createSummary(self, log):
-        self.addCompleteLog(
-            'summary', summarizeLogXpcshelltests(self.name, log))
-
-    def evaluateCommand(self, cmd):
-        superResult = self.super_class.evaluateCommand(self, cmd)
-        # When a unittest fails we mark it orange, indicating with the
-        # WARNINGS status. Therefore, FAILURE needs to become WARNINGS
-        # However, we don't want to override EXCEPTION or RETRY, so we still
-        # need to use worst_status in further status decisions.
-        if superResult == FAILURE:
-            superResult = WARNINGS
-
-        if superResult != SUCCESS:
-            return superResult
-
-        # Assume that having the "Failed: 0" line
-        # means the tests run completed (successfully).
-        # Also check for "^TEST-UNEXPECTED-" for harness errors.
-        if not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE) or \
-                re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
-            return worst_status(superResult, WARNINGS)
-
-        return worst_status(superResult, SUCCESS)
 
 
 # MochitestMixin overrides some methods that BuildStep calls
@@ -711,6 +714,39 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
             self.command.extend(cmdOptions)
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
         self.command.extend(self.getSuiteOptions(suite))
+
+        if symbols_path:
+            self.command.append(
+                WithProperties("--symbols-path=%s" % symbols_path))
+
+
+class RemoteXPCShellStep(XPCShellMixin, ChunkingMixin, ShellCommandReportTimeout):
+    def __init__(self, suite, symbols_path=None, xrePath='../hostutils/xre',
+                 totalChunks=None, thisChunk=None, cmdOptions=None, extra_args=None, **kwargs):
+        self.super_class = ShellCommandReportTimeout
+        ShellCommandReportTimeout.__init__(self, **kwargs)
+        self.addFactoryArguments(suite=suite, xrePath=xrePath,
+                                 symbols_path=symbols_path,
+                                 totalChunks=totalChunks, thisChunk=thisChunk,
+                                 cmdOptions=cmdOptions, extra_args=extra_args)
+
+        self.name = suite
+        if totalChunks:
+            self.name += '-%i' % thisChunk
+
+        self.command = ['python2.7', 'xpcshell/remotexpcshelltests.py',
+                        '--deviceIP', WithProperties('%(sut_ip)s'),
+                        '--xre-path', xrePath,
+                        '--manifest', 'xpcshell/tests/xpcshell_android.ini',
+                        '--build-info-json', 'xpcshell/mozinfo.json',
+                        '--testing-modules-dir', 'xpcshell/tests/modules',
+                        '--local-lib-dir', WithProperties('../%(exedir)s'),
+                        '--apk', WithProperties('../%(build_filename)s'),
+                        '--no-logfiles']
+        if extra_args:
+            self.command.append(extra_args)
+
+        self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
 
         if symbols_path:
             self.command.append(
