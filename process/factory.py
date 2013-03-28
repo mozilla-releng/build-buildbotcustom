@@ -5428,6 +5428,30 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                  log_eval_func=lambda c, s: regex_log_evaluator(c, s,
                                                                                 global_errors + tegra_errors),
                                  ))
+            elif name.startswith('xpcshell'):
+                totalChunks = suite.get('totalChunks', None)
+                thisChunk = suite.get('thisChunk', None)
+                extra_args = suite.get('extra_args', None)
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                             filename=WithProperties('../%(tests_filename)s'),
+                             testtype='xpcshell',
+                             workdir='build/tests',
+                             haltOnFailure=True,
+                             ))
+                self.addStep(unittest_steps.RemoteXPCShellStep(
+                             suite=name,
+                             symbols_path=symbols_path,
+                             totalChunks=totalChunks,
+                             thisChunk=thisChunk,
+                             extra_args=extra_args,
+                             workdir='build/tests',
+                             timeout=2400,
+                             env=self.env,
+                             log_eval_func=lambda c, s: regex_log_evaluator(
+                             c, s,
+                             global_errors + tegra_errors),
+                             ))
             elif name.startswith('reftest') or name == 'crashtest':
                 totalChunks = suite.get('totalChunks', None)
                 thisChunk = suite.get('thisChunk', None)

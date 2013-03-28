@@ -2362,6 +2362,7 @@ def generateFuzzingObjects(config, SLAVES):
     )
     for platform in config['platforms']:
         env = MozillaEnvironments.get("%s-unittest" % platform, {}).copy()
+        env['HG_BUNDLE'] = config['fuzzing_bundle']
         env['HG_REPO'] = config['fuzzing_repo']
         env['FUZZ_REMOTE_HOST'] = config['fuzzing_remote_host']
         env['FUZZ_BASE_DIR'] = config['fuzzing_base_dir']
@@ -2590,6 +2591,11 @@ def generateJetpackObjects(config, SLAVES):
                     interpreter='python',
                     log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE,
                                                 4: EXCEPTION, 5: RETRY}),
+                    reboot_command=['python',
+                                    'scripts/buildfarm/maintenance/count_and_reboot.py',
+                                    '-f', './reboot_count.txt',
+                                    '-n', '0',
+                                    '-z'],
                 )
 
                 builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
