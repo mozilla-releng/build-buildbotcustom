@@ -89,7 +89,7 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
     # Reuse 'infoRe'.
     infoRe = re.compile(infoRe)
     # Regular expression for crash and leak detections.
-    harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (Browser crashed \(minidump found\)|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
+    harnessErrorsRe = re.compile(r"(TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
     # Process the log.
     for line in log.readlines():
         # Set the counts.
@@ -109,7 +109,7 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
         m = harnessErrorsRe.match(line)
         if m:
             r = m.group(1)
-            if r == "Browser crashed (minidump found)":
+            if r == "application crashed":
                 crashed = True
             elif r == "missing output line for total leaks!":
                 leaked = None
@@ -202,7 +202,7 @@ def summarizeTUnit(name, log):
     leaked = False
 
     # Regular expression for crash and leak detections.
-    harnessErrorsRe = re.compile(r"TEST-UNEXPECTED-FAIL \| .* \| (missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
+    harnessErrorsRe = re.compile(r"(TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
     # Process the log.
     for line in log.readlines():
         if "TEST-PASS" in line:
