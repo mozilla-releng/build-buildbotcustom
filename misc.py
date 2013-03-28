@@ -2591,6 +2591,11 @@ def generateJetpackObjects(config, SLAVES):
                     interpreter='python',
                     log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE,
                                                 4: EXCEPTION, 5: RETRY}),
+                    reboot_command=['python',
+                                    'scripts/buildfarm/maintenance/count_and_reboot.py',
+                                    '-f', './reboot_count.txt',
+                                    '-n', '0',
+                                    '-z'],
                 )
 
                 builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
