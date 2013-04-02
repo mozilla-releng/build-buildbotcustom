@@ -1936,12 +1936,21 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 '--aus-host', self.ausHost,
                 '--aus-user', self.ausUser,
                 '--aus-ssh-key', '~/.ssh/%s' % self.ausSshKey,
+                '--properties-dir', WithProperties('%(basedir)s/properties'),
                 WithProperties(self.objdir + '/dist/%(packageFilename)s')
             ]
             self.addStep(ShellCommand(
                 name='create_android_snippet',
                 command=cmd,
                 haltOnFailure=False,
+            ))
+            self.addStep(SetProperty(
+                name='set_script_properties',
+                command=['bash', '-c', 'for file in `ls -1`; do cat $file; done'],
+                workdir='properties',
+                extract_fn=extractProperties,
+                warnOnFailure=False,
+                flunkOnFailure=False,
             ))
         else:
             milestone = self.branchName + milestone_extra
