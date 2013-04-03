@@ -652,6 +652,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                             '%(basedir)s/../runtestsremote.pid')
                         ]
         self.command.extend(self.getVariantOptions(variant))
+        self.slowTests = slowTests
         if testPath:
             self.command.extend(['--test-path', testPath])
         if testManifest:
@@ -659,9 +660,17 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
         if symbols_path:
             self.command.append(
                 WithProperties("--symbols-path=%s" % symbols_path))
-        if slowTests:
-            self.command.append(['--run-slower'])
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
+
+    def start(self):
+        properties = self.build.getProperties()
+        if callable(self.slowTests):
+            slowTests = properties.render(self.slowTests(self.build))
+        else:
+            slowTests = properties.render(self.slowTests)
+        if slowTests == str(True):
+            self.command.append(['--run-slower'])
+        ShellCommandReportTimeout.start(self)
 
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
