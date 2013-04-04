@@ -5387,14 +5387,19 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          ],
                 haltOnFailure=True)
             )
-            if name.startswith('mochitest'):
+            if name.startswith('mochitest'):                
                 # XXX Hack for Bug 811444
                 # Slow down tests for panda boards
-                if 'panda' in self.platform:
-                    slowTests = True
-                else:
-                    slowTests = False
-
+                def ifAPanda(build):
+                    slavename = build.slavename
+                    if re.match(r'panda-[0-9]{4}\+?', slavename):
+                        return "True"
+                    else:
+                        return "False"
+                self.addStep(SetBuildProperty(
+                            property_name="slowTests",
+                            value=ifAPanda,
+                            ))
                 self.addStep(UnpackTest(
                              filename=WithProperties('../%(tests_filename)s'),
                              testtype='mochitest',
@@ -5412,7 +5417,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                      variant=variant,
                                      symbols_path=symbols_path,
                                      testPath=tp,
-                                     slowTests=slowTests,
+                                     slowTests=WithProperties('%(slowTests)s'),
                                      workdir='build/tests',
                                      timeout=2400,
                                      app=self.remoteProcessName,
@@ -5420,6 +5425,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                      log_eval_func=lambda c, s: regex_log_evaluator(c, s,
                                                                                     global_errors + tegra_errors),
                                      ))
+                        
                 else:
                     totalChunks = suite.get('totalChunks', None)
                     thisChunk = suite.get('thisChunk', None)
@@ -5427,7 +5433,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                  variant=variant,
                                  symbols_path=symbols_path,
                                  testManifest=suite.get('testManifest', None),
-                                 slowTests=slowTests,
+                                 slowTests=WithProperties('%(slowTests)s'),
                                  workdir='build/tests',
                                  timeout=2400,
                                  app=self.remoteProcessName,

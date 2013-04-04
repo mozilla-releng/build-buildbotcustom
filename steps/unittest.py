@@ -89,7 +89,7 @@ def summarizeLog(name, log, successIdent, failureIdent, otherIdent, infoRe):
     # Reuse 'infoRe'.
     infoRe = re.compile(infoRe)
     # Regular expression for crash and leak detections.
-    harnessErrorsRe = re.compile(r"(TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
+    harnessErrorsRe = re.compile(r"(?:TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
     # Process the log.
     for line in log.readlines():
         # Set the counts.
@@ -202,7 +202,7 @@ def summarizeTUnit(name, log):
     leaked = False
 
     # Regular expression for crash and leak detections.
-    harnessErrorsRe = re.compile(r"(TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
+    harnessErrorsRe = re.compile(r"(?:TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
     # Process the log.
     for line in log.readlines():
         if "TEST-PASS" in line:
@@ -652,6 +652,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                             '%(basedir)s/../runtestsremote.pid')
                         ]
         self.command.extend(self.getVariantOptions(variant))
+        self.slowTests = slowTests
         if testPath:
             self.command.extend(['--test-path', testPath])
         if testManifest:
@@ -659,9 +660,17 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
         if symbols_path:
             self.command.append(
                 WithProperties("--symbols-path=%s" % symbols_path))
-        if slowTests:
-            self.command.append(['--run-slower'])
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
+
+    def start(self):
+        properties = self.build.getProperties()
+        if callable(self.slowTests):
+            slowTests = properties.render(self.slowTests(self.build))
+        else:
+            slowTests = properties.render(self.slowTests)
+        if slowTests == str(True):
+            self.command.append(['--run-slower'])
+        ShellCommandReportTimeout.start(self)
 
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):

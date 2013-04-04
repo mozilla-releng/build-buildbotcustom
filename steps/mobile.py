@@ -42,7 +42,7 @@ class MobileParseTestLog(ShellCommand):
         failIdent = "TEST-UNEXPECTED-"
         knownIdent = "TEST-KNOWN-FAIL"
 
-        harnessErrorsRe = re.compile(r"(TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
+        harnessErrorsRe = re.compile(r"(?:TEST-UNEXPECTED-FAIL|PROCESS-CRASH) \| .* \| (application crashed|missing output line for total leaks!|negative leaks caught!|\d+ bytes leaked)")
 
         for line in log.readlines():
             m = harnessErrorsRe.match(line)
