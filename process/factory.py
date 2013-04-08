@@ -5111,8 +5111,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 if suite in ('direct3D', 'opengl'):
                     self.env.update({'MOZ_ACCELERATED': '11'})
                 if suite in ('reftest-ipc', 'crashtest-ipc'):
-                    self.env.update({'MOZ_DISABLE_CONTEXT_SHARING_GLX': '1',
-                                     'MOZ_USE_OMTC': '1'})
+                    self.env.update({'MOZ_LAYERS_FORCE_SHMEM_SURFACES': '1'})
                 # Unpack the tests
                 self.addStep(UnpackTest(
                              filename=WithProperties('%(tests_filename)s'),
