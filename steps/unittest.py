@@ -364,14 +364,12 @@ class ReftestMixin(object):
             return ['reftest/tests/testing/crashtest/crashtests.list']
         elif suite == 'crashtest-ipc':
             return ['--setpref=browser.tabs.remote=true',
-                    '--setpref=layers.offmainthreadcomposition.testing.enabled=true',
                     'reftest/tests/testing/crashtest/crashtests.list']
         elif suite in ('reftest', 'direct3D', 'opengl', 'reftestsmall'):
             return ['reftest/tests/layout/reftests/reftest.list']
         elif suite in ('reftest-ipc'):
             # See bug 637858 for why we are doing a subset of all reftests
             return ['--setpref=browser.tabs.remote=true',
-                    '--setpref=layers.offmainthreadcomposition.testing.enabled=true',
                     'reftest/tests/layout/reftests/reftest-sanity/reftest.list']
         elif suite == 'reftest-d2d':
             return ['--setpref=gfx.font_rendering.directwrite.enabled=true',
