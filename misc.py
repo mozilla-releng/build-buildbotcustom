@@ -1855,7 +1855,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         opt_talos_branch = talosBranch
 
                     factory_kwargs = {
-                        "OS": slave_platform.split('-')[0],
+                        "OS": slave_platform,
                         "supportUrlBase": branch_config['support_url_base'],
                         "envName": platform_config['env_name'],
                         "workdirBase": "../talos-data",

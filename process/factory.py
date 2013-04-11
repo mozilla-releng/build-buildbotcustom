@@ -5613,7 +5613,7 @@ class TalosFactory(RequestSortingBuildFactory):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
-        elif (platform in ('win8',)):
+        elif (platform in ('win8', 'win7-ix', 'xp-ix')):
             return "C:\\mozilla-build\\python27\\python.exe"
         elif (platform.find("android") > -1):
             # path in the foopies
