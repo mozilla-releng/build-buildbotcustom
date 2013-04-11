@@ -364,14 +364,12 @@ class ReftestMixin(object):
             return ['reftest/tests/testing/crashtest/crashtests.list']
         elif suite == 'crashtest-ipc':
             return ['--setpref=browser.tabs.remote=true',
-                    '--setpref=layers.offmainthreadcomposition.testing.enabled=true',
                     'reftest/tests/testing/crashtest/crashtests.list']
         elif suite in ('reftest', 'direct3D', 'opengl', 'reftestsmall'):
             return ['reftest/tests/layout/reftests/reftest.list']
         elif suite in ('reftest-ipc'):
             # See bug 637858 for why we are doing a subset of all reftests
             return ['--setpref=browser.tabs.remote=true',
-                    '--setpref=layers.offmainthreadcomposition.testing.enabled=true',
                     'reftest/tests/layout/reftests/reftest-sanity/reftest.list']
         elif suite == 'reftest-d2d':
             return ['--setpref=gfx.font_rendering.directwrite.enabled=true',
@@ -625,8 +623,8 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
     def __init__(self, variant, symbols_path=None, testPath=None,
                  xrePath='../hostutils/xre', testManifest=None,
                  utilityPath='../hostutils/bin', certificatePath='certs',
-                 app='org.mozilla.fennec', consoleLevel='INFO',
-                 totalChunks=None, thisChunk=None, slowTests=False, **kwargs):
+                 consoleLevel='INFO', totalChunks=None, thisChunk=None,
+                 slowTests=False, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
@@ -636,7 +634,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
                                  testPath=testPath, xrePath=xrePath,
                                  testManifest=testManifest, utilityPath=utilityPath,
-                                 certificatePath=certificatePath, app=app,
+                                 certificatePath=certificatePath,
                                  consoleLevel=consoleLevel, slowTests=slowTests,
                                  totalChunks=totalChunks, thisChunk=thisChunk)
 
@@ -646,7 +644,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                         '--xre-path', xrePath,
                         '--utility-path', utilityPath,
                         '--certificate-path', certificatePath,
-                        '--app', app,
+                        '--app', WithProperties("%(remoteProcessName)s"),
                         '--console-level', consoleLevel,
                         '--http-port', WithProperties('%(http_port)s'),
                         '--ssl-port', WithProperties('%(ssl_port)s'),
@@ -672,7 +670,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
             slowTests = properties.render(self.slowTests)
         if slowTests == str(True):
             self.command.append(['--run-slower'])
-        ShellCommandReportTimeout.start(self)
+        self.super_class.start(self)
 
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
@@ -692,13 +690,13 @@ class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
 
 class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, xrePath='../hostutils/xre',
-                 utilityPath='../hostutils/bin', app='org.mozilla.fennec',
-                 totalChunks=None, thisChunk=None, cmdOptions=None, extra_args=None, **kwargs):
+                 utilityPath='../hostutils/bin', totalChunks=None,
+                 thisChunk=None, cmdOptions=None, extra_args=None, **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
         self.addFactoryArguments(suite=suite, xrePath=xrePath,
                                  symbols_path=symbols_path,
-                                 utilityPath=utilityPath, app=app,
+                                 utilityPath=utilityPath,
                                  totalChunks=totalChunks, thisChunk=thisChunk,
                                  cmdOptions=cmdOptions, extra_args=extra_args)
 
@@ -709,7 +707,7 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
                         '--utility-path', utilityPath,
-                        '--app', app,
+                        '--app', WithProperties("%(remoteProcessName)s"),
                         '--http-port', WithProperties('%(http_port)s'),
                         '--ssl-port', WithProperties('%(ssl_port)s'),
                         '--pidfile', WithProperties(

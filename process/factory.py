@@ -5112,8 +5112,6 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     self.env.update({'MOZ_ACCELERATED': '11'})
                 if suite in ('reftest-ipc', 'crashtest-ipc'):
                     self.env.update({'MOZ_LAYERS_FORCE_SHMEM_SURFACES': '1'})
-                    self.env.update({'MOZ_DISABLE_CONTEXT_SHARING_GLX': '1',
-                                     'MOZ_OMTC_ENABLED': '1'})
                 # Unpack the tests
                 self.addStep(UnpackTest(
                              filename=WithProperties('%(tests_filename)s'),
@@ -5240,15 +5238,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
         else:
             self.remoteExtras = {}
 
-        exePaths = self.remoteExtras.get('processName', {})
-        if branchName in exePaths:
-            self.remoteProcessName = exePaths[branchName]
-        else:
-            if 'default' in exePaths:
-                self.remoteProcessName = exePaths['default']
-            else:
-                self.remoteProcessName = 'org.mozilla.fennec'
-
         env = {}
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
         env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
@@ -5311,7 +5300,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
             command=['python', '/builds/sut_tools/installApp.py',
                      WithProperties("%(sut_ip)s"),
                      WithProperties("build/%(build_filename)s"),
-                     self.remoteProcessName,
+                     WithProperties("%(remoteProcessName)s"),
                      ],
             haltOnFailure=True)
         )
@@ -5339,6 +5328,11 @@ class RemoteUnittestFactory(MozillaTestFactory):
             workdir='build/%s' % self.productName,
             name='unpack_build',
         ))
+        self.addStep(SetProperty(
+                     command=['cat', 'package-name.txt'],
+                     workdir='build/%s' % self.productName,
+                     property='remoteProcessName'
+                     ))
 
         def get_robocop_url(build):
             '''We assume 'robocop.apk' is in same directory as the
@@ -5389,7 +5383,7 @@ class RemoteUnittestFactory(MozillaTestFactory):
                          ],
                 haltOnFailure=True)
             )
-            if name.startswith('mochitest'):                
+            if name.startswith('mochitest'):
                 # XXX Hack for Bug 811444
                 # Slow down tests for panda boards
                 def ifAPanda(build):
@@ -5422,12 +5416,11 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                      slowTests=WithProperties('%(slowTests)s'),
                                      workdir='build/tests',
                                      timeout=2400,
-                                     app=self.remoteProcessName,
                                      env=self.env,
                                      log_eval_func=lambda c, s: regex_log_evaluator(c, s,
                                                                                     global_errors + tegra_errors),
                                      ))
-                        
+
                 else:
                     totalChunks = suite.get('totalChunks', None)
                     thisChunk = suite.get('thisChunk', None)
@@ -5438,7 +5431,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                                  slowTests=WithProperties('%(slowTests)s'),
                                  workdir='build/tests',
                                  timeout=2400,
-                                 app=self.remoteProcessName,
                                  env=self.env,
                                  totalChunks=totalChunks,
                                  thisChunk=thisChunk,
@@ -5488,7 +5480,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                              extra_args=extra_args,
                              workdir='build/tests',
                              timeout=2400,
-                             app=self.remoteProcessName,
                              env=self.env,
                              cmdOptions=self.remoteExtras.get('cmdOptions'),
                              log_eval_func=lambda c, s: regex_log_evaluator(
@@ -5511,7 +5502,6 @@ class RemoteUnittestFactory(MozillaTestFactory):
                              thisChunk=thisChunk,
                              workdir='build/tests',
                              timeout=2400,
-                             app=self.remoteProcessName,
                              env=self.env,
                              cmdOptions=self.remoteExtras.get('cmdOptions'),
                              log_eval_func=lambda c, s: regex_log_evaluator(
@@ -5592,18 +5582,6 @@ class TalosFactory(RequestSortingBuildFactory):
         else:
             self.talosBranch = talosBranch
 
-        if self.remoteExtras is not None:
-            exePaths = self.remoteExtras.get('processName', {})
-        else:
-            exePaths = {}
-        if branch in exePaths:
-            self.remoteProcessName = exePaths[branch]
-        else:
-            if 'default' in exePaths:
-                self.remoteProcessName = exePaths['default']
-            else:
-                self.remoteProcessName = 'org.mozilla.fennec'
-
         self.addInfoSteps()
         if self.remoteTests:
             self.addMobileCleanupSteps()
@@ -5635,7 +5613,7 @@ class TalosFactory(RequestSortingBuildFactory):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
-        elif (platform in ('win8',)):
+        elif (platform in ('win8', 'win7-ix', 'xp-ix')):
             return "C:\\mozilla-build\\python27\\python.exe"
         elif (platform.find("android") > -1):
             # path in the foopies
@@ -5828,6 +5806,12 @@ class TalosFactory(RequestSortingBuildFactory):
                              self.workdirBase, self.productName),
                          name="Unpack build",
                          haltOnFailure=True,
+                         ))
+            self.addStep(SetProperty(
+                         command=['cat', 'package-name.txt'],
+                         workdir='%s/%s' % (
+                             self.workdirBase, self.productName),
+                         property='remoteProcessName'
                          ))
         else:
             self.addStep(UnpackFile(
@@ -6181,7 +6165,7 @@ class TalosFactory(RequestSortingBuildFactory):
             command=['python', '/builds/sut_tools/installApp.py',
                      WithProperties("%(sut_ip)s"),
                      WithProperties(self.workdirBase + "/%(filename)s"),
-                     self.remoteProcessName,
+                     WithProperties("%(remoteProcessName)s"),
                      ],
             env=self.env,
             haltOnFailure=True)
@@ -6200,8 +6184,7 @@ class TalosFactory(RequestSortingBuildFactory):
                      extName=TalosFactory.extName,
                      useSymbols=self.fetchSymbols,
                      remoteExtras=self.remoteExtras,
-                     remoteProcessName=self.remoteProcessName)
-                     )
+                     ))
 
     def addRunTestStep(self):
         if self.OS in ('mountainlion', 'lion', 'snowleopard'):
