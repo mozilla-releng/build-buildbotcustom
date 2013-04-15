@@ -1465,10 +1465,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             },
         })
 
-    for platform in releaseConfig.get('verifyConfigs', {}).keys():
+    if releaseConfig.get('verifyConfigs'):
         final_verification_factory = ReleaseFinalVerification(
             hgHost=branchConfig['hghost'],
-            platforms=[platform],
             buildToolsRepoPath=tools_repo_path,
             verifyConfigs=releaseConfig['verifyConfigs'],
             clobberURL=clobberer_url,
@@ -1477,17 +1476,17 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         )
 
         builders.append({
-            'name': builderPrefix('final_verification', platform),
+            'name': builderPrefix('final_verification'),
             'slavenames': branchConfig['platforms']['linux']['slaves'] +
             branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
-            'builddir': builderPrefix('final_verification', platform),
-            'slavebuilddir': normalizeName(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
+            'builddir': builderPrefix('final_verification'),
+            'slavebuilddir': normalizeName(builderPrefix('fnl_verf'), releaseConfig['productName']),
             'factory': final_verification_factory,
             'nextSlave': _nextFastSlave,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': normalizeName(builderPrefix('fnl_verf', platform), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('fnl_verf'), releaseConfig['productName']),
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             },
@@ -1727,9 +1726,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if releaseConfig.get('verifyConfigs'):
             readyForReleaseUpstreams += post_update_builders
             finalVerifyBuilders = []
-            for platform in releaseConfig['verifyConfigs'].keys():
-                finalVerifyBuilders.append(
-                    builderPrefix('final_verification', platform))
+            if releaseConfig.get('verifyConfigs'):
+                finalVerifyBuilders = [builderPrefix('final_verification')]
             readyForReleaseUpstreams += finalVerifyBuilders
 
             mirror_scheduler1 = TriggerBouncerCheck(
