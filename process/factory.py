@@ -1318,9 +1318,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                      description=['compile'],
                      env=self.env,
                      haltOnFailure=True,
-                     timeout=10800,
-                     # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose
-                     # the root cause of the linker time out.
+                     timeout=2 * 3600,  # max of 2 hours without output before killing
+                     maxTime=int(4.5 * 3600),  # max of 4.5 hours total runtime before killing
                      mock=self.use_mock,
                      target=self.mock_target,
                      workdir=workdir,
