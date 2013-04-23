@@ -25,22 +25,13 @@
 #   Alice Nodelman <anodelman@mozilla.com>
 # ***** END LICENSE BLOCK *****
 
-from buildbot.status.builder import FAILURE, SUCCESS, WARNINGS, EXCEPTION, \
+from buildbot.status.builder import FAILURE, SUCCESS, EXCEPTION, \
     worst_status
 from buildbot.process.properties import WithProperties
 
-from twisted.internet.defer import DeferredList, Deferred
 from twisted.python import log
-from twisted.web.client import getPage
-from twisted.internet import reactor
 
-from urllib import urlencode
-from time import strptime, strftime, localtime, mktime
 import re
-import os
-import signal
-from os import path
-import string
 
 from buildbotcustom.steps.base import ShellCommand
 
@@ -52,9 +43,9 @@ class AliveTest(ShellCommand):
     flunkOnFailure = False
     warnOnFailure = True
 
-    def __init__(self, extraArgs=None, logfile=None, **kwargs):
+    def __init__(self, extraArgs=None, logfile=None, timeout=300, maxTime=600, **kwargs):
         self.super_class = ShellCommand
-        self.super_class.__init__(self, **kwargs)
+        self.super_class.__init__(self, timeout=timeout, maxTime=maxTime, **kwargs)
 
         self.addFactoryArguments(extraArgs=extraArgs,
                                  logfile=logfile)
@@ -69,6 +60,7 @@ class AliveTest(ShellCommand):
             self.command.append('--')
             self.command.extend(extraArgs)
 
+
 class AliveMakeTest(ShellCommand):
     name = "alive test"
     description = ["alive test"]
@@ -76,9 +68,9 @@ class AliveMakeTest(ShellCommand):
     flunkOnFailure = False
     warnOnFailure = True
 
-    def __init__(self, extraArgs=None, logfile=None, **kwargs):
+    def __init__(self, extraArgs=None, logfile=None, timeout=300, maxTime=600, **kwargs):
         self.super_class = ShellCommand
-        self.super_class.__init__(self, **kwargs)
+        self.super_class.__init__(self, timeout=timeout, maxTime=maxTime, **kwargs)
 
         self.addFactoryArguments(extraArgs=extraArgs,
                                  logfile=logfile)
@@ -93,9 +85,11 @@ class AliveMakeTest(ShellCommand):
         if logfile:
             leakargs.append('-l')
             leakargs.append(logfile)
-        self.command = ['bash', '-c',
-            WithProperties("LEAKTEST_ARGS='" + ' '.join(leakargs) + \
-                          "' python %(basedir)s/build/build/pymake/make.py leaktest")]
+        self.command = [
+            'bash', '-c',
+            WithProperties("LEAKTEST_ARGS='" + ' '.join(leakargs) +
+                           "' python %(basedir)s/build/build/pymake/make.py leaktest")]
+
 
 def formatBytes(bytes, sigDigits=3):
     # Force a float calculation
