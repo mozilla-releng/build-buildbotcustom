@@ -411,9 +411,9 @@ class ShellCommandReportTimeout(ShellCommand):
     """We subclass ShellCommand so that we can bubble up the timeout errors
     to tinderbox that normally only get appended to the buildbot slave logs.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, timeout=2 * 3600, maxTime=4 * 3600, **kwargs):
         self.my_shellcommand = ShellCommand
-        ShellCommand.__init__(self, **kwargs)
+        ShellCommand.__init__(self, timeout=timeout, maxTime=maxTime, **kwargs)
 
     def evaluateCommand(self, cmd):
         superResult = self.my_shellcommand.evaluateCommand(self, cmd)
