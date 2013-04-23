@@ -5839,7 +5839,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          property_name="exepath",
                          name="Find executable",
                          ))
-        elif self.OS in ('xp', 'win7', 'w764', 'win8'):
+        elif self.OS in ('xp', 'win7', 'w764', 'win8', 'win7-ix', 'xp-ix'):
             self.addStep(SetBuildProperty(
                          property_name="exepath",
                          value="../%s/%s" % (
