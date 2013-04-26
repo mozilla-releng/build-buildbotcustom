@@ -330,7 +330,7 @@ def main():
     parser = OptionParser()
     parser.set_defaults(
         config=None,
-        loglevel=logging.INFO,
+        loglevel=logging.DEBUG,
         log_url=None,
         statusdb_id=None,
         master_name=None,
@@ -351,7 +351,7 @@ def main():
     if not options.config:
         parser.error("you must specify a configuration file")
 
-    logging.basicConfig(level=options.loglevel)
+    logging.basicConfig(level=options.loglevel, format="%(asctime)s - %(message)s")
 
     config = json.load(open(options.config))
 
