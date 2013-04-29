@@ -748,7 +748,7 @@ class RemoteXPCShellStep(XPCShellMixin, ChunkingMixin, ShellCommandReportTimeout
                         '--xre-path', xrePath,
                         '--manifest', 'xpcshell/tests/xpcshell_android.ini',
                         '--build-info-json', 'xpcshell/mozinfo.json',
-                        '--testing-modules-dir', 'xpcshell/tests/modules',
+                        '--testing-modules-dir', 'modules',
                         '--local-lib-dir', WithProperties('../%(exedir)s'),
                         '--apk', WithProperties('../%(build_filename)s'),
                         '--no-logfiles']
