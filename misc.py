@@ -1980,7 +1980,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
                 # Skip talos only platforms, not active platforms, branches
                 # with disabled unittests
-                if slave_platform in slave_platforms and platform in ACTIVE_UNITTEST_PLATFORMS.keys() and branch_config.get('enable_unittests', True):
+                if slave_platform in slave_platforms and platform in ACTIVE_UNITTEST_PLATFORMS.keys() \
+                        and branch_config.get('enable_unittests', True) and slave_platform in branch_config['platforms'][platform]:
                     testTypes = []
                     # unittestSuites are gathered up for each platform from
                     # config.py
