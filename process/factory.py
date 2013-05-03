@@ -5406,19 +5406,19 @@ class RemoteUnittestFactory(MozillaTestFactory):
                     stepProc = unittest_steps.RemoteMochitestBrowserChromeStep
                 else:
                     stepProc = unittest_steps.RemoteMochitestStep
-                if suite.get('testPaths', None):
-                    for tp in suite.get('testPaths', []):
-                        self.addStep(stepProc(
-                                     variant=variant,
-                                     symbols_path=symbols_path,
-                                     testPath=tp,
-                                     slowTests=WithProperties('%(slowTests)s'),
-                                     workdir='build/tests',
-                                     timeout=2400,
-                                     env=self.env,
-                                     log_eval_func=lambda c, s: regex_log_evaluator(c, s,
-                                                                                    global_errors + tegra_errors),
-                                     ))
+                if suite.get('testPath', None):
+                    tp = suite.get('testPath', [])
+                    self.addStep(stepProc(
+                                 variant=variant,
+                                 symbols_path=symbols_path,
+                                 testPath=tp,
+                                 slowTests=WithProperties('%(slowTests)s'),
+                                 workdir='build/tests',
+                                 timeout=2400,
+                                 env=self.env,
+                                 log_eval_func=lambda c, s: regex_log_evaluator(c, s,
+                                                                                global_errors + tegra_errors),
+                                 ))
 
                 else:
                     totalChunks = suite.get('totalChunks', None)
