@@ -684,7 +684,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
     def makeHgtoolStep(self, name='hg_update', repo_url=None, wc=None,
                        mirrors=None, bundles=None, env=None,
                        clone_by_revision=False, rev=None, workdir='build',
-                       use_properties=True, locks=None):
+                       use_properties=True, locks=None, autoPurge=False):
 
         if not env:
             env = self.env
@@ -728,6 +728,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
 
         if locks is None:
             locks = []
+
+        if autoPurge:
+            cmd.append('--purge')
 
         return RetryingShellCommand(
             name=name,
@@ -2106,12 +2109,6 @@ class TryBuildFactory(MercurialBuildFactory):
         if self.useSharedCheckouts:
             # We normally rely on the Mercurial step to clobber for us, but
             # since we're managing the checkout ourselves...
-            self.addStep(ShellCommand(
-                name='clobber_build',
-                command=['rm', '-rf', 'build'],
-                workdir='.',
-                timeout=60 * 60,
-            ))
             self.addStep(JSONPropertiesDownload(
                 name="download_props",
                 slavedest="buildprops.json",
@@ -2122,6 +2119,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 clone_by_revision=True,
                 wc='build',
                 workdir='.',
+                autoPurge=True,
                 locks=[hg_try_lock.access('counting')],
             )
             self.addStep(step)
