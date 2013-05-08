@@ -3213,7 +3213,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         if objdir != '':
             # L10NBASEDIR is relative to MOZ_OBJDIR
             self.env.update({'MOZ_OBJDIR': objdir,
-                             'L10NBASEDIR': '../../%s' % self.l10nRepoPath})
+                             'L10NBASEDIR': '../../l10n'})
 
         if platform == 'macosx64':
             # use "mac" instead of "mac64" for macosx64
@@ -3246,9 +3246,9 @@ class BaseRepackFactory(MozillaBuildFactory):
             MercurialBuildFactory.addMockSteps(self)
 
         self.addStep(ShellCommand(
-                     name='mkdir_l10nrepopath',
-                     command=['sh', '-c', 'mkdir -p %s' % self.l10nRepoPath],
-                     descriptionDone='mkdir ' + self.l10nRepoPath,
+                     name='mkdir_l10n',
+                     command=['sh', '-c', 'mkdir -p l10n'],
+                     descriptionDone='mkdir l10n',
                      workdir=self.baseWorkDir,
                      flunkOnFailure=False
                      ))
@@ -3406,7 +3406,7 @@ class BaseRepackFactory(MozillaBuildFactory):
             rev=WithProperties("%(l10n_revision)s"),
             repo_url=WithProperties("http://" + self.hgHost + "/" +
                                     self.l10nRepoPath + "/%(locale)s"),
-            workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
+            workdir='%s/l10n' % self.baseWorkDir,
             locks=[hg_l10n_lock.access('counting')],
             use_properties=False,
             mirrors=mirrors,
@@ -3527,7 +3527,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                               '../../../compare-locales/scripts/compare-locales'] +
                      mergeLocaleOptions +
                      ["l10n.ini",
-                      "../../../%s" % self.l10nRepoPath,
+                      "../../../l10n",
                       WithProperties('%(locale)s')],
                      description='comparing locale',
                      env={'PYTHONPATH': ['../../../compare-locales/lib']},
@@ -3751,15 +3751,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      command=['hg', 'up', '-C', '-r', self.l10nTag],
                      description='update workdir',
                      workdir=WithProperties(
-                     'build/' + self.l10nRepoPath + '/%(locale)s'),
+                     'build/l10n/%(locale)s'),
                      haltOnFailure=True
                      ))
         self.addStep(SetProperty(
                      command=['hg', 'ident', '-i'],
                      haltOnFailure=True,
                      property='l10n_revision',
-                     workdir=WithProperties('build/' + self.l10nRepoPath +
-                                            '/%(locale)s')
+                     workdir=WithProperties('build/l10n/%(locale)s')
                      ))
 
     def downloadBuilds(self):
