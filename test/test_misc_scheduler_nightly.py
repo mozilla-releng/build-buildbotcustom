@@ -248,7 +248,7 @@ class TestSpecificNightlyScheduler(unittest.TestCase):
 
     def testSpecificNightlyScheduler(self):
         createTestData(self.dbc)
-        ssFunc = lastGoodFunc('b2', ['builder1', 'builder2'])
+        ssFunc = lastGoodFunc('b1', ['builder1', 'builder2'])
         s = SpecificNightly(ssFunc, name='s', builderNames=['nightly1'])
         s.parent = mock.Mock()
         s.parent.db = self.dbc
@@ -257,7 +257,6 @@ class TestSpecificNightlyScheduler(unittest.TestCase):
 
         def startBuild(ign):
             return self.dbc.runInteractionNow(lambda t: s.start_HEAD_build(t))
-
         d.addCallback(startBuild)
 
         def check(ign):
@@ -271,5 +270,6 @@ class TestSpecificNightlyScheduler(unittest.TestCase):
                     revision = 'r1'
                     """)
             self.assertEquals(len(req), 1)
+        d.addCallback(check)
 
         return d
