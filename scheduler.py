@@ -393,6 +393,7 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
             "upstreamBuilders": self.upstreamBuilders,
             "remainingBuilders": self.upstreamBuilders,
             "lastCheck": now(),
+            "lastReset": now(),
         }
 
     def startService(self):
@@ -418,6 +419,11 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
                b not in state['remainingBuilders']:
                 state['remainingBuilders'].append(b)
         state['upstreamBuilders'] = self.upstreamBuilders
+        # Previous implentations of AggregatingScheduler didn't always set
+        # lastReset. We depend on it now in _run(), so make sure it's set to
+        # something
+        if 'lastReset' not in state:
+            state['lastReset'] = state['lastCheck']
         log.msg('%s: reloaded' % self.log_prefix)
         if old_state != state:
             log.msg('%s: old state: %s' % (self.log_prefix, old_state))
@@ -446,10 +452,15 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
 
         d = self.lock.acquire()
         d.addCallback(lambda _: self.parent.db.runInteraction(self._run))
-        d.addBoth(lambda _: self.lock.release())
+
+        def release(_):
+            self.lock.release()
+            return _
+
+        d.addBoth(release)
         return d
 
-    def findNewBuilds(self, db, t, lastCheck):
+    def findNewBuilds(self, db, t, lastCheck, lastReset):
         q = """SELECT buildername, id, complete_at FROM
                buildrequests WHERE
                buildername IN %s AND
@@ -461,8 +472,20 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
             db.parmlist(len(self.okResults)),
         )
         q = db.quoteq(q)
+
+        # Take any builds that have finished from the later of 60 seconds before our
+        # lastCheck time, or lastReset. Sometimes the SQL updates for finished
+        # builds appear out of order according to complete_at. This can be due
+        # to clock skew on the masters, network lag, etc.
+        # lastCheck is the time of the last build that finished that we're
+        # watching. Offset by 60 seconds in the past to make sure we catch
+        # builds that finished around the same time, but whose updates arrived
+        # to the DB later.
+        # Don't look at builds before we last reset.
+        # c.f. bug 811708
+        cutoff = max(lastCheck - 60, lastReset)
         t.execute(q, tuple(self.upstreamBuilders) + tuple(self.okResults) +
-                  (lastCheck,))
+                  (cutoff,))
         newBuilds = t.fetchall()
         if newBuilds:
             log.msg(
@@ -475,9 +498,10 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         state = self.get_state(t)
         # Check for new builds completed since lastCheck
         lastCheck = state['lastCheck']
+        lastReset = state['lastReset']
         remainingBuilders = state['remainingBuilders']
 
-        newBuilds = self.findNewBuilds(db, t, lastCheck)
+        newBuilds = self.findNewBuilds(db, t, lastCheck, lastReset)
 
         for builder, brid, complete_at in newBuilds:
             state['lastCheck'] = max(state['lastCheck'], complete_at)
