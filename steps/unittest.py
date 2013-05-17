@@ -624,7 +624,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                  xrePath='../hostutils/xre', testManifest=None,
                  utilityPath='../hostutils/bin', certificatePath='certs',
                  consoleLevel='INFO', totalChunks=None, thisChunk=None,
-                 slowTests=False, **kwargs):
+                 **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
@@ -635,7 +635,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                                  testPath=testPath, xrePath=xrePath,
                                  testManifest=testManifest, utilityPath=utilityPath,
                                  certificatePath=certificatePath,
-                                 consoleLevel=consoleLevel, slowTests=slowTests,
+                                 consoleLevel=consoleLevel,
                                  totalChunks=totalChunks, thisChunk=thisChunk)
 
         self.name = 'mochitest-%s' % variant
@@ -652,7 +652,6 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                             '%(basedir)s/../runtestsremote.pid')
                         ]
         self.command.extend(self.getVariantOptions(variant))
-        self.slowTests = slowTests
         if testPath:
             self.command.extend(['--test-path', testPath])
         if testManifest:
@@ -661,17 +660,6 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
             self.command.append(
                 WithProperties("--symbols-path=%s" % symbols_path))
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
-
-    def start(self):
-        properties = self.build.getProperties()
-        if callable(self.slowTests):
-            slowTests = properties.render(self.slowTests(self.build))
-        else:
-            slowTests = properties.render(self.slowTests)
-        if slowTests == str(True):
-            self.command.append(['--run-slower'])
-        self.super_class.start(self)
-
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
     def __init__(self, **kwargs):

@@ -1388,7 +1388,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     branchConfigFile, 'push',
                     '--product', 'xulrunner',
                     '--ssh-user', branchConfig['stage_username_xulrunner'],
-                    '--ssh-key', branchConfig['stage_ssh_xulrunner_key']
+                    '--ssh-key', branchConfig['stage_ssh_xulrunner_key'],
+                    '--overwrite'
                 ],
                 script_timeout=3 * 60 * 60,
             )
