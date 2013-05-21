@@ -5624,7 +5624,7 @@ class TalosFactory(RequestSortingBuildFactory):
                      ))
 
     def addCleanupSteps(self):
-        if self.OS in ('xp', 'win7', 'w764', 'xp-ix', 'win7-ix', 'win8'):
+        if self.OS in ('xp', 'win7', 'w764'):
             # required step due to long filename length in tp4
             self.addStep(ShellCommand(
                          name='mv tp4',
@@ -5760,7 +5760,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          ))
 
     def addUnpackBuildSteps(self):
-        if (self.releaseTester and (self.OS in ('xp', 'win7', 'w764', 'xp-ix', 'win7-ix', 'win8'))):
+        if (self.releaseTester and (self.OS in ('xp', 'win7', 'w764'))):
             # build is packaged in a windows installer
             self.addStep(DownloadFile(
                          url=WithProperties("%s/tools/buildfarm/utils/firefoxInstallConfig.ini" % self.supportUrlBase),
@@ -5802,7 +5802,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          name="Unpack build",
                          haltOnFailure=True,
                          ))
-        if self.OS in ('xp', 'win7', 'w764', 'xp-ix', 'win7-ix', 'win8'):
+        if self.OS in ('xp', 'win7', 'w764'):
             self.addStep(ShellCommand(
                          name='chmod_files',
                          workdir=os.path.join(
@@ -6052,8 +6052,7 @@ class TalosFactory(RequestSortingBuildFactory):
             if self.OS in ('xp', 'win7', 'fedora', 'ubuntu32_hw',
                            'tegra_android', 'tegra_android-armv6',
                            'tegra_android-noion', 'panda_android',
-                           'snowleopard', 'lion', 'mountainlion',
-                           'xp-ix', 'win7-ix', 'win8'):
+                           'snowleopard', 'lion', 'mountainlion'):
                 self.addStep(DownloadFile(
                              url=WithProperties(
                              "%s/%s" % (self.supportUrlBase, self.plugins['32'])),
