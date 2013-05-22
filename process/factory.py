@@ -6524,7 +6524,7 @@ def extractProperties(rv, stdout, stderr):
     return props
 
 
-class ScriptFactory(BuildFactory):
+class ScriptFactory(RequestSortingBuildFactory):
 
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
                  extra_data=None, extra_args=None,
