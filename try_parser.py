@@ -39,8 +39,8 @@ def processMessage(message):
         match = re.search('try: ', str(line))
         if match:
             line = line.strip().split('try: ', 1)
-            line = line[1].split(' ')
-            return line
+            # Allow spaces inside of [filter expressions]
+            return re.findall(r'(?:\[.*?\]|\S)+', line[1])
     return [""]
 
 

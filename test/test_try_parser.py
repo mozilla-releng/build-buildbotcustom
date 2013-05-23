@@ -25,6 +25,7 @@ TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
                        'macosx64': ['Rev3 MacOSX Snow Leopard 10.6.2',
                                     'Rev3 MacOSX Leopard 9.0 try-nondefault'],
                        'win32': ['Rev3 WINNT 5.1',
+                                 'Windows XP 32-bit',
                                  'Rev3 WINNT 6.1'],
                        'linux64': ['Rev3 Fedora 12x64'],
                        'linux': ['Rev3 Fedora 12'],
@@ -67,6 +68,7 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 5.1 try opt test crashtest',
                       'Rev3 WINNT 6.1 try opt test crashtest',
                       'Rev3 WINNT 6.1 try debug test crashtest',
+                      'Windows XP 32-bit try debug test crashtest',
                       'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
                       'Rev3 WINNT 6.1 try debug test mochitest-other',
                       'Rev3 WINNT 6.1 try debug test mochitest-3',
@@ -507,6 +509,14 @@ class TestTryParser(unittest.TestCase):
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [
             b for b in self.baselineBuilders if '5.1' in b or 'crash' in b]
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_bug875252(self):
+        tm = 'try: -b do -p win32 -u crashtest[5.1,Windows XP]'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [b for b in self.baselineBuilders
+                      if 'crashtest' in b
+                      and ('5.1' in b or 'Windows XP' in b)]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_HiddenCharactersAndOldSyntax(self):
