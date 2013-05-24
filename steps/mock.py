@@ -96,7 +96,7 @@ class MockCommand(ShellCommand):
         else:
             environment = ''
 
-        self.command = [self.mock_login, '-v', '-r', self.target,
+        self.command = [self.mock_login, '-r', self.target,
                         '--cwd', WithProperties(mock_workdir)] + \
             self.mock_args + ['--shell'] + \
             [WithProperties('/usr/bin/env %s %s' % (environment,
@@ -168,7 +168,7 @@ class MockReset(ShellCommand):
     def __init__(self, target, **kwargs):
         kwargs['command'] = "sh -c " \
             "'rm -f /builds/mock_mozilla/%s/buildroot.lock; " \
-            "mock_mozilla -v -r %s --orphanskill'" % (target, target)
+            "mock_mozilla -r %s --orphanskill'" % (target, target)
         assert target is not None, "target is required"
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
@@ -182,7 +182,7 @@ class MockInit(ShellCommand):
     name = "mock-init"
 
     def __init__(self, target, **kwargs):
-        kwargs['command'] = "mock_mozilla -v -r %s --init" % target
+        kwargs['command'] = "mock_mozilla -r %s --init" % target
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
         self.target = target
@@ -197,7 +197,7 @@ class MockInstall(ShellCommand):
     def __init__(self, target, packages, **kwargs):
         if packages is None:
             packages = []
-        kwargs['command'] = "mock_mozilla -v -r %s --install %s" % \
+        kwargs['command'] = "mock_mozilla -r %s --install %s" % \
             (target, ' '.join(packages))
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
@@ -276,7 +276,7 @@ def addMockCommand(obj):
             else:
                 environment = ''
 
-            self.command = [self.mock_login, '-v', '-r', self.target,
+            self.command = [self.mock_login, '-r', self.target,
                             '--cwd', WithProperties(mock_workdir)] + \
                 self.mock_args + ['--shell'] + \
                 [WithProperties('/usr/bin/env %s %s' % (environment,
