@@ -528,6 +528,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
             log_eval_func=lambda c, s: regex_log_evaluator(c, s, (
+                                                           (re.compile('remaining output has been truncated'), FAILURE),
                                                            (re.compile('# TBPL WARNING #'), WARNINGS),
                                                            (re.compile('# TBPL FAILURE #'), FAILURE),
                                                            (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
