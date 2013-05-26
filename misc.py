@@ -17,7 +17,7 @@ from buildbot.scheduler import Nightly, Scheduler, Triggerable
 from buildbot.schedulers.filter import ChangeFilter
 from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
-from buildbot.status.builder import WARNINGS, FAILURE, EXCEPTION, RETRY
+from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION, RETRY
 from buildbot.process.buildstep import regex_log_evaluator
 
 import buildbotcustom.common
@@ -527,13 +527,14 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             reboot_command=reboot_command,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
-            log_eval_func=lambda c, s: regex_log_evaluator(c, s, (
-                                                           (re.compile('remaining output has been truncated'), FAILURE),
-                                                           (re.compile('# TBPL WARNING #'), WARNINGS),
-                                                           (re.compile('# TBPL FAILURE #'), FAILURE),
-                                                           (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
-                                                           (re.compile('# TBPL RETRY #'), RETRY),
-                                                           ))
+            log_eval_func=rc_eval_func({
+                0: SUCCESS,
+                1: WARNINGS,
+                2: FAILURE,
+                3: EXCEPTION,
+                4: RETRY,
+                None: RETRY,
+            }),
         )
         builder = {
             'name': '%s %s' % (name_prefix, suites_name),
