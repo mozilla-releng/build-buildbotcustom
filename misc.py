@@ -533,7 +533,6 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 2: FAILURE,
                 3: EXCEPTION,
                 4: RETRY,
-                None: RETRY,
             }),
         )
         builder = {
@@ -2252,27 +2251,30 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                       ACTIVE_UNITTEST_PLATFORMS, factory_class)
 
-
-def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves):
-    pf = config['platforms'].get(platform, {})
-    extra_args = ['-b', config['repo_path'],
-                  '--hgtool', 'scripts/buildfarm/utils/hgtool.py']
-
+def mirrorAndBundleArgs(config):
+    args = []
     mirrors = None
     if config['base_mirror_urls']:
         mirrors = ["%s/%s" % (url, config['repo_path'])
                    for url in config['base_mirror_urls']]
     if mirrors:
         for mirror in mirrors:
-            extra_args.extend(["--mirror", mirror])
+            args.extend(["--mirror", mirror])
     bundles = None
     if config['base_bundle_urls']:
         bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip(
             '/').split('/')[-1]) for url in config['base_bundle_urls']]
     if bundles:
         for bundle in bundles:
-            extra_args.extend(["--bundle", bundle])
+            args.extend(["--bundle", bundle])
+    return args
 
+def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves):
+    pf = config['platforms'].get(platform, {})
+    extra_args = ['-b', config['repo_path'],
+                  '--hgtool', 'scripts/buildfarm/utils/hgtool.py']
+
+    extra_args += mirrorAndBundleArgs(config)
     if pf['product_name'] is not None:
         extra_args.extend(['-p', pf['product_name']])
     if config['hg_username'] is not None:
@@ -2306,21 +2308,7 @@ def generateHSTSBuilder(config, branch_name, platform, base_name, slaves):
     extra_args = ['-b', config['repo_path'],
                   '--hgtool', 'scripts/buildfarm/utils/hgtool.py']
 
-    mirrors = None
-    if config['base_mirror_urls']:
-        mirrors = ["%s/%s" % (url, config['repo_path'])
-                   for url in config['base_mirror_urls']]
-    if mirrors:
-        for mirror in mirrors:
-            extra_args.extend(["--mirror", mirror])
-    bundles = None
-    if config['base_bundle_urls']:
-        bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip(
-            '/').split('/')[-1]) for url in config['base_bundle_urls']]
-    if bundles:
-        for bundle in bundles:
-            extra_args.extend(["--bundle", bundle])
-
+    extra_args += mirrorAndBundleArgs(config)
     if pf['product_name'] is not None:
         extra_args.extend(['-p', pf['product_name']])
     if config['hg_username'] is not None:
@@ -2495,10 +2483,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             factory_kwargs['env'] = env
 
             extra_args = ['-r', WithProperties("%(revision)s")]
-            for url in bconfig['base_mirror_urls']:
-                extra_args += ['-m', "%s/%s" % (url, config['repo_path'])]
-            for url in bconfig['base_bundle_urls']:
-                extra_args += ['-b', "%s/%s.hg" % (url, config['repo_path'])]
+            extra_args += mirrorAndBundleArgs(bconfig)
             extra_args += [variant]
 
             f = ScriptFactory(

@@ -5254,6 +5254,12 @@ class RemoteUnittestFactory(MozillaTestFactory):
         ))
 
     def addInitialSteps(self):
+        self.addStep(ShellCommand(
+                     name="set_shutdown_flag",
+                     description="Setting the shutdown flag",
+                     command=['touch', '../shutdown.stamp'],
+                     workdir='.',
+        ))
         self.addStep(SetProperty(
                      command=['bash', '-c', 'echo $SUT_IP'],
                      property='sut_ip'
@@ -5608,6 +5614,12 @@ class TalosFactory(RequestSortingBuildFactory):
 
     def addInfoSteps(self):
         if self.remoteTests:
+            self.addStep(ShellCommand(
+                         name="set_shutdown_flag",
+                         description="Setting the shutdown flag",
+                         command=['touch', '../shutdown.stamp'],
+                         workdir='.',
+            ))
             self.addStep(SetProperty(
                          command=['bash', '-c', 'echo $SUT_IP'],
                          property='sut_ip'
