@@ -533,7 +533,6 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 2: FAILURE,
                 3: EXCEPTION,
                 4: RETRY,
-                None: RETRY,
             }),
         )
         builder = {
