@@ -6,7 +6,6 @@ import os
 import hashlib
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
-from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
 from buildbot.status.builder import Results
@@ -1950,26 +1949,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             relayhost='mail.build.mozilla.org',
             messageFormatter=createReleaseAVVendorsMessage,
         ))
-
-    if not releaseConfig.get('disable_tinderbox_mail'):
-        status.append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=branchConfig["tinderbox_tree"] + "-Release",
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org", ],
-            relayhost="mail.build.mozilla.org",
-            builders=[b['name'] for b in builders],
-            logCompression="gzip")
-        )
-
-        status.append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=branchConfig["tinderbox_tree"] + "-Release",
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org", ],
-            relayhost="mail.build.mozilla.org",
-            builders=[b['name'] for b in test_builders],
-            logCompression="gzip",
-            errorparser="unittest")
-        )
 
     builders.extend(test_builders)
 
