@@ -15,7 +15,6 @@ from twisted.python import log
 
 from buildbot.scheduler import Nightly, Scheduler, Triggerable
 from buildbot.schedulers.filter import ChangeFilter
-from buildbot.status.tinderbox import TinderboxMailNotifier
 from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import SUCCESS, WARNINGS, FAILURE, EXCEPTION, RETRY
 from buildbot.process.buildstep import regex_log_evaluator
@@ -827,28 +826,6 @@ def generateBranchObjects(config, name, secrets=None):
         l10n_binaryURL += "-l10n"
         nomergeBuilders.extend(l10n_builders)
 
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="bootstrap@mozilla.com",
-            tree=config['l10n_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
-
-        # We only want the builds from the specified builders
-        # since their builds have a build property called "locale"
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="bootstrap@mozilla.com",
-            tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
-
     tipsOnly = False
     maxChanges = 100
     if config.get('enable_try', False):
@@ -1501,7 +1478,6 @@ def generateBranchObjects(config, name, secrets=None):
 
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
-                    objdir = ''
                     mozconfig = os.path.join(os.path.dirname(
                         pf['src_mozconfig']), 'l10n-mozconfig')
                     l10n_kwargs = {}
@@ -1766,9 +1742,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
     branchObjects = {'schedulers': [], 'builders': [], 'status': [],
                      'change_source': []}
-    branch_builders = {}
-    all_test_builders = {}
-    all_builders = []
     # prettyNames is a mapping to pass to the try_parser for validation
     prettyNames = {}
 
@@ -1787,18 +1760,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
         if platform_config.get('is_mobile', False):
             branchName = branch_config['mobile_branch_name']
-            tinderboxTree = branch_config['mobile_tinderbox_tree']
             talosBranch = branch_config.get(
                 'mobile_talos_branch', branch_config['mobile_tinderbox_tree'])
         else:
             branchName = branch_config['branch_name']
-            tinderboxTree = branch_config['tinderbox_tree']
             talosBranch = branch_config['tinderbox_tree']
-
-        if tinderboxTree not in branch_builders:
-            branch_builders[tinderboxTree] = []
-        if tinderboxTree not in all_test_builders:
-            all_test_builders[tinderboxTree] = []
 
         branchProperty = branch
 
@@ -1945,8 +1911,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     talos_builders.setdefault(
                         tests, []).append(builder['name'])
                     branchObjects['builders'].append(builder)
-                    branch_builders[tinderboxTree].append(builder['name'])
-                    all_builders.append(builder['name'])
 
                     if create_pgo_builders:
                         pgo_factory_kwargs = factory_kwargs.copy()
@@ -1975,9 +1939,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         branchObjects['builders'].append(pgo_builder)
                         talos_pgo_builders.setdefault(
                             tests, []).append(pgo_builder['name'])
-                        branch_builders[
-                            tinderboxTree].append(pgo_builder['name'])
-                        all_builders.append(pgo_builder['name'])
 
                 # Skip talos only platforms, not active platforms, branches
                 # with disabled unittests
@@ -2021,10 +1982,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builders.extend(generateTestBuilderNames(
                                                     '%s %s pgo test' % (platform_name, branch), suites_name, suites))
-                        # Collect test builders for the TinderboxMailNotifier
-                        all_test_builders[tinderboxTree].extend(
-                            test_builders + pgo_builders)
-                        all_builders.extend(test_builders + pgo_builders)
 
                         triggeredUnittestBuilders.append(
                             (
@@ -2191,32 +2148,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 )
                 branchObjects['schedulers'].append(s)
 
-    if not branch_config.get('disable_tinderbox_mail'):
-        for tinderboxTree in branch_builders.keys():
-            if len(branch_builders[tinderboxTree]):
-                branchObjects['status'].append(TinderboxMailNotifier(
-                                               fromaddr="talos.buildbot@build.mozilla.org",
-                                               tree=tinderboxTree,
-                                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org", ],
-                                               relayhost="mail.build.mozilla.org",
-                                               builders=branch_builders[
-                                               tinderboxTree],
-                                               useChangeTime=False,
-                                               logCompression="gzip"))
-        ###  Unittests need specific errorparser
-        for tinderboxTree in all_test_builders.keys():
-            if len(all_test_builders[tinderboxTree]):
-                branchObjects['status'].append(TinderboxMailNotifier(
-                                               fromaddr="talos.buildbot@build.mozilla.org",
-                                               tree=tinderboxTree,
-                                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org", ],
-                                               relayhost="mail.build.mozilla.org",
-                                               builders=all_test_builders[
-                                               tinderboxTree],
-                                               useChangeTime=False,
-                                               errorparser="unittest",
-                                               logCompression="gzip"))
-
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
                                                            branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
@@ -2251,6 +2182,7 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                       ACTIVE_UNITTEST_PLATFORMS, factory_class)
 
+
 def mirrorAndBundleArgs(config):
     args = []
     mirrors = None
@@ -2268,6 +2200,7 @@ def mirrorAndBundleArgs(config):
         for bundle in bundles:
             args.extend(["--bundle", bundle])
     return args
+
 
 def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves):
     pf = config['platforms'].get(platform, {})
@@ -2303,6 +2236,7 @@ def generateBlocklistBuilder(config, branch_name, platform, base_name, slaves):
     }
     return blocklistupdate_builder
 
+
 def generateHSTSBuilder(config, branch_name, platform, base_name, slaves):
     pf = config['platforms'].get(platform, {})
     extra_args = ['-b', config['repo_path'],
@@ -2336,6 +2270,7 @@ def generateHSTSBuilder(config, branch_name, platform, base_name, slaves):
         'properties': {'branch': branch_name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-hsts' % (branch_name, platform)), 'product': 'firefox'},
     }
     return hsts_update_builder
+
 
 def generateFuzzingObjects(config, SLAVES):
     builders = []
@@ -2433,24 +2368,11 @@ def generateNanojitObjects(config, SLAVES):
         builderNames=[b['name'] for b in builders],
     )
 
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            relayhost="mail.build.mozilla.org",
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-        )
-        status = [tbox_mailer]
-
     return {
         'builders': builders,
         'change_source': [poller],
         'schedulers': [scheduler],
-        'status': status,
+        'status': [],
     }
 
 
