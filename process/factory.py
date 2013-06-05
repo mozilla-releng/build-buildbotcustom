@@ -2238,21 +2238,22 @@ class TryBuildFactory(MercurialBuildFactory):
                          sendchange_props=sendchange_props,
                          env=self.env,
                          ))
-        for master, warn, retries in self.unittestMasters:
-            self.addStep(SendChangeStep(
-                         name='sendchange_%s' % master,
-                         warnOnFailure=warn,
-                         master=master,
-                         retries=retries,
-                         branch=self.unittestBranch,
-                         revision=WithProperties('%(got_revision)s'),
-                         files=[WithProperties('%(packageUrl)s'),
-                                WithProperties('%(testsUrl)s')],
-                         user=WithProperties('%(who)s'),
-                         comments=WithProperties('%(comments:-)s'),
-                         sendchange_props=sendchange_props,
-                         env=self.env,
-                         ))
+        if self.packageTests:
+            for master, warn, retries in self.unittestMasters:
+                self.addStep(SendChangeStep(
+                             name='sendchange_%s' % master,
+                             warnOnFailure=warn,
+                             master=master,
+                             retries=retries,
+                             branch=self.unittestBranch,
+                             revision=WithProperties('%(got_revision)s'),
+                             files=[WithProperties('%(packageUrl)s'),
+                                    WithProperties('%(testsUrl)s')],
+                             user=WithProperties('%(who)s'),
+                             comments=WithProperties('%(comments:-)s'),
+                             sendchange_props=sendchange_props,
+                             env=self.env,
+                             ))
 
 
 def marFilenameToProperty(prop_name=None):
@@ -2740,20 +2741,21 @@ class NightlyBuildFactory(MercurialBuildFactory):
             if '1.9.1' not in self.branchName:
                 files.append(WithProperties('%(testsUrl)s'))
 
-            for master, warn, retries in self.unittestMasters:
-                self.addStep(SendChangeStep(
-                             name='sendchange_%s' % master,
-                             warnOnFailure=warn,
-                             master=master,
-                             retries=retries,
-                             branch=self.unittestBranch,
-                             revision=WithProperties("%(got_revision)s"),
-                             files=files,
-                             user="sendchange-unittest",
-                             comments=WithProperties('%(comments:-)s'),
-                             sendchange_props=sendchange_props,
-                             env=self.env,
-                             ))
+            if self.packageTests:
+                for master, warn, retries in self.unittestMasters:
+                    self.addStep(SendChangeStep(
+                                 name='sendchange_%s' % master,
+                                 warnOnFailure=warn,
+                                 master=master,
+                                 retries=retries,
+                                 branch=self.unittestBranch,
+                                 revision=WithProperties("%(got_revision)s"),
+                                 files=files,
+                                 user="sendchange-unittest",
+                                 comments=WithProperties('%(comments:-)s'),
+                                 sendchange_props=sendchange_props,
+                                 env=self.env,
+                                 ))
 
 
 class ReleaseBuildFactory(MercurialBuildFactory):

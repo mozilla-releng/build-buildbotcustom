@@ -1051,7 +1051,6 @@ def generateBranchObjects(config, name, secrets=None):
         uploadPackages = pf.get('uploadPackages', True)
         uploadSymbols = False
         disableSymbols = pf.get('disable_symbols', False)
-        packageTests = False
         talosMasters = pf.get('talos_masters', [])
         unittestBranch = "%s-%s-unittest" % (name, pf.get('unittest_platform', platform))
         # Generate the PGO branch even if it isn't on for dep builds
@@ -1059,12 +1058,11 @@ def generateBranchObjects(config, name, secrets=None):
         pgoUnittestBranch = "%s-%s-pgo-unittest" % (name, platform)
         tinderboxBuildsDir = None
 
-        packageTests = pf.get('packageTests', False)
         leakTest = pf.get('enable_leaktests', False)
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
-        packageTests = pf.get('packageTests', packageTests)
+        packageTests = pf.get('packageTests', False)
 
         doBuildAnalysis = pf.get('enable_build_analysis', False)
 
