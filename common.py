@@ -119,6 +119,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'b2g18': 'b18',
         'v1_0_0': '100',
         'v1_0_1': '101',
+        'v1_1_0': '110',
         'standalone': 'sa',
         'thunderbird': 'tb',
         'checksums': 'sums',
