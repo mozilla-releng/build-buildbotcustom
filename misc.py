@@ -470,38 +470,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     properties = {'branch': branchProperty, 'platform': platform,
                   'slavebuilddir': 'test', 'stage_platform': stagePlatform,
                   'product': stageProduct, 'repo_path': config['repo_path']}
-    if pf.get('is_remote', False):
-        hostUtils = pf['host_utils_url']
-        factory = RemoteUnittestFactory(
-            platform=platform,
-            productName=productName,
-            hostUtils=hostUtils,
-            suites=suites,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            branchName=branch_name,
-            remoteExtras=pf.get('remote_extras'),
-            # NB. If you change the defaults here, make sure to update the
-            # logic in generateTalosBranchObjects for test_type == "debug"
-            downloadSymbols=pf.get('download_symbols', False),
-            downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
-        )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': properties,
-        }
-        # XXX Bug 790698 hack for no android reftests on new tegras
-        # Purge with fire when this is no longer needed
-        if 'reftest' in suites_name:
-            builder['nextSlave'] = _nextOldTegra
-        builders.append(builder)
-    elif mozharness:
+    if mozharness:
         # suites is a dict!
         if mozharness_suite_config is None:
             mozharness_suite_config = {}
@@ -543,6 +512,37 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'category': category,
             'properties': properties,
         }
+        builders.append(builder)
+    elif pf.get('is_remote', False):
+        hostUtils = pf['host_utils_url']
+        factory = RemoteUnittestFactory(
+            platform=platform,
+            productName=productName,
+            hostUtils=hostUtils,
+            suites=suites,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            branchName=branch_name,
+            remoteExtras=pf.get('remote_extras'),
+            # NB. If you change the defaults here, make sure to update the
+            # logic in generateTalosBranchObjects for test_type == "debug"
+            downloadSymbols=pf.get('download_symbols', False),
+            downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': properties,
+        }
+        # XXX Bug 790698 hack for no android reftests on new tegras
+        # Purge with fire when this is no longer needed
+        if 'reftest' in suites_name:
+            builder['nextSlave'] = _nextOldTegra
         builders.append(builder)
     else:
         if isinstance(suites, dict) and "totalChunks" in suites:
@@ -1051,7 +1051,6 @@ def generateBranchObjects(config, name, secrets=None):
         uploadPackages = pf.get('uploadPackages', True)
         uploadSymbols = False
         disableSymbols = pf.get('disable_symbols', False)
-        packageTests = False
         talosMasters = pf.get('talos_masters', [])
         unittestBranch = "%s-%s-unittest" % (name, pf.get('unittest_platform', platform))
         # Generate the PGO branch even if it isn't on for dep builds
@@ -1059,12 +1058,11 @@ def generateBranchObjects(config, name, secrets=None):
         pgoUnittestBranch = "%s-%s-pgo-unittest" % (name, platform)
         tinderboxBuildsDir = None
 
-        packageTests = pf.get('packageTests', False)
         leakTest = pf.get('enable_leaktests', False)
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
-        packageTests = pf.get('packageTests', packageTests)
+        packageTests = pf.get('packageTests', False)
 
         doBuildAnalysis = pf.get('enable_build_analysis', False)
 
