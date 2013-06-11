@@ -802,6 +802,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  enableInstaller=False,
                  gaiaRepo=None,
                  gaiaRevision=None,
+                 gaiaRevisionFile=None,
                  gaiaLanguagesFile=None,
                  gaiaLanguagesScript=None,
                  gaiaL10nRoot=None,
@@ -879,7 +880,13 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.tooltool_bootstrap = tooltool_bootstrap
         self.runAliveTests = runAliveTests
         self.gaiaRepo = gaiaRepo
+        self.gaiaRepoUrl = "http://%s/%s" % (self.hgHost, self.gaiaRepo)
+        self.gaiaMirrors = None
+        if self.baseMirrorUrls and self.gaiaRepo:
+            self.gaiaMirrors = ['%s/%s' % (url, self.gaiaRepo)
+                                for url in self.baseMirrorUrls]
         self.gaiaRevision = gaiaRevision
+        self.gaiaRevisionFile = gaiaRevisionFile
         self.geckoL10nRoot = geckoL10nRoot
         self.geckoLanguagesFile = geckoLanguagesFile
         self.gaiaLanguagesFile = gaiaLanguagesFile
@@ -1180,14 +1187,36 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                          ))
 
     def addGaiaSourceSteps(self):
+        if self.gaiaRevisionFile:
+            def parse_gaia_revision(rc, stdout, stderr):
+                properties = {}
+                stream = '\n'.join([stdout, stderr])
+                # ugh, regex searching json output, since json.loads(stdout)
+                # stack dumped on me
+                m = re.search('"repo_path": "([^"]+)"', stream, re.M)
+                if m:
+                    properties['gaiaRepoPath'] = m.group(1)
+                m = re.search('"revision": "(\w+)"', stream, re.M)
+                if m:
+                    properties['gaiaRevision'] = m.group(1)
+                return properties
+            self.addStep(SetProperty(
+                command=['cat', self.gaiaRevisionFile],
+                name="read_gaia_json",
+                extract_fn=parse_gaia_revision,
+            ))
+            self.gaiaRevision = WithProperties("%(gaiaRevision)s")
+            self.gaiaRepoUrl = WithProperties("http://" + self.hgHost + "/%(gaiaRepoPath)s")
+            if self.baseMirrorUrls:
+                self.gaiaMirrors = [WithProperties(url + "/%(gaiaRepoPath)s") for url in self.baseMirrorUrls]
+
         self.addStep(self.makeHgtoolStep(
             name="gaia_sources",
             rev=self.gaiaRevision or 'default',
-            repo_url="http://%s/%s" % (self.hgHost, self.gaiaRepo),
+            repo_url=self.gaiaRepoUrl,
             workdir="build/",
             use_properties=False,
-            mirrors=['%s/%s' % (url, self.gaiaRepo)
-                    for url in self.baseMirrorUrls],
+            mirrors=self.gaiaMirrors,
             bundles=[],
             wc='gaia',
         ))
