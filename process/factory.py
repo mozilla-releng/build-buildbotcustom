@@ -6570,7 +6570,7 @@ def extractProperties(rv, stdout, stderr):
 class ScriptFactory(RequestSortingBuildFactory):
 
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
-                 extra_data=None, extra_args=None,
+                 extra_data=None, extra_args=None, use_credentials_file=False,
                  script_timeout=1200, script_maxtime=None, log_eval_func=None,
                  reboot_command=None, hg_bin='hg', platform=None,
                  use_mock=False, mock_target=None,
@@ -6587,6 +6587,7 @@ class ScriptFactory(RequestSortingBuildFactory):
         self.mock_copyin_files = mock_copyin_files
         self.get_basedir_cmd = ['bash', '-c', 'pwd']
         self.env = env.copy()
+        self.use_credentials_file = use_credentials_file
         if platform and 'win' in platform:
             self.get_basedir_cmd = ['cd']
         if scriptName[0] == '/':
@@ -6664,6 +6665,13 @@ class ScriptFactory(RequestSortingBuildFactory):
             workdir='scripts',
             haltOnFailure=False,
         ))
+        if use_credentials_file:
+            self.addStep(FileDownload(
+                mastersrc=os.path.join(os.getcwd(), 'BuildSlaves.py'),
+                slavedest='oauth.txt',
+                workdir='.',
+                flunkOnFailure=False,
+            ))
         self.addStep(OutputStep(
             name='tinderboxprint_script_revlink',
             data=WithProperties(
@@ -6671,7 +6679,18 @@ class ScriptFactory(RequestSortingBuildFactory):
                         (scriptRepo.split('/')[-1], scriptRepo)),
         ))
         self.runScript()
+        self.addCleanupSteps()
         self.reboot()
+
+    def addCleanupSteps(self):
+        # remove oauth.txt file, we don't wanna to leave keys lying around
+        if self.use_credentials_file:
+            self.addStep(ShellCommand(
+                name='rm_oauth_txt',
+                command=['rm', '-f', 'oauth.txt'],
+                workdir='.',
+                alwaysRun=True
+            ))
 
     def preRunScript(self):
         if self.use_mock:
