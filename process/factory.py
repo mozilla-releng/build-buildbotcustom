@@ -1058,6 +1058,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addValgrindCheckSteps()
         if self.createSnippet:
             self.addUpdateSteps()
+        if self.balrog_api_root:
+            self.addSubmitBalrogUpdates()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.doCleanup:
@@ -2022,43 +2024,41 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         ))
 
     def addSubmitBalrogUpdates(self):
-        if self.balrog_api_root:
-            self.addStep(JSONPropertiesDownload(
-                name='download_balrog_props',
-                slavedest='buildprops_balrog.json',
+        self.addStep(JSONPropertiesDownload(
+            name='download_balrog_props',
+            slavedest='buildprops_balrog.json',
+            workdir='.',
+            flunkOnFailure=False,
+        ))
+        cmd = [
+            self.env.get('PYTHON26', 'python'),
+            WithProperties(
+                '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
+            '--build-properties', 'buildprops_balrog.json',
+            '--api-root', self.balrog_api_root,
+            '--verbose',
+        ]
+        if self.balrog_credentials_file:
+            credentialsFile = os.path.join(os.getcwd(),
+                                            self.balrog_credentials_file)
+            target_file_name = os.path.basename(credentialsFile)
+            cmd.extend(['--credentials-file', target_file_name])
+            self.addStep(FileDownload(
+                mastersrc=credentialsFile,
+                slavedest=target_file_name,
                 workdir='.',
                 flunkOnFailure=False,
             ))
-            cmd = [
-                self.env.get('PYTHON26', 'python'),
-                WithProperties(
-                    '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
-                '--build-properties', 'buildprops_balrog.json',
-                '--api-root', self.balrog_api_root,
-                '--verbose',
-            ]
-            if self.balrog_credentials_file:
-                credentialsFile = os.path.join(os.getcwd(),
-                                               self.balrog_credentials_file)
-                target_file_name = os.path.basename(credentialsFile)
-                cmd.extend(['--credentials-file', target_file_name])
-                self.addStep(FileDownload(
-                    mastersrc=credentialsFile,
-                    slavedest=target_file_name,
-                    workdir='.',
-                    flunkOnFailure=False,
-                ))
-            self.addStep(RetryingShellCommand(
-                name='submit_balrog_updates',
-                command=cmd,
-                workdir='.',
-                flunkOnFailure=False,
-            ))
+        self.addStep(RetryingShellCommand(
+            name='submit_balrog_updates',
+            command=cmd,
+            workdir='.',
+            flunkOnFailure=False,
+        ))
 
     def addUpdateSteps(self):
         self.addCreateSnippetsSteps()
         self.addUploadSnippetsSteps()
-        self.addSubmitBalrogUpdates()
 
     def addBuildSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
