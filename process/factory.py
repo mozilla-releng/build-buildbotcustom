@@ -1058,6 +1058,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addValgrindCheckSteps()
         if self.createSnippet:
             self.addUpdateSteps()
+        if self.balrog_api_root:
+            self.addSubmitBalrogUpdates()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.doCleanup:
@@ -2022,43 +2024,41 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         ))
 
     def addSubmitBalrogUpdates(self):
-        if self.balrog_api_root:
-            self.addStep(JSONPropertiesDownload(
-                name='download_balrog_props',
-                slavedest='buildprops_balrog.json',
+        self.addStep(JSONPropertiesDownload(
+            name='download_balrog_props',
+            slavedest='buildprops_balrog.json',
+            workdir='.',
+            flunkOnFailure=False,
+        ))
+        cmd = [
+            self.env.get('PYTHON26', 'python'),
+            WithProperties(
+                '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
+            '--build-properties', 'buildprops_balrog.json',
+            '--api-root', self.balrog_api_root,
+            '--verbose',
+        ]
+        if self.balrog_credentials_file:
+            credentialsFile = os.path.join(os.getcwd(),
+                                            self.balrog_credentials_file)
+            target_file_name = os.path.basename(credentialsFile)
+            cmd.extend(['--credentials-file', target_file_name])
+            self.addStep(FileDownload(
+                mastersrc=credentialsFile,
+                slavedest=target_file_name,
                 workdir='.',
                 flunkOnFailure=False,
             ))
-            cmd = [
-                self.env.get('PYTHON26', 'python'),
-                WithProperties(
-                    '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
-                '--build-properties', 'buildprops_balrog.json',
-                '--api-root', self.balrog_api_root,
-                '--verbose',
-            ]
-            if self.balrog_credentials_file:
-                credentialsFile = os.path.join(os.getcwd(),
-                                               self.balrog_credentials_file)
-                target_file_name = os.path.basename(credentialsFile)
-                cmd.extend(['--credentials-file', target_file_name])
-                self.addStep(FileDownload(
-                    mastersrc=credentialsFile,
-                    slavedest=target_file_name,
-                    workdir='.',
-                    flunkOnFailure=False,
-                ))
-            self.addStep(RetryingShellCommand(
-                name='submit_balrog_updates',
-                command=cmd,
-                workdir='.',
-                flunkOnFailure=False,
-            ))
+        self.addStep(RetryingShellCommand(
+            name='submit_balrog_updates',
+            command=cmd,
+            workdir='.',
+            flunkOnFailure=False,
+        ))
 
     def addUpdateSteps(self):
         self.addCreateSnippetsSteps()
         self.addUploadSnippetsSteps()
-        self.addSubmitBalrogUpdates()
 
     def addBuildSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
@@ -6570,7 +6570,7 @@ def extractProperties(rv, stdout, stderr):
 class ScriptFactory(RequestSortingBuildFactory):
 
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
-                 extra_data=None, extra_args=None,
+                 extra_data=None, extra_args=None, use_credentials_file=False,
                  script_timeout=1200, script_maxtime=None, log_eval_func=None,
                  reboot_command=None, hg_bin='hg', platform=None,
                  use_mock=False, mock_target=None,
@@ -6587,6 +6587,7 @@ class ScriptFactory(RequestSortingBuildFactory):
         self.mock_copyin_files = mock_copyin_files
         self.get_basedir_cmd = ['bash', '-c', 'pwd']
         self.env = env.copy()
+        self.use_credentials_file = use_credentials_file
         if platform and 'win' in platform:
             self.get_basedir_cmd = ['cd']
         if scriptName[0] == '/':
@@ -6664,6 +6665,13 @@ class ScriptFactory(RequestSortingBuildFactory):
             workdir='scripts',
             haltOnFailure=False,
         ))
+        if use_credentials_file:
+            self.addStep(FileDownload(
+                mastersrc=os.path.join(os.getcwd(), 'BuildSlaves.py'),
+                slavedest='oauth.txt',
+                workdir='.',
+                flunkOnFailure=False,
+            ))
         self.addStep(OutputStep(
             name='tinderboxprint_script_revlink',
             data=WithProperties(
@@ -6671,7 +6679,18 @@ class ScriptFactory(RequestSortingBuildFactory):
                         (scriptRepo.split('/')[-1], scriptRepo)),
         ))
         self.runScript()
+        self.addCleanupSteps()
         self.reboot()
+
+    def addCleanupSteps(self):
+        # remove oauth.txt file, we don't wanna to leave keys lying around
+        if self.use_credentials_file:
+            self.addStep(ShellCommand(
+                name='rm_oauth_txt',
+                command=['rm', '-f', 'oauth.txt'],
+                workdir='.',
+                alwaysRun=True
+            ))
 
     def preRunScript(self):
         if self.use_mock:
