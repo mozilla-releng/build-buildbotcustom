@@ -46,7 +46,7 @@ from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
 import BuildSlaves
 
-DEFAULT_PARALLELIZATION = 6
+DEFAULT_PARALLELIZATION = 10
 
 
 def generateReleaseBranchObjects(releaseConfig, branchConfig,
