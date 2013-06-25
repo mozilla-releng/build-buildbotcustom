@@ -1468,6 +1468,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 env=leakEnv,
                 workdir='build/%s' % self.objdir,
                 command=self.makeCmd + [self.leakTarget],
+                timeout=3600,
+                # 1 hour, because this takes a long time on win32
                 warnOnFailure=True,
                 haltOnFailure=True,
                 mock=self.use_mock,
