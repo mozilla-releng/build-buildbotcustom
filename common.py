@@ -125,6 +125,9 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'checksums': 'sums',
         'update_verify': 'uv',
         'spidermonkey': 'sm',
+        'warnaserr': 'we',
+        'warnaserrdebug': 'wed',
+        'rootanalysis': 'ra',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before
