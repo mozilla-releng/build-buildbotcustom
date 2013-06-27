@@ -1893,7 +1893,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             branches=[sourceRepoInfo['path']],
             messageFormatter=createReleaseChangeMessage,
             changeIsImportant=lambda c:
-            changeContainsProduct(c, releaseConfig['productName'])
+            changeContainsProduct(c, releaseConfig['productName']) and
+            changeBaseTagContainsScriptRepoRevision(c, releaseConfig['baseTag'])
         ))
     for recipient in releaseConfig['ImportantRecipients']:
         if hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
