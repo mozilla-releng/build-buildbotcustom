@@ -217,7 +217,7 @@ def getLatestRev(db, t, branch, revs):
     if 'sqlite' in db._spec.dbapiName:
         rev_clause = " OR ".join(["revision LIKE (? || '%')"] * len(revs))
     else:
-        rev_clause = " OR ".join(["revision LIKE CONCAT(?, '%')"] * len(revs))
+        rev_clause = " OR ".join(["revision LIKE CONCAT(?, '%%')"] * len(revs))
 
     # Get the when_timestamp for these two revisions
     q = db.quoteq("""SELECT revision FROM changes
