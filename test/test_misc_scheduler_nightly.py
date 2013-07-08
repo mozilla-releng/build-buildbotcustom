@@ -8,7 +8,7 @@ from buildbot.db.schema.manager import DBSchemaManager
 from buildbot.changes.changes import Change
 
 from buildbotcustom.misc_scheduler import lastChange, lastGoodRev, \
-    getLatestRev, getLastBuiltRevision, lastGoodFunc, lastRevFunc
+    getLatestRev, getLastBuiltRevisions, lastGoodFunc, lastRevFunc
 from buildbotcustom.scheduler import SpecificNightly
 
 import mock
@@ -124,41 +124,59 @@ class TestLastGoodFuncs(unittest.TestCase):
         c1 = Change(who='me!', branch='b1', revision='1', files=[], comments='really important', when=1, revlink='from poller')
         c2 = Change(who='me!', branch='b2', revision='2', files=[], comments='really important', when=2, revlink='from poller')
         c3 = Change(who='me!', branch='b1', revision='3', files=[], comments='really important', when=3, revlink='from poller')
-        for c in [c1, c2, c3]:
+        c4 = Change(who='me!', branch='b1', revision='34', files=[], comments='really important', when=1, revlink='from poller')
+        for c in [c1, c2, c3, c4]:
             self.dbc.addChangeToDatabase(c)
 
         rev = self.dbc.runInteractionNow(
-            lambda t: getLatestRev(self.dbc, t, 'b1', '1', '3'))
+            lambda t: getLatestRev(self.dbc, t, 'b1', ['1', '3']))
         self.assertEquals(rev, '3')
 
         # Revision 2 isn't on branch b1, so revision 1 should be latest
         rev = self.dbc.runInteractionNow(
-            lambda t: getLatestRev(self.dbc, t, 'b1', '1', '2'))
+            lambda t: getLatestRev(self.dbc, t, 'b1', ['1', '2']))
         self.assertEquals(rev, '1')
 
         # Revision 1 and 1 are the same
         rev = self.dbc.runInteractionNow(
-            lambda t: getLatestRev(self.dbc, t, 'b1', '1', '1'))
+            lambda t: getLatestRev(self.dbc, t, 'b1', ['1', '1']))
         self.assertEquals(rev, '1')
+
+        # Revision 34 happened before 3
+        rev = self.dbc.runInteractionNow(
+            lambda t: getLatestRev(self.dbc, t, 'b1', ['3', '34']))
+        self.assertEquals(rev, '3')
+
+        # Add a new revision beginning with '3'
+        c5 = Change(who='me!', branch='b1', revision='35', files=[], comments='really important', when=4, revlink='from poller')
+        self.dbc.addChangeToDatabase(c5)
+
+        rev = self.dbc.runInteractionNow(
+            lambda t: getLatestRev(self.dbc, t, 'b1', ['3', '35']))
+        self.assertEquals(rev, '35')
+        # revision 35 maches 3%, so it should be latest too even if we don't
+        # ask about it specifically
+        rev = self.dbc.runInteractionNow(
+            lambda t: getLatestRev(self.dbc, t, 'b1', ['3', '34']))
+        self.assertEquals(rev, '35')
 
     def test_getLastBuiltRevision(self):
         createTestData(self.dbc)
 
         # r1 is the latest on branch b1
-        rev = self.dbc.runInteractionNow(lambda t: getLastBuiltRevision(
+        revs = self.dbc.runInteractionNow(lambda t: getLastBuiltRevisions(
             self.dbc, t, 'b1', ['builder1', 'builder2']))
-        self.assertEquals(rev, 'r1')
+        self.assertEquals(revs[0], 'r1')
 
-        # We do LIKE matching on changes.revision so we can get the full
-        # revisions.
-        rev = self.dbc.runInteractionNow(lambda t: getLastBuiltRevision(
+        # r2 is the latest on branch b2
+        revs = self.dbc.runInteractionNow(lambda t: getLastBuiltRevisions(
             self.dbc, t, 'b2', ['builder1', 'builder2']))
-        self.assertEquals(rev, 'r234567890')
+        self.assertEquals(revs[0], 'r2')
 
         # Nothing has happened on branch b3
-        rev = self.dbc.runInteractionNow(lambda t: getLastBuiltRevision(
+        revs = self.dbc.runInteractionNow(lambda t: getLastBuiltRevisions(
             self.dbc, t, 'b3', ['builder1', 'builder2']))
-        self.assertEquals(rev, None)
+        self.assertEquals(revs, [])
 
     def test_lastGoodFunc(self):
         createTestData(self.dbc)

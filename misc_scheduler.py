@@ -207,60 +207,52 @@ def lastGoodRev(db, t, branch, builderNames, starttime, endtime):
     return None
 
 
-def getLatestRev(db, t, branch, r1, r2):
-    """Returns whichever of r1, r2 has the latest when_timestamp"""
-    if r1 == r2:
-        return r1
+def getLatestRev(db, t, branch, revs):
+    """Returns whichever of revs has the latest when_timestamp"""
+    # Strip out duplicates
+    revs = set(r[:12] for r in revs)
+    if len(revs) == 1:
+        return list(revs)[0]
+
+    if 'sqlite' in db._spec.dbapiName:
+        rev_clause = " OR ".join(["revision LIKE (? || '%')"] * len(revs))
+    else:
+        rev_clause = " OR ".join(["revision LIKE CONCAT(?, '%')"] * len(revs))
 
     # Get the when_timestamp for these two revisions
     q = db.quoteq("""SELECT revision FROM changes
                      WHERE
                         branch = ? AND
-                        revision IN (?, ?)
+                        (%s)
                      ORDER BY
                         when_timestamp DESC
-                     LIMIT 1""")
-    t.execute(q, (branch, r1, r2))
-    return t.fetchone()[0]
+                     LIMIT 1""" % rev_clause)
+
+    t.execute(q, (branch,) + tuple(revs))
+    latest = t.fetchone()[0]
+    log.msg("getLatestRev: %s is latest of %s" % (latest, revs))
+    return latest
 
 
-def getLastBuiltRevision(db, t, branch, builderNames):
+def getLastBuiltRevisions(db, t, branch, builderNames, limit=5):
     """Returns the latest revision that was built on builderNames"""
-    # Utility function to handle concatenation differently depending on what
-    # database we're talking to. mysql uses the CONCAT() function whereas
-    # sqlite uses the || operator.
-    def concat(a, b):
-        if 'sqlite' in db._spec.dbapiName:
-            return "%s || %s" % (a, b)
-        else:
-            # Make sure any % are escaped since mysql uses % as the parameter
-            # style.
-            return "CONCAT(%s, %s)" % (a.replace("%", "%%"), b.replace("%", "%%"))
-
     # Find the latest revision we built on any one of builderNames.
-    # We match on changes.revision LIKE sourcestamps.revision + "%" in order to
-    # handle forced builds where only the short revision has been specified.
-    # This revision will show up as the sourcestamp's revision.
-    q = db.quoteq("""SELECT changes.revision FROM
-                buildrequests, buildsets, sourcestamps, changes
+    q = db.quoteq("""SELECT sourcestamps.revision FROM
+                buildrequests, buildsets, sourcestamps
             WHERE
                 buildrequests.buildsetid = buildsets.id AND
                 buildsets.sourcestampid = sourcestamps.id AND
-                changes.revision LIKE %s AND
-                changes.branch = ? AND
+                sourcestamps.branch = ? AND
                 buildrequests.buildername IN %s
             ORDER BY
-                changes.when_timestamp DESC
-            LIMIT 1""" % (
-        concat('sourcestamps.revision', "'%'"),
-        db.parmlist(len(builderNames)))
-    )
+                buildsets.submitted_at DESC
+            LIMIT ?""" % db.parmlist(len(builderNames)))
 
-    t.execute(q, (branch,) + tuple(builderNames))
-    result = t.fetchone()
-    if result:
-        return result[0]
-    return None
+    t.execute(q, (branch,) + tuple(builderNames) + (limit,))
+    retval = []
+    for row in t.fetchall():
+        retval.append(row[0])
+    return retval
 
 
 def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=None):
@@ -314,15 +306,15 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
                 rev = c.revision
             log.msg("lastChange returned %s" % (rev))
 
-        # Find the last revision our scheduler's builders have built.  This can
+        # Find the last revisions our scheduler's builders have built.  This can
         # include forced builds.
-        last_built_rev = getLastBuiltRevision(db, t, branch,
-                                              scheduler.builderNames)
-        log.msg("lastNightlyRevision was %s" % last_built_rev)
+        last_built_revs = getLastBuiltRevisions(db, t, branch,
+                                                scheduler.builderNames)
+        log.msg("lastNightlyRevisions: %s" % last_built_revs)
 
-        if last_built_rev is not None:
+        if last_built_revs:
             # Make sure that rev is newer than the last revision we built.
-            later_rev = getLatestRev(db, t, branch, rev, last_built_rev)
+            later_rev = getLatestRev(db, t, branch, [rev] + last_built_revs)
             if later_rev != rev:
                 log.msg("lastGoodRev: Building %s since it's newer than %s" %
                         (later_rev, rev))
@@ -344,16 +336,16 @@ def lastRevFunc(branch, triggerBuildIfNoChanges=True):
         rev = c.revision
         log.msg("lastChange returned %s" % (rev))
 
-        # Find the last revision our scheduler's builders have built.  This can
+        # Find the last revisions our scheduler's builders have built.  This can
         # include forced builds.
-        last_built_rev = getLastBuiltRevision(db, t, branch,
-                                              scheduler.builderNames)
-        log.msg("lastBuiltRevision was %s" % last_built_rev)
+        last_built_revs = getLastBuiltRevisions(db, t, branch,
+                                                scheduler.builderNames)
+        log.msg("lastBuiltRevisions: %s" % last_built_revs)
 
-        if last_built_rev is not None:
+        if last_built_revs:
             # Make sure that rev is newer than the last revision we built.
-            later_rev = getLatestRev(db, t, branch, rev, last_built_rev)
-            if later_rev == last_built_rev and not triggerBuildIfNoChanges:
+            later_rev = getLatestRev(db, t, branch, [rev] + last_built_revs)
+            if later_rev in last_built_revs and not triggerBuildIfNoChanges:
                 log.msg("lastGoodRev: Skipping %s since we've already built it" % rev)
                 return None
         return SourceStamp(branch=scheduler.branch, revision=rev)
