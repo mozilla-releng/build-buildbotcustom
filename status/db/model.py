@@ -2,13 +2,15 @@ import datetime
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, Unicode, UnicodeText, \
     Boolean, Text, DateTime, ForeignKey, Table, UniqueConstraint, \
-    and_, or_
-from sqlalchemy.orm import sessionmaker, relation, mapper, eagerload
+    and_
+from sqlalchemy.orm import relation
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.orderinglist import ordering_list
 from jsoncol import JSONColumn
 
-from twisted.python import log
+import logging
+log = logging.getLogger(__name__)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -18,7 +20,7 @@ Session = None
 def connect(url, drop_all=False, **kwargs):
     Base.metadata.bind = sqlalchemy.create_engine(url, **kwargs)
     if drop_all:
-        log.msg("DBMSG: Warning, dropping all tables")
+        log.warn("DBMSG: Warning, dropping all tables")
         Base.metadata.drop_all()
     Base.metadata.create_all()
     global Session
@@ -77,6 +79,28 @@ class File(Base):
             f = cls(path=path)
             session.add(f)
         return f
+
+    @classmethod
+    def getall(cls, session, paths):
+        """Retrieve a list File object given their paths.  If the path doesn't exist
+        yet in the database, it is created and added to the session, but not
+        committed."""
+        chunk_size = 100
+        all_files = []
+        log.info("getting lots of files")
+        for x in range(0, len(paths), chunk_size):
+            this_chunk = [unicode(p) for p in paths[x:x + chunk_size]]
+            files = session.query(cls).filter(cls.path.in_(this_chunk)).all()
+            log.debug("looking for %i in this chunk; got %i", len(this_chunk), len(files))
+            all_files.extend(files)
+            missing = set(this_chunk) - set(f.path for f in files)
+            log.debug("missing %i", len(missing))
+            for path in missing:
+                f = cls(path=path)
+                session.add(f)
+                all_files.append(f)
+
+        return all_files
 
 
 class Property(Base):
@@ -302,6 +326,7 @@ class Change(Base):
             when=when,
         )
         possible_changes = possible_changes_q.all()
+        log.debug("got %i possible_changes", len(possible_changes))
 
         # Look at files
         for c in possible_changes:
@@ -313,6 +338,7 @@ class Change(Base):
 
         # We didn't find an existing object in the database, so
         # let's create one
+        log.debug("creating new change row (%i files)", len(change.files))
         if change.when:
             when = datetime.datetime.utcfromtimestamp(change.when)
         else:
@@ -324,7 +350,10 @@ class Change(Base):
                 comments=unicode(change.comments),
                 when=when,
                 )
-        c.files = [File.get(session, path) for path in change.files]
+        if len(change.files) > 20:
+            c.files = File.getall(session, change.files)
+        else:
+            c.files = [File.get(session, path) for path in change.files]
         return c
 
 
@@ -517,6 +546,7 @@ class Build(Base):
     lost = Column(Boolean, nullable=False, default=False)
 
     def updateFromBBBuild(self, session, build):
+        log.debug("getting properties")
         self.properties = Property.fromBBProperties(
             session, build.getProperties())
 
@@ -529,7 +559,9 @@ class Build(Base):
             self.result = build.results
 
         if build.steps:
+            log.debug("getting steps")
             mysteps = dict((s.name, s) for s in self.steps)
+            log.debug("setting steps")
             for i, step in enumerate(build.steps):
                 s = mysteps.get(step.name)
                 if not s:
@@ -556,6 +588,7 @@ class Build(Base):
                         step.finished)
 
             # Get rid of any steps that are left over
+            log.debug("removing steps")
             for s in mysteps.values():
                 session.delete(s)
                 self.steps.remove(s)
@@ -563,15 +596,20 @@ class Build(Base):
     @classmethod
     def fromBBBuild(cls, session, build, builderName, master_id, request_mapping=None):
         """Create a database Build object from a buildbot Build"""
+        log.debug("getting builder")
         builder = Builder.get(session, builderName, master_id)
+        log.debug("getting slave")
         slave = Slave.get(session, build.getSlavename())
+        log.debug("creating build")
         b = cls(buildnumber=build.number, builder=builder,
                 slave=slave, master_id=master_id, reason=unicode(build.reason),
                 result=build.results)
+        log.debug("getting SS")
         b.source = SourceStamp.fromBBSourcestamp(
             session, build.getSourceStamp())
 
         if hasattr(build, 'getRequests'):
+            log.debug("getting requests")
             for req in build.getRequests():
                 r = None
                 if request_mapping:
@@ -585,8 +623,11 @@ class Build(Base):
                 b.requests.append(r)
 
         # Updates times, steps, properties
+        log.debug("adding to session")
         session.add(b)
+        log.debug("updating steps, etc.")
         b.updateFromBBBuild(session, build)
+        log.debug("done")
 
         return b
 
