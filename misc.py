@@ -2381,24 +2381,19 @@ def generateNanojitObjects(config, SLAVES):
 def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
     branch = config['branch']
+    assert branch == os.path.basename(config['repo_path']), "spidermonkey project object has mismatched branch and repo_path"
     bconfig = config['branchconfig']
 
-    PRETTY_NAME = '%(base_name)s %(project)s-%(variant)s build'
-    NAME = PRETTY_NAME
-
-    prettyNames = {}   # Map(variant => Map(platform => prettyName))
-    builderNames = {}  # Map(variant => builder names)
+    PRETTY_NAME = '%s %s-%s build'
+    prettyNames = {}
     for platform, variants in config['variants'].items():
-        if platform not in bconfig['platforms']:
-            continue
-
         interpreter = None
         if 'win' in platform:
             interpreter = 'bash'
 
-        pf = bconfig['platforms'][platform]
+        pf = config['platforms'][platform]
         env = pf['env'].copy()
-        env['HG_REPO'] = config['hgurl'] + bconfig['repo_path']
+        env['HG_REPO'] = config['hgurl'] + config['repo_path']
 
         for variant in variants:
             factory_platform_args = ['use_mock',
@@ -2425,18 +2420,15 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                 **factory_kwargs
             )
 
-            name_info = {'base_name': pf['base_name'] % config,
-                         'project': config['project_name'],
-                         'variant': variant,
-                         'branch': branch}
-            name = NAME % name_info
+            # Fill in interpolated variables in pf['base_name'], which is currently only
+            # "%(branch)s"
+            base_name = pf['base_name'] % config
 
-            prettyName = PRETTY_NAME % name_info
-            if 'try_by_default' in config:
-                if variant not in config['try_by_default']:
-                    prettyName += ' try-nondefault'
-            prettyNames.setdefault(variant, {})[platform] = prettyName
-            builderNames.setdefault(variant, []).append(name)
+            prettyName = PRETTY_NAME % (base_name, project, variant)
+            name = prettyName
+            if not config.get('try_by_default', True):
+                prettyName += ' try-nondefault'
+            prettyNames[platform] = prettyName
 
             builder = {'name': name,
                        'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
@@ -2461,7 +2453,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                 return True
         return False
 
-    # Set up schedulers
+    # Set up scheduler
     extra_args = {}
     scheduler_class = None
     if config.get('enable_try'):
@@ -2469,26 +2461,24 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
         extra_args['numberOfBuildsToTrigger'] = 1
+        extra_args['prettyNames'] = prettyNames
         extra_args['buildbotBranch'] = branch
     else:
         scheduler_class = Scheduler
 
-    schedulers = []
-    for variant in prettyNames:
-        if config.get('enable_try'):
-            extra_args['prettyNames'] = prettyNames[variant]
-        schedulers.append(scheduler_class(
-            name=project + "-" + variant,
-            treeStableTimer=None,
-            builderNames=builderNames[variant],
-            fileIsImportant=isImportant,
-            change_filter=ChangeFilter(branch=branch, filter_fn=isImportant),
-            **extra_args
-        ))
+    scheduler = scheduler_class(
+        name=project,
+        treeStableTimer=None,
+        builderNames=[b['name'] for b in builders],
+        fileIsImportant=isImportant,
+        change_filter=ChangeFilter(
+            branch=config['repo_path'], filter_fn=isImportant),
+        **extra_args
+    )
 
     return {
         'builders': builders,
-        'schedulers': schedulers,
+        'schedulers': [scheduler],
     }
 
 
