@@ -2686,7 +2686,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         if self.nightly:
             uploadArgs['to_dated'] = True
-            if 'rpm' in self.complete_platform:
+            if 'st-an' in self.complete_platform or 'dbg' in self.complete_platform or 'asan' in self.complete_platform:
                 uploadArgs['to_latest'] = False
             else:
                 uploadArgs['to_latest'] = True
