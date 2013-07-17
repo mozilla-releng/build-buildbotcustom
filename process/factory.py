@@ -6105,8 +6105,9 @@ class TalosFactory(RequestSortingBuildFactory):
             if self.OS in ('xp', 'win7', 'fedora', 'ubuntu32_hw',
                            'tegra_android', 'tegra_android-armv6',
                            'tegra_android-noion', 'panda_android',
-                           'snowleopard', 'lion', 'mountainlion',
-                           'xp-ix', 'win7-ix', 'win8'):
+                           'panda_android-nomozpool', 'snowleopard',
+                           'lion', 'mountainlion', 'xp-ix',
+                           'win7-ix', 'win8'):
                 self.addStep(DownloadFile(
                              url=WithProperties(
                              "%s/%s" % (self.supportUrlBase, self.plugins['32'])),
