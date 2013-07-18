@@ -2453,12 +2453,16 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                 nomergeBuilders.append(name)
 
     def isImportant(change):
+        if not isHgPollerTriggered(change, bconfig['hgurl']):
+            return False
+
         if not shouldBuild(change):
             return False
 
         for f in change.files:
             if f.startswith("js/src"):
                 return True
+
         return False
 
     # Set up schedulers
@@ -2482,7 +2486,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             treeStableTimer=None,
             builderNames=builderNames[variant],
             fileIsImportant=isImportant,
-            change_filter=ChangeFilter(branch=branch, filter_fn=isImportant),
+            change_filter=ChangeFilter(branch=bconfig['repo_path'], filter_fn=isImportant),
             **extra_args
         ))
 
