@@ -637,12 +637,13 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         script_maxtime=script_maxtime,
         reboot_command=reboot_command,
         platform=platform,
-        log_eval_func=lambda c, s: regex_log_evaluator(c, s, (
-                                                       (re.compile('# TBPL WARNING #'), WARNINGS),
-                        (re.compile('# TBPL FAILURE #'), FAILURE),
-            (re.compile('# TBPL EXCEPTION #'), EXCEPTION),
-            (re.compile('# TBPL RETRY #'), RETRY),
-        ))
+        log_eval_func=rc_eval_func({
+            0: SUCCESS,
+            1: WARNINGS,
+            2: FAILURE,
+            3: EXCEPTION,
+            4: RETRY,
+        }),
     )
 
 
