@@ -1061,8 +1061,6 @@ def generateBranchObjects(config, name, secrets=None):
         pgoUnittestBranch = "%s-%s-pgo-unittest" % (name, platform)
         tinderboxBuildsDir = None
 
-        leakTest = pf.get('enable_leaktests', False)
-
         # Allow for test packages on platforms that can't be tested
         # on the same master.
         packageTests = pf.get('packageTests', False)
@@ -1113,8 +1111,6 @@ def generateBranchObjects(config, name, secrets=None):
 
         if config.get('mozilla_dir'):
             extra_args['mozillaDir'] = config['mozilla_dir']
-        if config.get('leak_target'):
-            extra_args['leakTarget'] = config['leak_target']
 
         multiargs = {}
         if pf.get('product_name') == 'b2g':
@@ -1169,7 +1165,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'graphBranch': config.get('graph_branch', config.get('tinderbox_tree', None)),
                 'doBuildAnalysis': doBuildAnalysis,
                 'baseName': pf['base_name'],
-                'leakTest': leakTest,
                 'checkTest': checkTest,
                 'valgrindCheck': valgrindCheck,
                 'uploadPackages': uploadPackages,
@@ -1197,7 +1192,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozillaDir': config.get('mozilla_dir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
-                'runAliveTests': pf.get('run_alive_tests', True),
                 'gaiaRepo': pf.get('gaia_repo'),
                 'gaiaRevision': config.get('gaia_revision'),
                 'gaiaRevisionFile': pf.get('gaia_revision_file'),
@@ -1208,7 +1202,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'mozharnessTag': config.get('mozharness_tag'),
                 'geckoL10nRoot': config.get('gecko_l10n_root'),
                 'geckoLanguagesFile': pf.get('gecko_languages_file'),
-                'runMakeAliveTests': config.get('run_make_alive_tests'),
                 'enable_pymake': enable_pymake,
             }
             factory_kwargs.update(extra_args)
@@ -1457,7 +1450,6 @@ def generateBranchObjects(config, name, secrets=None):
                 geckoL10nRoot=config.get('gecko_l10n_root'),
                 geckoLanguagesFile=pf.get('gecko_languages_file'),
                 enable_pymake=enable_pymake,
-                runMakeAliveTests=config.get('run_make_alive_tests'),
                 **nightly_kwargs
             )
 
