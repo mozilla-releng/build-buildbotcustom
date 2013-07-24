@@ -3732,26 +3732,27 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             env=self.env,
             property='buildid',
         ))
+        # We need the appVersion to create snippets
+        self.addStep(SetProperty(
+            command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'Version'],
+            property='appVersion',
+            name='get_app_version',
+            workdir='.',
+            env=self.env,
+        ))
+        self.addStep(SetProperty(
+            command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'Name'],
+            property='appName',
+            name='get_app_name',
+            workdir='.',
+            env=self.env,
+        ))
+
         if self.l10nNightlyUpdate:
-            # We need the appVersion to create snippets
-            self.addStep(SetProperty(
-                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
-                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
-                         'App', 'Version'],
-                property='appVersion',
-                name='get_app_version',
-                workdir='.',
-                env=self.env,
-            ))
-            self.addStep(SetProperty(
-                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
-                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
-                         'App', 'Name'],
-                property='appName',
-                name='get_app_name',
-                workdir='.',
-                env=self.env,
-            ))
             self.addFilePropertiesSteps(filename='*.complete.mar',
                                         directory='%s/dist/update' % self.absMozillaObjDir,
                                         fileType='completeMar',
