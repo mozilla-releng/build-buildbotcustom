@@ -238,11 +238,11 @@ def evaluateMochitest(name, log, superResult):
     if superResult != SUCCESS:
         return superResult
 
-    failIdent = r"^\d+ INFO Failed: 0"
+    failIdent = r"^\d+ INFO Failed:\s+0"
     # Support browser-chrome result summary format which differs from
     # MozillaMochitest's.
     if 'browser-chrome' in name:
-        failIdent = r"^\tFailed: 0"
+        failIdent = r"^\tFailed:\s+0"
     # Assume that having the 'failIdent' line
     # means the tests run completed (successfully).
     # Also check for "^TEST-UNEXPECTED-" for harness errors.
@@ -264,11 +264,11 @@ def evaluateRemoteMochitest(name, log, superResult):
     if superResult != SUCCESS:
         return superResult
 
-    failIdent = r"^\d+ INFO Failed: 0"
+    failIdent = r"^\d+ INFO Failed:\s+0"
     # Support browser-chrome result summary format which differs from
     # MozillaMochitest's.
     if 'browser-chrome' in name:
-        failIdent = r"^\tFailed: 0"
+        failIdent = r"^\tFailed:\s+0"
     # Assume that having the 'failIdent' line
     # means the tests run completed (successfully).
     # Also check for "^TEST-UNEXPECTED-" for harness errors.
@@ -345,10 +345,10 @@ class XPCShellMixin(object):
         if superResult != SUCCESS:
             return superResult
 
-        # Assume that having the "Failed: 0" line
+        # Assume that having the "Failed:\s+0" line
         # means the tests run completed (successfully).
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
-        if not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE) or \
+        if not re.search(r"^INFO \| Failed:\s+0", cmd.logs["stdio"].getText(), re.MULTILINE) or \
                 re.search("^TEST-UNEXPECTED-", cmd.logs["stdio"].getText(), re.MULTILINE):
             return worst_status(superResult, WARNINGS)
 
@@ -471,10 +471,10 @@ class MozillaCheck(ShellCommandReportTimeout):
             return worst_status(superResult, WARNINGS)
 
         # Xpcshell tests (only):
-        # Assume that having the "Failed: 0" line
+        # Assume that having the "Failed:\s+0" line
         # means the tests run completed (successfully).
         if 'xpcshell' in self.name and \
-           not re.search(r"^INFO \| Failed: 0", cmd.logs["stdio"].getText(), re.MULTILINE):
+           not re.search(r"^INFO \| Failed:\s+0", cmd.logs["stdio"].getText(), re.MULTILINE):
             return worst_status(superResult, WARNINGS)
 
         # Also check for "^TEST-UNEXPECTED-" for harness errors.
