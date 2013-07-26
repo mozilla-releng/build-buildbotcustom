@@ -292,6 +292,3 @@ def addMockCommand(obj):
 MockMozillaCheck = addMockCommand(unittest_steps.MozillaCheck)
 RetryingMockCommand = addRetryEvaluateCommand(MockCommand)
 RetryingMockProperty = addRetryEvaluateCommand(MockProperty)
-MockAliveTest = addMockCommand(buildbotcustom.steps.test.AliveTest)
-MockAliveMakeTest = addMockCommand(buildbotcustom.steps.test.AliveMakeTest)
-MockCompareLeakLogs = addMockCommand(buildbotcustom.steps.test.CompareLeakLogs)

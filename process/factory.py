@@ -66,9 +66,9 @@ from buildbotcustom.steps.signing import SigningServerAuthenication
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
     genBuildID, normalizeName
-from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, MockInstall, \
-    MockMozillaCheck, MockProperty, RetryingMockProperty, RetryingMockCommand, \
-    MockAliveTest, MockAliveMakeTest, MockCompareLeakLogs
+from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, \
+    MockInstall, MockMozillaCheck, MockProperty, RetryingMockProperty, \
+    RetryingMockCommand
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -770,7 +770,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  stageProduct=None, post_upload_include_platform=False,
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
-                 ausHost=None, nightly=False, leakTest=False, leakTarget=None,
+                 ausHost=None, nightly=False,
                  checkTest=False, valgrindCheck=False,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
@@ -798,7 +798,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  tooltool_url_list=None,
                  tooltool_script='/tools/tooltool.py',
                  enablePackaging=True,
-                 runAliveTests=True,
                  enableInstaller=False,
                  gaiaRepo=None,
                  gaiaRevision=None,
@@ -808,7 +807,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  gaiaL10nRoot=None,
                  geckoL10nRoot=None,
                  geckoLanguagesFile=None,
-                 runMakeAliveTests=False,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -846,8 +844,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.ausSshKey = ausSshKey
         self.ausHost = ausHost
         self.nightly = nightly
-        self.leakTest = leakTest
-        self.leakTarget = leakTarget
         self.checkTest = checkTest
         self.valgrindCheck = valgrindCheck
         self.graphServer = graphServer
@@ -878,7 +874,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.tooltool_url_list = tooltool_url_list or []
         self.tooltool_script = tooltool_script
         self.tooltool_bootstrap = tooltool_bootstrap
-        self.runAliveTests = runAliveTests
         self.gaiaRepo = gaiaRepo
         self.gaiaRepoUrl = "http://%s/%s" % (self.hgHost, self.gaiaRepo)
         self.gaiaMirrors = None
@@ -898,7 +893,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.multiLocaleScript = multiLocaleScript
         self.multiLocaleConfig = multiLocaleConfig
         self.multiLocaleMerge = multiLocaleMerge
-        self.runMakeAliveTests = runMakeAliveTests
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1038,7 +1032,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.env['LOCALES_FILE'] = self.gaiaLanguagesFile
 
         self.addBuildSteps()
-        if self.uploadSymbols or (not self.disableSymbols and (self.packageTests or self.leakTest)):
+        if self.uploadSymbols or (not self.disableSymbols and self.packageTests):
             self.addBuildSymbolsStep()
         if self.uploadSymbols:
             self.addUploadSymbolsStep()
@@ -1048,8 +1042,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addUploadSteps()
         if self.testPrettyNames:
             self.addTestPrettyNamesSteps()
-        if self.leakTest:
-            self.addLeakTestSteps()
         if self.l10nCheckTest:
             self.addL10nCheckTestSteps()
         if self.checkTest:
@@ -1454,225 +1446,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                                      flunkOnFailure=False,
                                      haltOnFailure=False,
                                      propertiesFile="properties.json"))
-
-    def addLeakTestStepsCommon(self, baseUrl, leakEnv, graphAndUpload):
-        """ Helper function for the two implementations of addLeakTestSteps.
-        * baseUrl Base of the URL where we get the old logs.
-        * leakEnv Environment used for running firefox.
-        * graphAndUpload Used to prevent the try jobs from doing talos graph
-          posts and uploading logs."""
-
-        if self.leakTarget:
-            self.addStep(MockCommand(
-                name='make_%s' % self.leakTarget,
-                env=leakEnv,
-                workdir='build/%s' % self.objdir,
-                command=self.makeCmd + [self.leakTarget],
-                timeout=3600,
-                # 1 hour, because this takes a long time on win32
-                warnOnFailure=True,
-                haltOnFailure=True,
-                mock=self.use_mock,
-                target=self.mock_target,
-            ))
-
-        if self.runAliveTests:
-            if self.runMakeAliveTests:
-                self.addStep(MockAliveMakeTest(
-                             env=leakEnv,
-                             workdir='build/%s' % self.mozillaObjdir,
-                             extraArgs=['-register'],
-                             warnOnFailure=True,
-                             haltOnFailure=True,
-                             mock=self.use_mock,
-                             target=self.mock_target,
-                             ))
-                self.addStep(MockAliveMakeTest(
-                             env=leakEnv,
-                             workdir='build/%s' % self.mozillaObjdir,
-                             warnOnFailure=True,
-                             haltOnFailure=True,
-                             mock=self.use_mock,
-                             target=self.mock_target,
-                             ))
-                self.addStep(MockAliveMakeTest(
-                             env=leakEnv,
-                             workdir='build/%s' % self.mozillaObjdir,
-                             extraArgs=['--trace-malloc', 'malloc.log',
-                             '--shutdown-leaks=sdleak.log'],
-                             timeout=3600,
-                             # 1 hour, because this takes a long time on win32
-                             warnOnFailure=True,
-                             haltOnFailure=True,
-                             mock=self.use_mock,
-                             target=self.mock_target,
-                             ))
-            else:
-                self.addStep(MockAliveTest(
-                             env=leakEnv,
-                             workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                             extraArgs=['-register'],
-                             warnOnFailure=True,
-                             haltOnFailure=True,
-                             mock=self.use_mock,
-                             target=self.mock_target,
-                             ))
-                self.addStep(MockAliveTest(
-                             env=leakEnv,
-                             workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                             warnOnFailure=True,
-                             haltOnFailure=True,
-                             mock=self.use_mock,
-                             target=self.mock_target,
-                             ))
-                self.addStep(MockAliveTest(
-                             env=leakEnv,
-                             workdir='build/%s/_leaktest' % self.mozillaObjdir,
-                             extraArgs=['--trace-malloc', 'malloc.log',
-                             '--shutdown-leaks=sdleak.log'],
-                             timeout=3600,
-                             # 1 hour, because this takes a long time on win32
-                             warnOnFailure=True,
-                             haltOnFailure=True,
-                             mock=self.use_mock,
-                             target=self.mock_target,
-                             ))
-
-        # Download and unpack the old versions of malloc.log and sdleak.tree
-        cmd = ['bash', '-c',
-               WithProperties('%(toolsdir)s/buildfarm/utils/wget_unpack.sh ' +
-                              baseUrl + ' logs.tar.gz ' +
-                              'malloc.log:malloc.log.old sdleak.tree:sdleak.tree.old')]
-        self.addStep(ShellCommand(
-            name='get_logs',
-            env=self.env,
-            workdir='.',
-            command=cmd,
-        ))
-
-        logdir = "%s/_leaktest" % self.mozillaObjdir
-        if 'thunderbird' in self.stageProduct:
-            logdir = self.objdir
-
-        self.addStep(ShellCommand(
-                     name='mv_malloc_log',
-                     env=self.env,
-                     command=['mv',
-                              '%s/malloc.log' % logdir,
-                              '../malloc.log'],
-                     ))
-        self.addStep(ShellCommand(
-                     name='mv_sdleak_log',
-                     env=self.env,
-                     command=['mv',
-                              '%s/sdleak.log' % logdir,
-                              '../sdleak.log'],
-                     ))
-        self.addStep(MockCompareLeakLogs(
-                     name='compare_current_leak_log',
-                     mallocLog='../malloc.log',
-                     platform=self.platform,
-                     env=self.env,
-                     objdir=self.mozillaObjdir,
-                     testname='current',
-                     tbPrint=self.tbPrint,
-                     warnOnFailure=True,
-                     haltOnFailure=True,
-                     workdir='build',
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
-        if self.graphServer and graphAndUpload:
-            gs_env = self.env.copy()
-            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
-            self.addBuildInfoSteps()
-            self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
-            self.addStep(GraphServerPost(server=self.graphServer,
-                                         selector=self.graphSelector,
-                                         branch=self.graphBranch,
-                                         resultsname=self.baseName,
-                                         env=gs_env,
-                                         propertiesFile="properties.json"))
-        self.addStep(MockCompareLeakLogs(
-                     name='compare_previous_leak_log',
-                     mallocLog='../malloc.log.old',
-                     platform=self.platform,
-                     env=self.env,
-                     objdir=self.mozillaObjdir,
-                     testname='previous',
-                     workdir='build',
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
-        self.addStep(ShellCommand(
-                     name='create_sdleak_tree',
-                     env=self.env,
-                     workdir='.',
-                     command=['bash', '-c',
-                              'perl build%s/tools/trace-malloc/diffbloatdump.pl '
-                              '--depth=15 --use-address /dev/null sdleak.log '
-                              '> sdleak.tree' % self.mozillaDir],
-                     warnOnFailure=True,
-                     haltOnFailure=True
-                     ))
-        if self.platform in ('macosx', 'macosx64', 'linux', 'linux64'):
-            self.addStep(ShellCommand(
-                         name='create_sdleak_raw',
-                         env=self.env,
-                         workdir='.',
-                         command=['mv', 'sdleak.tree', 'sdleak.tree.raw']
-                         ))
-            # Bug 571443 - disable fix-macosx-stack.pl
-            if self.platform == 'macosx64':
-                self.addStep(ShellCommand(
-                             workdir='.',
-                             command=['cp', 'sdleak.tree.raw', 'sdleak.tree'],
-                             ))
-            else:
-                self.addStep(ShellCommand(
-                             name='get_fix_stack',
-                             env=self.env,
-                             workdir='.',
-                             command=['/bin/bash', '-c',
-                                      'perl '
-                                      'build%s/tools/rb/fix_stack_using_bpsyms.py '
-                                      'sdleak.tree.raw '
-                                      '> sdleak.tree' % self.mozillaDir,
-                                      ],
-                             warnOnFailure=True,
-                             haltOnFailure=True
-                             ))
-        if graphAndUpload:
-            cmd = ['bash', '-c',
-                   WithProperties('%(toolsdir)s/buildfarm/utils/pack_scp.sh ' +
-                                  'logs.tar.gz ' + ' .. ' +
-                                  '%s ' % self.stageUsername +
-                                  '%s ' % self.stageSshKey +
-                                  # Notice the '/' after the ':'. This prevents windows from trying to modify
-                                  # the path
-                                  '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
-                                                  self.logUploadDir) +
-                                  'malloc.log sdleak.tree')]
-            self.addStep(ShellCommand(
-                name='upload_logs',
-                env=self.env,
-                command=cmd,
-            ))
-        self.addStep(ShellCommand(
-                     name='compare_sdleak_tree',
-                     env=self.env,
-                     workdir='.',
-                     command=[
-                     'perl', 'build%s/tools/trace-malloc/diffbloatdump.pl' % self.mozillaDir,
-                     '--depth=15', 'sdleak.tree.old', 'sdleak.tree']
-                     ))
-
-    def addLeakTestSteps(self):
-        leakEnv = self.env.copy()
-        leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-        leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties(
-            '%(basedir:-)s/minidumps')
-        self.addLeakTestStepsCommon(self.logBaseUrl, leakEnv, True)
 
     def addCheckTestSteps(self):
         env = self.env.copy()
@@ -2130,10 +1903,6 @@ class TryBuildFactory(MercurialBuildFactory):
 
         self.tinderboxBuildsDir = tinderboxBuildsDir
 
-        self.leakTestReferenceRepo = 'mozilla-central'
-        if 'thunderbird' in kwargs['stageProduct']:
-            self.leakTestReferenceRepo = 'comm-central'
-
         MercurialBuildFactory.__init__(self, **kwargs)
 
     def addSourceSteps(self):
@@ -2193,16 +1962,6 @@ class TryBuildFactory(MercurialBuildFactory):
                                                      1].comments if len(
                                                          build.source.changes) > 0 else "",
         ))
-
-    def addLeakTestSteps(self):
-        leakEnv = self.env.copy()
-        leakEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
-        leakEnv['MINIDUMP_SAVE_PATH'] = WithProperties(
-            '%(basedir:-)s/minidumps')
-        baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/%s-%s' % \
-            (self.stageServer, self.productName,
-             self.leakTestReferenceRepo, self.complete_platform)
-        self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         self.addStep(SetBuildProperty(
@@ -3973,26 +3732,27 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             env=self.env,
             property='buildid',
         ))
+        # We need the appVersion to create snippets
+        self.addStep(SetProperty(
+            command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'Version'],
+            property='appVersion',
+            name='get_app_version',
+            workdir='.',
+            env=self.env,
+        ))
+        self.addStep(SetProperty(
+            command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'Name'],
+            property='appName',
+            name='get_app_name',
+            workdir='.',
+            env=self.env,
+        ))
+
         if self.l10nNightlyUpdate:
-            # We need the appVersion to create snippets
-            self.addStep(SetProperty(
-                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
-                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
-                         'App', 'Version'],
-                property='appVersion',
-                name='get_app_version',
-                workdir='.',
-                env=self.env,
-            ))
-            self.addStep(SetProperty(
-                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
-                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
-                         'App', 'Name'],
-                property='appName',
-                name='get_app_name',
-                workdir='.',
-                env=self.env,
-            ))
             self.addFilePropertiesSteps(filename='*.complete.mar',
                                         directory='%s/dist/update' % self.absMozillaObjDir,
                                         fileType='completeMar',
