@@ -777,6 +777,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 ])
                 if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                     extra_args.append('--generate-partials')
+                if releaseConfig.get('l10nUsePymake') and platform in ('win32', 'win64'):
+                    extra_args.append('--use-pymake')
                 standalone_factory = SigningScriptFactory(
                     signingServers=getSigningServers(platform),
                     env=env,
@@ -841,6 +843,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         '--compare-locales-repo-path',
                         branchConfig['compare_locales_repo_path']
                     ])
+                    if releaseConfig.get('l10nUsePymake') and platform in ('win32', 'win64'):
+                        extra_args.append('--use-pymake')
                     if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                         extra_args.append('--generate-partials')
                     if pf.get('tooltool_manifest_src'):
