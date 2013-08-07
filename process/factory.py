@@ -2769,6 +2769,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
         uploadArgs = dict(
+            upload_dir="%s-%s" % (self.branchName, self.platform),
             product=self.productName,
             version=self.version,
             buildNumber=str(self.buildNumber),
