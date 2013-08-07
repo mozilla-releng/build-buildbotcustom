@@ -1500,7 +1500,8 @@ def generateBranchObjects(config, name, secrets=None):
                         mozconfig=mozconfig,
                         l10nNightlyUpdate=config['l10nNightlyUpdate'],
                         l10nDatedDirs=config['l10nDatedDirs'],
-                        createPartial=config['create_partial_l10n'],
+                        createPartial=pf.get(
+                            'create_partial_l10n', config['create_partial_l10n']),
                         ausBaseUploadDir=config['aus2_base_upload_dir_l10n'],
                         updatePlatform=pf['update_platform'],
                         downloadBaseURL=config['download_base_url'],
