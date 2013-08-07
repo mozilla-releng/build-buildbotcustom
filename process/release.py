@@ -843,6 +843,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     ])
                     if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                         extra_args.append('--generate-partials')
+                    if pf.get('tooltool_manifest_src'):
+                        extra_args.extend(['--tooltool-manifest', pf.get('tooltool_manifest_src')])
                     repack_factory = SigningScriptFactory(
                         signingServers=getSigningServers(platform),
                         env=env,
