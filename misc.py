@@ -1849,15 +1849,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         'slavebuilddir': slavebuilddir,
                     }
 
-                    def makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
+                    def _makeGenerateMozharnessTalosBuilderArgs(suite, talos_branch, platform,
                                                                factory_kwargs, branch_config, platform_config):
-
                         mh_conf = platform_config['mozharness_config']
 
                         extra_args = ['--suite', suite,
                                       '--add-option',
                                       ','.join(['--webServer', 'localhost']),
-                                      '--branch-name', opt_talos_branch,
+                                      '--branch-name', talos_branch,
                                       '--system-bits', mh_conf['system_bits'],
                                       '--cfg', mh_conf['config_file']]
 
@@ -1883,10 +1882,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 'mozharness_config'].get('reboot_command'),
                         }
                         return args
+                        # end of _makeGenerateMozharnessTalosBuilderArgs
 
                     if branch_config.get('mozharness_talos') and not platform_config.get('is_mobile'):
-                        args = makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
-                                                                      factory_kwargs, branch_config, platform_config)
+                        args = _makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
+                                                                       factory_kwargs, branch_config, platform_config)
                         factory = generateMozharnessTalosBuilder(**args)
                         properties['script_repo_revision'] = branch_config['mozharness_tag']
                     else:
@@ -1911,9 +1911,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     branchObjects['builders'].append(builder)
 
                     if create_pgo_builders:
-                        pgo_factory_kwargs = factory_kwargs.copy()
-                        pgo_factory_kwargs['branchName'] = branchName
-                        pgo_factory_kwargs['talosBranch'] = talosBranch
                         properties = {
                             'branch': branchProperty,
                             'platform': slave_platform,
@@ -1923,12 +1920,16 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'slavebuilddir': slavebuilddir,
                         }
                         if branch_config.get('mozharness_talos') and not platform_config.get('is_mobile'):
-                            args = makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
+                            args = _makeGenerateMozharnessTalosBuilderArgs(suite, talosBranch, platform,
                                                                           factory_kwargs, branch_config, platform_config)
                             pgo_factory = generateMozharnessTalosBuilder(**args)
                             properties['script_repo_revision'] = branch_config['mozharness_tag']
                         else:
+                            pgo_factory_kwargs = factory_kwargs.copy()
+                            pgo_factory_kwargs['branchName'] = branchName
+                            pgo_factory_kwargs['talosBranch'] = talosBranch
                             pgo_factory = factory_class(**pgo_factory_kwargs)
+
                         pgo_builder = {
                             'name': "%s %s pgo talos %s" % (platform_name, branch, suite),
                             'slavenames': platform_config[slave_platform]['slaves'],
