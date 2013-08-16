@@ -1457,7 +1457,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                      warnOnWarnings=True,
                      workdir=WithProperties(
                          '%(basedir)s/build/' + self.objdir),
-                     timeout=5 * 60,  # 5 minutes.
+                     timeout=10 * 60,  # 10 minutes.
                      env=env,
                      target=self.mock_target,
                      mock=self.use_mock,
