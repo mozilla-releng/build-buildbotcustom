@@ -927,7 +927,6 @@ def generateBranchObjects(config, name, secrets=None):
         if platform.find('-debug') > -1:
             # Some platforms can't run on the build host
             leakTest = pf.get('enable_leaktests', True)
-            codesighs = False
             if not pf.get('enable_unittests'):
                 uploadPackages = pf.get('packageTests', False)
             else:
@@ -939,15 +938,11 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
-            codesighs = pf.get('enable_codesighs', True)
             leakTest = False
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
         packageTests = pf.get('packageTests', packageTests)
-
-        if platform.find('win') > -1:
-            codesighs = False
 
         doBuildAnalysis = pf.get('enable_build_analysis', False)
 
@@ -1028,7 +1023,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'leakTest': leakTest,
                 'checkTest': checkTest,
                 'valgrindCheck': valgrindCheck,
-                'codesighs': codesighs,
                 'uploadPackages': uploadPackages,
                 'uploadSymbols': uploadSymbols,
                 'buildSpace': buildSpace,
@@ -1274,7 +1268,6 @@ def generateBranchObjects(config, name, secrets=None):
                 stageLogBaseUrl=config.get('stage_log_base_url', None),
                 stagePlatform=pf['stage_platform'],
                 stageProduct=pf['stage_product'],
-                codesighs=False,
                 doBuildAnalysis=doBuildAnalysis,
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
@@ -1413,7 +1406,6 @@ def generateBranchObjects(config, name, secrets=None):
                     stageBasePath=stageBasePath,
                     stageLogBaseUrl=config.get('stage_log_base_url', None),
                     stageProduct=pf.get('stage_product'),
-                    codesighs=False,
                     uploadPackages=uploadPackages,
                     uploadSymbols=False,
                     nightly=True,
@@ -1665,7 +1657,6 @@ def generateBranchObjects(config, name, secrets=None):
                  stageGroup=config['stage_group'],
                  stageSshKey=config['stage_ssh_xulrunner_key'],
                  stageBasePath=xulrunnerStageBasePath,
-                 codesighs=False,
                  uploadPackages=uploadPackages,
                  uploadSymbols=True,
                  nightly=True,
@@ -2174,7 +2165,6 @@ def generateCCBranchObjects(config, name, secrets=None):
         if platform.find('-debug') > -1:
             # Some platforms can't run on the build host
             leakTest = pf.get('enable_leaktests', True)
-            codesighs = False
             if not pf.get('enable_unittests'):
                 uploadPackages = pf.get('packageTests', False)
             else:
@@ -2186,15 +2176,11 @@ def generateCCBranchObjects(config, name, secrets=None):
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
-            codesighs = pf.get('enable_codesighs', True)
             leakTest = False
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
         packageTests = pf.get('packageTests', packageTests)
-
-        if platform.find('win') > -1:
-            codesighs = False
 
         # Turn pymake on by default for Windows, and off by default
         # for other platforms.
@@ -2279,7 +2265,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'leakTest': leakTest,
                 'checkTest': checkTest,
                 'valgrindCheck': valgrindCheck,
-                'codesighs': codesighs,
                 'uploadPackages': uploadPackages,
                 'uploadSymbols': uploadSymbols,
                 'buildSpace': buildSpace,
@@ -2525,7 +2510,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                 stageLogBaseUrl=config.get('stage_log_base_url', None),
                 stagePlatform=pf['stage_platform'],
                 stageProduct=pf['stage_product'],
-                codesighs=False,
                 doBuildAnalysis=doBuildAnalysis,
                 uploadPackages=uploadPackages,
                 uploadSymbols=pf.get('upload_symbols', False),
@@ -2668,7 +2652,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                     stageBasePath=stageBasePath,
                     stageLogBaseUrl=config.get('stage_log_base_url', None),
                     stageProduct=pf.get('stage_product'),
-                    codesighs=False,
                     uploadPackages=uploadPackages,
                     uploadSymbols=False,
                     nightly=True,
@@ -2933,7 +2916,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                  stageGroup=config['stage_group'],
                  stageSshKey=config['stage_ssh_xulrunner_key'],
                  stageBasePath=xulrunnerStageBasePath,
-                 codesighs=False,
                  uploadPackages=uploadPackages,
                  uploadSymbols=True,
                  nightly=True,

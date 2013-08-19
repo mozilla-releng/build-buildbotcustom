@@ -62,7 +62,7 @@ from buildbotcustom.steps.release import UpdateVerify, L10nVerifyMetaDiff, \
   SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import AliveTest, \
-  CompareLeakLogs, Codesighs, GraphServerPost
+  CompareLeakLogs, GraphServerPost
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
   CreatePartialUpdateSnippet
 from buildbotcustom.steps.signing import SigningServerAuthenication
@@ -741,7 +741,7 @@ class MercurialBuildFactory(MozillaBuildFactory):
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
                  ausHost=None, nightly=False, leakTest=False,
-                 checkTest=False, valgrindCheck=False, codesighs=True,
+                 checkTest=False, valgrindCheck=False,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, createPartial=False, doCleanup=True,
@@ -804,7 +804,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         self.leakTest = leakTest
         self.checkTest = checkTest
         self.valgrindCheck = valgrindCheck
-        self.codesighs = codesighs
         self.graphServer = graphServer
         self.graphSelector = graphSelector
         self.graphBranch = graphBranch
@@ -984,8 +983,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
             self.addCheckTestSteps()
         if self.valgrindCheck:
             self.addValgrindCheckSteps()
-        if self.codesighs:
-            self.addCodesighsSteps()
         if self.createSnippet:
             self.addUpdateSteps()
         if self.triggerBuilds:
@@ -1686,77 +1683,6 @@ class MercurialBuildFactory(MozillaBuildFactory):
         # Call out to a subclass to do the actual uploading
         self.doUpload(uploadMulti=self.multiLocale)
 
-    def addCodesighsSteps(self):
-        codesighs_dir = WithProperties('%(basedir)s/build/' + self.mozillaObjdir +
-                                       '/tools/codesighs')
-        if self.platform.startswith('win'):
-            codesighs_dir = 'build/%s/tools/codesighs' % self.mozillaObjdir
-        self.addStep(ScratchboxCommand(
-         name='make_codesighs',
-         command=self.makeCmd,
-         env=self.env,
-         workdir=codesighs_dir,
-         sb=self.use_scratchbox,
-        ))
-
-        cmd = ['/bin/bash', '-c', 
-                WithProperties('%(toolsdir)s/buildfarm/utils/wget_unpack.sh ' +
-                               self.logBaseUrl + ' codesize-auto.tar.gz '+
-                               'codesize-auto.log:codesize-auto.log.old') ]
-        self.addStep(ShellCommand(
-            name='get_codesize_logs',
-            env=self.env,
-            workdir='.',
-            command=cmd,
-        ))
-
-        if self.mozillaDir == '':
-            codesighsObjdir = self.objdir
-        else:
-            codesighsObjdir = '../%s' % self.mozillaObjdir
-
-        self.addStep(Codesighs(
-         name='get_codesighs_diff',
-         objdir=codesighsObjdir,
-         platform=self.platform,
-         workdir='build%s' % self.mozillaDir,
-         env=self.env,
-         tbPrint=self.tbPrint,
-        ))
-
-        if self.graphServer:
-            gs_env = self.env.copy()
-            gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
-            self.addBuildInfoSteps()
-            self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
-            self.addStep(GraphServerPost(server=self.graphServer,
-                                         selector=self.graphSelector,
-                                         branch=self.graphBranch,
-                                         resultsname=self.baseName,
-                                         env=gs_env,
-                                         propertiesFile="properties.json"))
-        self.addStep(ShellCommand(
-         name='echo_codesize_log',
-         command=['cat', '../codesize-auto-diff.log'],
-         workdir='build%s' % self.mozillaDir
-        ))
-
-        cmd = ['/bin/bash', '-c', 
-                WithProperties('%(toolsdir)s/buildfarm/utils/pack_scp.sh ' +
-                    'codesize-auto.tar.gz ' + ' .. ' +
-                    '%s ' % self.stageUsername +
-                    '%s ' % self.stageSshKey +
-                    # Notice the '/' after the ':'. This prevents windows from trying to modify
-                    # the path
-                    '%s:/%s/%s ' % (self.stageServer, self.stageBasePath,
-                        self.logUploadDir) +
-                    'codesize-auto.log') ]
-        self.addStep(ShellCommand(
-            name='upload_codesize_logs',
-            command=cmd,
-            workdir='build%s' % self.mozillaDir
-            ))
-
     def addCreateSnippetsSteps(self, milestone_extra=''):
         if 'android' in self.complete_platform:
             cmd = [
@@ -1960,41 +1886,6 @@ class TryBuildFactory(MercurialBuildFactory):
             (self.stageServer, self.productName, self.platform)
 
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
-
-    def addCodesighsSteps(self):
-        self.addStep(ShellCommand(
-         name='make_codesighs',
-         command=self.makeCmd,
-         env=self.env,
-         workdir='build/%s/tools/codesighs' % self.mozillaObjdir
-        ))
-        self.addStep(RetryingShellCommand(
-         name='get_codesize_log',
-         command=['wget', '-O', 'codesize-auto-old.log',
-         'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s/codesize-auto.log' % \
-           (self.stageServer, self.productName, self.platform)],
-         workdir='.',
-         env=self.env
-        ))
-        if self.mozillaDir == '':
-            codesighsObjdir = self.objdir
-        else:
-            codesighsObjdir = '../%s' % self.mozillaObjdir
-
-        self.addStep(Codesighs(
-         name='get_codesighs_diff',
-         objdir=codesighsObjdir,
-         platform=self.platform,
-         workdir='build%s' % self.mozillaDir,
-         env=self.env,
-         tbPrint=self.tbPrint,
-        ))
-
-        self.addStep(ShellCommand(
-         name='echo_codesize_log',
-         command=['cat', '../codesize-auto-diff.log'],
-         workdir='build%s' % self.mozillaDir
-        ))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         self.addStep(SetBuildProperty(
