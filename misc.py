@@ -478,6 +478,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         if mozharness_suite_config.get('config_files'):
             extra_args.extend(['--cfg', ','.join(mozharness_suite_config['config_files'])])
         extra_args.extend(mozharness_suite_config.get('extra_args', suites.get('extra_args', [])))
+        if mozharness_suite_config.get('blob_upload'):
+            extra_args.extend(['--blob-upload-branch', branch_name])
         if mozharness_suite_config.get('download_symbols'):
             extra_args.extend(['--download-symbols', mozharness_suite_config['download_symbols']])
         reboot_command = mozharness_suite_config.get(
@@ -2032,6 +2034,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
                                 test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
                                 test_builder_kwargs['mozharness_suite_config']['env'].update(branch_config['platforms'][platform].get('unittest-env', {}))
+                                if branch_config.get('blob_upload') and suites.get('blob_upload'):
+                                    test_builder_kwargs['mozharness_suite_config']['blob_upload'] = True
                                 if suites.get('download_symbols', True) and branch_config['fetch_symbols'] and \
                                         branch_config['platforms'][platform][slave_platform].get('download_symbols', True):
                                     if test_type == 'opt':
