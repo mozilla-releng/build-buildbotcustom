@@ -397,9 +397,10 @@ def makeMHFactory(config, pf, **kwargs):
         else:
             del kwargs['signingServers']
 
+    scriptRepo = config.get('mozharness_repo_url',
+                            '%s%s' % (config['hgurl'], config['mozharness_repo_path']))
     factory = factory_class(
-        scriptRepo='%s%s' % (config['hgurl'],
-                             config['mozharness_repo_path']),
+        scriptRepo=scriptRepo,
         scriptName=pf['mozharness_config']['script_name'],
         extra_args=pf['mozharness_config'].get('extra_args'),
         reboot_command=pf['mozharness_config'].get('reboot_command'),
@@ -721,6 +722,8 @@ def generateBranchObjects(config, name, secrets=None):
                 buildersByProduct.setdefault(
                     pf['stage_product'], []).append(buildername)
                 prettyNames[platform] = buildername
+                if not pf.get('try_by_default', True):
+                    prettyNames[platform] += " try-nondefault"
 
             if pf.get('enable_nightly'):
                 buildername = '%s_nightly' % pf['base_name']
@@ -1001,6 +1004,8 @@ def generateBranchObjects(config, name, secrets=None):
         pf = config['platforms'][platform]
 
         if 'mozharness_config' in pf:
+            if 'mozharness_repo_url' in pf:
+                config['mozharness_repo_url'] = pf['mozharness_repo_url']
             factory = makeMHFactory(config, pf, signingServers=secrets.get(
                 pf.get('dep_signing_servers')))
             builder = {
@@ -1015,7 +1020,10 @@ def generateBranchObjects(config, name, secrets=None):
                     'platform': platform,
                     'product': pf['stage_product'],
                     'repo_path': config['repo_path'],
-                    'script_repo_revision': config['mozharness_tag'],
+                    'script_repo_revision': pf.get('mozharness_tag', config['mozharness_tag']),
+                    'hgurl': config.get('hgurl'),
+                    'base_mirror_urls': config.get('base_mirror_urls'),
+                    'base_bundle_urls': config.get('base_bundle_urls'),
                 }
             }
             if pf.get('enable_dep', True):
