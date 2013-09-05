@@ -594,7 +594,7 @@ class MozillaPackagedJetpackTests(ShellCommandReportTimeout):
         self.command = [
             'python', 'jetpack/bin/cfx',
             WithProperties('--binary=%(exepath)s'),
-            '--parseable', 'testpkgs'
+            '--parseable', suite
         ]
 
         # TODO: When jetpack can handle symbols path and leak testing, add those

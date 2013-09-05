@@ -4896,7 +4896,15 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              ))
 
                 self.addStep(unittest_steps.MozillaPackagedJetpackTests(
-                             suite=suite,
+                             suite='testpkgs',
+                             env=self.env,
+                             leakThreshold=leak_threshold,
+                             symbols_path=symbols_path,
+                             maxTime=120 * 60,  # Two Hours
+                             ))
+
+                self.addStep(unittest_steps.MozillaPackagedJetpackTests(
+                             suite='testaddons',
                              env=self.env,
                              leakThreshold=leak_threshold,
                              symbols_path=symbols_path,
