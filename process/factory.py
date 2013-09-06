@@ -84,7 +84,7 @@ hg_try_lock = locks.MasterLock("hg_try_lock", maxCount=20)
 hg_l10n_lock = locks.MasterLock("hg_l10n_lock", maxCount=20)
 
 # Limit ourselves to uploading 4 things at a time
-upload_lock = locks.MasterLock("upload_lock", maxCount=4)
+upload_lock = locks.MasterLock("upload_lock", maxCount=10)
 
 SIGNING_SERVER_CERT = os.path.join(
     os.path.dirname(build.paths.__file__),
