@@ -2022,9 +2022,6 @@ class TryBuildFactory(MercurialBuildFactory):
             'builduid': WithProperties('%(builduid:-)s'),
         }
 
-        if not uploadMulti:
-            return
-
         for master, warn, retries in self.talosMasters:
             self.addStep(SendChangeStep(
                          name='sendchange_%s' % master,
