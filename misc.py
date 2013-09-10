@@ -2438,6 +2438,12 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                 log_eval_func=rc_eval_func({1: WARNINGS}),
                 extra_args=tuple(extra_args),
                 script_timeout=3600,
+                reboot_command=[
+                    'python',
+                    'scripts/buildfarm/maintenance/count_and_reboot.py',
+                    '-f', './reboot_count.txt',
+                    '-n', '0',
+                    '-z'],
                 **factory_kwargs
             )
 
