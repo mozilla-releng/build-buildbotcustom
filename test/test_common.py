@@ -7,9 +7,6 @@ class TestNormalizeName(unittest.TestCase):
     def testNoPrefix(self):
         self.assertEquals(normalizeName('mozilla-beta', min_=1), 'm-beta')
 
-    def testPrefix(self):
-        self.assertEquals(normalizeName('comm-release', product='thunderbird', min_=1), 'tb-c-rel')
-
     def testExclusiveWordReplacement(self):
         self.assertEquals(normalizeName('errasdebug', min_=1), 'errasdebug')
 
