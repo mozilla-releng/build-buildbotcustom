@@ -399,6 +399,9 @@ def makeMHFactory(config, pf, **kwargs):
 
     scriptRepo = config.get('mozharness_repo_url',
                             '%s%s' % (config['hgurl'], config['mozharness_repo_path']))
+    if 'env' in pf:
+        kwargs['env'] = pf['env'].copy()
+
     factory = factory_class(
         scriptRepo=scriptRepo,
         scriptName=pf['mozharness_config']['script_name'],
