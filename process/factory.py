@@ -2000,8 +2000,11 @@ class TryBuildFactory(MercurialBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
+        upload_vars = []
+        if uploadMulti:
+            upload_vars.append("AB_CD=multi")
         self.addStep(RetryingMockProperty(
-                     command=self.makeCmd + ['upload'],
+                     command=self.makeCmd + ['upload'] + upload_vars,
                      env=uploadEnv,
                      workdir=objdir,
                      mock=self.use_mock,
@@ -2021,6 +2024,11 @@ class TryBuildFactory(MercurialBuildFactory):
             'buildid': WithProperties('%(buildid:-)s'),
             'builduid': WithProperties('%(builduid:-)s'),
         }
+
+        # We don't want to run sendchanges for the multilocale builds we just
+        # uploaded, so we can return early now.
+        if uploadMulti:
+            return
 
         for master, warn, retries in self.talosMasters:
             self.addStep(SendChangeStep(
