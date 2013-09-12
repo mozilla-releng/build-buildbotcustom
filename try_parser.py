@@ -161,7 +161,7 @@ def getTestBuilders(
     return list(testBuilders.intersection(builderNames))
 
 
-def parseTestOptions(s, unittestSuites):
+def parseTestOptions(s, testSuites):
     '''parse a comma-separated list of tests, each optionally followed by a
     comma-separated list of restrictions enclosed in square brackets
 
@@ -243,7 +243,7 @@ def parseTestOptions(s, unittestSuites):
         if not m:
             return []  # Bad syntax
 
-        tests = expandTestSuites([m.group(1)], unittestSuites)
+        tests = expandTestSuites([m.group(1)], testSuites)
         if m.group(2):
             for test in tests:
                 restrictions_map[test] = restrictions[int(m.group(2))]
@@ -313,7 +313,7 @@ def TryParser(
     # Platforms whose prettyNames all have 'try-nondefault' in them are not
     # included in -p all
     default_platforms = set()
-    if unittestSuites:
+    if unittestSuites or talosSuites:
         for p in all_platforms:
             default_platforms.update(
                 [p for n in prettyNames[p] if 'try-nondefault' not in n])
@@ -340,17 +340,13 @@ def TryParser(
 
     testFilters = None
     if unittestSuites:
-        orig = options.test
         options.test, testFilters = parseTestOptions(
             options.test, unittestSuites)
 
+    talosTestFilters = None
     if talosSuites:
-        if options.talos == 'all':
-            options.talos = talosSuites
-        elif options.talos == 'none':
-            options.talos = []
-        else:
-            options.talos = options.talos.split(',')
+        options.talos, talosTestFilters = parseTestOptions(
+            options.talos, talosSuites)
 
     # List for the custom builder names that match prettyNames passed in from
     # misc.py
@@ -372,11 +368,10 @@ def TryParser(
                     getTestBuilders(
                         options.user_platforms, "test", options.test, testFilters,
                         builderNames, options.build, buildbotBranch, {}, unittestPrettyNames))
-        if options.talos and talosSuites is not None:
+        if options.talos and talosSuites:
             customBuilderNames.extend(
                 getTestBuilders(
-                    options.user_platforms, "talos", options.talos, {
-                    }, builderNames,
+                    options.user_platforms, "talos", options.talos, talosTestFilters, builderNames,
                     options.build, buildbotBranch, prettyNames, None))
 
     return customBuilderNames
