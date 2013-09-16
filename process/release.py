@@ -777,7 +777,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 ])
                 if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                     extra_args.append('--generate-partials')
-                if releaseConfig.get('l10nUsePymake') and platform in ('win32', 'win64'):
+                if releaseConfig.get('l10nUsePymake', True) and \
+                   platform in ('win32', 'win64'):
                     extra_args.append('--use-pymake')
                 if pf.get('tooltool_manifest_src'):
                     extra_args.extend(['--tooltool-manifest', pf.get('tooltool_manifest_src')])
@@ -850,7 +851,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         '--compare-locales-repo-path',
                         branchConfig['compare_locales_repo_path']
                     ])
-                    if releaseConfig.get('l10nUsePymake') and platform in ('win32', 'win64'):
+                    if releaseConfig.get('l10nUsePymake', True) and \
+                       platform in ('win32', 'win64'):
                         extra_args.append('--use-pymake')
                     if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                         extra_args.append('--generate-partials')
