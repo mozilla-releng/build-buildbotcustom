@@ -1882,7 +1882,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         else:
                             extra_args.extend (['--talos-suite', suite, '--cfg', 'android/android_panda_talos_releng.py', '--branch-name', talos_branch])
                             scriptpath = "scripts/android_panda_talos.py"
-
+                           
                         args = {
                             'platform': platform,
                             'mozharness_repo': branch_config['mozharness_repo'],
@@ -1893,14 +1893,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 'mozharness_config']['mozharness_python'],
                             'extra_args': extra_args,
                             'script_timeout': platform_config['mozharness_config'].get('script_timeout', 3600),
-                            'script_maxtime': (platform_config['mozharness_config'].get('talos_script_maxtime', platform_config['mozharness_config'].get('script_maxtime', 7200))),
+                            'script_maxtime': (platform_config['mozharness_config'].get('talos_script_maxtime', platform_config['mozharness_config'].get('script_maxtime', 7200))),                           
                             'reboot_command': platform_config[
                                 'mozharness_config'].get('reboot_command'),
                         }
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
 
-                    if branch_config.get('mozharness_talos') and platform_config[slave_platform].get('mozharness_talos', True):
+                    if branch_config.get('mozharness_talos') and platform_config[slave_platform].get('mozharness_talos'):
                         args = _makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
                                                                        factory_kwargs, branch_config, platform_config)
                         factory = generateMozharnessTalosBuilder(**args)
