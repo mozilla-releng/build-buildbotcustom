@@ -1027,10 +1027,6 @@ def generateBranchObjects(config, name, secrets=None):
                     'hgurl': config.get('hgurl'),
                     'base_mirror_urls': config.get('base_mirror_urls'),
                     'base_bundle_urls': config.get('base_bundle_urls'),
-                    'mock_target': pf.get('mock_target'),
-                    'upload_ssh_server': config.get('stage_server'),
-                    'upload_ssh_user': config.get('stage_username'),
-                    'upload_ssh_key': config.get('stage_ssh_key'),
                 }
             }
             if pf.get('enable_dep', True):
@@ -1042,17 +1038,23 @@ def generateBranchObjects(config, name, secrets=None):
                     # servers are different
                     factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('nightly_signing_servers')))
 
-                nightly_builder = {
+                builder = {
                     'name': '%s_nightly' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s_nightly' % pf['base_name'],
                     'slavebuilddir': normalizeName('%s_nightly' % pf['base_name']),
                     'factory': factory,
                     'category': name,
-                    'properties': builder['properties'].copy(),
+                    'properties': {
+                        'branch': name,
+                        'platform': platform,
+                        'product': pf['stage_product'],
+                        'repo_path': config['repo_path'],
+                        'nightly_build': True,
+                        'script_repo_revision': config['mozharness_tag'],
+                    }
                 }
-                nightly_builder['properties']['nightly_build'] = True
-                branchObjects['builders'].append(nightly_builder)
+                branchObjects['builders'].append(builder)
             # Nothing else to do for this builder
             continue
 
@@ -1863,6 +1865,13 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     def _makeGenerateMozharnessTalosBuilderArgs(suite, talos_branch, platform,
                                                                factory_kwargs, branch_config, platform_config):
                         mh_conf = platform_config['mozharness_config']
+
+                        extra_args = ['--suite', suite,
+                                      '--add-option',
+                                      ','.join(['--webServer', 'localhost']),
+                                      '--branch-name', talos_branch,
+                                      '--system-bits', mh_conf['system_bits'],
+                                      '--cfg', mh_conf['config_file']]
 
                         if factory_kwargs['fetchSymbols']:
                             extra_args += ['--download-symbols', 'ondemand']
