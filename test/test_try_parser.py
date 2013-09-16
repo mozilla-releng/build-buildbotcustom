@@ -33,8 +33,8 @@ TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
 TESTER_PRETTY_TB_NAMES = {'linux': ['TB Rev3 Fedora 12']}
 UNITTEST_PRETTY_NAMES = {'win32-debug': 'WINNT 5.2 try debug test'}
 BUILDER_PRETTY_B2G_NAMES = {
-    'emulator': 'b2g_try_emulator build',
-    'emulator-debug': 'b2g_try_emulator-debug build'}
+    'emulator-ics': 'b2g_try_emulator-ics build',
+    'emulator-ics-debug': 'b2g_try_emulator-ics-debug build'}
 
 TALOS_SUITES = ['tp4', 'chrome']
 UNITTEST_SUITES = ['reftest',
@@ -81,8 +81,8 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 6.1 try talos chrome']
 VALID_TESTER_TB_NAMES = ['TB Rev3 Fedora 12 try-comm-central opt test mozmill',
                          'TB Rev3 Fedora 12 try-comm-central opt test xpcshell']
-VALID_BUILDER_B2G_NAMES = ['b2g_try_emulator-debug build',
-                           'b2g_try_emulator build']
+VALID_BUILDER_B2G_NAMES = ['b2g_try_emulator-ics-debug build',
+                           'b2g_try_emulator-ics build']
 
 
 def dictslice(d, keys, default=None):
@@ -206,19 +206,19 @@ class TestTryParser(unittest.TestCase):
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_B2GPlatform(self):
-        tm = 'try: -b od -p emulator'
+        tm = 'try: -b od -p emulator-ics'
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_B2G_NAMES, BUILDER_PRETTY_B2G_NAMES)
         builders = self.filterBuilders(
-            ['emulator', 'emulator-debug'],
+            ['emulator-ics', 'emulator-ics-debug'],
             pretties=BUILDER_PRETTY_B2G_NAMES,
             valid=VALID_BUILDER_B2G_NAMES)
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b o -p emulator'
+        tm = 'try: -b o -p emulator-ics'
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_B2G_NAMES, BUILDER_PRETTY_B2G_NAMES)
-        builders = ['b2g_try_emulator build']
-        builders = self.filterBuilders(['emulator'],
+        builders = ['b2g_try_emulator-ics build']
+        builders = self.filterBuilders(['emulator-ics'],
                                        pretties=BUILDER_PRETTY_B2G_NAMES,
                                        valid=VALID_BUILDER_B2G_NAMES)
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
