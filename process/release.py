@@ -1771,6 +1771,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             name=builderPrefix('almost-ready-for-release'),
             configRepo=config_repo,
             minUptake=releaseConfig.get('releaseUptake', 45000),
+            checkMARs=not releaseConfig.get('skip_updates', False),
             builderNames=[builderPrefix('almost_ready_for_release')],
             username=BuildSlaves.tuxedoUsername,
             password=BuildSlaves.tuxedoPassword
