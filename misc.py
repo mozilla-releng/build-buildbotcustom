@@ -1027,6 +1027,10 @@ def generateBranchObjects(config, name, secrets=None):
                     'hgurl': config.get('hgurl'),
                     'base_mirror_urls': config.get('base_mirror_urls'),
                     'base_bundle_urls': config.get('base_bundle_urls'),
+                    'mock_target': pf.get('mock_target'),
+                    'upload_ssh_server': config.get('stage_server'),
+                    'upload_ssh_user': config.get('stage_username'),
+                    'upload_ssh_key': config.get('stage_ssh_key'),
                 }
             }
             if pf.get('enable_dep', True):
@@ -1038,23 +1042,17 @@ def generateBranchObjects(config, name, secrets=None):
                     # servers are different
                     factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('nightly_signing_servers')))
 
-                builder = {
+                nightly_builder = {
                     'name': '%s_nightly' % pf['base_name'],
                     'slavenames': pf['slaves'],
                     'builddir': '%s_nightly' % pf['base_name'],
                     'slavebuilddir': normalizeName('%s_nightly' % pf['base_name']),
                     'factory': factory,
                     'category': name,
-                    'properties': {
-                        'branch': name,
-                        'platform': platform,
-                        'product': pf['stage_product'],
-                        'repo_path': config['repo_path'],
-                        'nightly_build': True,
-                        'script_repo_revision': config['mozharness_tag'],
-                    }
+                    'properties': builder['properties'].copy(),
                 }
-                branchObjects['builders'].append(builder)
+                nightly_builder['properties']['nightly_build'] = True
+                branchObjects['builders'].append(nightly_builder)
             # Nothing else to do for this builder
             continue
 
