@@ -1898,7 +1898,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
 
-                    if branch_config.get('mozharness_talos') and platform_config[slave_platform].get('mozharness_talos', True):
+                    if branch_config.get('mozharness_talos', True) and platform_config[slave_platform].get('mozharness_talos', True):
                         args = _makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
                                                                        factory_kwargs, branch_config, platform_config)
                         factory = generateMozharnessTalosBuilder(**args)
@@ -1996,6 +1996,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         else:
                             slave_platform_name = slave_platform
 
+                        # in case this builder is a set of suites
+                        builders_with_sets_mapping = {}
                         # create builder names for TinderboxMailNotifier
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
                             test_builders.extend(generateTestBuilderNames(
@@ -2003,6 +2005,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if create_pgo_builders and test_type == 'opt':
                                 pgo_builders.extend(generateTestBuilderNames(
                                                     '%s %s pgo test' % (platform_name, branch), suites_name, suites))
+                            if type(suites) is dict and suites.has_key('trychooser_suites'):
+                                for s in suites['trychooser_suites']:
+                                    builders_with_sets_mapping[s] = suites_name
 
                         triggeredUnittestBuilders.append(
                             (
@@ -2080,6 +2085,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 extra_args['numberOfBuildsToTrigger'] = 1
                                 extra_args['prettyNames'] = prettyNames
                                 extra_args['unittestSuites'] = unittestSuites
+                                extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
                                 extra_args['buildbotBranch'] = branch
                             else:
                                 scheduler_class = Scheduler
