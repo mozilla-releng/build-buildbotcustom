@@ -253,11 +253,9 @@ def parseTestOptions(s, testSuites):
     return list(all_tests), restrictions_map
 
 
-# XXX Hack warning: TryParser is a working hack
-# We need to redo scheduling to replace TryParser
 def TryParser(
     message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
-        buildbotBranch='try', buildersWithSetsMap=None):
+        buildbotBranch='try'):
 
     parser = argparse.ArgumentParser(description='Pass in a commit message and a list \
                                      and tryParse populates the list with the builderNames\
@@ -293,15 +291,6 @@ def TryParser(
     else:
         # for any input other than do/od, d, o, all set to default
         options.build = ['opt', 'debug']
-
-    if buildersWithSetsMap != {}:
-        chosen_suites = options.test.split(',')
-        new_choice = []
-        for chosen_suite in chosen_suites:
-            if buildersWithSetsMap.has_key(chosen_suite):
-                if chosen_suite not in new_choice:
-                    new_choice.append(buildersWithSetsMap[chosen_suite])
-        options.test = ','.join(new_choice)
 
     if unittestSuites:
         all_platforms = prettyNames.keys()
