@@ -1898,7 +1898,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
 
-                    if branch_config.get('mozharness_talos') and platform_config[slave_platform].get('mozharness_talos', True):
+                    if branch_config.get('mozharness_talos', True) and platform_config[slave_platform].get('mozharness_talos', True):
                         args = _makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
                                                                        factory_kwargs, branch_config, platform_config)
                         factory = generateMozharnessTalosBuilder(**args)
