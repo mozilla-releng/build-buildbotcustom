@@ -255,7 +255,7 @@ def parseTestOptions(s, testSuites):
 
 def TryParser(
     message, builderNames, prettyNames, unittestPrettyNames=None, unittestSuites=None, talosSuites=None,
-        buildbotBranch='try', buildersWithSetsMap=None):
+        buildbotBranch='try'):
 
     parser = argparse.ArgumentParser(description='Pass in a commit message and a list \
                                      and tryParse populates the list with the builderNames\
@@ -291,17 +291,6 @@ def TryParser(
     else:
         # for any input other than do/od, d, o, all set to default
         options.build = ['opt', 'debug']
-
-    if buildersWithSetsMap != None:
-        chosen_suites = options.test.split(',')
-        new_choice = []
-        for chosen_suite in chosen_suites:
-            print "ARMEN"
-            print buildersWithSetsMap
-            if buildersWithSetsMap.has_key(chosen_suite):
-                if chosen_suite not in new_choice:
-                    new_choice.append(buildersWithSetsMap[chosen_suite])
-        options.test = ','.join(new_choice)
 
     if unittestSuites:
         all_platforms = prettyNames.keys()
