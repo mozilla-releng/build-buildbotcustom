@@ -383,38 +383,18 @@ class MozillaClobberer(ShellCommand):
         self.setProperty('master', master)
 
     def createSummary(self, log):
-        my_builder = self.getProperty("builddir")
-        # Server is forcing a clobber
-        forcedClobberRe = re.compile(
-            '%s:Server is forcing a clobber' % my_builder)
-        # We are looking for something like :
-        #  More than 604800.0 seconds have passed since our last clobber
-        periodicClobberRe = re.compile('%s:More than [\d+\.]+ seconds have passed since our last clobber' % my_builder)
+        clobberTypeRE = re.compile(r"TinderboxPrint: (\w+) clobber")
+        clobberTypePerformed = None
 
-        # We don't have clobber data.  This usually means we've been purged
-        # before
-        purgedClobberRe = re.compile(
-            "%s:Our last clobber date:.*None" % my_builder)
-
-        self.setProperty('forced_clobber', False, 'MozillaClobberer')
-        self.setProperty('periodic_clobber', False, 'MozillaClobberer')
-        self.setProperty('purged_clobber', False, 'MozillaClobberer')
-
-        clobberType = None
         for line in log.readlines():
-            if forcedClobberRe.search(line):
-                self.setProperty('forced_clobber', True, 'MozillaClobberer')
-                clobberType = "forced"
-            elif periodicClobberRe.search(line):
-                self.setProperty('periodic_clobber', True, 'MozillaClobberer')
-                clobberType = "periodic"
-            elif purgedClobberRe.search(line):
-                self.setProperty('purged_clobber', True, 'MozillaClobberer')
-                clobberType = "free-space"
+            m = clobberTypeRE.match(line)
+            if m:
+                clobberTypePerformed = m.group(1)
+                break
 
-        if clobberType != None:
-            summary = "TinderboxPrint: %s clobber" % clobberType
-            self.addCompleteLog('clobberer', summary)
+        for clobberType in ('forced', 'periodic', 'purged'):
+            wasPerformed = clobberType == clobberTypePerformed
+            self.setProperty('%s_clobber' % clobberType, wasPerformed, 'MozillaClobberer')
 
 
 class SetBuildProperty(BuildStep):
