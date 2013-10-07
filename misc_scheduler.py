@@ -45,7 +45,7 @@ def tryChooser(s, all_changes):
             comments = ""
         customBuilders = TryParser(
             comments, s.builderNames, s.prettyNames, s.unittestPrettyNames,
-            s.unittestSuites, s.talosSuites, s.buildbotBranch)
+            s.unittestSuites, s.talosSuites, s.buildbotBranch, s.buildersWithSetsMap)
         buildersPerChange[c] = customBuilders
 
     def parseDataError(failure, c):
