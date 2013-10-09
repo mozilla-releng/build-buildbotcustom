@@ -140,17 +140,18 @@ class PersistentScheduler(BaseScheduler):
 class BuilderChooserScheduler(MultiScheduler):
     compare_attrs = MultiScheduler.compare_attrs + (
         'chooserFunc', 'prettyNames',
-        'unittestPrettyNames', 'unittestSuites', 'talosSuites', 'buildbotBranch')
+        'unittestPrettyNames', 'unittestSuites', 'talosSuites', 'buildbotBranch', 'buildersWithSetsMap')
 
     def __init__(
         self, chooserFunc, prettyNames=None, unittestPrettyNames=None, unittestSuites=None,
-            talosSuites=None, buildbotBranch=None, **kwargs):
+            talosSuites=None, buildbotBranch=None, buildersWithSetsMap=None, **kwargs):
         self.chooserFunc = chooserFunc
         self.prettyNames = prettyNames
         self.unittestPrettyNames = unittestPrettyNames
         self.unittestSuites = unittestSuites
         self.talosSuites = talosSuites
         self.buildbotBranch = buildbotBranch
+        self.buildersWithSetsMap = buildersWithSetsMap
         MultiScheduler.__init__(self, **kwargs)
 
     def run(self):
