@@ -292,7 +292,10 @@ def TryParser(
         # for any input other than do/od, d, o, all set to default
         options.build = ['opt', 'debug']
 
-    if buildersWithSetsMap != None and buildersWithSetsMap != {}:
+    if buildersWithSetsMap and type(buildersWithSetsMap) is dict:
+        # The TryChooser user has set a comma separated list of test suites
+        # This platform has a dictionary that allows to match a test suite
+        # to an actual builder (e.g. {"mochitest-1": "androidx86-set-1"}
         chosen_suites = options.test.split(',')
         new_choice = []
         for chosen_suite in chosen_suites:
