@@ -3888,7 +3888,7 @@ class SingleSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, mozconfig,
                  configRepoPath, configSubDir, objdir='',
-                 mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
+                 mozillaDir=None, autoconfDirs=['.'], buildSpace=2,
                  mozconfigBranch="production", appVersion=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
