@@ -230,7 +230,7 @@ def parse_make_upload(rc, stdout, stderr):
             retval['completeMarUrl'] = m
         elif m.endswith('.mar') and '.partial.' in m:
             retval['partialMarUrl'] = m
-        elif m.startswith('geckoview'):
+        elif m.find('geckoview') >= 0:
             pass
         else:
             retval['packageUrl'] = m
