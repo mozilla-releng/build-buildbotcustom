@@ -114,7 +114,9 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'system': 'sys',
         'panda': 'p',
         'b2g18': 'b18',
+        'b2g26': 'b26',
         'v1_0_0': '100',
+        'v1_2': '12',
         'v1_0_1': '101',
         'v1_1_0': '110',
         'standalone': 'sa',
@@ -126,6 +128,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'warnaserrdebug': 'wed',
         'rootanalysis': 'ra',
         'generational': 'ggc',
+        'emulator': 'emu',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before
