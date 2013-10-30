@@ -141,7 +141,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
                 r'(-|_|\Z)'     # And don't have anything other the end of the string
                                 # or a separator atfer them
             )
-            name = regex.sub(r'\1%s\2' % replacement, name)
+            name = regex.sub(r'\g<1>%s\g<2>' % replacement, name)
     name = prefix + name
     # XXX: Remove me when esr17 is dead. Nasty hack to avoid shortening
     # this branches' directories because the build system can't handle the
