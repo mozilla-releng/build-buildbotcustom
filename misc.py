@@ -1880,10 +1880,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             scriptpath = "scripts/talos_script.py"
                         else:
                             extra_args.extend (['--talos-suite', suite, '--cfg', 'android/android_panda_talos_releng.py', '--branch-name', talos_branch])
-                            if branch_config.get('blob_upload'):
-                                extra_args.extend(['--blob-upload-branch', talos_branch])
                             scriptpath = "scripts/android_panda_talos.py"
-                           
+                        # add branch config specification if blobber is enabled
+                        if branch_config.get('blob_upload'):
+                            extra_args.extend(['--blob-upload-branch', talos_branch])
                         args = {
                             'platform': platform,
                             'mozharness_repo': branch_config['mozharness_repo'],
