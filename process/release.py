@@ -13,13 +13,11 @@ from buildbot.process.factory import BuildFactory
 
 import release.platforms
 import release.paths
-import buildbotcustom.changes.ftppoller
 import buildbotcustom.common
 import build.paths
 import release.info
 reload(release.platforms)
 reload(release.paths)
-reload(buildbotcustom.changes.ftppoller)
 reload(build.paths)
 reload(release.info)
 
@@ -34,7 +32,6 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ReleaseUpdatesFactory, ReleaseFinalVerification, \
     PartnerRepackFactory, XulrunnerReleaseBuildFactory, \
     TuxedoEntrySubmitterFactory, makeDummyBuilder, SigningScriptFactory
-from buildbotcustom.changes.ftppoller import UrlPoller
 from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, \

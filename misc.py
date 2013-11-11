@@ -22,25 +22,21 @@ from buildbot.process.buildstep import regex_log_evaluator
 import buildbotcustom.common
 import buildbotcustom.changes.hgpoller
 import buildbotcustom.process.factory
-import buildbotcustom.log
 import buildbotcustom.l10n
 import buildbotcustom.scheduler
 import buildbotcustom.status.mail
 import buildbotcustom.status.generators
 import buildbotcustom.status.queued_command
-import buildbotcustom.status.log_handlers
 import buildbotcustom.misc_scheduler
 import build.paths
 import mozilla_buildtools.queuedir
 reload(buildbotcustom.common)
 reload(buildbotcustom.changes.hgpoller)
 reload(buildbotcustom.process.factory)
-reload(buildbotcustom.log)
 reload(buildbotcustom.l10n)
 reload(buildbotcustom.scheduler)
 reload(buildbotcustom.status.mail)
 reload(buildbotcustom.status.generators)
-reload(buildbotcustom.status.log_handlers)
 reload(buildbotcustom.misc_scheduler)
 reload(build.paths)
 reload(mozilla_buildtools.queuedir)
