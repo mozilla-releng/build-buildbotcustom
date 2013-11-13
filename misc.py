@@ -230,25 +230,6 @@ def generateTestBuilderNames(name_prefix, suites_name, suites):
 
     return test_builders
 
-fastRegexes = []
-
-
-def _partitionSlaves(slaves):
-    """Partitions the list of slaves into 'fast' and 'slow' slaves, according
-    to fastRegexes.
-    Returns two lists, 'fast' and 'slow'."""
-    fast = []
-    slow = []
-    for s in slaves:
-        name = s.slave.slavename
-        for e in fastRegexes:
-            if re.search(e, name):
-                fast.append(s)
-                break
-        else:
-            slow.append(s)
-    return fast, slow
-
 
 def _getLastTimeOnBuilder(builder, slavename):
     # New builds are at the end of the buildCache, so
@@ -275,63 +256,26 @@ def _recentSort(builder):
     return sortfunc
 
 
-def _nextSlowSlave(builder, available_slaves):
+def _nextSlave(builder, available_slaves):
     try:
-        fast, slow = _partitionSlaves(available_slaves)
         # Choose the slow slave that was most recently on this builder
-        # If there aren't any slow slaves, choose the slow slave that was most
-        # recently on this builder
-        if slow:
-            return sorted(slow, _recentSort(builder))[-1]
-        elif fast:
-            return sorted(fast, _recentSort(builder))[-1]
+        if available_slaves:
+            return sorted(available_slaves, _recentSort(builder))[-1]
         else:
             return None
     except:
-        log.msg("Error choosing next slow slave for builder '%s', choosing randomly instead" % builder.name)
+        log.msg("Error choosing next slave for builder '%s', choosing randomly instead" % builder.name)
         log.err()
         return random.choice(available_slaves)
 
 
-def _nextFastSlave(builder, available_slaves, only_fast=False):
-    try:
-        if only_fast:
-            # Check that the builder has some fast slaves configured.  We do
-            # this because some machines classes don't have a fast/slow
-            # distinction, and so they default to 'slow'
-            fast, slow = _partitionSlaves(builder.slaves)
-            if not fast:
-                log.msg("Builder '%s' has no fast slaves configured, but only_fast"
-                        " is enabled; disabling only_fast" % builder.name)
-                only_fast = False
-
-        fast, slow = _partitionSlaves(available_slaves)
-
-        # Choose the fast slave that was most recently on this builder
-        # If there aren't any fast slaves, choose the slow slave that was most
-        # recently on this builder if only_fast is False
-        if not fast and only_fast:
-            return None
-        elif fast:
-            return sorted(fast, _recentSort(builder))[-1]
-        elif slow and not only_fast:
-            return sorted(slow, _recentSort(builder))[-1]
-        else:
-            return None
-    except:
-        log.msg("Error choosing next fast slave for builder '%s', choosing randomly instead" % builder.name)
-        log.err()
-        return random.choice(available_slaves)
-
-
-def _nextSlowIdleSlave(nReserved):
+def _nextIdleSlave(nReserved):
     """Return a nextSlave function that will only return a slave to run a build
     if there are at least nReserved slaves available."""
     def _nextslave(builder, available_slaves):
-        fast, slow = _partitionSlaves(available_slaves)
-        if len(slow) <= nReserved:
+        if len(available_slaves) <= nReserved:
             return None
-        return sorted(slow, _recentSort(builder))[-1]
+        return sorted(available_slaves, _recentSort(builder))[-1]
     return _nextslave
 
 # XXX Bug 790698 hack for no android reftests on new tegras
@@ -438,7 +382,7 @@ def makeBundleBuilder(config, name):
         'slavebuilddir': normalizeName('%s-bundle' % (name,)),
         'factory': bundle_factory,
         'category': name,
-        'nextSlave': _nextSlowSlave,
+        'nextSlave': _nextSlave,
         'properties': {'slavebuilddir': normalizeName('%s-bundle' % (name,)),
                        'branch': name,
                        'platform': None,
@@ -1226,9 +1170,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': normalizeName('%s-%s' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_dep_factory,
                 'category': name,
-                'nextSlave': _nextFastSlave,
-                # Uncomment to enable only fast slaves for dep builds.
-                #'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
+                'nextSlave': _nextSlave,
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
@@ -1254,7 +1196,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
                     'category': name,
-                    'nextSlave': _nextFastSlave,
+                    'nextSlave': _nextSlave,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform + '-pgo',
@@ -1314,7 +1256,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
                         'category': name,
-                        'nextSlave': _nextSlowSlave,
+                        'nextSlave': _nextSlave,
                         'properties': {'branch': '%s' % config['repo_path'],
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                        'stage_platform': stage_platform,
@@ -1469,7 +1411,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': normalizeName('%s-%s-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
-                'nextSlave': lambda b, sl: _nextFastSlave(b, sl, only_fast=True),
+                'nextSlave': _nextSlave,
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
@@ -1555,7 +1497,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'slavebuilddir': slavebuilddir,
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
-                        'nextSlave': _nextSlowSlave,
+                        'nextSlave': _nextSlave,
                         'properties': {'branch': name,
                                        'platform': platform,
                                        'product': pf['stage_product'],
@@ -1587,7 +1529,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'factory': mozilla2_valgrind_factory,
                     'category': name,
                     'env': valgrind_env,
-                    'nextSlave': _nextSlowSlave,
+                    'nextSlave': _nextSlave,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform,
@@ -1656,7 +1598,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': slavebuilddir,
                 'factory': mozilla2_l10n_dep_factory,
                 'category': name,
-                'nextSlave': _nextSlowSlave,
+                'nextSlave': _nextSlave,
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
@@ -1732,7 +1674,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_xulrunner_factory,
                 'category': name,
-                'nextSlave': _nextSlowSlave,
+                'nextSlave': _nextSlave,
                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform)), 'product': 'xulrunner'},
             }
             branchObjects['builders'].append(mozilla2_xulrunner_builder)
@@ -2325,7 +2267,7 @@ def generateFuzzingObjects(config, SLAVES):
         builder = {'name': 'fuzzer-%s' % platform,
                    'builddir': 'fuzzer-%s' % platform,
                    'slavenames': SLAVES[platform],
-                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                   'nextSlave': _nextIdleSlave(config['idle_slaves']),
                    'factory': f,
                    'category': 'idle',
                    'env': env,
@@ -2373,7 +2315,7 @@ def generateNanojitObjects(config, SLAVES):
         builder = {'name': 'nanojit-%s' % platform,
                    'builddir': 'nanojit-%s' % platform,
                    'slavenames': slaves,
-                   'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                   'nextSlave': _nextIdleSlave(config['idle_slaves']),
                    'factory': f,
                    'category': 'idle',
                    'properties': {'branch': branch, 'platform': platform, 'product': 'nanojit'},
@@ -2474,7 +2416,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                        'builddir': '%s_%s_spidermonkey-%s' % (branch, platform, variant),
                        'slavebuilddir': normalizeName('%s_%s_spidermonkey-%s' % (branch, platform, variant)),
                        'slavenames': pf['slaves'],
-                       'nextSlave': _nextSlowIdleSlave(config['idle_slaves']),
+                       'nextSlave': _nextIdleSlave(config['idle_slaves']),
                        'factory': f,
                        'category': branch,
                        'env': env,
