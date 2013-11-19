@@ -2434,7 +2434,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             return False
 
         for f in change.files:
-            if f.startswith("js/src"):
+            if f.startswith("js/src") or f.startswith("js/public"):
                 return True
 
         return False
