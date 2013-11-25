@@ -35,7 +35,7 @@ import re
 
 from buildbot.process.buildstep import LoggedRemoteCommand, BuildStep
 from buildbot.steps.shell import WithProperties
-from buildbot.status.builder import FAILURE, SUCCESS, worst_status
+from buildbot.status.builder import FAILURE, SUCCESS, SKIPPED, worst_status
 from buildbot.status.builder import STDOUT, STDERR  # MockProperty
 
 from buildbotcustom.steps.base import LoggingBuildStep, ShellCommand, \
@@ -477,18 +477,23 @@ class DisconnectStep(ShellCommand):
         return self.finished(SUCCESS)
 
     def start(self):
-        # Give the machine 60 seconds to go away on its own
-        def die():
-            self._deferred_death = None
-            log.msg("Forcibly disconnecting %s" % self.getSlaveName())
-            self.buildslave.disconnect()
-            try:
-                # Try to close the socket too
-                self.buildslave.slave.broker.transport._closeSocket()
-            except:
-                log.err()
-        self._deferred_death = reactor.callLater(60, die)
-        return self.super_class.start(self)
+        # If a graceful shutdown was requested it doesn't make sense to reboot
+        # the slave - so let's not do anything!
+        if self.build.slavebuilder.slave.slave_status.getGraceful():
+            return SKIPPED
+        else:
+            # Give the machine 60 seconds to go away on its own
+            def die():
+                self._deferred_death = None
+                log.msg("Forcibly disconnecting %s" % self.getSlaveName())
+                self.buildslave.disconnect()
+                try:
+                    # Try to close the socket too
+                    self.buildslave.slave.broker.transport._closeSocket()
+                except:
+                    log.err()
+            self._deferred_death = reactor.callLater(60, die)
+            return self.super_class.start(self)
 
     def checkDisconnect(self, f):
         # This is called if there's a problem executing the command because the connection was disconnected.
