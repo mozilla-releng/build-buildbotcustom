@@ -4412,7 +4412,8 @@ class ReleaseFinalVerification(ReleaseFactory):
                      name='final_verification',
                      command=verifyCommand,
                      description=['final-verification.sh'],
-                     workdir='tools/release'
+                     workdir='tools/release',
+                     timeout=2400,
                      ))
 
 
