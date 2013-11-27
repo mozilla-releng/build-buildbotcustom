@@ -725,6 +725,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 enable_pymake=enable_pymake,
+                balrog_api_root=branchConfig.get('balrog_api_root', None),
+                balrog_credentials_file=branchConfig['balrog_credentials_file'],
             )
 
             builders.append({
