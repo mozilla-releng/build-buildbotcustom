@@ -5418,7 +5418,7 @@ class TalosFactory(RequestSortingBuildFactory):
         it is 2.6 or higher (which includes the json module)
         '''
         if (platform in ("fedora", "fedora64", "ubuntu32_hw", "ubuntu64_hw",
-                         "snowleopard", "lion", "mountainlion")):
+                         "snowleopard", "lion", "mountainlion", "mavericks")):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
             return "C:\\mozilla-build\\python25\\python.exe"
@@ -5539,7 +5539,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          ))
 
     def addDmgInstaller(self):
-        if self.OS in ('snowleopard', 'lion', 'mountainlion'):
+        if self.OS in ('snowleopard', 'lion', 'mountainlion', "mavericks"):
             self.addStep(DownloadFile(
                          url=WithProperties("%s/tools/buildfarm/utils/installdmg.sh" %
                                             self.supportUrlBase),
@@ -5646,7 +5646,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          command=["chmod", "-R", "a+x", "."],
                          env=self.env)
                          )
-        if self.OS in ('snowleopard', 'lion', 'mountainlion'):
+        if self.OS in ('snowleopard', 'lion', 'mountainlion', 'mavericks'):
             self.addStep(FindFile(
                          workdir=os.path.join(self.workdirBase, "talos"),
                          filename="%s-bin" % self.productName,
@@ -5885,7 +5885,7 @@ class TalosFactory(RequestSortingBuildFactory):
             if self.OS in ('xp', 'win7', 'fedora', 'ubuntu32_hw',
                            'tegra_android', 'tegra_android-armv6',
                            'tegra_android-noion', 'panda_android',
-                           'snowleopard','lion', 'mountainlion',
+                           'snowleopard', 'lion', 'mountainlion', 'mavericks',
                            'xp-ix','win7-ix', 'win8'):
                 self.addStep(DownloadFile(
                              url=WithProperties(
@@ -6003,7 +6003,7 @@ class TalosFactory(RequestSortingBuildFactory):
                      ))
 
     def addRunTestStep(self):
-        if self.OS in ('mountainlion', 'lion', 'snowleopard'):
+        if self.OS in ('mavericks', 'mountainlion', 'lion', 'snowleopard'):
             self.addStep(resolution_step())
         self.addStep(talos_steps.MozillaRunPerfTests(
                      warnOnWarnings=True,
@@ -6014,11 +6014,11 @@ class TalosFactory(RequestSortingBuildFactory):
                      command=self.talosCmd,
                      env=self.env)
                      )
-        if self.OS in ('mountainlion', 'lion', 'snowleopard'):
+        if self.OS in ('mavericks', 'mountainlion', 'lion', 'snowleopard'):
             self.addStep(resolution_step())
 
     def addRebootStep(self):
-        if self.OS in ('mountainlion', 'lion',):
+        if self.OS in ('mavericks', 'mountainlion', 'lion',):
             self.addStep(ShellCommand(
                 name="clear_saved_state",
                 flunkOnFailure=False,
