@@ -1,6 +1,6 @@
 import re
 
-from buildbot.status.builder import EXCEPTION, FAILURE, RETRY, WARNINGS, CANCELLED
+from buildbot.status.builder import EXCEPTION, FAILURE, RETRY, WARNINGS
 
 global_errors = ((re.compile("No space left on device"), RETRY),
                  (re.compile("Remote Device Error"), RETRY),
@@ -8,9 +8,6 @@ global_errors = ((re.compile("No space left on device"), RETRY),
                  (re.compile("Connection to the other side was lost in a non-clean fashion"), RETRY),
                  (re.compile("program finished with exit code 80"), RETRY),
                  (re.compile("INFRA-ERROR"), RETRY),
-                 # XXXXXX: This automation had an in tree fix but still causes
-                 # infinite retries on try sometimes.
-                 (re.compile("mozdevice.devicemanager.DMError: Automation Error: Timeout in command execcwd /data/local/tests/jit-tests/jit-tests", CANCELLED)),
                  )
 hg_errors = ((re.compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re.compile("abort: .*: no match found!"), RETRY),
