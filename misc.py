@@ -2478,7 +2478,11 @@ def generateJetpackObjects(config, SLAVES):
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
-            jetpackTarball = "%s/%s/%s" % (config['hgurl'], config['repo_path'], config['jetpack_tarball'])
+            jetpack_tarball = WithProperties(
+                "%s/%s/archive/%%(%s:~tip)s.tar.bz2" % (config['hgurl'],
+                                                        config['repo_path'],
+                                                        'revision')
+            )
             ftp_url = config['ftp_url']
             types = ['opt', 'debug']
             for type in types:
@@ -2488,7 +2492,7 @@ def generateJetpackObjects(config, SLAVES):
                     config['scripts_repo'],
                     'buildfarm/utils/run_jetpack.py',
                     extra_args=(
-                    "-p", platform, "-t", jetpackTarball, "-b", branch,
+                    "-p", platform, "-t", jetpack_tarball, "-b", branch,
                         "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
                     interpreter='python',
                     log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE,
