@@ -688,6 +688,11 @@ def generateBranchObjects(config, name, secrets=None):
                 pf['stage_product'], []).append(buildername)
             prettyNames[platform] = pretty_name
 
+        if config['enable_valgrind'] and \
+                platform in config['valgrind_platforms']:
+            buildersByProduct.setdefault(
+                pf['stage_product'], []).append('%s valgrind' % base_name)
+
         # Fill the l10n dep dict
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
                 config['enable_l10n_onchange']:
@@ -725,9 +730,6 @@ def generateBranchObjects(config, name, secrets=None):
                     '%s %s %s l10n nightly' % (pf['product_name'].capitalize(),
                     name, platform)
                 l10nNightlyBuilders[builder]['platform'] = platform
-            if config['enable_valgrind'] and \
-                    platform in config['valgrind_platforms']:
-                nightlyBuilders.append('%s valgrind' % base_name)
         if config.get('enable_blocklist_update', False) and platform in ('linux',):
             weeklyBuilders.append('%s blocklist update' % base_name)
         if config.get('enable_hsts_update', False) and platform in ('linux64',):
@@ -1507,37 +1509,6 @@ def generateBranchObjects(config, name, secrets=None):
                     branchObjects['builders'].append(
                         mozilla2_l10n_nightly_builder)
 
-            if config['enable_valgrind'] and \
-                    platform in config['valgrind_platforms']:
-                valgrind_env = platform_env.copy()
-                valgrind_env['REVISION'] = WithProperties("%(revision)s")
-                mozilla2_valgrind_factory = ScriptFactory(
-                    scriptRepo="%s%s" % (config['hgurl'],
-                                         config['build_tools_repo_path']),
-                    scriptName='scripts/valgrind/valgrind.sh',
-                    use_mock=pf.get('use_mock'),
-                    mock_target=pf.get('mock_target'),
-                    mock_packages=pf.get('mock_packages'),
-                    mock_copyin_files=pf.get('mock_copyin_files'),
-                    env=valgrind_env,
-                )
-                mozilla2_valgrind_builder = {
-                    'name': '%s valgrind' % pf['base_name'],
-                    'slavenames': pf['slaves'],
-                    'builddir': '%s-%s-valgrind' % (name, platform),
-                    'slavebuilddir': normalizeName('%s-%s-valgrind' % (name, platform), pf['stage_product']),
-                    'factory': mozilla2_valgrind_factory,
-                    'category': name,
-                    'env': valgrind_env,
-                    'nextSlave': _nextSlave,
-                    'properties': {'branch': name,
-                                   'platform': platform,
-                                   'stage_platform': stage_platform,
-                                   'product': pf['stage_product'],
-                                   'slavebuilddir': normalizeName('%s-%s-valgrind' % (name, platform), pf['stage_product'])},
-                }
-                branchObjects['builders'].append(mozilla2_valgrind_builder)
-
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
                 config['enable_l10n_onchange']:
@@ -1606,6 +1577,37 @@ def generateBranchObjects(config, name, secrets=None):
                                'slavebuilddir': slavebuilddir},
             }
             branchObjects['builders'].append(mozilla2_l10n_dep_builder)
+
+        if config['enable_valgrind'] and \
+                platform in config['valgrind_platforms']:
+            valgrind_env = pf['env'].copy()
+            valgrind_env['REVISION'] = WithProperties("%(revision)s")
+            mozilla2_valgrind_factory = ScriptFactory(
+                scriptRepo="%s%s" % (config['hgurl'],
+                                        config['build_tools_repo_path']),
+                scriptName='scripts/valgrind/valgrind.sh',
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
+                env=valgrind_env,
+            )
+            mozilla2_valgrind_builder = {
+                'name': '%s valgrind' % pf['base_name'],
+                'slavenames': pf['slaves'],
+                'builddir': '%s-%s-valgrind' % (name, platform),
+                'slavebuilddir': normalizeName('%s-%s-valgrind' % (name, platform), pf['stage_product']),
+                'factory': mozilla2_valgrind_factory,
+                'category': name,
+                'env': valgrind_env,
+                'nextSlave': _nextSlave,
+                'properties': {'branch': name,
+                                'platform': platform,
+                                'stage_platform': stage_platform,
+                                'product': pf['stage_product'],
+                                'slavebuilddir': normalizeName('%s-%s-valgrind' % (name, platform), pf['stage_product'])},
+            }
+            branchObjects['builders'].append(mozilla2_valgrind_builder)
 
         if config.get('enable_blocklist_update', False):
             if platform == 'linux':
@@ -2476,7 +2478,11 @@ def generateJetpackObjects(config, SLAVES):
     for branch in config['branches']:
         for platform in config['platforms'].keys():
             slaves = SLAVES[platform]
-            jetpackTarball = "%s/%s/%s" % (config['hgurl'], config['repo_path'], config['jetpack_tarball'])
+            jetpack_tarball = WithProperties(
+                "%s/%s/archive/%%(%s:~tip)s.tar.bz2" % (config['hgurl'],
+                                                        config['repo_path'],
+                                                        'revision')
+            )
             ftp_url = config['ftp_url']
             types = ['opt', 'debug']
             for type in types:
@@ -2486,7 +2492,7 @@ def generateJetpackObjects(config, SLAVES):
                     config['scripts_repo'],
                     'buildfarm/utils/run_jetpack.py',
                     extra_args=(
-                    "-p", platform, "-t", jetpackTarball, "-b", branch,
+                    "-p", platform, "-t", jetpack_tarball, "-b", branch,
                         "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
                     interpreter='python',
                     log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE,
