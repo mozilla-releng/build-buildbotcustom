@@ -51,16 +51,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
        appended until they reach the minimum length.
        See https://bugzilla.mozilla.org/show_bug.cgi?id=827306 for background.
     """
-    # XXX: Remove me when esr17 dies.
-    # We need a very very short directory name here because:
-    # 1) ESR builds have especially long paths compared to other branches.
-    # 2) Pymake doesn't work on esr17 which makes it possible to hit maximum
-    #    path length issues when working with certain mochitests.
-    # https://bugzilla.mozilla.org/show_bug.cgi?id=799095#c7
-    if name == 'release-comm-esr17-win32_build':
-        return 'zzz'
-    elif name == 'release-mozilla-esr17-win32_build':
-        return 'yyy'
     origName = name
     prefix = ''
     if product != None and 'thunderbird' in product:
@@ -144,11 +134,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
             )
             name = regex.sub(r'\g<1>%s\g<2>' % replacement, name)
     name = prefix + name
-    # XXX: Remove me when esr17 is dead. Nasty hack to avoid shortening
-    # this branches' directories because the build system can't handle the
-    # padded version. Can also be removed if we manage to turn pymake on for it.
-    if 'esr17' in origName:
-        return name
 
     if len(name) > max_:
         msg = 'Cannot shorten "%s" to maximum length (%d). Got to: %s' % (
