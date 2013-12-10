@@ -1591,6 +1591,11 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 env=valgrind_env,
+                reboot_command=['python',
+                                'scripts/buildfarm/maintenance/count_and_reboot.py',
+                                '-f', './reboot_count.txt',
+                                '-n', '0',
+                                '-z'],
             )
             mozilla2_valgrind_builder = {
                 'name': '%s valgrind' % pf['base_name'],
