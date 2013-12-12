@@ -1752,7 +1752,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mirror_scheduler1 = TriggerBouncerCheck(
                 name=builderPrefix('ready-for-rel-test'),
                 configRepo=config_repo,
-                minUptake=releaseConfig.get('releasetestUptake', 3),
+                minUptake=releaseConfig.get('releasetestUptake', 10000),
                 builderNames=[builderPrefix(
                     'ready_for_releasetest_testing')] + finalVerifyBuilders,
                 username=BuildSlaves.tuxedoUsername,
@@ -1769,7 +1769,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         schedulers.append(TriggerBouncerCheck(
             name=builderPrefix('almost-ready-for-release'),
             configRepo=config_repo,
-            minUptake=releaseConfig.get('releaseUptake', 45000),
+            minUptake=releaseConfig.get('releaseUptake', 10000),
             checkMARs=not releaseConfig.get('skip_updates', False),
             builderNames=[builderPrefix('almost_ready_for_release')],
             username=BuildSlaves.tuxedoUsername,
