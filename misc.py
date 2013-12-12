@@ -852,6 +852,7 @@ def generateBranchObjects(config, name, secrets=None):
                 platform in config['valgrind_platforms']:
             buildersByProduct.setdefault(
                 pf['stage_product'], []).append('%s valgrind' % base_name)
+            prettyNames["%s-valgrind" % platform] = "%s valgrind" % base_name
 
         # Fill the l10n dep dict
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \

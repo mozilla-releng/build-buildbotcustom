@@ -15,6 +15,7 @@ BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
                         'win64': 'WINNT 6.1 try try-nondefault build',
                         'linux64': 'Linux x86-64 try build',
                         'linux64-debug': 'Linux x86-64 try leak test build',
+                        'linux64-valgrind': 'Linux x86-64 try valgrind',
                         'linux': 'Linux try build',
                         'linux-debug': 'Linux try leak test build',
                         'android-r7': 'Android R7 try build',
@@ -280,6 +281,11 @@ class TestTryParser(unittest.TestCase):
             BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
         builders = [b for b in builders if 'nondefault' not in b]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_ValgrindBuilds(self):
+        tm = "try: -bo -p linux64-valgrind"
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        self.assertEquals(self.customBuilders, ["Linux x86-64 try valgrind"])
 
     def test_NoNondefaultTests(self):
         tm = 'try: -b d -p macosx64 -u all'
