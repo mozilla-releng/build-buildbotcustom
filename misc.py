@@ -294,6 +294,12 @@ def _getRetries(builder):
     del frame
 
     requests = builder._getBuildable(t, None)
+    # If we have no requests, no point in running the query below. Also, mysql
+    # will fail on a query like
+    # SELECT count(*) FROM builds WHERE brid IN ()
+    if not requests:
+        return [], 0
+
     request_ids = [r.id for r in requests]
     # Figure out if any of these requests have been retried
     # Do this by looking for existing builds corresponding to these
@@ -388,12 +394,16 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
             requests, retried = _getRetries(builder)
             log.msg("nextAWSSlave: %i retries for %s" %
                     (retried, builder.name))
-            oldestRequest = sorted(requests, key=lambda r: r.submittedAt)[0]
+            if requests:
+                oldestRequestTime = sorted(requests, key=lambda r:
+                                           r.submittedAt)[0].submittedAt
+            else:
+                oldestRequestTime = 0
         else:
             # We don't need to consider retries, so pretend like we have none
             retried = 0
 
-        if aws_wait and now() - oldestRequest.submittedAt < aws_wait:
+        if aws_wait and now() - oldestRequestTime < aws_wait:
             log.msg("nextAWSSlave: Waiting for inhouse slaves to show up")
             return None
 

@@ -1,12 +1,17 @@
 from __future__ import with_statement
 
+import os
+import shutil
+
 import mock
 
 from twisted.trial import unittest
+from buildbot.db import dbspec, connector
+from buildbot.db.schema.manager import DBSchemaManager
 
 import buildbotcustom.misc
 from buildbotcustom.misc import _nextIdleSlave, _nextAWSSlave, \
-    _classifyAWSSlaves
+    _classifyAWSSlaves, _getRetries
 
 
 class TestNextSlaveFuncs(unittest.TestCase):
@@ -141,3 +146,62 @@ class TestNextAWSSlave(unittest.TestCase):
                 self.assertEquals("slave-ec2",
                                   f(self.builder,
                                     spot + ondemand).slave.slavename)
+
+    def test_nextAWSSlave_noRequests(self):
+        """Test that everything works if there are no pending requests to
+        getRetries"""
+        f = _nextAWSSlave()
+        inhouse, ondemand, spot = _classifyAWSSlaves(self.slaves)
+        # We need to mock out _getRetries so that we don't have to create a db
+        # for these tests
+        with mock.patch.object(buildbotcustom.misc, "_getRetries") as \
+                _getRetries:
+            _getRetries.return_value = [], 0
+
+            # Sanity check - can't choose any slave if none are available!
+            self.assertEquals(None,
+                              f(self.builder, []))
+
+            # _getRetries shouldn't get called either
+            self.assertEquals(_getRetries.called, 0)
+
+            # _getRetries shouldn't get called if we only have ondemand
+            # instances either
+            self.assertEquals("slave-ec2",
+                              f(self.builder, ondemand).slave.slavename)
+            self.assertEquals(_getRetries.called, 0)
+
+            # Spot instances should be preferred if there are no retries
+            self.assertEquals("slave-spot",
+                              f(self.builder, spot + ondemand).slave.slavename)
+
+
+class TestGetRetries(unittest.TestCase):
+    basedir = "test_misc_nextslaves"
+    def setUp(self):
+        if os.path.exists(self.basedir):
+            shutil.rmtree(self.basedir)
+        os.makedirs(self.basedir)
+        spec = dbspec.DBSpec.from_url("sqlite:///state.sqlite", self.basedir)
+        # For testing against mysql, uncomment this
+        #spec = dbspec.DBSpec.from_url("mysql://buildbot@localhost/buildbot_schedulers", self.basedir)
+        manager = DBSchemaManager(spec, self.basedir)
+        manager.upgrade()
+
+        self.dbc = connector.DBConnector(spec)
+        self.dbc.start()
+
+    def tearDown(self):
+        self.dbc.stop()
+        shutil.rmtree(self.basedir)
+
+    def test_getRetries(self):
+        # Get a db transaction object so that getRetries' stack walking can
+        # find it!
+        t = self.dbc.get_sync_connection().cursor()
+
+        builder = mock.Mock()
+        builder._getBuildable.return_value = []
+        builder.db = self.dbc
+
+        self.assertEquals(_getRetries(builder), ([], 0))
