@@ -1535,7 +1535,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                          flunkOnFailure=False,
                          warnOnFailure=False,
                          ))
-        pkg_targets = ['package']
+        pkg_targets = ['package', 'package-tests']
         if self.enableInstaller:
             pkg_targets.append('installer')
         for t in pkg_targets:

@@ -11,6 +11,7 @@ global_errors = ((re_compile("No space left on device"), RETRY),
                  (re_compile("Connection to the other side was lost in a non-clean fashion"), RETRY),
                  (re_compile("program finished with exit code 80"), RETRY),
                  (re_compile("INFRA-ERROR"), RETRY),
+                 (re_compile("Failure instance: Traceback (failure with no frames): <class 'twisted.spread.pb.PBConnectionLost'>"), RETRY),
                  )
 hg_errors = ((re_compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re_compile("abort: .*: no match found!"), RETRY),
