@@ -352,6 +352,7 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
     build. Otherwise pick randomly.
 
     """
+    log.msg("nextAWSSlave: start")
 
     if recentSort:
         def sorter(slaves, builder):
