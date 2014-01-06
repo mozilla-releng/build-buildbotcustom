@@ -861,6 +861,7 @@ def generateBranchObjects(config, name, secrets=None):
 
         if config['enable_valgrind'] and \
                 platform in config['valgrind_platforms']:
+            builders.append('%s valgrind' % base_name)
             buildersByProduct.setdefault(
                 pf['stage_product'], []).append('%s valgrind' % base_name)
             prettyNames["%s-valgrind" % platform] = "%s valgrind" % base_name
