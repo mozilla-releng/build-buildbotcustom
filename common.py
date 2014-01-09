@@ -120,6 +120,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'generational': 'ggc',
         'emulator': 'emu',
         'hamachi': 'ham',
+        'buri-limited-memory': 'blm',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before
