@@ -639,7 +639,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
                                  totalChunks=totalChunks, thisChunk=thisChunk)
 
         self.name = 'mochitest-%s' % variant
-        self.command = ['python', 'mochitest/runtestsremote.py',
+        self.command = ['python', '-u', 'mochitest/runtestsremote.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
                         '--utility-path', utilityPath,
@@ -691,7 +691,7 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
         self.name = suite
         if totalChunks:
             self.name += '-%i' % thisChunk
-        self.command = ['python', 'reftest/remotereftest.py',
+        self.command = ['python', '-u', 'reftest/remotereftest.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
                         '--utility-path', utilityPath,
@@ -731,7 +731,7 @@ class RemoteXPCShellStep(XPCShellMixin, ChunkingMixin, ShellCommandReportTimeout
         if totalChunks:
             self.name += '-%i' % thisChunk
 
-        self.command = ['python2.7', 'xpcshell/remotexpcshelltests.py',
+        self.command = ['python2.7', '-u', 'xpcshell/remotexpcshelltests.py',
                         '--deviceIP', WithProperties('%(sut_ip)s'),
                         '--xre-path', xrePath,
                         '--manifest', 'xpcshell/tests/xpcshell_android.ini',
