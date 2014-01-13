@@ -615,6 +615,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             return False
         return packageFilename
 
+    def getInstallerFilename(self):
+        return '*.installer.exe'
+
     def parseFileSize(self, propertyName):
         def getSize(rv, stdout, stderr):
             stdout = stdout.strip()
@@ -1052,6 +1055,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addValgrindCheckSteps()
         if self.createSnippet:
             self.addUpdateSteps()
+            if self.balrog_api_root:
+                self.addSubmitBalrogUpdates()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.doCleanup:
@@ -1637,6 +1642,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
+        installerFilename = self.getInstallerFilename()
         if self.enableInstaller and self.productName != 'xulrunner':
             self.addStep(ShellCommand(
                 name='make_installer',
@@ -1645,10 +1651,11 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 workdir='build/%s' % self.objdir,
                 haltOnFailure=True
             ))
-            self.addFilePropertiesSteps(filename='*.installer.exe',
-                                        directory='build/%s/dist/install/sea' % self.mozillaObjdir,
-                                        fileType='installer',
-                                        haltOnFailure=True)
+            if installerFilename:
+                self.addFilePropertiesSteps(filename=installerFilename,
+                                            directory='build/%s/dist/install/sea' % self.mozillaObjdir,
+                                            fileType='installer',
+                                            haltOnFailure=True)
 
         if self.productName == 'xulrunner':
             self.addStep(SetProperty(
@@ -1798,44 +1805,42 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             haltOnFailure=True,
         ))
 
-    def addSubmitBalrogUpdates(self):
-        if self.balrog_api_root:
-            self.addStep(JSONPropertiesDownload(
-                name='download_balrog_props',
-                slavedest='buildprops_balrog.json',
+    def addSubmitBalrogUpdates(self, type_='nightly'):
+        self.addStep(JSONPropertiesDownload(
+            name='download_balrog_props',
+            slavedest='buildprops_balrog.json',
+            workdir='.',
+            flunkOnFailure=False,
+        ))
+        cmd = [
+            self.env.get('PYTHON26', 'python'),
+            WithProperties(
+                '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
+            '--build-properties', 'buildprops_balrog.json',
+            '--api-root', self.balrog_api_root,
+            '-t', type_, '--verbose',
+        ]
+        if self.balrog_credentials_file:
+            credentialsFile = os.path.join(os.getcwd(),
+                                            self.balrog_credentials_file)
+            target_file_name = os.path.basename(credentialsFile)
+            cmd.extend(['--credentials-file', target_file_name])
+            self.addStep(FileDownload(
+                mastersrc=credentialsFile,
+                slavedest=target_file_name,
                 workdir='.',
                 flunkOnFailure=False,
             ))
-            cmd = [
-                self.env.get('PYTHON26', 'python'),
-                WithProperties(
-                    '%(toolsdir)s/scripts/updates/balrog-submitter.py'),
-                '--build-properties', 'buildprops_balrog.json',
-                '--api-root', self.balrog_api_root,
-                '--verbose',
-            ]
-            if self.balrog_credentials_file:
-                credentialsFile = os.path.join(os.getcwd(),
-                                               self.balrog_credentials_file)
-                target_file_name = os.path.basename(credentialsFile)
-                cmd.extend(['--credentials-file', target_file_name])
-                self.addStep(FileDownload(
-                    mastersrc=credentialsFile,
-                    slavedest=target_file_name,
-                    workdir='.',
-                    flunkOnFailure=False,
-                ))
-            self.addStep(RetryingShellCommand(
-                name='submit_balrog_updates',
-                command=cmd,
-                workdir='.',
-                flunkOnFailure=False,
-            ))
+        self.addStep(RetryingShellCommand(
+            name='submit_balrog_updates',
+            command=cmd,
+            workdir='.',
+            flunkOnFailure=False,
+        ))
 
     def addUpdateSteps(self):
         self.addCreateSnippetsSteps()
         self.addUploadSnippetsSteps()
-        self.addSubmitBalrogUpdates()
 
     def addBuildSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
@@ -2596,12 +2601,22 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             env['MOZ_PKG_PRETTYNAMES'] = '1'
         if appVersion is None or self.version != appVersion:
             env['MOZ_PKG_VERSION'] = version
+        self.update_dir = 'update/%s/en-US' % getPlatformFtpDir(kwargs['platform'])
+        self.current_mar_name = '%s-%s.complete.mar' % (kwargs['productName'],
+                                                        self.version)
         MercurialBuildFactory.__init__(self, env=env, **kwargs)
 
-    def addFilePropertiesSteps(self, filename=None, directory=None,
-                               fileType=None, maxDepth=1, haltOnFailure=False):
-        # We don't need to do this for release builds.
-        pass
+    def getPackageFilename(self, platform, platform_variation):
+        # Returning a non-True value prevents file properties steps from
+        # running, which we don't need anything from (and don't work for
+        # release builds in the first place)
+        return False
+
+    def getInstallerFilename(self):
+        # Returning a non-True value prevents file properties steps from
+        # running, which we don't need anything from (and don't work for
+        # release builds in the first place)
+        return False
 
     def addCreatePartialUpdateSteps(self):
         updateEnv = self.env.copy()
@@ -2611,9 +2626,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             '%(basedir)s' + '/%s/dist/host/bin/mar' % self.absMozillaObjDir)
         updateEnv['MBSDIFF'] = WithProperties(
             '%(basedir)s' + '/%s/dist/host/bin/mbsdiff' % self.absMozillaObjDir)
-        update_dir = 'update/%s/en-US' % getPlatformFtpDir(self.platform)
-        current_mar_name = '%s-%s.complete.mar' % (self.productName,
-                                                   self.version)
         mar_unpack_cmd = WithProperties(
             '%(basedir)s' + '/%s/tools/update-packaging/unwrap_full_update.pl' % self.absMozillaSrcDir)
         partial_mar_cmd = WithProperties(
@@ -2636,7 +2648,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         self.addStep(MockCommand(
             name='unpack_current_mar',
             command=['perl', mar_unpack_cmd,
-                     '../dist/%s/%s' % (update_dir, current_mar_name)],
+                     '../dist/%s/%s' % (self.update_dir, self.current_mar_name)],
             env=updateEnv,
             haltOnFailure=True,
             mock=self.use_mock,
@@ -2707,7 +2719,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 name='make_partial_mar',
                 description=self.makeCmd + ['partial', 'mar'],
                 command=['bash', partial_mar_cmd,
-                         '%s/%s' % (update_dir, partial_mar_name),
+                         '%s/%s' % (self.update_dir, partial_mar_name),
                          '../previous', '../current'],
                 env=updateEnv,
                 mock=self.use_mock,
@@ -2720,15 +2732,15 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 name='check_partial_mar',
                 description=['check', 'partial', 'mar'],
                 command=['ls', '-l',
-                         '%s/%s' % (update_dir, partial_mar_name)],
+                         '%s/%s' % (self.update_dir, partial_mar_name)],
                 workdir='%s/dist' % self.absMozillaObjDir,
                         haltOnFailure=True,
             ))
             self.UPLOAD_EXTRA_FILES.append(
-                '%s/%s' % (update_dir, partial_mar_name))
+                '%s/%s' % (self.update_dir, partial_mar_name))
             if self.enableSigning and self.signingServers:
                 partial_mar_path = '%s/dist/%s/%s' % \
-                    (self.absMozillaObjDir, update_dir, partial_mar_name)
+                    (self.absMozillaObjDir, self.update_dir, partial_mar_name)
                 cmd = '%s -f mar -f gpg "%s"' % (self.signing_command,
                                                  partial_mar_path)
                 self.addStep(MockCommand(
@@ -2741,7 +2753,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                     workdir='.',
                     haltOnFailure=True,
                 ))
-                self.UPLOAD_EXTRA_FILES.append('%s/%s.asc' % (update_dir,
+                self.UPLOAD_EXTRA_FILES.append('%s/%s.asc' % (self.update_dir,
                                                               partial_mar_name))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
@@ -2759,6 +2771,12 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 target=self.mock_target,
                 workdir='build',
             ))
+            self.addFilePropertiesSteps(
+                filename=self.current_mar_name,
+                directory='%s/dist/%s' % (self.absMozillaObjDir, self.update_dir),
+                fileType='completeMar',
+                haltOnFailure=True,
+            )
             if self.createPartial:
                 self.addCreatePartialUpdateSteps()
         self.addStep(MockCommand(
@@ -2876,6 +2894,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                          sendchange_props=sendchange_props,
                          env=self.env,
                          ))
+        if self.balrog_api_root:
+            self.addSubmitBalrogUpdates(type_='release')
 
 
 class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
