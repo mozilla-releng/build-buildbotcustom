@@ -1725,8 +1725,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 mock_workdir_prefix=None,
             ))
             # b2g doesn't get snippets, and these steps don't work it, so don't
-            # run them
-            if self.productName != 'b2g':
+            # run them. Also ignore the Android release case where
+            # packageFilename is undefined (bug 739959)
+            if self.productName != 'b2g' and self.packageFilename:
                 self.addFilePropertiesSteps(filename=self.packageFilename,
                                             directory='build/%s/dist' % self.mozillaObjdir,
                                             fileType='package',
