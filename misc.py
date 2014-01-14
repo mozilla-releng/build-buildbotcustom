@@ -1455,7 +1455,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'factory': factory,
                         'category': name,
                         'nextSlave': _nextAWSSlave_wait_sort,
-                        'properties': {'branch': '%s' % config['repo_path'],
+                        'properties': {'branch': name,
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                        'stage_platform': stage_platform,
                                        'product': pf['stage_product'],
