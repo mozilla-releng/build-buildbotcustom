@@ -1386,6 +1386,9 @@ def generateBranchObjects(config, name, secrets=None):
                 kwargs = factory_kwargs.copy()
                 kwargs['stagePlatform'] += '-nonunified'
                 kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-nonunified'
+                # We don't need to upload these packages
+                # This also disables sendchanges, etc.
+                kwargs['uploadPackages'] = False
                 factory = factory_class(**kwargs)
                 builder = {
                     'name': '%s non-unified' % pf['base_name'],
