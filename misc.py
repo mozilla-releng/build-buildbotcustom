@@ -792,8 +792,7 @@ def generateBranchObjects(config, name, secrets=None):
     buildersByProduct = {}
     nightlyBuilders = []
     xulrunnerNightlyBuilders = []
-    periodicPgoBuilders = []
-        # Only used for the 'periodic' strategy. rename to perodicPgoBuilders?
+    periodicBuilders = []
     weeklyBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
     PRETTY_NAME = '%(basename)s %(trystatus)sbuild'
@@ -886,11 +885,14 @@ def generateBranchObjects(config, name, secrets=None):
 
         # Check if platform as a PGO builder
         if config['pgo_strategy'] in ('periodic',) and platform in config['pgo_platforms']:
-            periodicPgoBuilders.append('%s pgo-build' % pf['base_name'])
+            periodicBuilders.append('%s pgo-build' % pf['base_name'])
         elif config['pgo_strategy'] in ('try',) and platform in config['pgo_platforms']:
             builders.append('%s pgo-build' % pf['base_name'])
             buildersByProduct.setdefault(pf['stage_product'], []).append(
                 '%s pgo-build' % pf['base_name'])
+
+        if pf.get('enable_nonunified_build'):
+            periodicBuilders.append('%s non-unified' % pf['base_name'])
 
         if do_nightly:
             builder = '%s nightly' % base_name
@@ -1000,7 +1002,7 @@ def generateBranchObjects(config, name, secrets=None):
     if not config.get('enable_merging', True):
         nomergeBuilders.extend(builders)
     # these should never, ever merge
-    nomergeBuilders.extend(periodicPgoBuilders)
+    nomergeBuilders.extend(periodicBuilders)
 
     if 'product_prefix' in config:
         scheduler_name_prefix = "%s_%s" % (config['product_prefix'], name)
@@ -1072,18 +1074,18 @@ def generateBranchObjects(config, name, secrets=None):
             )
         branchObjects['schedulers'].append(nightly_scheduler)
 
-    if len(periodicPgoBuilders) > 0:
-        pgo_scheduler = makePropertiesScheduler(
+    if len(periodicBuilders) > 0:
+        periodic_scheduler = makePropertiesScheduler(
             SpecificNightly,
             [buildIDSchedFunc, buildUIDSchedFunc])(
                 ssFunc=lastRevFunc(config['repo_path'],
                                    triggerBuildIfNoChanges=False),
-                name="%s pgo" % scheduler_name_prefix,
+                name="%s periodic" % scheduler_name_prefix,
                 branch=config['repo_path'],
-                builderNames=periodicPgoBuilders,
-                hour=range(0, 24, config['periodic_pgo_interval']),
+                builderNames=periodicBuilders,
+                hour=range(0, 24, config['periodic_interval']),
             )
-        branchObjects['schedulers'].append(pgo_scheduler)
+        branchObjects['schedulers'].append(periodic_scheduler)
 
     for builder in nightlyBuilders + xulrunnerNightlyBuilders:
         if config['enable_l10n'] and \
@@ -1380,6 +1382,27 @@ def generateBranchObjects(config, name, secrets=None):
                 }
                 branchObjects['builders'].append(pgo_builder)
 
+            if pf.get('enable_nonunified_build'):
+                kwargs = factory_kwargs.copy()
+                kwargs['stagePlatform'] += '-nonunified'
+                kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-nonunified'
+                factory = factory_class(**kwargs)
+                builder = {
+                    'name': '%s non-unified' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s-nonunified' % (name, platform),
+                    'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product']),
+                    'factory': factory,
+                    'category': name,
+                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'properties': {'branch': name,
+                                   'platform': platform,
+                                   'stage_platform': stage_platform + '-nonunified',
+                                   'product': pf['stage_product'],
+                                   'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product'])},
+                }
+                branchObjects['builders'].append(builder)
+
         # skip nightlies for debug builds unless requested at platform level
         if platform.endswith("-debug") and not pf.get('enable_nightly'):
                 continue
@@ -1432,7 +1455,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'factory': factory,
                         'category': name,
                         'nextSlave': _nextAWSSlave_wait_sort,
-                        'properties': {'branch': '%s' % config['repo_path'],
+                        'properties': {'branch': name,
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                        'stage_platform': stage_platform,
                                        'product': pf['stage_product'],
