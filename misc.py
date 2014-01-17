@@ -2484,7 +2484,7 @@ def generateFuzzingObjects(config, SLAVES):
                    },
                    }
         builders.append(builder)
-        nomergeBuilders.append(builder)
+        nomergeBuilders.append(builder['name'])
     fuzzing_scheduler = PersistentScheduler(
         name="fuzzer",
         builderNames=[b['name'] for b in builders],
@@ -2527,7 +2527,7 @@ def generateNanojitObjects(config, SLAVES):
                    'properties': {'branch': branch, 'platform': platform, 'product': 'nanojit'},
                    }
         builders.append(builder)
-        nomergeBuilders.append(builder)
+        nomergeBuilders.append(builder['name'])
 
     # Set up polling
     poller = HgPoller(
@@ -2718,7 +2718,7 @@ def generateJetpackObjects(config, SLAVES):
                            'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
                            }
                 builders.append(builder)
-                nomergeBuilders.append(builder)
+                nomergeBuilders.append(builder['name'])
 
     # Set up polling
     poller = HgPoller(
