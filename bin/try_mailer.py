@@ -167,11 +167,13 @@ if __name__ == '__main__':
     parser.add_argument("--to-author", dest="to_author", help="send mail to build's owner", action="store_true")
     parser.add_argument(
         "--log-url", dest="log_url", help="url to uploaded log")
+    parser.add_argument("--relay", dest="relayhost", help="smtp host to send mail through")
     parser.set_defaults(
         to_author=False,
         to=[],
         from_=None,
-        log_url=None
+        log_url=None,
+        relayhost='mail.build.mozilla.org'
     )
 
     options, args = parser.parse_known_args()
@@ -227,7 +229,7 @@ if __name__ == '__main__':
         print msg
 
         s = SMTP()
-        s.connect()
+        s.connect(options.relayhost)
         s.sendmail(options.from_, options.to, msg.as_string())
 
     sys.exit(exit_code)
