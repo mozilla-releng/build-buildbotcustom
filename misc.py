@@ -1389,6 +1389,8 @@ def generateBranchObjects(config, name, secrets=None):
                 # We don't need to upload these packages
                 # This also disables sendchanges, etc.
                 kwargs['uploadPackages'] = False
+                # Don't need to run checktests
+                kwargs['checkTest'] = False
                 factory = factory_class(**kwargs)
                 builder = {
                     'name': '%s non-unified' % pf['base_name'],
