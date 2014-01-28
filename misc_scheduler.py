@@ -210,14 +210,14 @@ def lastGoodRev(db, t, branch, builderNames, starttime, endtime):
 def getLatestRev(db, t, branch, revs):
     """Returns whichever of revs has the latest when_timestamp"""
     # Strip out duplicates
-    revs = set(r[:12] for r in revs)
-    if len(revs) == 1:
+    short_revs = set(r[:12] for r in revs)
+    if len(short_revs) == 1:
         return list(revs)[0]
 
     if 'sqlite' in db._spec.dbapiName:
-        rev_clause = " OR ".join(["revision LIKE (? || '%')"] * len(revs))
+        rev_clause = " OR ".join(["revision LIKE (? || '%')"] * len(short_revs))
     else:
-        rev_clause = " OR ".join(["revision LIKE CONCAT(?, '%%')"] * len(revs))
+        rev_clause = " OR ".join(["revision LIKE CONCAT(?, '%%')"] * len(short_revs))
 
     # Get the when_timestamp for these two revisions
     q = db.quoteq("""SELECT revision FROM changes
@@ -228,7 +228,7 @@ def getLatestRev(db, t, branch, revs):
                         when_timestamp DESC
                      LIMIT 1""" % rev_clause)
 
-    t.execute(q, (branch,) + tuple(revs))
+    t.execute(q, (branch,) + tuple(short_revs))
     latest = t.fetchone()[0]
     log.msg("getLatestRev: %s is latest of %s" % (latest, revs))
     return latest
