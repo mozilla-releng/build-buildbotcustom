@@ -45,24 +45,24 @@ def startHTTPServer(contents):
 
 class UrlCreation(unittest.TestCase):
     def testSimpleUrl(self):
-        correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1'
         poller = BaseHgPoller(
-            hgURL='http://hg.mozilla.org', branch='mozilla-central')
+            hgURL='https://hg.mozilla.org', branch='mozilla-central')
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithLastChangeset(self):
-        correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
         poller = BaseHgPoller(
-            hgURL='http://hg.mozilla.org', branch='mozilla-central')
+            hgURL='https://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = '123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testTipsOnlyUrl(self):
-        correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1&tipsonly=1'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&tipsonly=1'
         poller = BaseHgPoller(
-            hgURL='http://hg.mozilla.org', branch='mozilla-central',
+            hgURL='https://hg.mozilla.org', branch='mozilla-central',
             tipsOnly=True)
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
@@ -70,28 +70,28 @@ class UrlCreation(unittest.TestCase):
     def testTipsOnlyWithLastChangeset(self):
         # there's two possible correct URLs in this case
         correctUrls = [
-            'http://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&fromchange=123456&tipsonly=1',
-            'http://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&tipsonly=1&fromchange=123456'
+            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&fromchange=123456&tipsonly=1',
+            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&tipsonly=1&fromchange=123456'
         ]
-        poller = BaseHgPoller(hgURL='http://hg.mozilla.org',
+        poller = BaseHgPoller(hgURL='https://hg.mozilla.org',
                               branch='releases/mozilla-1.9.1', tipsOnly=True)
         poller.lastChangeset = '123456'
         url = poller._make_url()
         self.failUnlessIn(url, correctUrls)
 
     def testOverrideUrl(self):
-        correctUrl = 'http://hg.mozilla.org/other_repo/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?full=1&fromchange=123456'
         poller = BaseHgPoller(
-            hgURL='http://hg.mozilla.org', branch='mozilla-central',
-            pushlogUrlOverride='http://hg.mozilla.org/other_repo/json-pushes?full=1')
+            hgURL='https://hg.mozilla.org', branch='mozilla-central',
+            pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?full=1')
         poller.lastChangeset = '123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithUnicodeLastChangeset(self):
-        correctUrl = 'http://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
         poller = BaseHgPoller(
-            hgURL='http://hg.mozilla.org', branch='mozilla-central')
+            hgURL='https://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = u'123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)

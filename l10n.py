@@ -80,7 +80,7 @@ class L10nMixin(object):
     inidividual locale to be built for that BuildSet.
     """
 
-    def __init__(self, platform, repo='http://hg.mozilla.org/', branch=None,
+    def __init__(self, platform, repo='https://hg.mozilla.org/', branch=None,
                  baseTag='default', localesFile="browser/locales/all-locales",
                  locales=None, localesURL=None):
         """

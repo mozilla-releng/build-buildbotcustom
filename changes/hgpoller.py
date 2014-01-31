@@ -397,7 +397,7 @@ class HgPoller(base.ChangeSource, BaseHgPoller):
         """
         @type   hgURL:          string
         @param  hgURL:          The base URL of the Hg repo
-                                (e.g. http://hg.mozilla.org/)
+                                (e.g. https://hg.mozilla.org/)
         @type   branch:         string
         @param  branch:         The branch to check (e.g. mozilla-central)
         @type   pollInterval:   int
@@ -471,7 +471,7 @@ class HgLocalePoller(BaseHgPoller):
 class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     """Poll all localization repositories from an index page.
 
-    For a index page like http://hg.mozilla.org/releases/l10n-mozilla-1.9.1/,
+    For a index page like https://hg.mozilla.org/releases/l10n-mozilla-1.9.1/,
     all links look like /releases/l10n-mozilla-1.9.1/af/, where the last
     path step will be the locale code, and the others will be passed
     as branch for the changes, i.e. 'releases/l10n-mozilla-1.9.1'.

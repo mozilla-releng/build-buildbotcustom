@@ -6253,7 +6253,7 @@ class PartnerRepackFactory(ReleaseFactory):
             self.addStep(ShellCommand(
                 name='download_pkg-dmg',
                 command=['bash', '-c',
-                         'wget http://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
+                         'wget https://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
                 description=['download', 'pkg-dmg'],
                 workdir='%s/scripts' % self.partnersRepackDir,
                 haltOnFailure=True
