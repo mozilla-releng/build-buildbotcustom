@@ -66,7 +66,7 @@ def tryChooser(s, all_changes):
                 d = defer.succeed(c.comments)
             # otherwise getPage from hg.m.o
             else:
-                d = getPage(str("http://hg.mozilla.org/try/json-pushes?full=1&changeset=%s" % c.revision))
+                d = getPage(str("https://hg.mozilla.org/try/json-pushes?full=1&changeset=%s" % c.revision))
                 d.addCallback(getJSON)
         except:
             log.msg("Error in all_changes loop: sending default try set")

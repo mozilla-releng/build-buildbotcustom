@@ -581,14 +581,14 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
 
     def getRepository(self, repoPath, hgHost=None, push=False):
         assert repoPath
-        for prefix in ('http://', 'ssh://'):
+        for prefix in ('http://', 'ssh://', 'https://'):
             if repoPath.startswith(prefix):
                 return repoPath
         if repoPath.startswith('/'):
             repoPath = repoPath.lstrip('/')
         if not hgHost:
             hgHost = self.hgHost
-        proto = 'ssh' if push else 'http'
+        proto = 'ssh' if push else 'https'
         return '%s://%s/%s' % (proto, hgHost, repoPath)
 
     def getPackageFilename(self, platform, platform_variation):
@@ -880,7 +880,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.tooltool_script = tooltool_script
         self.tooltool_bootstrap = tooltool_bootstrap
         self.gaiaRepo = gaiaRepo
-        self.gaiaRepoUrl = "http://%s/%s" % (self.hgHost, self.gaiaRepo)
+        self.gaiaRepoUrl = "https://%s/%s" % (self.hgHost, self.gaiaRepo)
         self.gaiaMirrors = None
         if self.baseMirrorUrls and self.gaiaRepo:
             self.gaiaMirrors = ['%s/%s' % (url, self.gaiaRepo)
@@ -1205,7 +1205,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 extract_fn=parse_gaia_revision,
             ))
             self.gaiaRevision = WithProperties("%(gaiaRevision)s")
-            self.gaiaRepoUrl = WithProperties("http://" + self.hgHost + "/%(gaiaRepoPath)s")
+            self.gaiaRepoUrl = WithProperties("https://" + self.hgHost + "/%(gaiaRepoPath)s")
             if self.baseMirrorUrls:
                 self.gaiaMirrors = [WithProperties(url + "/%(gaiaRepoPath)s") for url in self.baseMirrorUrls]
 
@@ -1262,7 +1262,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addStep(Mercurial(
                          name='hg_update',
                          mode='update',
-                         baseURL='http://%s/' % self.hgHost,
+                         baseURL='https://%s/' % self.hgHost,
                          defaultBranch=self.repoPath,
                          timeout=60 * 60,  # 1 hour
                          ))
@@ -1944,7 +1944,7 @@ class TryBuildFactory(MercurialBuildFactory):
             self.addStep(Mercurial(
                          name='hg_update',
                          mode='clobber',
-                         baseURL='http://%s/' % self.hgHost,
+                         baseURL='https://%s/' % self.hgHost,
                          defaultBranch=self.repoPath,
                          timeout=60 * 60,  # 1 hour
                          locks=[hg_try_lock.access('counting')],
@@ -2918,7 +2918,7 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
             uploadEnv['POST_UPLOAD_CMD'] += ' --signed'
 
         def get_url(rc, stdout, stderr):
-            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
+            for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
                 if m.endswith("crashreporter-symbols.zip"):
                     continue
                 if m.endswith("tests.tar.bz2"):
@@ -3236,7 +3236,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         step = self.makeHgtoolStep(
             name='get_locale_src',
             rev=WithProperties("%(l10n_revision)s"),
-            repo_url=WithProperties("http://" + self.hgHost + "/" +
+            repo_url=WithProperties("https://" + self.hgHost + "/" +
                                     self.l10nRepoPath + "/%(locale)s"),
             workdir='%s/l10n' % self.baseWorkDir,
             locks=[hg_l10n_lock.access('counting')],
@@ -4822,7 +4822,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                 command=['python.exe',
                          WithProperties('%(toolsdir)s/scripts/support/mouse_and_screen_resolution.py'),
                          '--configuration-url',
-                         WithProperties("http://%s/%s" % (self.hgHost, self.repoPath) +
+                         WithProperties("https://%s/%s" % (self.hgHost, self.repoPath) +
                                         "/raw-file/%(revision)s/testing/machine-configuration.json")],
                 flunkOnFailure=True,
                 haltOnFailure=True,
@@ -6242,7 +6242,7 @@ class PartnerRepackFactory(ReleaseFactory):
         ))
         self.addStep(self.makeHgtoolStep(
             name='clone_partner_repacks',
-            repo_url='http://%s/%s' % (self.hgHost, self.partnersRepoPath),
+            repo_url='https://%s/%s' % (self.hgHost, self.partnersRepoPath),
             wc=self.partnersRepackDir,
             workdir=self.baseWorkDir,
             rev=self.partnersRepoRevision,
@@ -6253,7 +6253,7 @@ class PartnerRepackFactory(ReleaseFactory):
             self.addStep(ShellCommand(
                 name='download_pkg-dmg',
                 command=['bash', '-c',
-                         'wget http://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
+                         'wget https://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
                 description=['download', 'pkg-dmg'],
                 workdir='%s/scripts' % self.partnersRepackDir,
                 haltOnFailure=True
@@ -6282,7 +6282,7 @@ class PartnerRepackFactory(ReleaseFactory):
                      '--version', str(self.version),
                      '--build-number', str(self.buildNumber),
                      '--repo', self.repoPath,
-                     '--hgroot', 'http://%s' % self.hgHost,
+                     '--hgroot', 'https://%s' % self.hgHost,
                      '--staging-server', self.stagingServer,
                      '--dmg-extract-script',
                      WithProperties(

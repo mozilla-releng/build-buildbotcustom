@@ -2364,7 +2364,7 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 def mirrorAndBundleArgs(config):
     args = []
     mirrors = None
-    if config['base_mirror_urls']:
+    if config.get('base_mirror_urls'):
         mirrors = ["%s/%s" % (url, config['repo_path'])
                    for url in config['base_mirror_urls']]
     if mirrors:
