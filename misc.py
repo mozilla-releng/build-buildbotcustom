@@ -1145,6 +1145,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'hgurl': config.get('hgurl'),
                     'base_mirror_urls': config.get('base_mirror_urls'),
                     'base_bundle_urls': config.get('base_bundle_urls'),
+                    'tooltool_url_list': config.get('tooltool_url_list'),
                     'mock_target': pf.get('mock_target'),
                     'upload_ssh_server': config.get('stage_server'),
                     'upload_ssh_user': config.get('stage_username'),
