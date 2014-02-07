@@ -2191,7 +2191,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
-                                test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
+                                # allow mozharness_python to be overridden per test slave platform in case Python
+                                # not installed to a consistent location.
+                                if 'mozharness_config' in platform_config[slave_platform] and \
+                                        'mozharness_python' in platform_config[slave_platform]['mozharness_config']:
+                                    test_builder_kwargs['mozharness_python'] = \
+                                            platform_config[slave_platform]['mozharness_config']['mozharness_python']
+                                else:
+                                    test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
                                     test_builder_kwargs['mozharness_suite_config'] = deepcopy(branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name])
                                 else:
