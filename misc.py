@@ -607,7 +607,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             extra_args=extra_args,
             use_credentials_file=True,
             script_maxtime=suites.get('script_maxtime', 7200),
-            script_timeout=suites.get('timeout', 1200),
+            script_timeout=suites.get('timeout', 1800),
             reboot_command=reboot_command,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
@@ -1145,6 +1145,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'hgurl': config.get('hgurl'),
                     'base_mirror_urls': config.get('base_mirror_urls'),
                     'base_bundle_urls': config.get('base_bundle_urls'),
+                    'tooltool_url_list': config.get('tooltool_url_list'),
                     'mock_target': pf.get('mock_target'),
                     'upload_ssh_server': config.get('stage_server'),
                     'upload_ssh_user': config.get('stage_username'),
@@ -2191,7 +2192,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
-                                test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
+                                # allow mozharness_python to be overridden per test slave platform in case Python
+                                # not installed to a consistent location.
+                                if 'mozharness_config' in platform_config[slave_platform] and \
+                                        'mozharness_python' in platform_config[slave_platform]['mozharness_config']:
+                                    test_builder_kwargs['mozharness_python'] = \
+                                            platform_config[slave_platform]['mozharness_config']['mozharness_python']
+                                else:
+                                    test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
                                 if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
                                     test_builder_kwargs['mozharness_suite_config'] = deepcopy(branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name])
                                 else:

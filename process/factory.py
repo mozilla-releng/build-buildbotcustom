@@ -866,8 +866,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.enableInstaller = enableInstaller
         self.packageTests = packageTests
         self.enable_ccache = enable_ccache
-        if self.enable_ccache:
-            self.env['CCACHE_BASEDIR'] = WithProperties('%(basedir:-)s')
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
         self.mozconfigBranch = mozconfigBranch
