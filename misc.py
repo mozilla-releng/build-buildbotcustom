@@ -314,6 +314,10 @@ def _getRetries(builder):
     return requests, retried
 
 
+def is_spot(name):
+    return "-spot-" in name
+
+
 def _classifyAWSSlaves(slaves):
     """
     Partitions slaves into three groups: inhouse, ondemand, spot according to
@@ -325,7 +329,7 @@ def _classifyAWSSlaves(slaves):
     spot = []
     for s in slaves:
         name = s.slave.slavename
-        if 'spot' in name:
+        if is_spot(name):
             spot.append(s)
         elif 'ec2' in name:
             ondemand.append(s)
@@ -335,7 +339,7 @@ def _classifyAWSSlaves(slaves):
     return inhouse, ondemand, spot
 
 
-def _nextAWSSlave(aws_wait=None, recentSort=False):
+def _nextAWSSlave(aws_wait=None, recentSort=False, skip_spot=False):
     """
     Returns a nextSlave function that pick the next available slave, with some
     special consideration for AWS instances:
@@ -408,6 +412,14 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
             log.msg("nextAWSSlave: Waiting for inhouse slaves to show up")
             return None
 
+        if skip_spot:
+            if ondemand:
+                log.msg("nextAWSSlave: Choosing ondemand because we skip spot")
+                return sorter(ondemand, builder)
+            log.msg("nextAWSSlave: No slaves appropriate for skip-spot job -"
+                    " returning None")
+            return None
+
         # If we have retries, use ondemand
         if retried > 0:
             if ondemand:
@@ -429,6 +441,8 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
     return _nextSlave
 
 _nextAWSSlave_wait_sort = _nextAWSSlave(aws_wait=60, recentSort=True)
+_nextAWSSlave_wait_sort_skip_spot = _nextAWSSlave(aws_wait=60, recentSort=True,
+                                                  skip_spot=True)
 _nextAWSSlave_nowait = _nextAWSSlave()
 
 
@@ -437,6 +451,16 @@ def _nextSlave(builder, available_slaves):
     # Choose the slave that was most recently on this builder
     if available_slaves:
         return sorted(available_slaves, _recentSort(builder))[-1]
+    else:
+        return None
+
+
+@safeNextSlave
+def _nextSlave_skip_spot(builder, available_slaves):
+    if available_slaves:
+        no_spot_slaves = [s for s in available_slaves if not
+                          is_spot(s.slave.slavename)]
+        return sorted(no_spot_slaves, _recentSort(builder))[-1]
     else:
         return None
 
@@ -1388,7 +1412,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_wait_sort_skip_spot,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform + '-pgo',
@@ -1629,7 +1653,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': normalizeName('%s-%s-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_nightly_factory,
                 'category': name,
-                'nextSlave': _nextAWSSlave_wait_sort,
+                'nextSlave': _nextAWSSlave_wait_sort_skip_spot,
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
