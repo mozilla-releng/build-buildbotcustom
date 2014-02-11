@@ -25,7 +25,7 @@ from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, \
     generateTestBuilderNames, generateTestBuilder, _nextSlave, \
     changeContainsProduct, nomergeBuilders, changeContainsProperties, \
-    changeBaseTagContainsScriptRepoRevision
+    changeBaseTagContainsScriptRepoRevision, _nextSlave_skip_spot
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -459,7 +459,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'slavebuilddir': normalizeName(
                 builderPrefix('%s_tag' % releaseConfig['productName'])),
             'factory': tag_factory,
-            'nextSlave': _nextSlave,
+            'nextSlave': _nextSlave_skip_spot,
             'env': tag_env,
             'properties': {
                 'builddir': builderPrefix(
@@ -738,7 +738,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'builddir': builderPrefix('%s_build' % platform),
                 'slavebuilddir': normalizeName(builderPrefix('%s_build' % platform), releaseConfig['productName']),
                 'factory': build_factory,
-                'nextSlave': _nextSlave,
+                'nextSlave': _nextSlave_skip_spot,
                 'env': builder_env,
                 'properties': {
                     'slavebuilddir': normalizeName(builderPrefix('%s_build' % platform), releaseConfig['productName']),
@@ -887,7 +887,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'builddir': builddir,
                     'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
                     'factory': repack_factory,
-                    'nextSlave': _nextSlave,
+                    'nextSlave': _nextSlave_skip_spot,
                     'env': env,
                     'properties': properties,
                 })
@@ -1211,7 +1211,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'builddir': builderPrefix('updates'),
             'slavebuilddir': normalizeName(builderPrefix('updates'), releaseConfig['productName']),
             'factory': updates_factory,
-            'nextSlave': _nextSlave,
+            'nextSlave': _nextSlave_skip_spot,
             'env': builder_env,
             'properties': {
                 'slavebuilddir': normalizeName(builderPrefix('updates'), releaseConfig['productName']),
@@ -1267,7 +1267,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'builddir': builddir,
                 'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
                 'factory': uv_factory,
-                'nextSlave': _nextSlave,
+                'nextSlave': _nextSlave_skip_spot,
                 'env': env,
                 'properties': {'builddir': builddir,
                                'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
