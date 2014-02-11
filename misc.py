@@ -838,6 +838,13 @@ def generateBranchObjects(config, name, secrets=None):
                 prettyNames[platform] = buildername
                 if not pf.get('try_by_default', True):
                     prettyNames[platform] += " try-nondefault"
+            elif pf.get('enable_periodic', False):
+                buildername = "%s_periodic" % pf['base_name']
+                periodicBuilders.append(buildername)
+                if pf.get('consider_for_nightly', True):
+                    buildersForNightly.append(buildername)
+                if not pf.get('try_by_default', True):
+                    prettyNames[platform] += " try-nondefault"
 
             if pf.get('enable_nightly'):
                 buildername = '%s_nightly' % pf['base_name']
@@ -857,6 +864,10 @@ def generateBranchObjects(config, name, secrets=None):
             buildersByProduct.setdefault(
                 pf['stage_product'], []).append(buildername)
             prettyNames[platform] = pretty_name
+        elif pf.get('enable_periodic', False):
+            periodicBuilders.append(buildername)
+            if pf.get('consider_for_nightly', True):
+                buildersForNightly.append(buildername)
 
         if config['enable_valgrind'] and \
                 platform in config['valgrind_platforms']:
@@ -1153,6 +1164,9 @@ def generateBranchObjects(config, name, secrets=None):
                 }
             }
             if pf.get('enable_dep', True):
+                branchObjects['builders'].append(builder)
+            elif pf.get('enable_periodic', False):
+                builder['name'] = '%s_periodic' % pf['base_name']
                 branchObjects['builders'].append(builder)
 
             if pf.get('enable_nightly'):
@@ -2507,61 +2521,6 @@ def generateFuzzingObjects(config, SLAVES):
     }
 
 
-def generateNanojitObjects(config, SLAVES):
-    builders = []
-    branch = os.path.basename(config['repo_path'])
-
-    for platform in config['platforms']:
-        if 'win' in platform:
-            slaves = SLAVES[platform]
-            nanojit_script = 'scripts/nanojit/nanojit.sh'
-            interpreter = 'bash'
-        else:
-            slaves = SLAVES[platform]
-            nanojit_script = 'scripts/nanojit/nanojit.sh'
-            interpreter = None
-
-        f = ScriptFactory(
-            config['scripts_repo'],
-            nanojit_script,
-            interpreter=interpreter,
-            log_eval_func=rc_eval_func({1: WARNINGS}),
-        )
-
-        builder = {'name': 'nanojit-%s' % platform,
-                   'builddir': 'nanojit-%s' % platform,
-                   'slavenames': slaves,
-                   'nextSlave': _nextIdleSlave(config['idle_slaves']),
-                   'factory': f,
-                   'category': 'idle',
-                   'properties': {'branch': branch, 'platform': platform, 'product': 'nanojit'},
-                   }
-        builders.append(builder)
-        nomergeBuilders.append(builder['name'])
-
-    # Set up polling
-    poller = HgPoller(
-        hgURL=config['hgurl'],
-        branch=config['repo_path'],
-        pollInterval=5 * 60,
-    )
-
-    # Set up scheduler
-    scheduler = Scheduler(
-        name="nanojit",
-        branch=config['repo_path'],
-        treeStableTimer=None,
-        builderNames=[b['name'] for b in builders],
-    )
-
-    return {
-        'builders': builders,
-        'change_source': [poller],
-        'schedulers': [scheduler],
-        'status': [],
-    }
-
-
 def generateSpiderMonkeyObjects(project, config, SLAVES):
     builders = []
     branch = config['branch']
@@ -2768,11 +2727,6 @@ def generateProjectObjects(project, config, SLAVES):
     if project.startswith('fuzzing'):
         fuzzingObjects = generateFuzzingObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, fuzzingObjects)
-
-    # Nanojit
-    elif project == 'nanojit':
-        nanojitObjects = generateNanojitObjects(config, SLAVES)
-        buildObjects = mergeBuildObjects(buildObjects, nanojitObjects)
 
     # Jetpack
     elif project.startswith('jetpack'):
