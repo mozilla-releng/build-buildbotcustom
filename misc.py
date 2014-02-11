@@ -838,6 +838,13 @@ def generateBranchObjects(config, name, secrets=None):
                 prettyNames[platform] = buildername
                 if not pf.get('try_by_default', True):
                     prettyNames[platform] += " try-nondefault"
+            elif pf.get('enable_periodic', False):
+                buildername = "%s_periodic" % pf['base_name']
+                periodicBuilders.append(buildername)
+                if pf.get('consider_for_nightly', True):
+                    buildersForNightly.append(buildername)
+                if not pf.get('try_by_default', True):
+                    prettyNames[platform] += " try-nondefault"
 
             if pf.get('enable_nightly'):
                 buildername = '%s_nightly' % pf['base_name']
@@ -857,6 +864,10 @@ def generateBranchObjects(config, name, secrets=None):
             buildersByProduct.setdefault(
                 pf['stage_product'], []).append(buildername)
             prettyNames[platform] = pretty_name
+        elif pf.get('enable_periodic', False):
+            periodicBuilders.append(buildername)
+            if pf.get('consider_for_nightly', True):
+                buildersForNightly.append(buildername)
 
         if config['enable_valgrind'] and \
                 platform in config['valgrind_platforms']:
@@ -1153,6 +1164,9 @@ def generateBranchObjects(config, name, secrets=None):
                 }
             }
             if pf.get('enable_dep', True):
+                branchObjects['builders'].append(builder)
+            elif pf.get('enable_periodic', False):
+                builder['name'] = '%s_periodic' % pf['base_name']
                 branchObjects['builders'].append(builder)
 
             if pf.get('enable_nightly'):
