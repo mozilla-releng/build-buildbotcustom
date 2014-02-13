@@ -375,6 +375,7 @@ class MockMixin(object):
             self.addStep(MockInstall(
                 target=self.mock_target,
                 packages=self.mock_packages,
+                timeout=1800,
             ))
 
 
@@ -6530,6 +6531,7 @@ class ScriptFactory(RequestSortingBuildFactory):
             self.addStep(MockInstall(
                 target=self.mock_target,
                 packages=self.mock_packages,
+                timeout=1800,
             ))
 
     def runScript(self):

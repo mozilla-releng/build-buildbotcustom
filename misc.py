@@ -460,6 +460,8 @@ def _nextSlave_skip_spot(builder, available_slaves):
     if available_slaves:
         no_spot_slaves = [s for s in available_slaves if not
                           is_spot(s.slave.slavename)]
+        if not no_spot_slaves:
+            return None
         return sorted(no_spot_slaves, _recentSort(builder))[-1]
     else:
         return None
@@ -1438,7 +1440,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product']),
                     'factory': factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_wait_sort_skip_spot,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform + '-nonunified',
