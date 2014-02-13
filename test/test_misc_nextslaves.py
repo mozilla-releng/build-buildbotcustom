@@ -44,7 +44,7 @@ class TestNextSlaveFuncs(unittest.TestCase):
 class TestNextAWSSlave(unittest.TestCase):
     def setUp(self):
         self.slaves = slaves = []
-        for name in ('slave-hw', 'slave-ec2', 'slave-spot'):
+        for name in ('slave-hw', 'slave-ec2', 'slave-spot-001'):
             slave = mock.Mock()
             slave.slave.slavename = name
             slaves.append(slave)
@@ -60,7 +60,7 @@ class TestNextAWSSlave(unittest.TestCase):
         self.assert_(len(spot) == 1)
         self.assertEquals(inhouse[0].slave.slavename, "slave-hw")
         self.assertEquals(ondemand[0].slave.slavename, "slave-ec2")
-        self.assertEquals(spot[0].slave.slavename, "slave-spot")
+        self.assertEquals(spot[0].slave.slavename, "slave-spot-001")
 
     def test_nextAWSSlave_inhouse(self):
         """Test that _nextAWSSlave returns the correct slave in different
@@ -102,7 +102,7 @@ class TestNextAWSSlave(unittest.TestCase):
             self.assertEquals(_getRetries.called, 0)
 
             # Spot instances should be preferred if there are no retries
-            self.assertEquals("slave-spot",
+            self.assertEquals("slave-spot-001",
                               f(self.builder, spot + ondemand).slave.slavename)
 
             # Otherwise ondemand should be preferred
@@ -135,7 +135,7 @@ class TestNextAWSSlave(unittest.TestCase):
 
                 # at t=61, we shoue use an ondemand or spot intance
                 t.return_value = 61
-                self.assertEquals("slave-spot",
+                self.assertEquals("slave-spot-001",
                                   f(self.builder,
                                     spot + ondemand).slave.slavename)
                 self.assertEquals("slave-ec2",
@@ -172,7 +172,7 @@ class TestNextAWSSlave(unittest.TestCase):
             self.assertEquals(_getRetries.called, 0)
 
             # Spot instances should be preferred if there are no retries
-            self.assertEquals("slave-spot",
+            self.assertEquals("slave-spot-001",
                               f(self.builder, spot + ondemand).slave.slavename)
 
 
