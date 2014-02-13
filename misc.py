@@ -1440,7 +1440,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product']),
                     'factory': factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_wait_sort_skip_spot,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform + '-nonunified',
