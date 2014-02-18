@@ -1922,19 +1922,11 @@ class TryBuildFactory(MercurialBuildFactory):
                 workdir='.'
             ))
 
-            ### Bugs 851270, 883918, 873067.
-            # We'd like to use hg purge here, but it's buggy
-            self.addStep(ShellCommand(
-                name='clobber_build',
-                command=['rm', '-rf', 'build'],
-                workdir='.',
-                timeout=60 * 60,
-            ))
             step = self.makeHgtoolStep(
                 clone_by_revision=True,
                 wc='build',
                 workdir='.',
-                autoPurge=False,
+                autoPurge=True,
                 locks=[hg_try_lock.access('counting')],
             )
             self.addStep(step)
