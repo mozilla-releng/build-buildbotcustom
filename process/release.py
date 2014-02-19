@@ -687,7 +687,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
-                buildSpace=10,
+                buildSpace=pf.get(
+                    'build_space', branchConfig['default_build_space']),
                 productName=releaseConfig['productName'],
                 version=releaseConfig['version'],
                 appVersion=releaseConfig['appVersion'],
