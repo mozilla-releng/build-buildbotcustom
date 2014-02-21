@@ -197,7 +197,7 @@ class MockInstall(ShellCommand):
     def __init__(self, target, packages, **kwargs):
         if packages is None:
             packages = []
-        kwargs['command'] = "mock_mozilla -r %s --install %s" % \
+        kwargs['command'] = "mock_mozilla -v -r %s --install %s" % \
             (target, ' '.join(packages))
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)

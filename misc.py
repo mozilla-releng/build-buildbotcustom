@@ -931,6 +931,9 @@ def generateBranchObjects(config, name, secrets=None):
         if pf.get('enable_nonunified_build'):
             periodicBuilders.append('%s non-unified' % pf['base_name'])
 
+        if pf.get('enable_noprofiling_build'):
+            nightlyBuilders.append('%s no-profiling' % pf['base_name'])
+
         if do_nightly:
             builder = '%s nightly' % base_name
             nightlyBuilders.append(builder)
@@ -1448,6 +1451,34 @@ def generateBranchObjects(config, name, secrets=None):
                                    'stage_platform': stage_platform + '-nonunified',
                                    'product': pf['stage_product'],
                                    'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product'])},
+                }
+                branchObjects['builders'].append(builder)
+
+            if pf.get('enable_noprofiling_build'):
+                kwargs = factory_kwargs.copy()
+                kwargs['stagePlatform'] += '-noprofiling'
+                kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-noprofiling'
+                # We do need to upload these packages
+                kwargs['uploadPackages'] = True
+                # Disable sendchanges
+                kwargs['talosMasters'] = None
+                kwargs['unittestMasters'] = None
+                # Enable nightly stuff, e.g. upload location
+                kwargs['nightly'] = True
+                factory = factory_class(**kwargs)
+                builder = {
+                    'name': '%s no-profiling' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s-noprofiling' % (name, platform),
+                    'slavebuilddir': normalizeName('%s-%s-noprofiling' % (name, platform), pf['stage_product']),
+                    'factory': factory,
+                    'category': name,
+                    'nextSlave': _nextAWSSlave_wait_sort_skip_spot,
+                    'properties': {'branch': name,
+                                   'platform': platform,
+                                   'stage_platform': stage_platform + '-noprofiling',
+                                   'product': pf['stage_product'],
+                                   'slavebuilddir': normalizeName('%s-%s-noprofiling' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(builder)
 
