@@ -2640,9 +2640,17 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             name = NAME % name_info
 
             prettyName = PRETTY_NAME % name_info
+            # try_by_default is a dict from variant name to either True
+            # (meaning all platforms for which that variant is defined) or a
+            # set of platform names for which the try build should be on by
+            # default.
             if 'try_by_default' in config:
                 if variant not in config['try_by_default']:
                     prettyName += ' try-nondefault'
+                else:
+                    defaults = config['try_by_default'][variant]
+                    if isinstance(defaults, set) and platform not in defaults:
+                        prettyName += ' try-nondefault'
             prettyNames.setdefault(variant, {})[platform] = prettyName
             builderNames.setdefault(variant, []).append(name)
 
