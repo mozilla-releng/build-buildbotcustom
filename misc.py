@@ -1692,8 +1692,7 @@ def generateBranchObjects(config, name, secrets=None):
                 builder_env = platform_env.copy()
                 for n in range(1, int(pf['l10n_chunks']) + 1):
                     builddir = '%s-%s-l10n_%s' % (name, platform, str(n))
-                    builderName = "%s l10n nightly %s/%s" % \
-                        (pf['base_name'], n, pf['l10n_chunks'])
+                    builderName = "%s l10n nightly-%s" % (pf['base_name'], n)
                     mobile_l10n_builders.append(builderName)
                     extra_args = ['--cfg',
                                   'single_locale/%s_%s.py' % (name, platform),
