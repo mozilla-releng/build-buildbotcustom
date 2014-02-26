@@ -392,7 +392,7 @@ class JacuzziAllocator(object):
         else:
             self.log("cache miss")
 
-        url = "%s/builders/%s" % (self.BASE_URL, buildername)
+        url = "%s/builders/%s" % (self.BASE_URL, urllib2.quote(buildername, ""))
         for i in range(self.MAX_TRIES):
             try:
                 if self.missing_cache.get(buildername, 0) > time.time():

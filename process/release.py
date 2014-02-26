@@ -31,7 +31,7 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
     ReleaseUpdatesFactory, ReleaseFinalVerification, \
     PartnerRepackFactory, XulrunnerReleaseBuildFactory, \
-    TuxedoEntrySubmitterFactory, makeDummyBuilder, SigningScriptFactory
+    makeDummyBuilder, SigningScriptFactory
 from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, \
@@ -1562,22 +1562,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         important_builders.append(builderPrefix('ready_for_release'))
 
     if not releaseConfig.get('disableBouncerEntries'):
-        bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
-            baseTag=releaseConfig['baseTag'],
-            appName=releaseConfig['appName'],
-            config=releaseConfig['tuxedoConfig'],
-            productName=releaseConfig['productName'],
-            version=releaseConfig['version'],
-            milestone=releaseConfig['milestone'],
-            tuxedoServerUrl=releaseConfig['tuxedoServerUrl'],
-            enUSPlatforms=releaseConfig['enUSPlatforms'],
-            l10nPlatforms=releaseConfig['l10nPlatforms'],
-            extraPlatforms=releaseConfig.get('extraBouncerPlatforms'),
-            partialUpdates=releaseConfig.get('partialUpdates', {}),
-            hgHost=branchConfig['hghost'],
-            repoPath=sourceRepoInfo['path'],
-            buildToolsRepoPath=tools_repo_path,
-            credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py")
+        extra_args = ["-c", releaseConfig["bouncer_submitter_config"],
+                      "--revision", releaseConfig["baseTag"],
+                      "--repo", sourceRepoInfo['path'],
+                      "--version", releaseConfig['version'],
+                      "--credentials-file", "oauth.txt",
+                      "--bouncer-api-prefix", releaseConfig['tuxedoServerUrl'],
+                      ]
+        for p in releaseConfig['enUSPlatforms']:
+            extra_args.extend(["--platform", p])
+        for p in releaseConfig.get('extraBouncerPlatforms', []):
+            extra_args.extend(["--platform", p])
+        for partial in releaseConfig.get('partialUpdates', {}).iterkeys():
+            extra_args.extend(["--previous-version", partial])
+
+        bouncer_submitter_factory = ScriptFactory(
+            scriptRepo=mozharness_repo,
+            scriptName="scripts/bouncer_submitter.py",
+            extra_args=extra_args,
+            use_credentials_file=True,
         )
 
         builders.append({
@@ -1598,23 +1601,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             }
         })
 
-        if releaseConfig['doPartnerRepacks']:
-            euballot_bouncer_submitter_factory = TuxedoEntrySubmitterFactory(
-                baseTag=releaseConfig['baseTag'],
-                appName=releaseConfig['appName'],
-                config=releaseConfig['tuxedoConfig'],
-                productName=releaseConfig['productName'],
-                bouncerProductSuffix='EUballot',
-                version=releaseConfig['version'],
-                milestone=releaseConfig['milestone'],
-                tuxedoServerUrl=releaseConfig['tuxedoServerUrl'],
-                enUSPlatforms=('win32-EUballot',),
-                l10nPlatforms=None,  # not needed
-                partialUpdates={},  # no updates
-                hgHost=branchConfig['hghost'],
-                repoPath=sourceRepoInfo['path'],
-                buildToolsRepoPath=tools_repo_path,
-                credentialsFile=os.path.join(os.getcwd(), "BuildSlaves.py"),
+        if releaseConfig.get("bouncer_add_euballot"):
+            extra_args = ["-c", releaseConfig["bouncer_submitter_config"],
+                          "--product-name", "Firefox-%(version)s-EUBallot",
+                          "--version", releaseConfig['version'],
+                          "--credentials-file", "oauth.txt",
+                          "--bouncer-api-prefix",
+                          releaseConfig['tuxedoServerUrl'],
+                          "--platform", "win32-EUBallot",
+                          "--no-add-ssl-only-product",
+                          "--no-add-complete-updates",
+                          "--no-add-partial-updates",
+                          "--no-locales",
+                          ]
+
+            euballot_bouncer_submitter_factory = ScriptFactory(
+                scriptRepo=mozharness_repo,
+                scriptName="scripts/bouncer_submitter.py",
+                extra_args=extra_args,
+                use_credentials_file=True,
             )
 
             builders.append({
@@ -1691,7 +1696,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             and not releaseConfig.get('disableBouncerEntries'):
         tag_downstream.append(builderPrefix('bouncer_submitter'))
 
-        if releaseConfig['doPartnerRepacks']:
+        if releaseConfig.get("bouncer_add_euballot"):
             tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
 
     if releaseConfig.get('xulrunnerPlatforms'):
