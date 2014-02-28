@@ -1564,7 +1564,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if not releaseConfig.get('disableBouncerEntries'):
         extra_args = ["-c", releaseConfig["bouncer_submitter_config"],
-                      "--revision", releaseConfig["baseTag"],
+                      "--revision", releaseTag,
                       "--repo", sourceRepoInfo['path'],
                       "--version", releaseConfig['version'],
                       "--credentials-file", "oauth.txt",
