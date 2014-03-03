@@ -1822,6 +1822,7 @@ def generateBranchObjects(config, name, secrets=None):
                 hashType=config['hash_type'],
                 balrog_api_root=config.get('balrog_api_root', None),
                 balrog_credentials_file=config['balrog_credentials_file'],
+                balrog_username=config['balrog_username'],
                 buildSpace=buildSpace,
                 clobberURL=config['base_clobber_url'],
                 clobberTime=clobberTime,
@@ -1920,6 +1921,7 @@ def generateBranchObjects(config, name, secrets=None):
                         balrog_api_root=config.get('balrog_api_root', None),
                         balrog_credentials_file=config[
                             'balrog_credentials_file'],
+                        balrog_username=config['balrog_username'],
                         hashType=config['hash_type'],
                         stageServer=config['stage_server'],
                         stageUsername=config['stage_username'],
