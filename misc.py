@@ -149,6 +149,7 @@ _product_excludes = {
     ],
     'thunderbird': [
         re.compile('^CLOBBER'),
+        re.compile("^im/"),
         re.compile("^suite/")
     ],
 }
