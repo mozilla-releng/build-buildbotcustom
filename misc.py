@@ -513,6 +513,8 @@ def _classifyAWSSlaves(slaves):
     ondemand = []
     spot = []
     for s in slaves:
+        if not s.slave:
+            continue
         name = s.slave.slavename
         if is_spot(name):
             spot.append(s)
