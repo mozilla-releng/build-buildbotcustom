@@ -803,7 +803,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=None,
-                 tooltool_script=['/tools/tooltool.py'],
+                 tooltool_script='/tools/tooltool.py',
                  enablePackaging=True,
                  enableInstaller=False,
                  gaiaRepo=None,
@@ -1321,19 +1321,16 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                      command=['cat', '.mozconfig'],
                      ))
         if self.tooltool_manifest_src:
-            command=[
-                'sh',
-                WithProperties(
-                    '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
-                self.tooltool_manifest_src,
-                self.tooltool_url_list[0],
-                self.tooltool_bootstrap,
-            ]
-            if self.tooltool_script:
-                command.extend(self.tooltool_script)
             self.addStep(ShellCommand(
                 name='run_tooltool',
-                command=command,
+                command=[
+                    WithProperties(
+                        '%(toolsdir)s/scripts/tooltool/fetch_and_unpack.sh'),
+                    self.tooltool_manifest_src,
+                    self.tooltool_url_list[0],
+                    self.tooltool_script,
+                    self.tooltool_bootstrap
+                ],
                 haltOnFailure=True,
             ))
 
