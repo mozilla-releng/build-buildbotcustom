@@ -4996,9 +4996,14 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              haltOnFailure=True,
                              name='unpack mozmill tests',
                              ))
+
+                installscript = " && ".join(["if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi",
+                                             "if [ ! -d %(exedir)s/extensions ]; then mkdir %(exedir)s/extensions; fi",
+                                             "cp -R bin/plugins/* %(exedir)s/plugins/",
+                                             "if [ -d extensions ]; then cp -R extensions/* %(exedir)s/extensions/; fi"])
                 self.addStep(ShellCommand(
-                             name='install plugins',
-                             command=['sh', '-c', WithProperties('if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi && cp -R bin/plugins/* %(exedir)s/plugins/')],
+                             name='install plugins and extensions',
+                             command=['sh', '-c', WithProperties(installscript)],
                              haltOnFailure=True,
                              ))
 

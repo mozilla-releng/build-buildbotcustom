@@ -271,7 +271,7 @@ class UnpackTest(ShellCommand):
         filename = self.build.getProperties().render(self.filename)
         self.filename = filename
         if filename.endswith(".zip"):
-            args = ['unzip', '-oq', filename, 'mozbase*', 'bin*', 'certs*', 'modules*']
+            args = ['unzip', '-oq', filename, 'mozbase*', 'bin*', 'certs*', 'modules*', 'extensions*']
 
             # modify the commands to extract only the files we need - the test
             # directory and bin/ and certs/
@@ -306,7 +306,11 @@ class UnpackTest(ShellCommand):
 
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
-        if superResult != SUCCESS:
+
+        # Some directories, like extensions, won't always be available. unzip
+        # will exit with code 11, "no matching files were found" and the
+        # remaining files will be extracted. Ignore this exit code.
+        if superResult != SUCCESS and cmd.rc != 11:
             return superResult
         if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
             return FAILURE
