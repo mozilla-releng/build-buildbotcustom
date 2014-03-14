@@ -15,6 +15,7 @@ from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, JSONSt
 from buildbot.steps.dummy import Dummy
 from buildbot import locks
 from buildbot.status.builder import worst_status
+from buildbot.util import json
 
 import buildbotcustom.common
 import buildbotcustom.status.errors
@@ -448,11 +449,10 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             property='basedir',
             workdir='.',
         ))
-        self.addStep(SetProperty(
+        self.addStep(SetBuildProperty(
             name='set_hashType',
-            command=['echo', self.hashType],
-            property='hashType',
-            workdir='.',
+            property_name='hashType',
+            value=self.hashType,
         ))
         # We need the basename of the current working dir so we can
         # ignore that dir when purging builds later.
@@ -483,6 +483,15 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             command=['bash', '-c', 'pwd'],
             property='toolsdir',
             workdir='tools',
+        ))
+        # Set properties for metadata about this slave
+        self.addStep(SetProperty(
+            name='set_instance_metadata',
+            extract_fn=extractJSONProperties,
+            command=['python', 'tools/buildfarm/maintenance/get_instance_metadata.py'],
+            workdir='.',
+            haltOnFailure=False,
+            warnOnFailure=False,
         ))
 
         if self.clobberURL is not None:
@@ -4987,9 +4996,14 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              haltOnFailure=True,
                              name='unpack mozmill tests',
                              ))
+
+                installscript = " && ".join(["if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi",
+                                             "if [ ! -d %(exedir)s/extensions ]; then mkdir %(exedir)s/extensions; fi",
+                                             "cp -R bin/plugins/* %(exedir)s/plugins/",
+                                             "if [ -d extensions ]; then cp -R extensions/* %(exedir)s/extensions/; fi"])
                 self.addStep(ShellCommand(
-                             name='install plugins',
-                             command=['sh', '-c', WithProperties('if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi && cp -R bin/plugins/* %(exedir)s/plugins/')],
+                             name='install plugins and extensions',
+                             command=['sh', '-c', WithProperties(installscript)],
                              haltOnFailure=True,
                              ))
 
@@ -6369,6 +6383,15 @@ def extractProperties(rv, stdout, stderr):
         if len(e) == 2:
             props[e[0]] = e[1].strip()
     return props
+
+
+def extractJSONProperties(rv, stdout, stderr):
+    props = {}
+    try:
+        stdout = stdout.strip()
+        props.update(json.loads(stdout))
+    finally:
+        return props
 
 
 class ScriptFactory(RequestSortingBuildFactory):
