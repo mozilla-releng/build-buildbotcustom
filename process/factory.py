@@ -492,6 +492,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             workdir='.',
             haltOnFailure=False,
             warnOnFailure=False,
+            flunkOnFailure=False,
         ))
 
         if self.clobberURL is not None:
