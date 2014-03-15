@@ -526,7 +526,7 @@ def _classifyAWSSlaves(slaves):
     return inhouse, ondemand, spot
 
 
-def _nextAWSSlave(aws_wait=None, recentSort=False, skip_spot=False):
+def _nextAWSSlave(aws_wait=None, recentSort=False):
     """
     Returns a nextSlave function that pick the next available slave, with some
     special consideration for AWS instances:
@@ -598,14 +598,6 @@ def _nextAWSSlave(aws_wait=None, recentSort=False, skip_spot=False):
             log.msg("nextAWSSlave: Waiting for inhouse slaves to show up")
             return None
 
-        if skip_spot:
-            if ondemand:
-                log.msg("nextAWSSlave: Choosing ondemand because we skip spot")
-                return sorter(ondemand, builder)
-            log.msg("nextAWSSlave: No slaves appropriate for skip-spot job -"
-                    " returning None")
-            return None
-
         # If we have retries, use ondemand
         if retried > 0:
             if ondemand:
@@ -627,8 +619,6 @@ def _nextAWSSlave(aws_wait=None, recentSort=False, skip_spot=False):
     return _nextSlave
 
 _nextAWSSlave_wait_sort = safeNextSlave(J(_nextAWSSlave(aws_wait=60, recentSort=True)))
-_nextAWSSlave_wait_sort_skip_spot = safeNextSlave(J(_nextAWSSlave(aws_wait=60, recentSort=True,
-                                                    skip_spot=True)))
 _nextAWSSlave_nowait = safeNextSlave(_nextAWSSlave())
 
 
