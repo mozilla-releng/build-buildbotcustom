@@ -11,7 +11,7 @@ from buildbot.db.schema.manager import DBSchemaManager
 
 import buildbotcustom.misc
 from buildbotcustom.misc import _nextIdleSlave, _nextAWSSlave, \
-    _classifyAWSSlaves, _getRetries
+    _classifyAWSSlaves, _getRetries, MAX_SPOT_RETRIES
 
 
 class TestNextSlaveFuncs(unittest.TestCase):
@@ -106,12 +106,12 @@ class TestNextAWSSlave(unittest.TestCase):
                               f(self.builder, spot + ondemand).slave.slavename)
 
             # Otherwise ondemand should be preferred
-            _getRetries.return_value = [request], 1
+            _getRetries.return_value = [request], MAX_SPOT_RETRIES + 1
             self.assertEquals("slave-ec2",
                               f(self.builder, spot + ondemand).slave.slavename)
 
             # Or no slave if only spot are available
-            _getRetries.return_value = [request], 1
+            _getRetries.return_value = [request], MAX_SPOT_RETRIES + 1
             self.assertEquals(None, f(self.builder, spot))
 
     def test_nextAWSSlave_AWS_wait(self):
@@ -142,7 +142,7 @@ class TestNextAWSSlave(unittest.TestCase):
                                   f(self.builder,
                                     ondemand).slave.slavename)
 
-                _getRetries.return_value = [request], 1
+                _getRetries.return_value = [request], MAX_SPOT_RETRIES + 1
                 self.assertEquals("slave-ec2",
                                   f(self.builder,
                                     spot + ondemand).slave.slavename)
