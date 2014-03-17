@@ -1847,7 +1847,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             name='submit_balrog_updates',
             command=cmd,
             workdir='.',
-            flunkOnFailure=False,
+            flunkOnFailure=True,
         ))
 
     def addUpdateSteps(self):
