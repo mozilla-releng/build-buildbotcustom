@@ -63,6 +63,12 @@ from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
 
+# Number of job retries allowed to run on spot instances. We stop using spot
+# instances if number of retires a larger than this number. If you update this
+# number, you also need to update the same viariable in
+# cloud-tools/scripts/aws_watch_pending.py
+MAX_SPOT_RETRIES = 1
+
 
 def get_l10n_repositories(file, l10nRepoPath, relbranch):
     """Reads in a list of locale names and revisions for their associated
@@ -564,8 +570,9 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
         # We always prefer to run on inhouse. We'll wait up to aws_wait
         # seconds for one to show up!
         # Next we look to see if the job has been previously retried. If it
-        # has, we won't use spot instances, just ondemand.
-        # If there are no retries, then prefer spot instances over ondemand
+        # has been retried more that MAX_SPOT_RETRIES times, we won't use spot
+        # instances, just ondemand.  Otherwise we prefer spot instances over
+        # ondemand
 
         # Easy! If there are no available slaves, don't return any!
         if not available_slaves:
@@ -599,7 +606,7 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
             return None
 
         # If we have retries, use ondemand
-        if retried > 0:
+        if retried > MAX_SPOT_RETRIES:
             if ondemand:
                 log.msg("nextAWSSlave: Choosing ondemand because of retries")
                 return sorter(ondemand, builder)
