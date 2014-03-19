@@ -813,7 +813,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=None,
-                 tooltool_script='/tools/tooltool.py',
+                 tooltool_script=None,
                  enablePackaging=True,
                  enableInstaller=False,
                  gaiaRepo=None,
@@ -887,7 +887,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.l10nCheckTest = l10nCheckTest
         self.tooltool_manifest_src = tooltool_manifest_src
         self.tooltool_url_list = tooltool_url_list or []
-        self.tooltool_script = tooltool_script
+        self.tooltool_script = tooltool_script or '/tools/tooltool.py'
         self.tooltool_bootstrap = tooltool_bootstrap
         self.gaiaRepo = gaiaRepo
         self.gaiaRepoUrl = "https://%s/%s" % (self.hgHost, self.gaiaRepo)
