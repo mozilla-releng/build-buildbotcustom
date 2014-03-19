@@ -1753,34 +1753,40 @@ def generateBranchObjects(config, name, secrets=None):
             if pf.get('product_name') == 'b2g':
                 factory_kwargs.update(multiargs)
 
-            mozilla2_dep_factory = factory_class(**factory_kwargs)
-            # eg. TB Linux comm-central build
-            #    TB Linux comm-central leak test build
-            mozilla2_dep_builder = {
-                'name': '%s build' % pf['base_name'],
-                'slavenames': pf['slaves'],
-                'builddir': '%s-%s' % (name, platform),
-                'slavebuilddir': normalizeName('%s-%s' % (name, platform), pf['stage_product']),
-                'factory': mozilla2_dep_factory,
-                'category': name,
-                'nextSlave': _nextAWSSlave_wait_sort,
-                'properties': {'branch': name,
-                               'platform': platform,
-                               'stage_platform': stage_platform,
-                               'product': pf['stage_product'],
-                               'slavebuilddir': normalizeName('%s-%s' % (name, platform), pf['stage_product'])},
-            }
-            # TEMP CODE. This condition just checks to see if we used
+            # This condition just checks to see if we used
             # mozharness to create this builder already. Once we port all
             # builders to mozharness we won't need mozilla2_dep_builder at
             # all
             if not builder_tracker['done_generic_build']:
+                mozilla2_dep_factory = factory_class(**factory_kwargs)
+                # eg. TB Linux comm-central build
+                #    TB Linux comm-central leak test build
+                mozilla2_dep_builder = {
+                    'name': '%s build' % pf['base_name'],
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s' % (name, platform),
+                    'slavebuilddir': normalizeName('%s-%s' % (name, platform), pf['stage_product']),
+                    'factory': mozilla2_dep_factory,
+                    'category': name,
+                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'properties': {'branch': name,
+                                   'platform': platform,
+                                   'stage_platform': stage_platform,
+                                   'product': pf['stage_product'],
+                                   'slavebuilddir': normalizeName('%s-%s' % (name, platform), pf['stage_product'])},
+                }
                 branchObjects['builders'].append(mozilla2_dep_builder)
 
             # We have some platforms which need to be built every X hours with PGO.
             # These builds are as close to regular dep builds as we can make them,
             # other than PGO
-            if config['pgo_strategy'] in ('periodic', 'try') and platform in config['pgo_platforms']:
+            # builder_tracker just checks to see if we used
+            # mozharness to create this builder already. Once we port all
+            # builders to mozharness we won't need pgo_builder at
+            # all
+            if (config['pgo_strategy'] in ('periodic', 'try') and
+                        platform in config['pgo_platforms'] and not
+                        builder_tracker['done_pgo_build']):
                 pgo_kwargs = factory_kwargs.copy()
                 pgo_kwargs["doPostLinkerSize"] = pf.get('enable_post_linker_size', False)
                 pgo_kwargs['profiledBuild'] = True
@@ -1801,14 +1807,13 @@ def generateBranchObjects(config, name, secrets=None):
                                    'product': pf['stage_product'],
                                    'slavebuilddir': normalizeName('%s-%s-pgo' % (name, platform), pf['stage_product'])},
                 }
-                # TEMP CODE. This condition just checks to see if we used
-                # mozharness to create this builder already. Once we port all
-                # builders to mozharness we won't need pgo_builder at
-                # all
-                if not builder_tracker['done_pgo_build']:
-                    branchObjects['builders'].append(pgo_builder)
+                branchObjects['builders'].append(pgo_builder)
 
-            if pf.get('enable_nonunified_build'):
+            # builder_tracker just checks to see if we used
+            # mozharness to create this builder already. Once we port all
+            # builders to mozharness we won't need this builder at all
+            if (pf.get('enable_nonunified_build') and not
+                    builder_tracker['done_nonunified_build']):
                 kwargs = factory_kwargs.copy()
                 kwargs['stagePlatform'] += '-nonunified'
                 kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-nonunified'
@@ -1832,11 +1837,7 @@ def generateBranchObjects(config, name, secrets=None):
                                    'product': pf['stage_product'],
                                    'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product'])},
                 }
-                # TEMP CODE. This condition just checks to see if we used
-                # mozharness to create this builder already. Once we port all
-                # builders to mozharness we won't need this builder at all
-                if not builder_tracker['done_nonunified_build']:
-                    branchObjects['builders'].append(builder)
+                branchObjects['builders'].append(builder)
 
             if pf.get('enable_noprofiling_build'):
                 kwargs = factory_kwargs.copy()
@@ -1983,109 +1984,113 @@ def generateBranchObjects(config, name, secrets=None):
             nightly_env = platform_env.copy()
             nightly_env['IS_NIGHTLY'] = "yes"
 
-            mozilla2_nightly_factory = NightlyBuildFactory(
-                env=nightly_env,
-                objdir=pf['platform_objdir'],
-                platform=platform,
-                hgHost=config['hghost'],
-                repoPath=config['repo_path'],
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                configRepoPath=config['config_repo_path'],
-                configSubDir=config['config_subdir'],
-                profiledBuild=nightly_pgo,
-                productName=pf['product_name'],
-                mozconfig=pf['mozconfig'],
-                srcMozconfig=pf.get('src_mozconfig'),
-                use_mock=pf.get('use_mock'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                stageServer=config['stage_server'],
-                stageUsername=config['stage_username'],
-                stageGroup=config['stage_group'],
-                stageSshKey=config['stage_ssh_key'],
-                stageBasePath=stageBasePath,
-                stageLogBaseUrl=config.get('stage_log_base_url', None),
-                stagePlatform=pf['stage_platform'],
-                stageProduct=pf['stage_product'],
-                doBuildAnalysis=doBuildAnalysis,
-                uploadPackages=uploadPackages,
-                uploadSymbols=pf.get('upload_symbols', False),
-                disableSymbols=pf.get('disable_symbols', False),
-                nightly=True,
-                createSnippet=create_snippet,
-                createPartial=pf.get(
-                    'create_partial', config['create_partial']),
-                updatePlatform=pf['update_platform'],
-                ausUser=config['aus2_user'],
-                ausSshKey=config['aus2_ssh_key'],
-                ausHost=config['aus2_host'],
-                hashType=config['hash_type'],
-                balrog_api_root=config.get('balrog_api_root', None),
-                balrog_credentials_file=config['balrog_credentials_file'],
-                balrog_username=config['balrog_username'],
-                buildSpace=buildSpace,
-                clobberURL=config['base_clobber_url'],
-                clobberTime=clobberTime,
-                buildsBeforeReboot=pf['builds_before_reboot'],
-                talosMasters=talosMasters,
-                enablePackaging=pf.get('enable_packaging', True),
-                enableInstaller=pf.get('enable_installer', False),
-                packageTests=packageTests,
-                unittestMasters=pf.get(
-                    'unittest_masters', config['unittest_masters']),
-                unittestBranch=nightlyUnittestBranch,
-                triggerBuilds=config['enable_l10n'],
-                triggeredSchedulers=triggeredSchedulers,
-                tinderboxBuildsDir=tinderboxBuildsDir,
-                enable_ccache=pf.get('enable_ccache', False),
-                useSharedCheckouts=pf.get('enable_shared_checkouts', False),
-                testPrettyNames=pf.get('test_pretty_names', False),
-                l10nCheckTest=pf.get('l10n_check_test', False),
-                post_upload_include_platform=pf.get(
-                    'post_upload_include_platform', False),
-                signingServers=secrets.get(pf.get('nightly_signing_servers')),
-                baseMirrorUrls=config.get('base_mirror_urls'),
-                baseBundleUrls=config.get('base_bundle_urls'),
-                mozillaDir=config.get('mozilla_dir', None),
-                tooltool_manifest_src=pf.get('tooltool_manifest_src'),
-                tooltool_script=pf.get('tooltool_script'),
-                tooltool_url_list=config.get('tooltool_url_list', []),
-                gaiaRepo=pf.get('gaia_repo'),
-                gaiaRevision=config.get('gaia_revision'),
-                gaiaRevisionFile=pf.get('gaia_revision_file'),
-                gaiaLanguagesFile=pf.get('gaia_languages_file'),
-                gaiaLanguagesScript=pf.get('gaia_languages_script', 'scripts/b2g_desktop_multilocale.py'),
-                gaiaL10nRoot=config.get('gaia_l10n_root'),
-                mozharnessRepoPath=config.get('mozharness_repo_path'),
-                mozharnessTag=config.get('mozharness_tag'),
-                geckoL10nRoot=config.get('gecko_l10n_root'),
-                geckoLanguagesFile=pf.get('gecko_languages_file'),
-                enable_pymake=enable_pymake,
-                **nightly_kwargs
-            )
-
-            # eg. TB Linux comm-aurora nightly
-            mozilla2_nightly_builder = {
-                'name': nightly_builder,
-                'slavenames': pf['slaves'],
-                'builddir': '%s-%s-nightly' % (name, platform),
-                'slavebuilddir': normalizeName('%s-%s-nightly' % (name, platform), pf['stage_product']),
-                'factory': mozilla2_nightly_factory,
-                'category': name,
-                'nextSlave': _nextAWSSlave_wait_sort,
-                'properties': {'branch': name,
-                               'platform': platform,
-                               'stage_platform': stage_platform,
-                               'product': pf['stage_product'],
-                               'nightly_build': True,
-                               'slavebuilddir': normalizeName('%s-%s-nightly' % (name, platform), pf['stage_product'])},
-            }
-            # TEMP CODE. This condition just checks to see if we used
+            # This condition just checks to see if we used
             # mozharness to create this builder already. Once we port all
             # builders to mozharness we won't need mozilla2_nightly_builder at
             # all
             if not builder_tracker['done_nightly_build']:
+                mozilla2_nightly_factory = NightlyBuildFactory(
+                    env=nightly_env,
+                    objdir=pf['platform_objdir'],
+                    platform=platform,
+                    hgHost=config['hghost'],
+                    repoPath=config['repo_path'],
+                    buildToolsRepoPath=config['build_tools_repo_path'],
+                    configRepoPath=config['config_repo_path'],
+                    configSubDir=config['config_subdir'],
+                    profiledBuild=nightly_pgo,
+                    productName=pf['product_name'],
+                    mozconfig=pf['mozconfig'],
+                    srcMozconfig=pf.get('src_mozconfig'),
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
+                    stageServer=config['stage_server'],
+                    stageUsername=config['stage_username'],
+                    stageGroup=config['stage_group'],
+                    stageSshKey=config['stage_ssh_key'],
+                    stageBasePath=stageBasePath,
+                    stageLogBaseUrl=config.get('stage_log_base_url', None),
+                    stagePlatform=pf['stage_platform'],
+                    stageProduct=pf['stage_product'],
+                    doBuildAnalysis=doBuildAnalysis,
+                    uploadPackages=uploadPackages,
+                    uploadSymbols=pf.get('upload_symbols', False),
+                    disableSymbols=pf.get('disable_symbols', False),
+                    nightly=True,
+                    createSnippet=create_snippet,
+                    createPartial=pf.get(
+                        'create_partial', config['create_partial']),
+                    updatePlatform=pf['update_platform'],
+                    ausUser=config['aus2_user'],
+                    ausSshKey=config['aus2_ssh_key'],
+                    ausHost=config['aus2_host'],
+                    hashType=config['hash_type'],
+                    balrog_api_root=config.get('balrog_api_root', None),
+                    balrog_credentials_file=config['balrog_credentials_file'],
+                    balrog_username=config['balrog_username'],
+                    buildSpace=buildSpace,
+                    clobberURL=config['base_clobber_url'],
+                    clobberTime=clobberTime,
+                    buildsBeforeReboot=pf['builds_before_reboot'],
+                    talosMasters=talosMasters,
+                    enablePackaging=pf.get('enable_packaging', True),
+                    enableInstaller=pf.get('enable_installer', False),
+                    packageTests=packageTests,
+                    unittestMasters=pf.get(
+                        'unittest_masters', config['unittest_masters']),
+                    unittestBranch=nightlyUnittestBranch,
+                    triggerBuilds=config['enable_l10n'],
+                    triggeredSchedulers=triggeredSchedulers,
+                    tinderboxBuildsDir=tinderboxBuildsDir,
+                    enable_ccache=pf.get('enable_ccache', False),
+                    useSharedCheckouts=pf.get('enable_shared_checkouts', False),
+                    testPrettyNames=pf.get('test_pretty_names', False),
+                    l10nCheckTest=pf.get('l10n_check_test', False),
+                    post_upload_include_platform=pf.get(
+                        'post_upload_include_platform', False),
+                    signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                    baseMirrorUrls=config.get('base_mirror_urls'),
+                    baseBundleUrls=config.get('base_bundle_urls'),
+                    mozillaDir=config.get('mozilla_dir', None),
+                    tooltool_manifest_src=pf.get('tooltool_manifest_src'),
+                    tooltool_script=pf.get('tooltool_script'),
+                    tooltool_url_list=config.get('tooltool_url_list', []),
+                    gaiaRepo=pf.get('gaia_repo'),
+                    gaiaRevision=config.get('gaia_revision'),
+                    gaiaRevisionFile=pf.get('gaia_revision_file'),
+                    gaiaLanguagesFile=pf.get('gaia_languages_file'),
+                    gaiaLanguagesScript=pf.get('gaia_languages_script',
+                                               'scripts/b2g_desktop_multilocale.py'),
+                    gaiaL10nRoot=config.get('gaia_l10n_root'),
+                    mozharnessRepoPath=config.get('mozharness_repo_path'),
+                    mozharnessTag=config.get('mozharness_tag'),
+                    geckoL10nRoot=config.get('gecko_l10n_root'),
+                    geckoLanguagesFile=pf.get('gecko_languages_file'),
+                    enable_pymake=enable_pymake,
+                    **nightly_kwargs
+                )
+
+                # eg. TB Linux comm-aurora nightly
+                mozilla2_nightly_builder = {
+                    'name': nightly_builder,
+                    'slavenames': pf['slaves'],
+                    'builddir': '%s-%s-nightly' % (name, platform),
+                    'slavebuilddir': normalizeName('%s-%s-nightly' % (name, platform), pf['stage_product']),
+                    'factory': mozilla2_nightly_factory,
+                    'category': name,
+                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'properties': {'branch': name,
+                                   'platform': platform,
+                                   'stage_platform': stage_platform,
+                                   'product': pf['stage_product'],
+                                   'nightly_build': True,
+                                   'slavebuilddir': normalizeName(
+                                       '%s-%s-nightly' % (name, platform),
+                                       pf['stage_product']
+                                   )},
+                }
                 branchObjects['builders'].append(mozilla2_nightly_builder)
 
             if config['enable_l10n']:
