@@ -813,7 +813,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=None,
-                 tooltool_script='/tools/tooltool.py',
+                 tooltool_script=None,
                  enablePackaging=True,
                  enableInstaller=False,
                  gaiaRepo=None,
@@ -887,7 +887,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.l10nCheckTest = l10nCheckTest
         self.tooltool_manifest_src = tooltool_manifest_src
         self.tooltool_url_list = tooltool_url_list or []
-        self.tooltool_script = tooltool_script
+        self.tooltool_script = tooltool_script or '/tools/tooltool.py'
         self.tooltool_bootstrap = tooltool_bootstrap
         self.gaiaRepo = gaiaRepo
         self.gaiaRepoUrl = "https://%s/%s" % (self.hgHost, self.gaiaRepo)
@@ -6402,7 +6402,8 @@ class ScriptFactory(RequestSortingBuildFactory):
                  script_timeout=1200, script_maxtime=None, log_eval_func=None,
                  reboot_command=None, hg_bin='hg', platform=None,
                  use_mock=False, mock_target=None,
-                 mock_packages=None, mock_copyin_files=None, env={}):
+                 mock_packages=None, mock_copyin_files=None,
+                 triggered_schedulers=None, env={}):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -6414,6 +6415,7 @@ class ScriptFactory(RequestSortingBuildFactory):
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
         self.get_basedir_cmd = ['bash', '-c', 'pwd']
+        self.triggered_schedulers = triggered_schedulers
         self.env = env.copy()
         self.use_credentials_file = use_credentials_file
         if platform and 'win' in platform:
@@ -6583,6 +6585,14 @@ class ScriptFactory(RequestSortingBuildFactory):
             warnOnFailure=False,
             flunkOnFailure=False,
         ))
+
+        if self.triggered_schedulers:
+            for triggered_scheduler in self.triggered_schedulers:
+                self.addStep(Trigger(
+                    schedulerNames=[triggered_scheduler],
+                    copy_properties=['buildid', 'builduid'],
+                    waitForFinish=False)
+                )
 
     def reboot(self):
         def do_disconnect(cmd):
