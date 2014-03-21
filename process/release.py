@@ -1584,10 +1584,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                       "--credentials-file", "oauth.txt",
                       "--bouncer-api-prefix", releaseConfig['tuxedoServerUrl'],
                       ]
-        for p in releaseConfig['enUSPlatforms']:
-            extra_args.extend(["--platform", p])
-        for p in releaseConfig.get('extraBouncerPlatforms', []):
-            extra_args.extend(["--platform", p])
         for partial in releaseConfig.get('partialUpdates', {}).iterkeys():
             extra_args.extend(["--previous-version", partial])
 
@@ -1615,45 +1611,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             }
         })
-
-        if releaseConfig.get("bouncer_add_euballot"):
-            extra_args = ["-c", releaseConfig["bouncer_submitter_config"],
-                          "--product-name", "Firefox-%(version)s-EUBallot",
-                          "--version", releaseConfig['version'],
-                          "--credentials-file", "oauth.txt",
-                          "--bouncer-api-prefix",
-                          releaseConfig['tuxedoServerUrl'],
-                          "--platform", "win32-EUBallot",
-                          "--no-add-ssl-only-product",
-                          "--no-add-complete-updates",
-                          "--no-add-partial-updates",
-                          "--no-locales",
-                          ]
-
-            euballot_bouncer_submitter_factory = ScriptFactory(
-                scriptRepo=mozharness_repo,
-                scriptName="scripts/bouncer_submitter.py",
-                extra_args=extra_args,
-                use_credentials_file=True,
-            )
-
-            builders.append({
-                'name': builderPrefix('euballot_bouncer_submitter'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'] +
-                branchConfig['platforms']['linux64']['slaves'],
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('euballot_bouncer_submitter'),
-                'slavebuilddir': normalizeName(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
-                'factory': euballot_bouncer_submitter_factory,
-                'env': builder_env,
-                'nextSlave': _nextSlave_skip_spot,
-                'properties': {
-                    'slavebuilddir': normalizeName(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
-                    'release_config': releaseConfigFile,
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                }
-            })
 
     ##### Change sources and Schedulers
 
@@ -1710,9 +1667,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if releaseConfig['buildNumber'] == 1 \
             and not releaseConfig.get('disableBouncerEntries'):
         tag_downstream.append(builderPrefix('bouncer_submitter'))
-
-        if releaseConfig.get("bouncer_add_euballot"):
-            tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
 
     if releaseConfig.get('xulrunnerPlatforms'):
         tag_downstream.append(builderPrefix('xulrunner_source'))
