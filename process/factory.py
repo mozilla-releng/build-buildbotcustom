@@ -4081,7 +4081,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  testOlderPartials=False,
                  longVersion=None, schema=None,
                  useBetaChannelForRelease=False, useChecksums=False,
-                 promptWaitTime=None, **kwargs):
+                 promptWaitTime=None, balrog_api_root=None,
+                 balrog_credentials_file=None, balrog_username=None, **kwargs):
         """patcherConfig: The filename of the patcher config file to bump,
                           and pass to patcher.
            mozRepoPath: The path for the Mozilla repo to hand patcher as the
@@ -4125,6 +4126,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.python = python
         self.configRepoPath = configRepoPath
         self.promptWaitTime = promptWaitTime
+        self.balrog_api_root = balrog_api_root
+        self.balrog_credentials_file = balrog_credentials_file
+        self.balrog_username = balrog_username
 
         # The patcher config bumper needs to know the exact previous version
         self.previousVersion = str(
@@ -4153,6 +4157,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         if buildNumber >= 2:
             self.createBuildNSnippets()
         self.uploadSnippets()
+        if self.balrog_api_root:
+            self.submitBalrogUpdates()
         self.verifySnippets()
         self.trigger()
 
@@ -4398,6 +4404,39 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                              description=['pushsnip'],
                              haltOnFailure=True
                              ))
+
+    def submitBalrogUpdates(self):
+        self.addStep(JSONPropertiesDownload(
+            name='download_balrog_props',
+            slavedest='buildprops_balrog.json',
+            workdir='.',
+            flunkOnFailure=False,
+        ))
+        credentials_file = os.path.join(os.getcwd(),
+                                        self.balrog_credentials_file)
+        target_file_name = os.path.basename(credentials_file)
+        self.addStep(FileDownload(
+            mastersrc=credentials_file,
+            slavedest=target_file_name,
+            workdir='.',
+            flunkOnFailure=False,
+        ))
+        cmd = [
+            self.python,
+            WithProperties('%(toolsdir)s/scripts/updates/balrog-release-pusher.py'),
+            '--build-properties', 'buildprops_balrog.json',
+            '--api-root', self.balrog_api_root,
+            '--buildbot-configs', self.getRepository(self.configRepoPath),
+            '--release-config', WithProperties('%(release_config)s'),
+            '--credentials-file', target_file_name,
+            '--username', self.balrog_username,
+        ]
+        self.addStep(RetryingShellCommand(
+            name='submit_balrog_updates',
+            command=cmd,
+            workdir='.',
+            flunkOnFailure=False,
+        ))
 
     def verifySnippets(self):
         channelComparisons = [(c, self.channels[c]['compareTo']) for c in self.channels if 'compareTo' in self.channels[c]]

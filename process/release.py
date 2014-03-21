@@ -657,6 +657,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('multilocaleOptions')
             balrog_api_root=releaseConfig.get('balrog_api_root',
                 branchConfig.get('balrog_api_root', None))
+            balrog_username=releaseConfig.get('balrog_username',
+                branchConfig.get('balrog_username', None))
+            balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
+                branchConfig.get('balrog_credentials_file', None))
             # Turn pymake on by default for Windows, and off by default for
             # other platforms.
             if 'win' in platform:
@@ -732,8 +736,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 enable_pymake=enable_pymake,
                 balrog_api_root=balrog_api_root,
-                balrog_username=branchConfig['balrog_username'],
-                balrog_credentials_file=branchConfig['balrog_credentials_file'],
+                balrog_username=balrog_username,
+                balrog_credentials_file=balrog_credentials_file,
             )
 
             builders.append({
@@ -1163,6 +1167,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'sourceRepositories']['mozilla']['path']
         except KeyError:
             moz_repo_path = sourceRepoInfo['path']
+        balrog_api_root=releaseConfig.get('balrog_api_root',
+            branchConfig.get('balrog_api_root', None))
+        balrog_username=releaseConfig.get('balrog_username',
+            branchConfig.get('balrog_username', None))
+        balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
+            branchConfig.get('balrog_credentials_file', None))
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -1210,6 +1220,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_copyin_files=pf.get('mock_copyin_files'),
             promptWaitTime=releaseConfig.get(
                 'promptWaitTime', None),
+            balrog_api_root=balrog_api_root,
+            balrog_username=balrog_username,
+            balrog_credentials_file=balrog_credentials_file,
         )
 
         builders.append({
@@ -1226,6 +1239,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'platform': platform,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
             }
         })
         post_signing_builders.append(builderPrefix('updates'))
