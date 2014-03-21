@@ -657,6 +657,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('multilocaleOptions')
             balrog_api_root=releaseConfig.get('balrog_api_root',
                 branchConfig.get('balrog_api_root', None))
+            balrog_username=releaseConfig.get('balrog_username',
+                branchConfig.get('balrog_username', None))
+            balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
+                branchConfig.get('balrog_credentials_file', None))
             # Turn pymake on by default for Windows, and off by default for
             # other platforms.
             if 'win' in platform:
@@ -732,8 +736,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 enable_pymake=enable_pymake,
                 balrog_api_root=balrog_api_root,
-                balrog_username=branchConfig['balrog_username'],
-                balrog_credentials_file=branchConfig['balrog_credentials_file'],
+                balrog_username=balrog_username,
+                balrog_credentials_file=balrog_credentials_file,
             )
 
             builders.append({
@@ -1163,6 +1167,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'sourceRepositories']['mozilla']['path']
         except KeyError:
             moz_repo_path = sourceRepoInfo['path']
+        balrog_api_root=releaseConfig.get('balrog_api_root',
+            branchConfig.get('balrog_api_root', None))
+        balrog_username=releaseConfig.get('balrog_username',
+            branchConfig.get('balrog_username', None))
+        balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
+            branchConfig.get('balrog_credentials_file', None))
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -1210,6 +1220,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_copyin_files=pf.get('mock_copyin_files'),
             promptWaitTime=releaseConfig.get(
                 'promptWaitTime', None),
+            balrog_api_root=balrog_api_root,
+            balrog_username=balrog_username,
+            balrog_credentials_file=balrog_credentials_file,
         )
 
         builders.append({
@@ -1226,6 +1239,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'platform': platform,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
             }
         })
         post_signing_builders.append(builderPrefix('updates'))
@@ -1570,10 +1584,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                       "--credentials-file", "oauth.txt",
                       "--bouncer-api-prefix", releaseConfig['tuxedoServerUrl'],
                       ]
-        for p in releaseConfig['enUSPlatforms']:
-            extra_args.extend(["--platform", p])
-        for p in releaseConfig.get('extraBouncerPlatforms', []):
-            extra_args.extend(["--platform", p])
         for partial in releaseConfig.get('partialUpdates', {}).iterkeys():
             extra_args.extend(["--previous-version", partial])
 
@@ -1601,45 +1611,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             }
         })
-
-        if releaseConfig.get("bouncer_add_euballot"):
-            extra_args = ["-c", releaseConfig["bouncer_submitter_config"],
-                          "--product-name", "Firefox-%(version)s-EUBallot",
-                          "--version", releaseConfig['version'],
-                          "--credentials-file", "oauth.txt",
-                          "--bouncer-api-prefix",
-                          releaseConfig['tuxedoServerUrl'],
-                          "--platform", "win32-EUBallot",
-                          "--no-add-ssl-only-product",
-                          "--no-add-complete-updates",
-                          "--no-add-partial-updates",
-                          "--no-locales",
-                          ]
-
-            euballot_bouncer_submitter_factory = ScriptFactory(
-                scriptRepo=mozharness_repo,
-                scriptName="scripts/bouncer_submitter.py",
-                extra_args=extra_args,
-                use_credentials_file=True,
-            )
-
-            builders.append({
-                'name': builderPrefix('euballot_bouncer_submitter'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'] +
-                branchConfig['platforms']['linux64']['slaves'],
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('euballot_bouncer_submitter'),
-                'slavebuilddir': normalizeName(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
-                'factory': euballot_bouncer_submitter_factory,
-                'env': builder_env,
-                'nextSlave': _nextSlave_skip_spot,
-                'properties': {
-                    'slavebuilddir': normalizeName(builderPrefix('eu_bncr_sub'), releaseConfig['productName']),
-                    'release_config': releaseConfigFile,
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                }
-            })
 
     ##### Change sources and Schedulers
 
@@ -1696,9 +1667,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if releaseConfig['buildNumber'] == 1 \
             and not releaseConfig.get('disableBouncerEntries'):
         tag_downstream.append(builderPrefix('bouncer_submitter'))
-
-        if releaseConfig.get("bouncer_add_euballot"):
-            tag_downstream.append(builderPrefix('euballot_bouncer_submitter'))
 
     if releaseConfig.get('xulrunnerPlatforms'):
         tag_downstream.append(builderPrefix('xulrunner_source'))
