@@ -1155,9 +1155,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.addPreBuildSteps()
         self.addSourceSteps()
         self.addConfigSteps()
-        self.addDoBuildSteps()
         if self.signingServers and self.enableSigning:
             self.addGetTokenSteps()
+        self.addDoBuildSteps()
         if self.doBuildAnalysis:
             self.addBuildAnalysisSteps()
         if self.doPostLinkerSize:
