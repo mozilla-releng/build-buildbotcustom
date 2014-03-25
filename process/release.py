@@ -793,8 +793,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 if pf.get('tooltool_manifest_src'):
                     extra_args.extend(['--tooltool-manifest', pf.get('tooltool_manifest_src')])
                 if pf.get('tooltool_script'):
-                    extra_args.extend(['--tooltool-script',
-                                       pf['tooltool_script']])
+                    for script in pf['tooltool_script']:
+                        extra_args.extend(['--tooltool-script', script])
                 for url in branchConfig['tooltool_url_list']:
                     extra_args.extend(['--tooltool-url', url])
                 standalone_factory = SigningScriptFactory(
@@ -869,8 +869,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     if pf.get('tooltool_manifest_src'):
                         extra_args.extend(['--tooltool-manifest', pf.get('tooltool_manifest_src')])
                     if pf.get('tooltool_script'):
-                        extra_args.extend(['--tooltool-script',
-                                           pf['tooltool_script']])
+                        for script in pf['tooltool_script']:
+                            extra_args.extend(['--tooltool-script', script])
                     for url in branchConfig['tooltool_url_list']:
                         extra_args.extend(['--tooltool-url', url])
                     repack_factory = SigningScriptFactory(
