@@ -1399,6 +1399,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
         postrelease_factory = ScriptFactory(
             scriptRepo=tools_repo,
+            use_credentials_file=True,
             scriptName='scripts/release/stage-tasks.sh',
             extra_args=[branchConfigFile, 'postrelease',
                        '--extra-excludes=*.zip',
