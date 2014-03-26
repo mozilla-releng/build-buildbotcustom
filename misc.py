@@ -3121,9 +3121,11 @@ def generateJetpackObjects(config, SLAVES):
                                                         'revision')
             )
             ftp_url = config['ftp_url']
-            types = ['opt', 'debug']
-            for type in types:
-                if type == 'debug':
+            types = ['opt']
+            if config['platforms'][platform].get('debug'):
+                types.append('debug')
+            for type_ in types:
+                if type_ == 'debug':
                     ftp_url = ftp_url + "-debug"
                 f = ScriptFactory(
                     config['scripts_repo'],
@@ -3141,8 +3143,8 @@ def generateJetpackObjects(config, SLAVES):
                                     '-z'],
                 )
 
-                builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type),
-                           'builddir': 'jetpack-%s-%s-%s' % (branch, platform, type),
+                builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type_),
+                           'builddir': 'jetpack-%s-%s-%s' % (branch, platform, type_),
                            'slavebuilddir': 'test',
                            'slavenames': slaves,
                            'factory': f,
