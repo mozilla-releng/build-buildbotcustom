@@ -1418,7 +1418,7 @@ def generateBranchObjects(config, name, secrets=None):
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
     if nightlyBuilders or xulrunnerNightlyBuilders:
-        if config.get('enable_nightly_lastgood', True):
+        if config.get('enable_nightly_lastgood', False):
             goodFunc = lastGoodFunc(
                 branch=config['repo_path'],
                 builderNames=buildersForNightly,
