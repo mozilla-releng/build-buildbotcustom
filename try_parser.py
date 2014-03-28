@@ -15,6 +15,8 @@ def testSuiteMatches(v, u):
     '''Check whether test suite v matches a user-requested test suite spec u'''
     if u in ('mochitests', 'mochitest'):
         return v.startswith('mochitest')
+    elif u in ('jittests', 'jittest'):
+        return v.startswith('jittest')
     elif u == 'mochitest-o':
         return re.search(u, v)
     elif u == 'mochitest-bc':
