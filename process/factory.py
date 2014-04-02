@@ -5453,6 +5453,7 @@ class TalosFactory(RequestSortingBuildFactory):
         self.talos_from_source_code = talos_from_source_code
         self.credentialsFile = credentialsFile
 
+        self.talosCmd.append(WithProperties('%(configFile)s'))
         if datazillaUrl:
             self.talosCmd.extend(['--datazilla-url', datazillaUrl])
             self.talosCmd.extend(
