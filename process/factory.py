@@ -6446,7 +6446,7 @@ class ScriptFactory(RequestSortingBuildFactory):
                  reboot_command=None, hg_bin='hg', platform=None,
                  use_mock=False, mock_target=None,
                  mock_packages=None, mock_copyin_files=None,
-                 triggered_schedulers=None, env={}):
+                 triggered_schedulers=None, env={}, copy_properties=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -6461,6 +6461,7 @@ class ScriptFactory(RequestSortingBuildFactory):
         self.triggered_schedulers = triggered_schedulers
         self.env = env.copy()
         self.use_credentials_file = use_credentials_file
+        self.copy_properties = copy_properties or []
         if platform and 'win' in platform:
             self.get_basedir_cmd = ['cd']
         if scriptName[0] == '/':
@@ -6633,7 +6634,7 @@ class ScriptFactory(RequestSortingBuildFactory):
             for triggered_scheduler in self.triggered_schedulers:
                 self.addStep(Trigger(
                     schedulerNames=[triggered_scheduler],
-                    copy_properties=['buildid', 'builduid'],
+                    copy_properties=self.copy_properties,
                     waitForFinish=False)
                 )
 

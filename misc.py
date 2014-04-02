@@ -1078,6 +1078,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
                                         signingServers=nightly_signing_servers,
                                         extra_args=nightly_extra_args,
                                         triggered_schedulers=triggered_nightly_schedulers,
+                                        copy_properties=['buildid', 'builduid'],
                                         use_credentials_file=True)
         nightly_builder = {
             'name': '%s nightly' % pf['base_name'],
