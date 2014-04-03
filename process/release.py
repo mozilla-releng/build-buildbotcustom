@@ -1397,7 +1397,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             },
         })
 
-        postrelease_factory = ScriptFactory(
+        postrelease_factory_args = dict(
             scriptRepo=tools_repo,
             use_credentials_file=True,
             scriptName='scripts/release/stage-tasks.sh',
@@ -1408,6 +1408,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                        '--ssh-key', branchConfig['stage_ssh_key'],
                         ],
         )
+        if releaseConfig.get('xulrunnerPlatforms'):
+            postrelease_factory_args["triggered_schedulers"] = [builderPrefix('xr_postrelease')]
+        postrelease_factory = ScriptFactory(**postrelease_factory_args)
 
         builders.append({
             'name': builderPrefix('postrelease'),
@@ -1671,6 +1674,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if releaseConfig.get('xulrunnerPlatforms'):
         tag_downstream.append(builderPrefix('xulrunner_source'))
+        xr_postrelease_scheduler = Triggerable(
+            name=builderPrefix('xr_postrelease'),
+            builderNames=[builderPrefix('xr_postrelease')],
+        )
+        schedulers.append(xr_postrelease_scheduler)
 
     for platform in releaseConfig['enUSPlatforms']:
         tag_downstream.append(builderPrefix('%s_build' % platform))
