@@ -100,7 +100,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'blocklistupdate': 'blu',
         'armv6': 'a6',
         'armv7a': 'a7',
-        'ionmonkey': 'ion',
         'system': 'sys',
         'panda': 'p',
         'b2g18': 'b18',
