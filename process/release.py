@@ -70,6 +70,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mozharness_repo = '%s%s' % (branchConfig['hgurl'], mozharness_repo_path)
     clobberer_url = releaseConfig.get(
         'base_clobber_url', branchConfig['base_clobber_url'])
+    balrog_api_root=releaseConfig.get('balrog_api_root',
+        branchConfig.get('balrog_api_root', None))
+    balrog_username=releaseConfig.get('balrog_username',
+        branchConfig.get('balrog_username', None))
 
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
@@ -655,10 +659,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
                 'multilocale_config', {}).get('multilocaleOptions')
-            balrog_api_root=releaseConfig.get('balrog_api_root',
-                branchConfig.get('balrog_api_root', None))
-            balrog_username=releaseConfig.get('balrog_username',
-                branchConfig.get('balrog_username', None))
             balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
                 branchConfig.get('balrog_credentials_file', None))
             # Turn pymake on by default for Windows, and off by default for
@@ -797,6 +797,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args.extend(['--tooltool-script', script])
                 for url in branchConfig['tooltool_url_list']:
                     extra_args.extend(['--tooltool-url', url])
+                if balrog_api_root:
+                    extra_args.extend([
+                        "--balrog-api-root", balrog_api_root,
+                        "--balrog-username", balrog_username,
+                        "--credentials-file", "oauth.txt",
+                    ])
                 standalone_factory = SigningScriptFactory(
                     signingServers=getSigningServers(platform),
                     env=env,
@@ -810,7 +816,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     mock_target=pf.get('mock_target'),
                     mock_packages=pf.get('mock_packages'),
                     mock_copyin_files=pf.get('mock_copyin_files'),
+                    use_credentials_file=True,
+                    copy_properties=['buildid'],
                 )
+                # TODO: how to make this work with balrog, where we need 4 properties set (but webstatus only allows for 3). can we avoid the need for script_repo_revision or release_tag?
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
                     'slavenames': pf.get('l10n_slaves', pf['slaves']),
@@ -827,6 +836,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             "standalone_repack", platform), releaseConfig['productName']),
                         'platform': platform,
                         'branch': 'release-%s' % sourceRepoInfo['name'],
+                        'release_config': releaseConfigFile,
                     }
                 })
 
@@ -873,6 +883,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             extra_args.extend(['--tooltool-script', script])
                     for url in branchConfig['tooltool_url_list']:
                         extra_args.extend(['--tooltool-url', url])
+                    if balrog_api_root:
+                        extra_args.extend([
+                            "--balrog-api-root", balrog_api_root,
+                            "--balrog-username", balrog_username,
+                            "--credentials-file", "oauth.txt",
+                        ])
                     repack_factory = SigningScriptFactory(
                         signingServers=getSigningServers(platform),
                         env=env,
@@ -887,6 +903,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
+                        use_credentials_file=True,
+                        copy_properties=['buildid'],
                     )
 
                 builders.append({
@@ -1167,10 +1185,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'sourceRepositories']['mozilla']['path']
         except KeyError:
             moz_repo_path = sourceRepoInfo['path']
-        balrog_api_root=releaseConfig.get('balrog_api_root',
-            branchConfig.get('balrog_api_root', None))
-        balrog_username=releaseConfig.get('balrog_username',
-            branchConfig.get('balrog_username', None))
         balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
             branchConfig.get('balrog_credentials_file', None))
         updates_factory = ReleaseUpdatesFactory(
