@@ -11,7 +11,7 @@ from buildbot.db.schema.manager import DBSchemaManager
 
 import buildbotcustom.misc
 from buildbotcustom.misc import _nextIdleSlave, _nextAWSSlave, \
-    _classifyAWSSlaves, _getRetries, MAX_SPOT_RETRIES
+    _classifyAWSSlaves, _get_pending
 
 
 class TestNextSlaveFuncs(unittest.TestCase):
@@ -80,54 +80,46 @@ class TestNextAWSSlave(unittest.TestCase):
         """Test that we pick between ondemand and spot properly"""
         f = _nextAWSSlave()
         inhouse, ondemand, spot = _classifyAWSSlaves(self.slaves)
-        # We need to mock out _getRetries so that we don't have to create a db
+        # We need to mock out _get_pending so that we don't have to create a db
         # for these tests
-        with mock.patch.object(buildbotcustom.misc, "_getRetries") as \
-                _getRetries:
+        with mock.patch.object(buildbotcustom.misc, "_get_pending") as \
+                _get_pending:
             request = mock.Mock()
             request.submittedAt = 0
-            _getRetries.return_value = [request], 0
+            _get_pending.return_value = [request]
 
             # Sanity check - can't choose any slave if none are available!
             self.assertEquals(None,
                               f(self.builder, []))
 
-            # _getRetries shouldn't get called either
-            self.assertEquals(_getRetries.called, 0)
+            # _get_pending shouldn't get called either
+            self.assertEquals(_get_pending.called, 0)
 
-            # _getRetries shouldn't get called if we only have ondemand
+            # _get_pending shouldn't get called if we only have ondemand
             # instances either
             self.assertEquals("slave-ec2",
                               f(self.builder, ondemand).slave.slavename)
-            self.assertEquals(_getRetries.called, 0)
+            self.assertEquals(_get_pending.called, 0)
 
-            # Spot instances should be preferred if there are no retries
+            # Spot instances should be preferred
             self.assertEquals("slave-spot-001",
                               f(self.builder, spot + ondemand).slave.slavename)
 
-            # Otherwise ondemand should be preferred
-            _getRetries.return_value = [request], MAX_SPOT_RETRIES + 1
-            self.assertEquals("slave-ec2",
-                              f(self.builder, spot + ondemand).slave.slavename)
-
-            # Or no slave if only spot are available
-            _getRetries.return_value = [request], MAX_SPOT_RETRIES + 1
-            self.assertEquals(None, f(self.builder, spot))
 
     def test_nextAWSSlave_AWS_wait(self):
         """Test that we'll wait up to aws_wait for inhouse instances to become
         available"""
         f = _nextAWSSlave(aws_wait=60)
         inhouse, ondemand, spot = _classifyAWSSlaves(self.slaves)
-        # We need to mock out _getRetries so that we don't have to create a db
+        # We need to mock out _get_pending so that we don't have to create a db
         # for these tests
-        with mock.patch.object(buildbotcustom.misc, "_getRetries") as \
-                _getRetries:
+        with mock.patch.object(buildbotcustom.misc, "_get_pending") as \
+                _get_pending:
             # Also need to mock time
             with mock.patch.object(buildbotcustom.misc, "now") as t:
                 request = mock.Mock()
                 request.submittedAt = 0
-                _getRetries.return_value = [request], 0
+                _get_pending.return_value = [request]
 
                 # at t=1, we shouldn't use an ondemand or spot intance
                 t.return_value = 1
@@ -142,42 +134,38 @@ class TestNextAWSSlave(unittest.TestCase):
                                   f(self.builder,
                                     ondemand).slave.slavename)
 
-                _getRetries.return_value = [request], MAX_SPOT_RETRIES + 1
-                self.assertEquals("slave-ec2",
-                                  f(self.builder,
-                                    spot + ondemand).slave.slavename)
-
     def test_nextAWSSlave_noRequests(self):
         """Test that everything works if there are no pending requests to
         getRetries"""
         f = _nextAWSSlave()
         inhouse, ondemand, spot = _classifyAWSSlaves(self.slaves)
-        # We need to mock out _getRetries so that we don't have to create a db
+        # We need to mock out _get_pending so that we don't have to create a db
         # for these tests
-        with mock.patch.object(buildbotcustom.misc, "_getRetries") as \
-                _getRetries:
-            _getRetries.return_value = [], 0
+        with mock.patch.object(buildbotcustom.misc, "_get_pending") as \
+                _get_pending:
+            _get_pending.return_value = []
 
             # Sanity check - can't choose any slave if none are available!
             self.assertEquals(None,
                               f(self.builder, []))
 
-            # _getRetries shouldn't get called either
-            self.assertEquals(_getRetries.called, 0)
+            # _get_pending shouldn't get called either
+            self.assertEquals(_get_pending.called, 0)
 
-            # _getRetries shouldn't get called if we only have ondemand
+            # _get_pending shouldn't get called if we only have ondemand
             # instances either
             self.assertEquals("slave-ec2",
                               f(self.builder, ondemand).slave.slavename)
-            self.assertEquals(_getRetries.called, 0)
+            self.assertEquals(_get_pending.called, 0)
 
             # Spot instances should be preferred if there are no retries
             self.assertEquals("slave-spot-001",
                               f(self.builder, spot + ondemand).slave.slavename)
 
 
-class TestGetRetries(unittest.TestCase):
+class TestGetPending(unittest.TestCase):
     basedir = "test_misc_nextslaves"
+
     def setUp(self):
         if os.path.exists(self.basedir):
             shutil.rmtree(self.basedir)
@@ -195,7 +183,7 @@ class TestGetRetries(unittest.TestCase):
         self.dbc.stop()
         shutil.rmtree(self.basedir)
 
-    def test_getRetries(self):
+    def test_get_pending(self):
         # Get a db transaction object so that getRetries' stack walking can
         # find it!
         t = self.dbc.get_sync_connection().cursor()
@@ -204,4 +192,4 @@ class TestGetRetries(unittest.TestCase):
         builder._getBuildable.return_value = []
         builder.db = self.dbc
 
-        self.assertEquals(_getRetries(builder), ([], 0))
+        self.assertEquals(_get_pending(builder), ([]))
