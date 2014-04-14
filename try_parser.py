@@ -19,6 +19,8 @@ def testSuiteMatches(v, u):
         return v.startswith('jittest')
     elif u == 'mochitest-o':
         return re.search(u, v)
+    elif u == 'mochitest-dt':
+        return v.startswith('mochitest-devtools-chrome')
     elif u == 'mochitest-bc':
         return v.startswith('mochitest-browser-chrome')
     elif u in ('reftests', 'reftest'):
