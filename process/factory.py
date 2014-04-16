@@ -5490,7 +5490,7 @@ class TalosFactory(RequestSortingBuildFactory):
         Return path to a python version that eithers has "simplejson" or
         it is 2.6 or higher (which includes the json module)
         '''
-        if (platform in ("fedora", "fedora64", "ubuntu32_hw", "ubuntu64_hw",
+        if (platform in ("ubuntu32_hw", "ubuntu64_hw",
                          "snowleopard", "lion", "mountainlion", "mavericks")):
             return "/tools/buildbot/bin/python"
         elif (platform in ('w764', 'win7', 'xp')):
@@ -5955,7 +5955,7 @@ class TalosFactory(RequestSortingBuildFactory):
     def addPluginInstallSteps(self):
         if self.plugins:
             # 32 bit (includes mac browsers)
-            if self.OS in ('xp', 'win7', 'fedora', 'ubuntu32_hw',
+            if self.OS in ('xp', 'win7', 'ubuntu32_hw',
                            'tegra_android', 'tegra_android-armv6',
                            'tegra_android-noion', 'panda_android',
                            'snowleopard', 'lion', 'mountainlion', 'mavericks',
@@ -5974,7 +5974,7 @@ class TalosFactory(RequestSortingBuildFactory):
                              haltOnFailure=True,
                              ))
             # 64 bit
-            if self.OS in ('w764', 'fedora64', 'ubuntu64_hw'):
+            if self.OS in ('w764', 'ubuntu64_hw'):
                 self.addStep(DownloadFile(
                              url=WithProperties(
                              "%s/%s" % (self.supportUrlBase, self.plugins['64'])),
@@ -6126,17 +6126,6 @@ class TalosFactory(RequestSortingBuildFactory):
                          log_eval_func=lambda c, s: SUCCESS,
                          ))
         else:
-            # the following step is to help the linux running on mac minis reboot cleanly
-            # see bug561442
-            if 'fedora' in self.OS:
-                self.addStep(ShellCommand(
-                    name='set_time',
-                    description=['set', 'time'],
-                    alwaysRun=True,
-                    command=['bash', '-c',
-                             'sudo hwclock --set --date="$(date +%m/%d/%y\ %H:%M:%S)"'],
-                ))
-
             self.addStep(DisconnectStep(
                          name='reboot',
                          flunkOnFailure=False,
