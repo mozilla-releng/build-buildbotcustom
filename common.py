@@ -84,8 +84,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'maple': 'map',
         'cypress': 'cy',
         'snowleopard': 'snow',
-        'fedora': 'fed',
-        'fedora64': 'fed64',
         'ubuntu64': 'ub64',
         'ubuntu32': 'ub32',
         'repack': 'rpk',
