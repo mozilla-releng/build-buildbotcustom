@@ -455,6 +455,7 @@ class JacuzziAllocator(object):
             if my_available_slaves is None:
                 return func(builder, available_slaves)
             return func(builder, my_available_slaves)
+        _nextSlave.jacuzzi_enabled = True
         return _nextSlave
 
 J = JacuzziAllocator()
@@ -593,6 +594,7 @@ def _nextSlave(builder, available_slaves):
 
 
 @safeNextSlave
+@J
 def _nextSlave_skip_spot(builder, available_slaves):
     if available_slaves:
         no_spot_slaves = [s for s in available_slaves if not
@@ -608,6 +610,7 @@ def _nextIdleSlave(nReserved):
     """Return a nextSlave function that will only return a slave to run a build
     if there are at least nReserved slaves available."""
     @safeNextSlave
+    @J
     def _nextslave(builder, available_slaves):
         if len(available_slaves) <= nReserved:
             return None
