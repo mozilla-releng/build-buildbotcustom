@@ -119,12 +119,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             releaseConfig['version'],
             releaseConfig['buildNumber'], )
 
-    def majorReleasePrefix():
-        return "%s %s build%s" % (
-            releaseConfig['productName'].title(),
-            releaseConfig['majorUpdateToVersion'],
-            releaseConfig['majorUpdateBuildNumber'], )
-
     def genericFtpUrl():
         """ Generate an FTP URL pointing to the uploaded release builds for
         sticking into release notification messages """
@@ -163,8 +157,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         if stage.replace("xulrunner_", "").split('_')[0] == p]
         else:
             platform = [p for p in allplatforms if stage.split('_')[0] == p]
-        if releaseConfig.get('majorUpdateRepoPath'):
-            majorReleaseName = majorReleasePrefix()
         platform = platform[0] if len(platform) >= 1 else ''
         bare_platform = platform.replace('xulrunner_', '')
         message_tag = getMessageTag()
@@ -295,10 +287,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         return parallelizeBuilders("update_verify", platform,
                                    updateVerifyChunks)
 
-    def majorUpdateVerifyBuilders(platform):
-        return parallelizeBuilders("major_update_verify", platform,
-                                   updateVerifyChunks)
-
     def hasPlatformSubstring(platforms, substring):
         if isinstance(platforms, basestring):
             platforms = (platforms,)
@@ -407,37 +395,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
             ))
-
-        if not releaseConfig.get('skip_release_download'):
-            release_downloader_factory = ScriptFactory(
-                scriptRepo=tools_repo,
-                extra_args=[branchConfigFile],
-                scriptName='scripts/staging/release_downloader.sh',
-            )
-
-            builders.append({
-                'name': builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName']),
-                'slavenames': unix_slaves,
-                'category': builderPrefix(''),
-                'builddir': builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName']),
-                'slavebuilddir': normalizeName(builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName']), releaseConfig['productName']),
-                'factory': release_downloader_factory,
-                'env': builder_env,
-                'nextSlave': _nextSlave_skip_spot,
-                'properties': {
-                    'release_config': releaseConfigFile,
-                    'builddir': builderPrefix('%s_release_downloader' %
-                                              releaseConfig['productName']),
-                    'slavebuilddir': normalizeName(builderPrefix(
-                        '%s_release_downloader' %
-                        releaseConfig['productName'])),
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                }
-            })
 
     if not releaseConfig.get('skip_tag'):
         pf = branchConfig['platforms']['linux']
@@ -1658,18 +1615,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderNames=[builderPrefix(
                 '%s_tag' % releaseConfig['productName'])],
         )
-        if not releaseConfig.get('skip_release_download'):
-            release_downloader_scheduler = Scheduler(
-                name=builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName']),
-                branch=sourceRepoInfo['path'],
-                treeStableTimer=None,
-                builderNames=[builderPrefix(
-                    '%s_release_downloader' % releaseConfig['productName'])],
-                fileIsImportant=lambda c: changeContainsProduct(c,
-                                                                releaseConfig['productName'])
-            )
-            schedulers.append(release_downloader_scheduler)
     else:
         tag_scheduler = Dependent(
             name=builderPrefix('%s_tag' % releaseConfig['productName']),
@@ -1727,17 +1672,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             upstream=tag_scheduler,
             builderNames=tag_downstream,
         ))
-
-    if releaseConfig.get('majorUpdateRepoPath'):
-        majorUpdateBuilderNames = []
-        for platform in sorted(releaseConfig['majorUpdateVerifyConfigs'].keys()):
-            majorUpdateBuilderNames.extend(
-                majorUpdateVerifyBuilders(platform).values())
-        major_update_verify_scheduler = Triggerable(
-            name=builderPrefix('major_update_verify'),
-            builderNames=majorUpdateBuilderNames
-        )
-        schedulers.append(major_update_verify_scheduler)
 
     for platform in releaseConfig['unittestPlatforms']:
         platform_test_builders = []
