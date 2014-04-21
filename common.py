@@ -53,7 +53,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
     """
     origName = name
     prefix = ''
-    if product != None and 'thunderbird' in product:
+    if product is not None and 'thunderbird' in product:
         prefix = 'tb-'
 
     mappings = {
@@ -103,10 +103,13 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'b2g18': 'b18',
         'b2g26': 'b26',
         'b2g28': 'b28',
+        'b2g30': 'b30',
         'v1_0_0': '100',
         'v1_2': '12',
         'v1_0_1': '101',
         'v1_1_0': '110',
+        'v1_3': '13',
+        'v1_4': '14',
         'standalone': 'sa',
         'thunderbird': 'tb',
         'checksums': 'sums',
@@ -127,10 +130,10 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         if word in name:
             # Match strings that...
             regex = re.compile(
-                r'(-|_|\A)' +   # Are the start of the string or after a separator
-                ('%s' % word) + # Contain the word we're looking
-                r'(-|_|\Z)'     # And don't have anything other the end of the string
-                                # or a separator atfer them
+                r'(-|_|\A)' +    # Are the start of the string or after a separator
+                ('%s' % word) +  # Contain the word we're looking
+                r'(-|_|\Z)'      # And don't have anything other the end of the string
+                                 # or a separator atfer them
             )
             name = regex.sub(r'\g<1>%s\g<2>' % replacement, name)
     name = prefix + name
