@@ -172,7 +172,6 @@ def postUploadCmdPrefix(upload_dir=None,
         cmd.extend(['--builddir', builddir])
     if to_tinderbox_dated:
         cmd.append('--release-to-tinderbox-dated-builds')
-        cmd.append('--release-to-latest-tinderbox-builds')
     if to_tinderbox_builds:
         cmd.append('--release-to-tinderbox-builds')
     if to_try:
