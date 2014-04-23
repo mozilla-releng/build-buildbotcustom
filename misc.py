@@ -1401,6 +1401,9 @@ def generateBranchObjects(config, name, secrets=None):
         branchObjects['schedulers'].append(nightly_scheduler)
 
     if len(periodicBuilders) > 0:
+        hour = config['periodic_start_hours']
+        minute = config.get('periodic_start_minute', 0)
+
         periodic_scheduler = makePropertiesScheduler(
             SpecificNightly,
             [buildIDSchedFunc, buildUIDSchedFunc])(
@@ -1409,7 +1412,8 @@ def generateBranchObjects(config, name, secrets=None):
                 name="%s periodic" % scheduler_name_prefix,
                 branch=config['repo_path'],
                 builderNames=periodicBuilders,
-                hour=range(0, 24, config['periodic_interval']),
+                hour=hour,
+                minute=minute,
             )
         branchObjects['schedulers'].append(periodic_scheduler)
 
