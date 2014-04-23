@@ -3139,7 +3139,29 @@ def generateJetpackObjects(config, SLAVES):
     }
 
 
-def generateProjectObjects(project, config, SLAVES):
+def generateGaiaTryObjects(config, all_builders):
+    # Set up polling
+    assert all_builders
+    builder_names = [x['name'] for x in all_builders if 'gaia-try' in x['name']]
+    poller = HgPoller(
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        pollInterval=5 * 60,
+    )
+    # Set up scheduler
+    scheduler = Scheduler(
+        name="gaia-try",
+        branch=config['repo_path'],
+        treeStableTimer=None,
+        builderNames=builder_names,
+    )
+    return {
+        'change_source': [poller],
+        'schedulers': [scheduler],
+    }
+
+
+def generateProjectObjects(project, config, SLAVES, all_builders=None):
     builders = []
     schedulers = []
     change_sources = []
@@ -3166,6 +3188,11 @@ def generateProjectObjects(project, config, SLAVES):
         spiderMonkeyObjects = generateSpiderMonkeyObjects(
             project, config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
+
+    # Gaia-Try
+    elif project == "gaia-try":
+        gaiaTryObjects = generateGaiaTryObjects(config, all_builders)
+        buildObjects = mergeBuildObjects(buildObjects, gaiaTryObjects)
 
     return buildObjects
 
