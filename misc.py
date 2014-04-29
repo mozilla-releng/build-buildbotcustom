@@ -1784,6 +1784,10 @@ def generateBranchObjects(config, name, secrets=None):
                 kwargs['uploadPackages'] = False
                 # Don't need to run checktests
                 kwargs['checkTest'] = False
+                # Do pretty names testing
+                if platform in ('linux', 'linux64', 'macosx64', 'win32', 'win64'):
+                    kwargs['testPrettyNames'] = True
+
                 factory = factory_class(**kwargs)
                 builder = {
                     'name': '%s non-unified' % pf['base_name'],
