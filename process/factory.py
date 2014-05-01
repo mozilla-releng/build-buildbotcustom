@@ -1344,6 +1344,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addStep(ShellCommand(
                 name='run_tooltool',
                 command=command,
+                env=self.env,
                 haltOnFailure=True,
             ))
 
