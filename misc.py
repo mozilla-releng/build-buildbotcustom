@@ -2013,6 +2013,7 @@ def generateBranchObjects(config, name, secrets=None):
                     enable_ccache=pf.get('enable_ccache', False),
                     useSharedCheckouts=pf.get('enable_shared_checkouts', False),
                     testPrettyNames=pf.get('test_pretty_names', False),
+                    checkTest=pf.get('enable_checktests', False),
                     l10nCheckTest=pf.get('l10n_check_test', False),
                     post_upload_include_platform=pf.get(
                         'post_upload_include_platform', False),
