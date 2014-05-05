@@ -737,7 +737,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         stagePlatform=None, stageProduct=None,
                         mozharness=False, mozharness_python=None,
                         mozharness_suite_config=None,
-                        mozharness_repo=None, mozharness_tag='production'):
+                        mozharness_repo=None, mozharness_tag='production',
+                        is_debug=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves is None:
@@ -760,6 +761,20 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
         if mozharness_suite_config.get('config_files'):
             extra_args.extend(['--cfg', ','.join(mozharness_suite_config['config_files'])])
         extra_args.extend(mozharness_suite_config.get('extra_args', suites.get('extra_args', [])))
+        if is_debug is True:
+            extra_args.extend(
+                mozharness_suite_config.get(
+                    'debug_extra_args',
+                    suites.get('debug_extra_args', [])
+                )
+            )
+        elif is_debug is False:
+            extra_args.extend(
+                mozharness_suite_config.get(
+                    'opt_extra_args',
+                    suites.get('opt_extra_args', [])
+                )
+            )
         if mozharness_suite_config.get('blob_upload'):
             extra_args.extend(['--blob-upload-branch', branch_name])
         if mozharness_suite_config.get('download_symbols'):
@@ -2013,6 +2028,7 @@ def generateBranchObjects(config, name, secrets=None):
                     enable_ccache=pf.get('enable_ccache', False),
                     useSharedCheckouts=pf.get('enable_shared_checkouts', False),
                     testPrettyNames=pf.get('test_pretty_names', False),
+                    checkTest=pf.get('enable_checktests', False),
                     l10nCheckTest=pf.get('l10n_check_test', False),
                     post_upload_include_platform=pf.get(
                         'post_upload_include_platform', False),
@@ -2653,6 +2669,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                         test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'ondemand'
                                     else:
                                         test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'true'
+                                if test_type == 'opt':
+                                    test_builder_kwargs['is_debug'] = False
+                                else:
+                                    test_builder_kwargs['is_debug'] = True
+
                             branchObjects['builders'].extend(
                                 generateTestBuilder(**test_builder_kwargs))
                             if create_pgo_builders and test_type == 'opt':
