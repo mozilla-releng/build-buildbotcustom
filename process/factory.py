@@ -157,7 +157,7 @@ def postUploadCmdPrefix(upload_dir=None,
     if branch:
         cmd.extend(["-b", branch])
     if product:
-        cmd.extend(["-p", product])
+        cmd.extend(["-p", product.lower()])
     if buildid:
         cmd.extend(['-i', buildid])
     if buildNumber:

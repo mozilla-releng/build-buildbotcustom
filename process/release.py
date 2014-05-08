@@ -1934,7 +1934,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if 'version' not in props:
             props['version'] = releaseConfig['version']
         if 'product' not in props:
-            props['product'] = releaseConfig['productName']
+            props['product'] = releaseConfig['productName'].capitalize()
 
     return {
         "builders": builders,
