@@ -56,7 +56,7 @@ class PostRunner(object):
 
         info = self.getBuildInfo(build)
         branch = info['branch']
-        product = info['product']
+        product = info['product'].lower()
         platform = info['platform']
 
         upload_args = ['-r', '2', '-t', '10', '--master-name',
@@ -169,7 +169,7 @@ class PostRunner(object):
         if props.getProperty('stage_product') is not None:
             retval['product'] = props['stage_product']
         elif props.getProperty('product') is not None:
-            retval['product'] = props['product']
+            retval['product'] = props['product'].lower()
         else:
             retval['product'] = None
 
