@@ -1514,7 +1514,8 @@ def generateBranchObjects(config, name, secrets=None):
                 # finished all the builders needed for this platform and
                 # there is nothing left to do
                 factory = makeMHFactory(config, pf, signingServers=secrets.get(
-                    pf.get('dep_signing_servers')))
+                    pf.get('dep_signing_servers')),
+                    use_credentials_file=True)
                 builder = {
                     'name': '%s_dep' % pf['base_name'],
                     'slavenames': pf['slaves'],
@@ -1549,7 +1550,8 @@ def generateBranchObjects(config, name, secrets=None):
                     if pf.get('dep_signing_servers') != pf.get('nightly_signing_servers'):
                         # We need a new factory for this because our signing
                         # servers are different
-                        factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('nightly_signing_servers')))
+                        factory = makeMHFactory(config, pf, signingServers=secrets.get(pf.get('nightly_signing_servers')),
+                                                use_credentials_file=True)
 
                     nightly_builder = {
                         'name': '%s_nightly' % pf['base_name'],
