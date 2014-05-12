@@ -640,17 +640,72 @@ def _nextOldTegra(builder, available_slaves):
         return random.choice(valid)
     return None
 
-nomergeBuilders = []
+
+# Globals for mergeRequests
+nomergeBuilders = set()
+# Default to max of 3 merged requests.
+builderMergeLimits = collections.defaultdict(lambda: 3)
+# For tracking state in mergeRequests below
+_mergeCount = 0
+_mergeId = None
 
 
 def mergeRequests(builder, req1, req2):
-    if builder.name in nomergeBuilders:
+    """
+    Returns True if req1 and req2 are mergeable requests, False otherwise.
+
+    This is called by buildbot to determine if pairs of buildrequests can be
+    merged together for a build.
+
+    Args:
+        builder (buildbot builder object): which builder is being considered
+        req1 (buildbot request object): first request being considered.
+            This stays constant for a given build being constructed.
+        req2 (buildbot request object): second request being considered.
+            This changes as the buildbot master considers all pending requests
+            for the build.
+    """
+    global _mergeCount, _mergeId
+
+    # If the requests are fundamentally unmergeable, get that done first
+    if not req1.canBeMergedWith(req2):
+        # The requests are inherently unmergeable; e.g. on different branches
+        # Don't log this; it would be spammy
         return False
+
+    log.msg("mergeRequests: considering %s %s %s" % (builder.name, req1.id, req2.id))
+    # Merging is disallowed on these builders
+    if builder.name in nomergeBuilders:
+        log.msg("mergeRequests: in nomergeBuilders; returning False")
+        return False
+
     if 'Self-serve' in req1.reason or 'Self-serve' in req2.reason:
         # A build was explicitly requested on this revision, so don't coalesce
         # it
+        log.msg("mergeRequests: self-serve; returning False")
         return False
-    return req1.canBeMergedWith(req2)
+
+    # We're merging a different request now; reset the state
+    # This works because buildbot calls this function with the same req1 for
+    # all pending requests for the builder, only req2 varies between calls.
+    # Once req1 changes we know we're in the middle of creating a different
+    # build.
+    if req1.id != _mergeId:
+        # Start counting at 1 here, since if we're being called, we've already
+        # got 2 requests we're considering merging. If we pa
+        _mergeCount = 1
+        _mergeId = req1.id
+        log.msg("mergeRequests: different r1 id; resetting state")
+
+    if _mergeCount >= builderMergeLimits[builder.name]:
+        # This request has already been merged with too many requests
+        log.msg("mergeRequests: %s: exceeded limit (%i)" %
+                (builder.name, builderMergeLimits[builder.name]))
+        return False
+
+    log.msg("mergeRequests: %s merging %i %i" % (builder.name, req1.id, req2.id))
+    _mergeCount += 1
+    return True
 
 
 def mergeBuildObjects(d1, d2):
@@ -1294,7 +1349,7 @@ def generateBranchObjects(config, name, secrets=None):
         if l10n_binaryURL.endswith('/'):
             l10n_binaryURL = l10n_binaryURL[:-1]
         l10n_binaryURL += "-l10n"
-        nomergeBuilders.extend(l10n_builders)
+        nomergeBuilders.update(l10n_builders)
 
     tipsOnly = False
     maxChanges = 100
@@ -1341,9 +1396,9 @@ def generateBranchObjects(config, name, secrets=None):
             Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
     if not config.get('enable_merging', True):
-        nomergeBuilders.extend(builders)
+        nomergeBuilders.update(builders)
     # these should never, ever merge
-    nomergeBuilders.extend(periodicBuilders)
+    nomergeBuilders.update(periodicBuilders)
 
     if 'product_prefix' in config:
         scheduler_name_prefix = "%s_%s" % (config['product_prefix'], name)
@@ -2523,7 +2578,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     }
 
                     if not merge:
-                        nomergeBuilders.append(builder['name'])
+                        nomergeBuilders.add(builder['name'])
 
                     talos_builders.setdefault(
                         tests, []).append(builder['name'])
@@ -2560,7 +2615,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         }
 
                         if not merge:
-                            nomergeBuilders.append(pgo_builder['name'])
+                            nomergeBuilders.add(pgo_builder['name'])
                         branchObjects['builders'].append(pgo_builder)
                         talos_pgo_builders.setdefault(
                             tests, []).append(pgo_builder['name'])
@@ -2693,7 +2748,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             scheduler_branch = ('%s-%s-%s-unittest' %
                                                 (branch, platform, test_type))
                             if not merge:
-                                nomergeBuilders.extend(test_builders)
+                                nomergeBuilders.update(test_builders)
                             extra_args = {}
                             if branch_config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
@@ -2718,7 +2773,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             scheduler_branch = '%s-%s-pgo-unittest' % (
                                 branch, platform)
                             if not merge:
-                                nomergeBuilders.extend(pgo_builders)
+                                nomergeBuilders.update(pgo_builders)
                             extra_args = {}
                             if branch_config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
@@ -2953,7 +3008,7 @@ def generateFuzzingObjects(config, SLAVES):
                    },
                    }
         builders.append(builder)
-        nomergeBuilders.append(builder['name'])
+        nomergeBuilders.add(builder['name'])
     fuzzing_scheduler = PersistentScheduler(
         name="fuzzer",
         builderNames=[b['name'] for b in builders],
@@ -3052,7 +3107,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
                        }
             builders.append(builder)
             if not bconfig.get('enable_merging', True):
-                nomergeBuilders.append(name)
+                nomergeBuilders.add(name)
 
     def isImportant(change):
         if not isHgPollerTriggered(change, bconfig['hgurl']):
@@ -3142,7 +3197,7 @@ def generateJetpackObjects(config, SLAVES):
                            'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
                            }
                 builders.append(builder)
-                nomergeBuilders.append(builder['name'])
+                nomergeBuilders.add(builder['name'])
 
     # Set up polling
     poller = HgPoller(

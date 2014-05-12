@@ -1924,7 +1924,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     builders.extend(test_builders)
 
     # Don't merge release builder requests
-    nomergeBuilders.extend([b['name'] for b in builders + test_builders])
+    nomergeBuilders.update([b['name'] for b in builders + test_builders])
 
     # Make sure all builders have our build number and version set
     for b in builders:
