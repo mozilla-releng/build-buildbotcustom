@@ -1004,6 +1004,50 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         }),
     )
 
+
+def generateUnittestBuilders(
+    platform_name,
+    branch,
+    test_type,
+    create_pgo_builders,
+    **test_builder_kwargs
+):
+    builders = []
+    builders.extend(generateTestBuilder(**test_builder_kwargs))
+    if create_pgo_builders and test_type == 'opt':
+        pgo_builder_kwargs = test_builder_kwargs.copy()
+        pgo_builder_kwargs['name_prefix'] = "%s %s pgo test" % (platform_name, branch)
+        pgo_builder_kwargs['build_dir_prefix'] += '_pgo'
+        pgo_builder_kwargs['stagePlatform'] += '-pgo'
+        builders.extend(generateTestBuilder(**pgo_builder_kwargs))
+    return builders
+
+
+def generateChunkedUnittestBuilders(total_chunks, *args, **kwargs):
+    if not total_chunks:
+        return generateUnittestBuilders(
+            *args, **kwargs
+        )
+    builders = []
+    for i in range(1, total_chunks + 1):
+        kwargs_copy = deepcopy(kwargs)
+        kwargs_copy['suites_name'] = '%s-%d' % (kwargs_copy['suites_name'], i)
+        chunk_args = [
+            '--total-chunks', str(total_chunks),
+            '--this-chunk', str(i)
+        ]
+        if 'extra_args' in kwargs_copy['mozharness_suite_config']:
+            kwargs_copy['mozharness_suite_config']['extra_args'].extend(chunk_args)
+        elif 'extra_args' in kwargs_copy['suites']:
+            kwargs_copy['suites']['extra_args'].extend(chunk_args)
+        else:
+            kwargs_copy['mozharness_suite_config']['extra_args'] = chunk_args
+        builders.extend(generateUnittestBuilders(
+            *args, **kwargs_copy
+        ))
+    return builders
+
+
 def generateDesktopMozharnessBuilders(name, platform, config, secrets,
                                       l10nNightlyBuilders, builds_created):
     desktop_mh_builders = []
@@ -1036,7 +1080,6 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
     non_unified_extra_args.extend(branch_and_pool_args)
 
     base_builder_dir = '%s-%s' % (name, platform)
-    nightly_build_dir = '%s-%s-nightly' % (name, platform)
     # let's assign next_slave here so we only have to change it in
     # this location for mozharness builds if we swap it out again.
     next_slave = _nextAWSSlave_wait_sort
@@ -2697,6 +2740,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 "stagePlatform": stage_platform,
                                 "stageProduct": stage_product
                             }
+                            test_builder_chunks = None
                             if isinstance(suites, dict) and "use_mozharness" in suites:
                                 test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
@@ -2730,17 +2774,19 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                     test_builder_kwargs['is_debug'] = False
                                 else:
                                     test_builder_kwargs['is_debug'] = True
+                                if suites.get('totalChunks'):
+                                    test_builder_chunks = suites['totalChunks']
 
                             branchObjects['builders'].extend(
-                                generateTestBuilder(**test_builder_kwargs))
-                            if create_pgo_builders and test_type == 'opt':
-                                pgo_builder_kwargs = test_builder_kwargs.copy()
-                                pgo_builder_kwargs['name_prefix'] = "%s %s pgo test" % (platform_name, branch)
-                                pgo_builder_kwargs[
-                                    'build_dir_prefix'] += '_pgo'
-                                pgo_builder_kwargs['stagePlatform'] += '-pgo'
-                                branchObjects['builders'].extend(
-                                    generateTestBuilder(**pgo_builder_kwargs))
+                                generateChunkedUnittestBuilders(
+                                    test_builder_chunks,
+                                    platform_name,
+                                    branch,
+                                    test_type,
+                                    create_pgo_builders,
+                                    **test_builder_kwargs
+                                )
+                            )
 
                         for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
                             for test in test_builders:
