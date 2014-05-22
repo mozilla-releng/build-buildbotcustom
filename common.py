@@ -100,7 +100,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'armv7a': 'a7',
         'system': 'sys',
         'panda': 'p',
-        'b2g18': 'b18',
         'b2g26': 'b26',
         'b2g28': 'b28',
         'b2g30': 'b30',

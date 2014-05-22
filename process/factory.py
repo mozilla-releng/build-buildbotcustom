@@ -278,7 +278,6 @@ def getPlatformMinidumpPath(platform):
         # Android uses OSX *and* Linux because the Foopies are on both.
         'android': WithProperties('/builds/minidump_stackwalk'),
         'android-x86': WithProperties('/builds/minidump_stackwalk'),
-        'android-noion': WithProperties('/builds/minidump_stackwalk'),
         'android-armv6': WithProperties('/builds/minidump_stackwalk'),
     }
     return platform_minidump_path[platform]
@@ -5958,7 +5957,7 @@ class TalosFactory(RequestSortingBuildFactory):
             # 32 bit (includes mac browsers)
             if self.OS in ('xp', 'win7', 'ubuntu32_hw',
                            'tegra_android', 'tegra_android-armv6',
-                           'tegra_android-noion', 'panda_android',
+                           'panda_android',
                            'snowleopard', 'lion', 'mountainlion', 'mavericks',
                            'xp-ix','win7-ix', 'win8'):
                 self.addStep(DownloadFile(
