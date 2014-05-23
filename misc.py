@@ -2643,6 +2643,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         triggeredUnittestBuilders = []
                         pgoUnittestBuilders = []
                         unittest_suites = "%s_unittest_suites" % test_type
+                        build_dir_prefix = platform_config[slave_platform].get(
+                                'build_dir_prefix', slave_platform)
                         if test_type == "debug":
                             # Debug tests always need to download symbols for
                             # runtime assertions
@@ -2655,11 +2657,11 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 pf = branch_config['platforms'][platform]
                                 pf['download_symbols'] = True
                                 pf['download_symbols_ondemand'] = False
-                            slave_platform_name = "%s-debug" % slave_platform
+                            slave_platform_name = "%s-debug" % build_dir_prefix
                         elif test_type == "mobile":
-                            slave_platform_name = "%s-mobile" % slave_platform
+                            slave_platform_name = "%s-mobile" % build_dir_prefix
                         else:
-                            slave_platform_name = slave_platform
+                            slave_platform_name = build_dir_prefix
 
                         # in case this builder is a set of suites
                         builders_with_sets_mapping = {}
@@ -2674,16 +2676,18 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 for s in suites['trychooser_suites']:
                                     builders_with_sets_mapping[s] = suites_name
 
+                        scheduler_slave_platform_identifier = platform_config[slave_platform].get(
+                                'scheduler_slave_platform_identifier', slave_platform)
                         triggeredUnittestBuilders.append(
                             (
                                 'tests-%s-%s-%s-unittest' % (
-                                    branch, slave_platform, test_type),
+                                    branch, scheduler_slave_platform_identifier, test_type),
                                 test_builders, merge_tests))
                         if create_pgo_builders and test_type == 'opt':
                             pgoUnittestBuilders.append(
                                 (
                                     'tests-%s-%s-pgo-unittest' % (
-                                        branch, slave_platform),
+                                        branch, scheduler_slave_platform_identifier),
                                     pgo_builders, merge_tests))
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
