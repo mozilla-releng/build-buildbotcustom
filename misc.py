@@ -902,78 +902,37 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             builder['nextSlave'] = _nextOldTegra
         builders.append(builder)
     else:
-        if isinstance(suites, dict) and "totalChunks" in suites:
-            totalChunks = suites['totalChunks']
-            for i in range(totalChunks):
-                factory = UnittestPackagedBuildFactory(
-                    platform=platform,
-                    test_suites=[suites['suite']],
-                    mochitest_leak_threshold=mochitestLeakThreshold,
-                    crashtest_leak_threshold=crashtestLeakThreshold,
-                    hgHost=config['hghost'],
-                    repoPath=config['repo_path'],
-                    productName=productName,
-                    posixBinarySuffix=posixBinarySuffix,
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    buildSpace=1.0,
-                    buildsBeforeReboot=config[
-                        'platforms'][platform]['builds_before_reboot'],
-                    totalChunks=totalChunks,
-                    thisChunk=i + 1,
-                    chunkByDir=suites.get('chunkByDir'),
-                    env=pf.get('unittest-env', {}),
-                    # NB. If you change the defaults here, make sure to update the
-                    # logic in generateTalosBranchObjects for test_type ==
-                    # "debug"
-                    downloadSymbols=pf.get('download_symbols', False),
-                    downloadSymbolsOnDemand=pf.get(
-                        'download_symbols_ondemand', True),
-                    resetHwClock=resetHwClock,
-                )
-                builder = {
-                    'name': '%s %s-%i' % (name_prefix, suites_name, i + 1),
-                    'slavenames': slavenames,
-                    'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i + 1),
-                    'slavebuilddir': 'test',
-                    'factory': factory,
-                    'category': category,
-                    'properties': properties,
-                    'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-                    'nextSlave': _nextAWSSlave_nowait,
-                }
-                builders.append(builder)
-        else:
-            factory = UnittestPackagedBuildFactory(
-                platform=platform,
-                test_suites=suites,
-                mochitest_leak_threshold=mochitestLeakThreshold,
-                crashtest_leak_threshold=crashtestLeakThreshold,
-                hgHost=config['hghost'],
-                repoPath=config['repo_path'],
-                productName=productName,
-                posixBinarySuffix=posixBinarySuffix,
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                buildSpace=1.0,
-                buildsBeforeReboot=config['platforms'][
-                    platform]['builds_before_reboot'],
-                downloadSymbols=pf.get('download_symbols', False),
-                downloadSymbolsOnDemand=pf.get(
-                    'download_symbols_ondemand', True),
-                env=pf.get('unittest-env', {}),
-                resetHwClock=resetHwClock,
-            )
-            builder = {
-                'name': '%s %s' % (name_prefix, suites_name),
-                'slavenames': slavenames,
-                'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-                'slavebuilddir': 'test',
-                'factory': factory,
-                'category': category,
-                'properties': properties,
-                'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-                'nextSlave': _nextAWSSlave_nowait,
-            }
-            builders.append(builder)
+        factory = UnittestPackagedBuildFactory(
+            platform=platform,
+            test_suites=suites,
+            mochitest_leak_threshold=mochitestLeakThreshold,
+            crashtest_leak_threshold=crashtestLeakThreshold,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            productName=productName,
+            posixBinarySuffix=posixBinarySuffix,
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            buildSpace=1.0,
+            buildsBeforeReboot=config['platforms'][
+                platform]['builds_before_reboot'],
+            downloadSymbols=pf.get('download_symbols', False),
+            downloadSymbolsOnDemand=pf.get(
+                'download_symbols_ondemand', True),
+            env=pf.get('unittest-env', {}),
+            resetHwClock=resetHwClock,
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': properties,
+            'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
+            'nextSlave': _nextAWSSlave_nowait,
+        }
+        builders.append(builder)
     return builders
 
 
