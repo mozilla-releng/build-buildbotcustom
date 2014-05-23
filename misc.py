@@ -2687,9 +2687,13 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         if test_type == "debug":
                             # Debug tests always need to download symbols for
                             # runtime assertions
-                            branch_config = deepcopy(branch_config)
                             pf = branch_config['platforms'][platform]
                             if pf.get('download_symbols', False) or pf.get('download_symbols_ondemand', True):
+                                # Copy the platform config so we can modify it here
+                                # safely
+                                branch_config['platforms'][platform] = deepcopy(branch_config['platforms'][platform])
+                                # Get a new reference
+                                pf = branch_config['platforms'][platform]
                                 pf['download_symbols'] = True
                                 pf['download_symbols_ondemand'] = False
                             slave_platform_name = "%s-debug" % slave_platform
