@@ -902,78 +902,37 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             builder['nextSlave'] = _nextOldTegra
         builders.append(builder)
     else:
-        if isinstance(suites, dict) and "totalChunks" in suites:
-            totalChunks = suites['totalChunks']
-            for i in range(totalChunks):
-                factory = UnittestPackagedBuildFactory(
-                    platform=platform,
-                    test_suites=[suites['suite']],
-                    mochitest_leak_threshold=mochitestLeakThreshold,
-                    crashtest_leak_threshold=crashtestLeakThreshold,
-                    hgHost=config['hghost'],
-                    repoPath=config['repo_path'],
-                    productName=productName,
-                    posixBinarySuffix=posixBinarySuffix,
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    buildSpace=1.0,
-                    buildsBeforeReboot=config[
-                        'platforms'][platform]['builds_before_reboot'],
-                    totalChunks=totalChunks,
-                    thisChunk=i + 1,
-                    chunkByDir=suites.get('chunkByDir'),
-                    env=pf.get('unittest-env', {}),
-                    # NB. If you change the defaults here, make sure to update the
-                    # logic in generateTalosBranchObjects for test_type ==
-                    # "debug"
-                    downloadSymbols=pf.get('download_symbols', False),
-                    downloadSymbolsOnDemand=pf.get(
-                        'download_symbols_ondemand', True),
-                    resetHwClock=resetHwClock,
-                )
-                builder = {
-                    'name': '%s %s-%i' % (name_prefix, suites_name, i + 1),
-                    'slavenames': slavenames,
-                    'builddir': '%s-%s-%i' % (build_dir_prefix, suites_name, i + 1),
-                    'slavebuilddir': 'test',
-                    'factory': factory,
-                    'category': category,
-                    'properties': properties,
-                    'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-                    'nextSlave': _nextAWSSlave_nowait,
-                }
-                builders.append(builder)
-        else:
-            factory = UnittestPackagedBuildFactory(
-                platform=platform,
-                test_suites=suites,
-                mochitest_leak_threshold=mochitestLeakThreshold,
-                crashtest_leak_threshold=crashtestLeakThreshold,
-                hgHost=config['hghost'],
-                repoPath=config['repo_path'],
-                productName=productName,
-                posixBinarySuffix=posixBinarySuffix,
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                buildSpace=1.0,
-                buildsBeforeReboot=config['platforms'][
-                    platform]['builds_before_reboot'],
-                downloadSymbols=pf.get('download_symbols', False),
-                downloadSymbolsOnDemand=pf.get(
-                    'download_symbols_ondemand', True),
-                env=pf.get('unittest-env', {}),
-                resetHwClock=resetHwClock,
-            )
-            builder = {
-                'name': '%s %s' % (name_prefix, suites_name),
-                'slavenames': slavenames,
-                'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-                'slavebuilddir': 'test',
-                'factory': factory,
-                'category': category,
-                'properties': properties,
-                'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-                'nextSlave': _nextAWSSlave_nowait,
-            }
-            builders.append(builder)
+        factory = UnittestPackagedBuildFactory(
+            platform=platform,
+            test_suites=suites,
+            mochitest_leak_threshold=mochitestLeakThreshold,
+            crashtest_leak_threshold=crashtestLeakThreshold,
+            hgHost=config['hghost'],
+            repoPath=config['repo_path'],
+            productName=productName,
+            posixBinarySuffix=posixBinarySuffix,
+            buildToolsRepoPath=config['build_tools_repo_path'],
+            buildSpace=1.0,
+            buildsBeforeReboot=config['platforms'][
+                platform]['builds_before_reboot'],
+            downloadSymbols=pf.get('download_symbols', False),
+            downloadSymbolsOnDemand=pf.get(
+                'download_symbols_ondemand', True),
+            env=pf.get('unittest-env', {}),
+            resetHwClock=resetHwClock,
+        )
+        builder = {
+            'name': '%s %s' % (name_prefix, suites_name),
+            'slavenames': slavenames,
+            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+            'slavebuilddir': 'test',
+            'factory': factory,
+            'category': category,
+            'properties': properties,
+            'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
+            'nextSlave': _nextAWSSlave_nowait,
+        }
+        builders.append(builder)
     return builders
 
 
@@ -2684,19 +2643,25 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         triggeredUnittestBuilders = []
                         pgoUnittestBuilders = []
                         unittest_suites = "%s_unittest_suites" % test_type
+                        build_dir_prefix = platform_config[slave_platform].get(
+                                'build_dir_prefix', slave_platform)
                         if test_type == "debug":
                             # Debug tests always need to download symbols for
                             # runtime assertions
-                            branch_config = deepcopy(branch_config)
                             pf = branch_config['platforms'][platform]
                             if pf.get('download_symbols', False) or pf.get('download_symbols_ondemand', True):
+                                # Copy the platform config so we can modify it here
+                                # safely
+                                branch_config['platforms'][platform] = deepcopy(branch_config['platforms'][platform])
+                                # Get a new reference
+                                pf = branch_config['platforms'][platform]
                                 pf['download_symbols'] = True
                                 pf['download_symbols_ondemand'] = False
-                            slave_platform_name = "%s-debug" % slave_platform
+                            slave_platform_name = "%s-debug" % build_dir_prefix
                         elif test_type == "mobile":
-                            slave_platform_name = "%s-mobile" % slave_platform
+                            slave_platform_name = "%s-mobile" % build_dir_prefix
                         else:
-                            slave_platform_name = slave_platform
+                            slave_platform_name = build_dir_prefix
 
                         # in case this builder is a set of suites
                         builders_with_sets_mapping = {}
@@ -2711,16 +2676,18 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 for s in suites['trychooser_suites']:
                                     builders_with_sets_mapping[s] = suites_name
 
+                        scheduler_slave_platform_identifier = platform_config[slave_platform].get(
+                                'scheduler_slave_platform_identifier', slave_platform)
                         triggeredUnittestBuilders.append(
                             (
                                 'tests-%s-%s-%s-unittest' % (
-                                    branch, slave_platform, test_type),
+                                    branch, scheduler_slave_platform_identifier, test_type),
                                 test_builders, merge_tests))
                         if create_pgo_builders and test_type == 'opt':
                             pgoUnittestBuilders.append(
                                 (
                                     'tests-%s-%s-pgo-unittest' % (
-                                        branch, slave_platform),
+                                        branch, scheduler_slave_platform_identifier),
                                     pgo_builders, merge_tests))
 
                         for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:

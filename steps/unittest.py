@@ -515,49 +515,6 @@ class MozillaPackagedXPCShellTests(XPCShellMixin, ShellCommandReportTimeout):
         self.command = ['bash', '-c', WithProperties(script)]
 
 
-# MochitestMixin overrides some methods that BuildStep calls
-# In order to make sure its are called, instead of ShellCommandReportTimeout's,
-# it needs to be listed first
-class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandReportTimeout):
-    def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
-                 chunkByDir=None, totalChunks=None, thisChunk=None, testPath=None,
-                 **kwargs):
-        self.super_class = ShellCommandReportTimeout
-        ShellCommandReportTimeout.__init__(self, **kwargs)
-
-        if totalChunks:
-            assert 1 <= thisChunk <= totalChunks
-
-        self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
-                                 leakThreshold=leakThreshold, chunkByDir=chunkByDir,
-                                 totalChunks=totalChunks, thisChunk=thisChunk, testPath=testPath)
-
-        if totalChunks:
-            self.name = 'mochitest-%s-%i' % (variant, thisChunk)
-        else:
-            self.name = 'mochitest-%s' % variant
-
-        self.command = ['python', 'mochitest/runtests.py',
-                        WithProperties(
-                        '--appname=%(exepath)s'), '--utility-path=bin',
-                        WithProperties('--extra-profile-file=bin/plugins'),
-                        '--certificate-path=certs', '--autorun', '--close-when-done',
-                        '--console-level=INFO']
-        if testPath:
-            self.command.append("--test-path=%s" % testPath)
-
-        if symbols_path:
-            self.command.append(
-                WithProperties("--symbols-path=%s" % symbols_path))
-
-        if leakThreshold:
-            self.command.append('--leak-threshold=%d' % leakThreshold)
-
-        self.command.extend(self.getChunkOptions(totalChunks, thisChunk,
-                                                 chunkByDir))
-        self.command.extend(self.getVariantOptions(variant))
-
-
 class MozillaPackagedReftests(ReftestMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, leakThreshold=None,
                  **kwargs):
