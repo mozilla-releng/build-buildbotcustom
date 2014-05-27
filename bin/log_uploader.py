@@ -196,7 +196,6 @@ if __name__ == "__main__":
         nightly=False,
         release=None,
         trybuild=False,
-        shadowbuild=False,
         l10n=False,
         user=os.environ.get("USER"),
         product="firefox",
@@ -221,8 +220,6 @@ if __name__ == "__main__":
                       help="include locale value in log filename")
     parser.add_option("--try", dest="trybuild", action="store_true",
                       help="upload to try build directory")
-    parser.add_option("--shadow", dest="shadowbuild", action="store_true",
-                      help="upload to shadow build directory")
     parser.add_option("--master-name", dest="master_name")
 
     options, args = parser.parse_args()
@@ -336,11 +333,7 @@ if __name__ == "__main__":
                         else:
                             uploadArgs['branch'] = options.branch
 
-                    if options.shadowbuild:
-                        uploadArgs['to_shadow'] = True
-                        uploadArgs['to_tinderbox_dated'] = False
-                    elif buildid:
-                        uploadArgs['to_shadow'] = False
+                    if buildid:
                         uploadArgs['to_tinderbox_dated'] = True
                         uploadArgs['buildid'] = buildid
                     else:
