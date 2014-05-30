@@ -1233,6 +1233,10 @@ def generateBranchObjects(config, name, secrets=None):
             if pf.get('enable_nightly'):
                 buildername = '%s_nightly' % pf['base_name']
                 nightlyBuilders.append(buildername)
+
+            if pf.get('enable_nonunified_build'):
+                periodicBuilders.append('%s_nonunified' % pf['base_name'])
+
             continue
 
         values = {'basename': base_name,
@@ -1602,6 +1606,25 @@ def generateBranchObjects(config, name, secrets=None):
                 elif pf.get('enable_periodic', False):
                     builder['name'] = '%s_periodic' % pf['base_name']
                     branchObjects['builders'].append(builder)
+
+                if pf.get('enable_nonunified_build'):
+                    # We need a new factory for new extra_args
+                    extra_args = pf['mozharness_config'].get('extra_args', [])[:]
+                    extra_args += pf['mozharness_config'].get('non_unified_extra_args', [])
+                    non_unified_factory = makeMHFactory(config, pf, extra_args=extra_args,
+                                            signingServers=secrets.get(pf.get('dep_signing_servers')),
+                                            use_credentials_file=True)
+                    non_unified_builder = {
+                        'name': '%s_nonunified' % pf['base_name'],
+                        'slavenames': pf['slaves'],
+                        'nextSlave': _nextAWSSlave_wait_sort,
+                        'builddir': '%s_nonunified' % pf['base_name'],
+                        'slavebuilddir': normalizeName('%s_nonunified' % pf['base_name']),
+                        'factory': non_unified_factory,
+                        'category': name,
+                        'properties': builder['properties'].copy(),
+                    }
+                    branchObjects['builders'].append(non_unified_builder)
 
                 if pf.get('enable_nightly'):
                     if pf.get('dep_signing_servers') != pf.get('nightly_signing_servers'):

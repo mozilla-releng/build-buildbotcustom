@@ -122,6 +122,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'hamachi': 'ham',
         'wasabi': 'wsb',
         'tarako': 'tko',
+        'nonunified': 'nu',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before
