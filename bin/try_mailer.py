@@ -124,10 +124,9 @@ Your %(tree)s Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder
 
     if log_url:
         log_url = log_url.replace('://stage', '://ftp')
-        text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n" % locals()
-    else:
-        text += "Please check <a href=\"https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s\">Tinderbox Pushlog</a> for your logs.\n" % locals()
+        text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n\n" % locals()
 
+    text += "For an overview of all results see <a href=\"https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s\">TBPL</a>.\n" % locals()
     text = re.sub("\n", "<br>\n", text)
 
     headers = {"In-Reply-To": "<%(branch)s-%(revision)s>" % locals(),
