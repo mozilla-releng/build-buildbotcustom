@@ -1182,15 +1182,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                      description=['deleting', 'old', 'package'],
                      descriptionDone=['delete', 'old', 'package']
                      ))
-        if self.nightly:
-            self.addStep(ShellCommand(
-                         name='rm_old_symbols',
-                         command="find 20* -maxdepth 2 -mtime +7 -exec rm -rf {} \;",
-                         env=self.env,
-                         workdir='.',
-                         description=['cleanup', 'old', 'symbols'],
-                         flunkOnFailure=False
-                         ))
 
     def addGaiaSourceSteps(self):
         if self.gaiaRevisionFile:
