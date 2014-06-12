@@ -4828,7 +4828,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              env=self.env,
                              leakThreshold=leak_threshold,
                              symbols_path=symbols_path,
-                             maxTime=120 * 60,  # Two Hours
+                             maxTime=75 * 60,  # 75 Minutes
                              ))
 
                 self.addStep(unittest_steps.MozillaPackagedJetpackTests(
@@ -4836,7 +4836,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              env=self.env,
                              leakThreshold=leak_threshold,
                              symbols_path=symbols_path,
-                             maxTime=120 * 60,  # Two Hours
+                             maxTime=30 * 60,  # 30 Minutes
                              ))
             elif suite == 'mozmill':
                 MOZMILL_VIRTUALENV_DIR = os.path.join(
