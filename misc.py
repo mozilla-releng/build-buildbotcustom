@@ -1459,9 +1459,12 @@ def generateBranchObjects(config, name, secrets=None):
                 triggerBuildIfNoChanges=False,
                 l10nBranch=config.get('l10n_repo_path')
             )
-        else:
+        elif config.get('enable_nightly_everytime', True):
             goodFunc = lastRevFunc(
                 config['repo_path'], triggerBuildIfNoChanges=True)
+        else:
+            goodFunc = lastRevFunc(
+                config['repo_path'], triggerBuildIfNoChanges=False)
 
         nightly_scheduler = makePropertiesScheduler(
             SpecificNightly,
