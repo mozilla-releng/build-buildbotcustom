@@ -2505,6 +2505,21 @@ class NightlyBuildFactory(MercurialBuildFactory):
                 locks=[upload_lock.access('counting')],
             ))
 
+        def getPartialInfo(build):
+            return [{
+                "from_buildid": build.getProperty("previous_buildid"),
+                "size": build.getProperty("partialMarSize"),
+                "hash": build.getProperty("partialMarHash"),
+                "url": build.getProperty("partialMarUrl"),
+            }]
+
+        self.addStep(SetBuildProperty(
+            property_name="partialInfo",
+            value=getPartialInfo,
+            doStepIf=self.previousMarExists,
+            haltOnFailure=True,
+        ))
+
         if self.profiledBuild:
             talosBranch = "%s-%s-pgo-talos" % (
                 self.branchName, self.complete_platform)
@@ -2645,6 +2660,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             target=self.mock_target,
             workdir='%s/current' % self.absMozillaObjDir,
         ))
+
         for oldVersion in self.partialUpdates:
             oldBuildNumber = self.partialUpdates[oldVersion]['buildNumber']
 
@@ -2745,6 +2761,29 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 ))
                 self.UPLOAD_EXTRA_FILES.append('%s/%s.asc' % (self.update_dir,
                                                               partial_mar_name))
+
+            self.addFilePropertiesSteps(
+                filename=partial_mar_name,
+                directory='%s/dist/%s' % (self.absMozillaObjDir, self.update_dir),
+                fileType='%sMar' % oldVersion,
+                haltOnFailure=True,
+            )
+
+        def getPartialInfo(build, oldVersions):
+            partials = []
+            for v in oldVersions:
+                partials.append({
+                    "previousVersion": v,
+                    "size": build.getProperty("%sMarSize" % v),
+                    "hash": build.getProperty("%sMarHash" % v),
+                })
+            return partials
+
+        self.addStep(SetBuildProperty(
+            property_name="partialInfo",
+            value=lambda b: getPartialInfo(b, self.partialUpdates.keys()),
+            haltOnFailure=True,
+        ))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         info_txt = '%s_info.txt' % self.complete_platform
@@ -3207,6 +3246,21 @@ class BaseRepackFactory(MozillaBuildFactory):
                      mock=self.use_mock,
                      target=self.mock_target,
                      ))
+
+        def getPartialInfo(build):
+            return [{
+                "from_buildid": build.getProperty("previous_buildid"),
+                "size": build.getProperty("partialMarSize"),
+                "hash": build.getProperty("partialMarHash"),
+                "url": build.getProperty("partialMarUrl"),
+            }]
+
+        self.addStep(SetBuildProperty(
+            property_name="partialInfo",
+            value=getPartialInfo,
+            doStepIf=self.previousMarExists,
+            haltOnFailure=True,
+        ))
 
     def getSources(self):
         step = self.makeHgtoolStep(
