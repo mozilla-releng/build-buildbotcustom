@@ -658,8 +658,7 @@ class RemoteReftestStep(ReftestMixin, ChunkingMixin, ShellCommandReportTimeout):
                         '--http-port', WithProperties('%(http_port)s'),
                         '--ssl-port', WithProperties('%(ssl_port)s'),
                         '--pidfile', WithProperties(
-                            '%(basedir)s/../remotereftest.pid'),
-                        '--enable-privilege'
+                            '%(basedir)s/../remotereftest.pid')
                         ]
         if suite == 'jsreftest' or suite == 'crashtest':
             self.command.append('--ignore-window-size')
