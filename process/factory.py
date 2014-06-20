@@ -1351,8 +1351,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                      description=['compile'],
                      env=self.env,
                      haltOnFailure=True,
-                     timeout=2 * 3600,  # max of 2 hours without output before killing
-                     maxTime=int(4.5 * 3600),  # max of 4.5 hours total runtime before killing
+                     # bug 1027983
+                     timeout=3 * 3600,  # max of 3 hours without output before killing
+                     maxTime=int(5.5 * 3600),  # max of 5.5 hours total runtime before killing
                      mock=self.use_mock,
                      target=self.mock_target,
                      workdir=workdir,
