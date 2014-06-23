@@ -2226,6 +2226,9 @@ def generateBranchObjects(config, name, secrets=None):
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
                         enable_pymake=enable_pymake,
+                        tooltool_manifest_src=pf.get('tooltool_l10n_manifest_src'),
+                        tooltool_script=pf.get('tooltool_script'),
+                        tooltool_url_list=config.get('tooltool_url_list', []),
                         **l10n_kwargs
                     )
                     # eg. Thunderbird comm-aurora linux l10n nightly
@@ -2296,6 +2299,9 @@ def generateBranchObjects(config, name, secrets=None):
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 mozconfig=mozconfig,
                 enable_pymake=enable_pymake,
+                tooltool_manifest_src=pf.get('tooltool_l10n_manifest_src'),
+                tooltool_script=pf.get('tooltool_script'),
+                tooltool_url_list=config.get('tooltool_url_list', []),
                 **dep_kwargs
             )
             # eg. Thunderbird comm-central linux l10n dep

@@ -377,6 +377,27 @@ class MockMixin(object):
             ))
 
 
+class TooltoolMixin(object):
+    def addTooltoolStep(self, **kwargs):
+        command=[
+            'sh',
+            WithProperties(
+                '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
+            self.tooltool_manifest_src,
+            self.tooltool_url_list[0],
+            self.tooltool_bootstrap,
+        ]
+        if self.tooltool_script:
+            command.extend(self.tooltool_script)
+        self.addStep(ShellCommand(
+            name='run_tooltool',
+            command=command,
+            env=self.env,
+            haltOnFailure=True,
+            **kwargs
+        ))
+
+
 class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
     ignore_dirs = ['info', 'rel-*:45d', 'tb-rel-*:45d']
 
@@ -775,7 +796,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         ))
 
 
-class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
+class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
     def __init__(self, objdir, platform, configRepoPath, configSubDir,
                  profiledBuild, mozconfig, srcMozconfig=None,
                  productName=None,
@@ -1319,22 +1340,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                      command=['cat', '.mozconfig'],
                      ))
         if self.tooltool_manifest_src:
-            command=[
-                'sh',
-                WithProperties(
-                    '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
-                self.tooltool_manifest_src,
-                self.tooltool_url_list[0],
-                self.tooltool_bootstrap,
-            ]
-            if self.tooltool_script:
-                command.extend(self.tooltool_script)
-            self.addStep(ShellCommand(
-                name='run_tooltool',
-                command=command,
-                env=self.env,
-                haltOnFailure=True,
-            ))
+            self.addTooltoolStep()
 
     def addDoBuildSteps(self):
         workdir = WithProperties('%(basedir)s/build')
@@ -2990,7 +2996,7 @@ def identToProperties(default_prop=None):
     return list2dict
 
 
-class BaseRepackFactory(MozillaBuildFactory):
+class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
     ignore_dirs = MozillaBuildFactory.ignore_dirs + [normalizeName('*-nightly')]
@@ -3006,6 +3012,10 @@ class BaseRepackFactory(MozillaBuildFactory):
                  testPrettyNames=False,
                  callClientPy=False,
                  clientPyConfig=None,
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=None,
+                 tooltool_script=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -3026,6 +3036,12 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.testPrettyNames = testPrettyNames
         self.callClientPy = callClientPy
         self.clientPyConfig = clientPyConfig
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list or []
+        self.tooltool_script = tooltool_script or ['/tools/tooltool.py']
+        self.tooltool_bootstrap = tooltool_bootstrap
+
+        assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
         self.addStep(SetBuildProperty(
                      property_name='tree',
@@ -3118,6 +3134,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.getSources()
         self.updateSources()
         self.getMozconfig()
+        if self.tooltool_manifest_src:
+            self.addTooltoolStep(workdir=self.absSrcDir)
         self.configure()
         self.tinderboxPrintBuildInfo()
         self.downloadBuilds()
