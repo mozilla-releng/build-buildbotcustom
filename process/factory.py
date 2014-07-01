@@ -3692,6 +3692,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(MockProperty(
                      command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
+                     env=self.env,
                      workdir = '%s/%s/locales' % (self.absObjDir,
                                                   self.appName),
                      extract_fn=identToProperties(),
