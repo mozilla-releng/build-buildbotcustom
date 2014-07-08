@@ -19,6 +19,10 @@ def testSuiteMatches(v, u):
         return v.startswith('jittest')
     elif u in ('mochitest-o', 'mochitest-chrome', 'mochitest-a11y'):
         return re.search('mochitest-o', v)
+    elif u == 'xpcshell':
+        return v.startswith('xpcshell')
+    elif u == 'robocop':
+        return v.startswith(u)
     elif u == 'mochitest-dt':
         return v.startswith('mochitest-devtools-chrome')
     elif u in ('mochitest-bc', 'mochitest-browser'):
