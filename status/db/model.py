@@ -2,13 +2,15 @@ import datetime
 import sqlalchemy
 from sqlalchemy import Column, Integer, String, Unicode, UnicodeText, \
         Boolean, Text, DateTime, ForeignKey, Table, UniqueConstraint, \
-        and_, or_
-from sqlalchemy.orm import sessionmaker, relation, mapper, eagerload
+        and_
+from sqlalchemy.orm import relation
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.orderinglist import ordering_list
 from jsoncol import JSONColumn
 
-from twisted.python import log
+import logging
+log = logging.getLogger(__name__)
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 Base = declarative_base()
 metadata = Base.metadata
@@ -17,7 +19,7 @@ Session = None
 def connect(url, drop_all=False, **kwargs):
     Base.metadata.bind = sqlalchemy.create_engine(url, **kwargs)
     if drop_all:
-        log.msg("DBMSG: Warning, dropping all tables")
+        log.warn("DBMSG: Warning, dropping all tables")
         Base.metadata.drop_all()
     Base.metadata.create_all()
     global Session
@@ -61,6 +63,28 @@ class File(Base):
             f = cls(path=path)
             session.add(f)
         return f
+
+    @classmethod
+    def getall(cls, session, paths):
+        """Retrieve a list File object given their paths.  If the path doesn't exist
+        yet in the database, it is created and added to the session, but not
+        committed."""
+        chunk_size = 100
+        all_files = []
+        log.info("getting lots of files")
+        for x in range(0, len(paths), chunk_size):
+            this_chunk = [unicode(p) for p in paths[x:x + chunk_size]]
+            files = session.query(cls).filter(cls.path.in_(this_chunk)).all()
+            log.debug("looking for %i in this chunk; got %i", len(this_chunk), len(files))
+            all_files.extend(files)
+            missing = set(this_chunk) - set(f.path for f in files)
+            log.debug("missing %i", len(missing))
+            for path in missing:
+                f = cls(path=path)
+                session.add(f)
+                all_files.append(f)
+
+        return all_files
 
 class Property(Base):
     __tablename__ = "properties"
@@ -291,7 +315,10 @@ class Change(Base):
                 comments=unicode(change.comments),
                 when=when,
                 )
-        c.files = [File.get(session, path) for path in change.files]
+        if len(change.files) > 20:
+            c.files = File.getall(session, change.files)
+        else:
+            c.files = [File.get(session, path) for path in change.files]
         return c
 
 class SourceChange(Base):

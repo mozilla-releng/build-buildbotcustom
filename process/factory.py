@@ -2149,6 +2149,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
         '''
         pass
 
+    def downloadMarTools(self):
+        '''The mar and bsdiff tools are created by default when
+           --enable-update-packaging is specified. The latest version should
+           always be available latest-${branch}/mar-tools/${platform}
+           on the ftp server.
+        '''
+        pass
+
     def getCompleteMarPatternMatch(self):
         marPattern = getPlatformFtpDir(self.platform)
         if not marPattern:
@@ -2757,6 +2765,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
 
         uploadArgs = dict(
+            upload_dir="%s-%s" % (self.branchName, self.platform),
             product=self.productName,
             version=self.version,
             buildNumber=str(self.buildNumber),
@@ -2972,6 +2981,11 @@ class BaseRepackFactory(MozillaBuildFactory):
 
         self.origSrcDir = self.branchName
 
+        if self.enable_pymake:
+            self.makeCmd = ['python2.7', WithProperties("%(basedir)s/build/" + "%s/build/pymake/make.py" % self.origSrcDir)]
+        else:
+            self.makeCmd = ['make']
+
         # Mozilla subdir
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
@@ -2984,6 +2998,9 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.objdir = objdir or self.origSrcDir
         self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
 
+        self.absSrcDir = "%s/%s" % (self.baseWorkDir, self.origSrcDir)
+        self.absObjDir = "%s/%s" % (self.absSrcDir, self.objdir)
+
         # These following variables are useful for sharing build steps (e.g.
         # update generation) from classes that use object dirs (e.g. nightly
         # repacks).
@@ -2991,7 +3008,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         # We also concatenate the baseWorkDir at the outset to avoid having to
         # do that everywhere.
         self.absMozillaSrcDir = "%s/%s" % (self.baseWorkDir, self.mozillaSrcDir)
-        self.absMozillaObjDir = '%s/%s' % (self.baseWorkDir, self.mozillaObjdir)
+        self.absMozillaObjDir = '%s/%s/%s' % (self.baseWorkDir, self.origSrcDir, self.mozillaObjdir)
 
         self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
                          '/nightly/latest-%s-l10n' % self.branchName
@@ -2999,7 +3016,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         if objdir != '':
             # L10NBASEDIR is relative to MOZ_OBJDIR
             self.env.update({'MOZ_OBJDIR': objdir,
-                             'L10NBASEDIR':  '../../%s' % self.l10nRepoPath})            
+                             'L10NBASEDIR':  '../../l10n'})            
 
         if platform == 'macosx64':
             # use "mac" instead of "mac64" for macosx64
@@ -3032,9 +3049,9 @@ class BaseRepackFactory(MozillaBuildFactory):
                 workdir='.'
             ))
         self.addStep(ShellCommand(
-         name='mkdir_l10nrepopath',
-         command=['sh', '-c', 'mkdir -p %s' % self.l10nRepoPath],
-         descriptionDone='mkdir '+ self.l10nRepoPath,
+         name='mkdir_l10n',
+         command=['sh', '-c', 'mkdir -p l10n'],
+         descriptionDone='mkdir l10n',
          workdir=self.baseWorkDir,
          flunkOnFailure=False
         ))
@@ -3106,47 +3123,64 @@ class BaseRepackFactory(MozillaBuildFactory):
 
 
     def configure(self):
-        self.addStep(ShellCommand(
-         name='autoconf',
-         command=['bash', '-c', 'autoconf-2.13'],
-         haltOnFailure=True,
-         descriptionDone=['autoconf'],
-         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
-        ))
-        if (self.mozillaDir):
-            self.addStep(ShellCommand(
-             name='autoconf_mozilla',
-             command=['bash', '-c', 'autoconf-2.13'],
-             haltOnFailure=True,
-             descriptionDone=['autoconf mozilla'],
-             workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
-            ))
-        self.addStep(ShellCommand(
-         name='autoconf_js_src',
-         command=['bash', '-c', 'autoconf-2.13'],
-         haltOnFailure=True,
-         descriptionDone=['autoconf js/src'],
-         workdir='%s/%s/js/src' % (self.baseWorkDir, self.mozillaSrcDir)
-        ))
-        # WinCE is the only platform that will do repackages with
-        # a mozconfig for now. This will be fixed in bug 518359
-        # For backward compatibility where there is no mozconfig
+#        self.addStep(ShellCommand(
+#         name='autoconf',
+#         command=['bash', '-c', 'autoconf-2.13'],
+#         haltOnFailure=True,
+#         descriptionDone=['autoconf'],
+#         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+#        ))
+#        if (self.mozillaDir):
+#            self.addStep(ShellCommand(
+#             name='autoconf_mozilla',
+#             command=['bash', '-c', 'autoconf-2.13'],
+#             haltOnFailure=True,
+#             descriptionDone=['autoconf mozilla'],
+#             workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
+#            ))
+#        self.addStep(ShellCommand(
+#         name='autoconf_js_src',
+#         command=['bash', '-c', 'autoconf-2.13'],
+#         haltOnFailure=True,
+#         descriptionDone=['autoconf js/src'],
+#         workdir='%s/%s/js/src' % (self.baseWorkDir, self.mozillaSrcDir)
+#        ))
+#        # WinCE is the only platform that will do repackages with
+#        # a mozconfig for now. This will be fixed in bug 518359
+#        # For backward compatibility where there is no mozconfig
+#        self.addStep(ShellCommand( **self.processCommand(
+#         name='configure',
+#         command=['sh', '--',
+#                  './configure', '--enable-application=%s' % self.appName,
+#                  '--with-l10n-base=../%s' % self.l10nRepoPath ] +
+#                  self.extraConfigureArgs,
+#         description='configure',
+#         descriptionDone='configure done',
+#         env=self.env,
+#         haltOnFailure=True,
+#         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+#        )))
+        if self.mozillaDir:
+            self.addStep(ShellCommand( **self.processCommand(
+                name='link_tools',
+                env=self.env,
+                command=['sh', '-c', 'if [ ! -e tools ]; then ln -s ../tools; fi'],
+                workdir='build',
+                description=['link tools'],
+            )))
         self.addStep(ShellCommand( **self.processCommand(
-         name='configure',
-         command=['sh', '--',
-                  './configure', '--enable-application=%s' % self.appName,
-                  '--with-l10n-base=../%s' % self.l10nRepoPath ] +
-                  self.extraConfigureArgs,
-         description='configure',
-         descriptionDone='configure done',
-         env=self.env,
-         haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir)
+            name='configure',
+            command=self.makeCmd + [ '-f', 'client.mk', 'configure'],
+            workdir=self.absSrcDir,
+            description='configure',
+            descriptionDone='configure done',
+            env=self.env,
+            haltOnFailure=True,
         )))
         self.addStep(ShellCommand( **self.processCommand(
          name='make_config',
          command=self.makeCmd,
-         workdir='%s/%s/config' % (self.baseWorkDir, self.mozillaObjdir),
+         workdir='%s/config' % self.absMozillaObjDir,
          description=['make config'],
          env=self.env,
          haltOnFailure=True
@@ -3172,8 +3206,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='make_upload',
          command=self.makeCmd + ['upload', WithProperties('AB_CD=%(locale)s')],
          env=self.uploadEnv,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir,
-                                       self.appName),
+         workdir='%s/%s/locales' % (self.absObjDir, self.appName),
          haltOnFailure=True,
          flunkOnFailure=True,
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
@@ -3196,7 +3229,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                 rev=WithProperties("%(l10n_revision)s"),
                 repo_url=WithProperties("http://" + self.hgHost + "/" + \
                                  self.l10nRepoPath + "/%(locale)s"),
-                workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath),
+                workdir='%s/l10n' % self.baseWorkDir,
                 locks=[hg_l10n_lock.access('counting')],
                 use_properties=False,
                 mirrors=[],
@@ -3244,7 +3277,10 @@ class BaseRepackFactory(MozillaBuildFactory):
 
     def compareLocales(self):
         if self.mergeLocales:
-            mergeLocaleOptions = ['-m', 'merged']
+            mergeLocaleOptions = ['-m',
+                                  WithProperties('%(basedir)s/' + \
+                                                 "%s/merged" % self.baseWorkDir)]
+                ###'%s/%s/locales/merged' % (self.absObjDir, self.appName)]
             flunkOnFailure = False
             haltOnFailure = False
             warnOnFailure = True
@@ -3257,27 +3293,32 @@ class BaseRepackFactory(MozillaBuildFactory):
          name='rm_merged',
          command=['rm', '-rf', 'merged'],
          description=['remove', 'merged'],
-         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.origSrcDir,
-                                       self.appName),
+         workdir=self.baseWorkDir,
          haltOnFailure=True
         ))
         self.addStep(ShellCommand(
          name='run_compare_locales',
+#         command=['python',
+#                  'build/compare-locales/scripts/compare-locales'] +
+#                  mergeLocaleOptions +
+#                  ["%s/%s/locales/l10n.ini" % (self.absSrcDir, self.appName),
+#                  "build/l10n",
+#                  WithProperties('%(locale)s')],
          command=['python',
                   '../../../compare-locales/scripts/compare-locales'] +
                   mergeLocaleOptions +
                   ["l10n.ini",
-                  "../../../%s" % self.l10nRepoPath,
-                  WithProperties('%(locale)s')],
+                   "../../../l10n",
+                   WithProperties('%(locale)s')],
          description='comparing locale',
          env={'PYTHONPATH': ['../../../compare-locales/lib']},
+#         env={'PYTHONPATH': ['build/compare-locales/lib']},
          flunkOnFailure=flunkOnFailure,
          warnOnFailure=warnOnFailure,
          haltOnFailure=haltOnFailure,
-         workdir="%s/%s/%s/locales" % (self.baseWorkDir,
-                                       self.origSrcDir,
-                                       self.appName),
+         workdir="%s/%s/locales" % (self.absSrcDir,
+                                    self.appName),
+#         workdir=".",
         ))
 
     def doRepack(self):
@@ -3358,7 +3399,7 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=False,
          flunkOnFailure=False,
          warnOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+         workdir='%s/%s/locales' % (self.absObjDir, self.appName),
         ))
 
 class CCBaseRepackFactory(BaseRepackFactory):
@@ -3530,15 +3571,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
          name='update_locale_source',
          command=['hg', 'up', '-C', '-r', self.l10nTag],
          description='update workdir',
-         workdir=WithProperties('build/' + self.l10nRepoPath + '/%(locale)s'),
+         workdir=WithProperties('build/l10n/%(locale)s'),
          haltOnFailure=True
         ))
         self.addStep(SetProperty(
                      command=['hg', 'ident', '-i'],
                      haltOnFailure=True,
                      property='l10n_revision',
-                     workdir=WithProperties('build/' + self.l10nRepoPath + 
-                                            '/%(locale)s')
+                     workdir=WithProperties('build/l10n/%(locale)s')
         ))
 
     def downloadBuilds(self):
@@ -3548,7 +3588,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
          descriptionDone='wget en-US',
          env=self.env,
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName)
+         workdir='%s/%s/locales' % (self.absObjDir, self.appName)
         ))
 
     def updateEnUS(self):
@@ -3562,7 +3602,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
                      env=self.env,
-                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absObjDir, self.appName),
                      ))
         self.addStep(SetProperty(
                      command=self.makeCmd + ['ident'],
@@ -3581,6 +3621,44 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     def tinderboxPrintRevisions(self):
         self.tinderboxPrint('fx_revision',WithProperties('%(fx_revision)s'))
         self.tinderboxPrint('l10n_revision',WithProperties('%(l10n_revision)s'))
+
+    def downloadMarTools(self):
+        mar = 'mar'
+        mbsdiff = 'mbsdiff'
+        if self.platform.startswith('win'):
+            mar += '.exe'
+            mbsdiff += '.exe'
+        
+        baseURL = 'http://%s' % self.stageServer + \
+                  '/pub/mozilla.org/%s' % self.productName + \
+                  '/nightly/latest-%s' % self.branchName + \
+                  '/mar-tools/%s' % self.platform
+        marURL = '%s/%s' % (baseURL, mar)
+        mbsdiffURL = '%s/%s' % (baseURL, mbsdiff)
+        self.addStep(ShellCommand(
+            name='get_mar',
+            description=['get', 'mar'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     (test -e %s && test -s %s) || exit 1;
+                     chmod 755 %s'''.replace("\n", "") % (mar, mar, marURL, mar, mar, mar)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+        self.addStep(ShellCommand(
+            name='get_mbsdiff',
+            description=['get', 'mbsdiff'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     (test -e %s && test -s %s) || exit 1;
+                     chmod 755 %s'''.replace("\n", "") % (mbsdiff, mbsdiff, mbsdiffURL, mbsdiff, mbsdiff, mbsdiff)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
 
     def makePartialTools(self):
         # Build the tools we need for update-packaging, specifically bsdiff.
@@ -3613,6 +3691,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         return '.%(locale)s.' + NightlyBuildFactory.getCompleteMarPatternMatch(self)
 
     def doRepack(self):
+        self.downloadMarTools()
         self.addStep(ShellCommand(
          name='make_tier_base',
          command=self.makeCmd + ['tier_base'],
@@ -3642,11 +3721,12 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=['sh', '-c',
-                 WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+         command=self.makeCmd + [WithProperties('installers-%(locale)s'),
+                                 WithProperties('LOCALE_MERGEDIR=%(basedir)s/' + \
+                                                "%s/merged" % self.baseWorkDir)],
          env = self.env,
          haltOnFailure=True,
-         workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+         workdir='%s/%s/locales' % (self.absObjDir, self.appName),
         ))
         self.addStep(FindFile(
             name='find_inipath',
@@ -3783,7 +3863,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
     def __init__(self, platform, buildRevision, version, buildNumber,
                  env={}, brandName=None, mergeLocales=False,
                  mozRepoPath='', inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='', **kwargs):
+                 chatzillaRepoPath='', cvsroot='', enUSBinaryURL='', **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -3797,6 +3877,11 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             self.brandName = brandName
         else:
             self.brandName = kwargs['project'].capitalize()
+ 
+        env = env.copy()
+
+        env.update({'EN_US_BINARY_URL':enUSBinaryURL})
+
         # more vars are added in downloadBuilds
         env.update({
             'MOZ_PKG_PRETTYNAMES': '1',
@@ -3849,7 +3934,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
          descriptionDone="locale source",
          timeout=10*60, # 10 minutes
          haltOnFailure=True,
-         workdir='%s/%s' % (self.baseWorkDir, self.l10nRepoPath)
+         workdir='%s/l10n' % self.baseWorkDir
         ))
         # build up the checkout command with all options
         co_command = ['python', 'client.py', 'checkout',
@@ -3898,15 +3983,14 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         self.addStep(ShellCommand(
          name='update_locale_sources',
          command=['hg', 'up', '-C', '-r', self.buildRevision],
-         workdir=WithProperties('build/' + self.l10nRepoPath + '/%(locale)s'),
+         workdir=WithProperties('build/l10n/%(locale)s'),
          description=['update to', self.buildRevision]
         ))
         self.addStep(SetProperty(
                      command=['hg', 'ident', '-i'],
                      haltOnFailure=True,
                      property='l10n_revision',
-                     workdir=WithProperties('build/' + self.l10nRepoPath + 
-                                            '/%(locale)s')
+                     workdir=WithProperties('build/l10n/%(locale)s')
         ))
         self.addStep(ShellCommand(
          command=['hg', 'up', '-C', '-r', self.buildRevision],
@@ -3950,6 +4034,24 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         ))
 
     def downloadBuilds(self):
+        if self.mozillaDir:
+            workdir = '%s/%s/locales' % (self.absObjDir,
+                                         self.appName)
+        else:
+            workdir = '%s/%s/locales' % (self.absMozillaObjDir,
+                                         self.appName)
+
+        self.addStep(ShellCommand(
+                     name='wget_enUS',
+                     command=self.makeCmd + ['wget-en-US'],
+                     descriptionDone='wget en-US',
+                     env=self.env,
+                     haltOnFailure=True,
+                     workdir=workdir,
+                     ))
+
+        # Break this function early, since I'm testing
+        return
         candidatesDir = 'http://%s' % self.stageServer + \
                         '/pub/mozilla.org/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
@@ -3995,41 +4097,56 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
              haltOnFailure=True
             ))
 
-    def doRepack(self):
+    def downloadMarTools(self):
+        mar = 'mar'
+        mbsdiff = 'mbsdiff'
+        if self.platform.startswith('win'):
+            mar += '.exe'
+            mbsdiff += '.exe'
+
+        baseURL = 'http://%s' % self.stageServer + \
+                  '/pub/mozilla.org/%s/candidates' % self.project + \
+                  '/%s-candidates/build%s' % (self.version, self.buildNumber) + \
+                  '/mar-tools/%s' % self.platform
+        marURL = '%s/%s' % (baseURL, mar)
+        mbsdiffURL = '%s/%s' % (baseURL, mbsdiff)
         self.addStep(ShellCommand(
-         name='make_tier_base',
-         command=self.makeCmd + ['tier_base'],
-         workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
-         description=['make tier_base'],
-         env=self.env,
-         haltOnFailure=True
+            name='get_mar',
+            description=['get', 'mar'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     (test -e %s && test -s %s) || exit 1;
+                     chmod 755 %s'''.replace("\n", "") % (mar, mar, marURL, mar, mar, mar)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
         ))
-        # Because we're generating updates we need to build the libmar tools
         self.addStep(ShellCommand(
-            name='make_tier_nspr',
-            command=self.makeCmd + ['tier_nspr'],
-            workdir='build/'+self.mozillaObjdir,
-            description=['make tier_nspr'],
-            env=self.env,
-            haltOnFailure=True
-            ))
-        self.addStep(ShellCommand(
-             name='make_libmar',
-             command=self.makeCmd,
-             workdir='build/'+self.mozillaObjdir+'/modules/libmar',
-             description=['make libmar'],
-             env=self.env,
-             haltOnFailure=True
-            ))
+            name='get_mbsdiff',
+            description=['get', 'mbsdiff'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     (test -e %s && test -s %s) || exit 1;
+                     chmod 755 %s'''.replace("\n", "") % (mbsdiff, mbsdiff, mbsdiffURL, mbsdiff, mbsdiff, mbsdiff)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
+        ))
+
+    def doRepack(self):
+        self.downloadMarTools()
 
         self.addStep(ShellCommand(
          name='repack_installers',
          description=['repack', 'installers'],
-         command=['sh', '-c', 
-                  WithProperties('make installers-%(locale)s LOCALE_MERGEDIR=$PWD/merged')],
+         command=self.makeCmd + [WithProperties('installers-%(locale)s'),
+                                 WithProperties('LOCALE_MERGEDIR=%(basedir)s/' + \
+                                                "%s/merged" % self.baseWorkDir)],
          env=self.env,
          haltOnFailure=True,
-         workdir='build/'+self.objdir+'/'+self.appName+'/locales'
+         workdir='%s/%s/locales' % (self.absObjDir, self.appName),
         ))
 
 class StagingRepositorySetupFactory(ReleaseFactory):

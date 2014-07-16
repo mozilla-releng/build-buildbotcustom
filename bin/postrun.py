@@ -330,7 +330,7 @@ def main():
     parser = OptionParser()
     parser.set_defaults(
         config=None,
-        loglevel=logging.INFO,
+        loglevel=logging.DEBUG,
         log_url=None,
         statusdb_id=None,
         master_name=None,
