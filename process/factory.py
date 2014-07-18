@@ -6057,7 +6057,8 @@ class ScriptFactory(RequestSortingBuildFactory):
                  reboot_command=None, hg_bin='hg', platform=None,
                  use_mock=False, mock_target=None,
                  mock_packages=None, mock_copyin_files=None,
-                 triggered_schedulers=None, env={}, copy_properties=None):
+                 triggered_schedulers=None, env={}, copy_properties=None,
+                 properties_file='buildprops.json'):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -6102,10 +6103,10 @@ class ScriptFactory(RequestSortingBuildFactory):
             haltOnFailure=True,
         ))
         self.env['PROPERTIES_FILE'] = WithProperties(
-            '%(basedir)s/buildprops.json')
+            '%(basedir)s/' + properties_file)
         self.addStep(JSONPropertiesDownload(
             name="download_props",
-            slavedest="buildprops.json",
+            slavedest=properties_file,
             workdir="."
         ))
         if extra_data:

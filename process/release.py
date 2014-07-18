@@ -1222,6 +1222,42 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if not releaseConfig.get('enableSigningAtBuildTime', True) or \
                 not releaseConfig.get('enablePartialMarsAtBuildTime', True):
             deliverables_builders.append(builderPrefix('updates'))
+
+        update_shipping_factory_args = dict(
+            scriptRepo=tools_repo,
+            use_credentials_file=True,
+            interpreter='python',
+            scriptName='scripts/updates/balrog-release-shipper.py',
+            extra_args=[
+                '-b', '%s%s' % (branchConfig['hgurl'], branchConfig['config_repo_path']),
+                '-r', releaseConfigFile,
+                '-a', balrog_api_root,
+                '-u', balrog_username,
+                '-c', 'oauth.txt',
+                '-p', 'buildprops.json',
+            ],
+        )
+        update_shipping_factory = ScriptFactory(**update_shipping_factory_args)
+
+        builders.append({
+            'name': builderPrefix('update_shipping'),
+            'slavenames': unix_slaves,
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('update_shipping'),
+            'slavebuilddir': normalizeName(builderPrefix('update_shipping'), releaseConfig['productName']),
+            'factory': update_shipping_factory,
+            'env': builder_env,
+            'nextSlave': _nextSlave_skip_spot,
+            'properties': {
+                'slavebuilddir': normalizeName(builderPrefix('update_shipping'), releaseConfig['productName']),
+                'release_config': releaseConfigFile,
+                'script_repo_revision': releaseTag,
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            },
+        })
+        important_builders.append(builderPrefix('update_shipping'))
+
     elif releaseConfig.get('verifyConfigs'):
         builders.append(makeDummyBuilder(
             name=builderPrefix('updates'),
