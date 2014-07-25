@@ -1100,7 +1100,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         desktop_mh_builders.append(nonunified_builder)
         builds_created['done_nonunified_build'] = True
 
-    # if do_nightly:
+    # if do nightly:
     if config['enable_nightly'] and pf.get('enable_nightly', True):
         # include use_credentials_file for balrog step
         nightly_factory = makeMHFactory(config, pf,
@@ -2250,6 +2250,73 @@ def generateBranchObjects(config, name, secrets=None):
                     }
                     branchObjects['builders'].append(
                         mozilla2_l10n_nightly_builder)
+
+        # end do_nightly
+
+        # enable mozharness desktop repacks
+        # mozharnes repacks are enabled only on ash
+        # standard repacks might be enabled there as well.
+        # this is expected for early versions of desktop_repacks in mozharness
+        if pf.get('desktop_mozharness_repacks_enabled'):
+            l10n_builders = []
+            platform_env = pf['env'].copy()
+            builder_env = platform_env.copy()
+            # reboot command and python interpreter are defined per platform
+            mozharness_python = pf.get('mozharness_python')
+            reboot_command = pf['reboot_command']
+            scriptRepo = '%s%s' % (config['hgurl'],
+                                   config['mozharness_repo_path'])
+            # repacks specific configuration is in:
+            # platform > mozharness_desktop_l10n
+            repacks = pf['mozharness_desktop_l10n']
+            scriptName = repacks['scriptName']
+            l10n_chunks = repacks['l10n_chunks']
+            use_credentials_file = repacks['use_credentials_file']
+            repack_config = repacks['config']
+            # desktop repacks run in chunks...
+            for n in range(1, l10n_chunks + 1):
+                l10n_scheduler_name = '%s-%s-l10n_%s' % (name, platform, str(n))
+                builddir = '%s-%s-l10n_%s' % (name, platform, str(n))
+                builderName = "%s l10n %s/%s" % \
+                    (pf['base_name'], n, l10n_chunks)
+                l10n_builders.append(builderName)
+                extra_args = ['--config', repack_config,
+                              '--total-chunks', str(l10n_chunks),
+                              '--this-chunk', str(n)]
+                signing_servers = secrets.get(pf.get('nightly_signing_servers'))
+                factory = SigningScriptFactory(
+                    signingServers=signing_servers,
+                    scriptRepo=scriptRepo,
+                    scriptName=scriptName,
+                    use_credentials_file=use_credentials_file,
+                    interpreter=mozharness_python,
+                    extra_args=extra_args,
+                    reboot_command=reboot_command,
+                )
+                slavebuilddir = normalizeName(builddir, pf['stage_product'])
+                branchObjects['builders'].append({
+                    'name': builderName,
+                    'slavenames': pf.get('slaves'),
+                    'builddir': builddir,
+                    'slavebuilddir': slavebuilddir,
+                    'factory': factory,
+                    'category': name,
+                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'properties': {'branch': name,
+                                   'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                                   'stage_platform': stage_platform,
+                                   'product': pf['stage_product'],
+                                   'platform': platform,
+                                   'slavebuilddir': slavebuilddir,
+                                   'script_repo_revision': config['mozharness_tag'], },
+                    'env': builder_env
+                })
+
+                branchObjects["schedulers"].append(Triggerable(
+                    name=l10n_scheduler_name,
+                    builderNames=l10n_builders
+                ))
+                triggeredSchedulers = [l10n_scheduler_name]
 
         # We still want l10n_dep builds if nightlies are off
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
