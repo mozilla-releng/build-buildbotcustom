@@ -21,6 +21,9 @@ Thank you for your try submission. It's the best!
 Results will be displayed on TBPL as they come in:
 https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s
 
+Alternatively, view them on Treeherder (experimental):
+https://treeherder.mozilla.org/ui/#/jobs?repo=%(tree)s&revision=%(revision)s
+
 Once completed, builds and logs will be available at:
 %(packageDir)s
 """ % locals()

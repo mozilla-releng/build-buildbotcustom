@@ -150,6 +150,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         allplatforms = list(releaseConfig['enUSPlatforms'])
         xrplatforms = list(releaseConfig.get('xulrunnerPlatforms', []))
         stage = name.replace(builderPrefix(""), "")
+        releaseChannel = releaseConfig.get("releaseChannel")
         # Detect platform from builder name by tokenizing by '_', and matching
         # the first token after the prefix
         if stage.startswith("xulrunner"):
