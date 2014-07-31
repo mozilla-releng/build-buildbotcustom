@@ -9,6 +9,7 @@ def buildTryChangeMessage(change, packageDir):
     tree = "Try"
     if 'comm' in branch:
         tree = "Thunderbird-Try"
+    treeherderTree = tree.lower()
     packageDir = packageDir % locals()
     msgdict = {"type": "plain"}
     msgdict['subject'] = "%(tree)s submission %(revision)s" % locals()
@@ -22,7 +23,7 @@ Results will be displayed on TBPL as they come in:
 https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s
 
 Alternatively, view them on Treeherder (experimental):
-https://treeherder.mozilla.org/ui/#/jobs?repo=%(tree)s&revision=%(revision)s
+https://treeherder.mozilla.org/ui/#/jobs?repo=%(treeherderTree)s&revision=%(revision)s
 
 Once completed, builds and logs will be available at:
 %(packageDir)s
