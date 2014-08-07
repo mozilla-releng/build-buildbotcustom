@@ -433,6 +433,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'release_config': releaseConfigFile,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                'event_group': 'tag',
             }
         })
     else:
@@ -710,8 +711,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'env': builder_env,
                 'properties': {
                     'slavebuilddir': normalizeName(builderPrefix('%s_build' % platform), releaseConfig['productName']),
-                'platform': platform,
-                'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'platform': platform,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'event_group': 'build',
                 },
             })
         else:
@@ -722,6 +724,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 properties={
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'event_group': 'build',
                 },
             ))
         updates_upstream_builders.append(builderPrefix('%s_build' % platform))
@@ -809,6 +812,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'release_config': releaseConfigFile,
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'chunkTotal': int(l10nChunks),
+                    'chunkNum': int(n),
+                    'event_group': 'repack',
                 }
                 if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
@@ -1216,6 +1222,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
+                'event_group': 'update',
             }
         })
         post_signing_builders.append(builderPrefix('updates'))
@@ -1267,6 +1274,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             properties={
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                'event_group': 'update',
             },
         ))
         post_signing_builders.append(builderPrefix('updates'))
@@ -1310,6 +1318,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                'release_config': releaseConfigFile,
                                'platform': platform,
                                'branch': 'release-%s' % sourceRepoInfo['name'],
+                               'chunkTotal': int(updateVerifyChunks),
+                               'chunkNum': int(n),
+                               'event_group': 'update_verify',
                                },
             })
             post_update_builders.append(builderName)
@@ -1566,6 +1577,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             properties={
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                'event_group': 'releasetest',
             },
         ))
         important_builders.append(
@@ -1588,6 +1600,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             properties={
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                'event_group': 'release',
             },
         ))
         important_builders.append(builderPrefix('ready_for_release'))
