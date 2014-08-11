@@ -4971,14 +4971,10 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     return ("mozmillVirtualenvSetup" in step.build.getProperties() and
                             len(step.build.getProperty("mozmillVirtualenvSetup")) > 0)
 
-                # We want to use system python on non-Windows
-                virtualenv_python = 'python' if self.platform.startswith(
-                    'win') else '/usr/bin/python'
-
                 self.addStep(ShellCommand(
                              name='setup virtualenv',
                              command=[
-                             virtualenv_python, 'resources/installmozmill.py',
+                             'python', 'resources/installmozmill.py',
                              MOZMILL_VIRTUALENV_DIR],
                              doStepIf=isVirtualenvSetup,
                              flunkOnFailure=True,
