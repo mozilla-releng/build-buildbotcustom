@@ -254,8 +254,9 @@ def get_signing_cmd(signingServers, python):
         '-n', '%(basedir)s/nonce',
         '-c', '%(toolsdir)s/release/signing/host.cert',
     ]
-    for ss, user, passwd in signingServers:
-        cmd.extend(['-H', ss])
+    for ss, user, passwd, formats in signingServers:
+        opt = "%s:%s" % (":".join(formats), ss)
+        cmd.extend(['-H', opt])
     return ' '.join(cmd)
 
 
@@ -6309,6 +6310,6 @@ class SigningScriptFactory(ScriptFactory):
             self.env['MOZ_SIGN_CMD'] = WithProperties(get_signing_cmd(
                 self.signingServers, self.env.get('PYTHON26')))
             self.env['MOZ_SIGNING_SERVERS'] = ",".join(
-                s[0] for s in self.signingServers)
+                "%s:%s" % (":".join(s[3]), s[0]) for s in self.signingServers)
 
         ScriptFactory.runScript(self)

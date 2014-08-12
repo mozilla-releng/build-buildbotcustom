@@ -84,7 +84,7 @@ class SigningServerAuthenication(StringDownload):
                 self.current_attempt = 1
 
         if self.current_attempt == 1:
-            uri, self.username, self.password = self.servers.pop()
+            uri, self.username, self.password, _ = self.servers.pop()
             self.uri = 'https://%s/token' % uri
 
         slaveName = self.getSlaveName()

@@ -96,10 +96,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         secrets = {}
 
     def getSigningServers(platform):
-        if 'macosx' in platform:
-            signingServers = secrets.get('mac-release-signing')
-        else:
-            signingServers = secrets.get('release-signing')
+        signingServers = secrets.get('release-signing')
         if releaseConfig.get('enableSigningAtBuildTime', True):
             assert signingServers, 'Please provide a valid list of signing servers'
         return signingServers
