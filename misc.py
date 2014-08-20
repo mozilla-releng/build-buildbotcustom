@@ -455,6 +455,9 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     downloadSymbols=pf.get('download_symbols', True),
                     resetHwClock=resetHwClock,
                     stackwalk_cgi=config.get('stackwalk_cgi'),
+                    use_mock=pf.get('use_mock', False),
+                    mock_target=pf.get('mock_target', None),
+                    mock_packages=pf.get('mock_packages', None),
                 )
                 builder = {
                     'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
@@ -485,6 +488,9 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 env=pf.get('unittest-env', {}),
                 resetHwClock=resetHwClock,
                 stackwalk_cgi=config.get('stackwalk_cgi'),
+                use_mock=pf.get('use_mock', False),
+                mock_target=pf.get('mock_target', None),
+                mock_packages=pf.get('mock_packages', None),
             )
             builder = {
                 'name': '%s %s' % (name_prefix, suites_name),
@@ -926,7 +932,6 @@ def generateBranchObjects(config, name, secrets=None):
         tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
             # Some platforms can't run on the build host
-            leakTest = pf.get('enable_leaktests', True)
             if not pf.get('enable_unittests'):
                 uploadPackages = pf.get('packageTests', False)
             else:
@@ -938,7 +943,6 @@ def generateBranchObjects(config, name, secrets=None):
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
-            leakTest = False
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
@@ -1020,7 +1024,6 @@ def generateBranchObjects(config, name, secrets=None):
                 'graphBranch': config.get('graph_branch', config['tinderbox_tree']),
                 'doBuildAnalysis': doBuildAnalysis,
                 'baseName': pf['base_name'],
-                'leakTest': leakTest,
                 'checkTest': checkTest,
                 'valgrindCheck': valgrindCheck,
                 'uploadPackages': uploadPackages,
@@ -1047,6 +1050,10 @@ def generateBranchObjects(config, name, secrets=None):
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
                 'enable_pymake': enable_pymake,
+                'use_mock': pf.get('use_mock'),
+                'mock_target': pf.get('mock_target'),
+                'mock_packages': pf.get('mock_packages'),
+                'mock_copyin_files': pf.get('mock_copyin_files'),
             }
             factory_kwargs.update(extra_args)
 
@@ -1303,6 +1310,10 @@ def generateBranchObjects(config, name, secrets=None):
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=config.get('tooltool_url_list', []),
                 enable_pymake=enable_pymake,
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 **nightly_kwargs
             )
 
@@ -1363,6 +1374,10 @@ def generateBranchObjects(config, name, secrets=None):
                         signingServers=secrets.get(pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                        use_mock=config['use_mock'],
+                        mock_target=pf.get('mock_target'),
+                        mock_packages=pf.get('mock_packages'),
+                        mock_copyin_files=pf.get('mock_copyin_files'),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -1485,6 +1500,10 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 mozconfig=mozconfig,
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
@@ -1670,6 +1689,10 @@ def generateBranchObjects(config, name, secrets=None):
                  tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                  tooltool_url_list=config.get('tooltool_url_list', []),
                  enable_pymake=enable_pymake,
+                 use_mock=pf.get('use_mock'),
+                 mock_target=pf.get('mock_target'),
+                 mock_packages=pf.get('mock_packages'),
+                 mock_copyin_files=pf.get('mock_copyin_files'),
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],
@@ -2164,7 +2187,6 @@ def generateCCBranchObjects(config, name, secrets=None):
         tinderboxBuildsDir = None
         if platform.find('-debug') > -1:
             # Some platforms can't run on the build host
-            leakTest = pf.get('enable_leaktests', True)
             if not pf.get('enable_unittests'):
                 uploadPackages = pf.get('packageTests', False)
             else:
@@ -2176,7 +2198,6 @@ def generateCCBranchObjects(config, name, secrets=None):
         else:
             if pf.get('enable_opt_unittests'):
                 packageTests=True
-            leakTest = False
 
         # Allow for test packages on platforms that can't be tested
         # on the same master.
@@ -2262,7 +2283,6 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'graphBranch': config.get('graph_branch', config['tinderbox_tree']),
                 'doBuildAnalysis': doBuildAnalysis,
                 'baseName': pf['base_name'],
-                'leakTest': leakTest,
                 'checkTest': checkTest,
                 'valgrindCheck': valgrindCheck,
                 'uploadPackages': uploadPackages,
@@ -2289,6 +2309,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
                 'enable_pymake': enable_pymake,
+                'use_mock': pf.get('use_mock'),
+                'mock_target': pf.get('mock_target'),
+                'mock_packages': pf.get('mock_packages'),
+                'mock_copyin_files' : pf.get('mock_copyin_files'),
             }
             factory_kwargs.update(extra_args)
 
@@ -2545,6 +2569,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 tooltool_manifest_src= pf.get('tooltool_manifest_src', None),
                 tooltool_url_list= config.get('tooltool_url_list', []),
                 enable_pymake=enable_pymake,
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 **nightly_kwargs
             )
 
@@ -2608,6 +2636,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                         extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                         branchName=name,
                         enable_pymake=False,
+                        use_mock=pf.get('use_mock'),
+                        mock_target=pf.get('mock_target'),
+                        mock_packages=pf.get('mock_packages'),
+                        mock_copyin_files=pf.get('mock_copyin_files'),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2735,6 +2767,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 branchName=name,
                 mozconfig=mozconfig,
                 enable_pymake=False,
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
@@ -2796,6 +2832,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 mochibrowser_leak_threshold=mochibrowserLeakThreshold,
                 branchName=name,
                 enable_pymake=enable_pymake,
+                use_mock=pf.get('use_mock'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
                 **extra_args
             )
             unittest_builder = {
@@ -2929,6 +2969,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                  tooltool_manifest_src= pf.get('tooltool_manifest_src', None),
                  tooltool_url_list= config.get('tooltool_url_list', []),
                  enable_pymake=enable_pymake,
+                 use_mock=pf.get('use_mock'),
+                 mock_target=pf.get('mock_target'),
+                 mock_packages=pf.get('mock_packages'),
+                 mock_copyin_files=pf.get('mock_copyin_files'),
              )
              mozilla2_xulrunner_builder = {
                  'name': '%s xulrunner' % pf['base_name'],

@@ -612,7 +612,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
-        self.addFactoryArguments(test_name=test_name)
+        self.addFactoryArguments(test_name=test_name, makeCmd=makeCmd)
 
     def createSummary(self, log):
         if 'xpcshell' in self.name:
@@ -807,7 +807,11 @@ class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandRepor
         else:
             self.name = 'mochitest-%s' % variant
 
-        self.command = ['python', 'mochitest/runtests.py',
+        env_os = kwargs.get('env', {})
+        pythonCmd = 'python'
+        if env_os['OS'].fmtstring == "WIN":
+            pythonCmd = 'python2.7'
+        self.command = [pythonCmd, 'mochitest/runtests.py',
                 WithProperties('--appname=%(exepath)s'), '--utility-path=bin',
                 WithProperties('--extra-profile-file=bin/plugins'),
                 '--certificate-path=certs', '--autorun', '--close-when-done',

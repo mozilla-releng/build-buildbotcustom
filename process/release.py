@@ -72,13 +72,17 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
+    mock_slaves = []
     all_slaves = []
     for p in branchConfig['platforms']:
         platform_slaves = branchConfig['platforms'][p].get('slaves', [])
         all_slaves.extend(platform_slaves)
         if 'win' not in p:
             unix_slaves.extend(platform_slaves)
+            if branchConfig['platforms'][p].get('use_mock'):
+              mock_slaves.extend(platform_slaves)
     unix_slaves = [x for x in set(unix_slaves)]
+    mock_slaves = [x for x in set(mock_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
     signedPlatforms = ()
@@ -279,6 +283,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         return parallelizeBuilders("major_update_verify", platform,
                                    updateVerifyChunks)
 
+    def use_mock(platform):
+      pf = branchConfig['platforms'][platform]
+      if releaseConfig.get('use_mock', pf.get('use_mock')):
+        if platform in releaseConfig['mock_platforms']:
+          return True
+      return False
+
     builders = []
     test_builders = []
     schedulers = []
@@ -300,6 +311,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                     branchConfig['buildbotcustom_repo_path']),
         'CLOBBERER_URL': branchConfig['base_clobber_url']
     }
+
+    if use_mock('linux'):
+      unix_slaves = mock_slaves
 
     if releaseConfig.get('enable_repo_setup'):
         if not releaseConfig.get('skip_repo_setup'):
@@ -325,6 +339,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 repositories=clone_repositories,
                 clobberURL=branchConfig['base_clobber_url'],
                 userRepoRoot=releaseConfig['userRepoRoot'],
+                use_mock=use_mock('linux'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
+                env=pf['env'],
             )
 
             builders.append({
@@ -393,6 +412,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         tag_factory = ScriptFactory(
             scriptRepo=tools_repo,
             scriptName='scripts/release/tagging.sh',
+            use_mock=use_mock('linux'),
+            mock_target=pf.get('mock_target'),
+            mock_packages=pf.get('mock_packages'),
+            mock_copyin_files=pf.get('mock_copyin_files'),
+            env=tag_env,
         )
 
         builders.append({
@@ -447,6 +471,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             configSubDir=branchConfig['config_subdir'],
             signingServers=signingServers,
             enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
+            use_mock=use_mock('linux'),
+            mock_target=pf.get('mock_target'),
+            mock_packages=pf.get('mock_packages'),
+            mock_copyin_files=pf.get('mock_copyin_files'),
         )
 
         builders.append({
@@ -611,6 +639,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 signingServers=signingServers,
                 enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
                 createPartial=releaseConfig.get('enablePartialMarsAtBuildTime', True),
+                use_mock=use_mock('linux'),
+                mock_target=pf.get('mock_target'),
+                mock_packages=pf.get('mock_packages'),
+                mock_copyin_files=pf.get('mock_copyin_files'),
             )
 
             builders.append({
@@ -987,6 +1019,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', False),
             signingServers=signingServers,
             useChecksums=releaseConfig.get('enablePartialMarsAtBuildTime', True),
+            use_mock=use_mock('linux'),
+            mock_target=pf.get('mock_target'),
+            mock_packages=pf.get('mock_packages'),
+            mock_copyin_files=pf.get('mock_copyin_files'),
         )
 
         builders.append({
@@ -1163,6 +1199,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             buildToolsRepoPath=tools_repo_path,
             verifyConfigs=releaseConfig['verifyConfigs'],
             clobberURL=branchConfig['base_clobber_url'],
+            use_mock=use_mock('linux'),
+            mock_target=pf.get('mock_target'),
+            mock_packages=pf.get('mock_packages'),
+            mock_copyin_files=pf.get('mock_copyin_files'),
         )
 
         builders.append({
@@ -1246,6 +1286,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             fakeMacInfoTxt=releaseConfig['majorFakeMacInfoTxt'],
             schema=releaseConfig.get('majorSnippetSchema', None),
             useBetaChannelForRelease=releaseConfig.get('useBetaChannelForRelease', True),
+            use_mock=use_mock('linux'),
+            mock_target=pf.get('mock_target'),
+            mock_packages=pf.get('mock_packages'),
+            mock_copyin_files=pf.get('mock_copyin_files'),
         )
 
         builders.append({
