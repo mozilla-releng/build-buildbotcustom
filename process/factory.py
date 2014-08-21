@@ -1388,15 +1388,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         env = self.env.copy()
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-        env['V1'] = "1"
-#        self.addStep(unittest_steps.MozillaCheck,
-#         test_name="check",
-#         makeCmd=self.makeCmd,
-#         warnOnWarnings=True,
-#         workdir="build/%s" % self.objdir,
-#         timeout=5*60, # 5 minutes.
-#         env=env,
-#        )
         self.addStep(MockMozillaCheck(
                          test_name="check",
                          makeCmd=self.makeCmd,
@@ -7351,13 +7342,10 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                                name="get_mozbase",
                                command=["ls", "-1", "mozbase"],
                                extract_fn=glob2list))
+                tmpEnv['PYTHONPATH'] = WithProperties('%(files)s')
                 if self.platform.startswith('win'):
-                    tmpEnv['PATH'] = WithProperties('%s;.\\certs\\;.\\modules\\' % tmpEnv['PATH'])
-                    tmpEnv['PYTHONPATH'] = WithProperties('%(files)s')
                     tmpEnv['OS'] = WithProperties('WIN')
                 else:
-                    tmpEnv['PATH'] = WithProperties('%s:./certs/:./modules/' % tmpEnv['PATH'])
-                    tmpEnv['PYTHONPATH'] = WithProperties('%(files)s')
                     tmpEnv['OS'] = WithProperties('NONWIN')
                 variant = suite.split('-', 1)[1]
                 self.addStep(MockMozillaPackagedMochitests(
