@@ -1971,6 +1971,8 @@ def generateBranchObjects(config, name, secrets=None):
                     mobile_l10n_builders.append(builderName)
                     extra_args = ['--cfg',
                                   'single_locale/%s_%s.py' % (name, platform),
+                                  '--cfg',
+                                  config['mozharness_configs']['balrog'],
                                   '--total-chunks', str(pf['l10n_chunks']),
                                   '--this-chunk', str(n)]
                     signing_servers = secrets.get(
@@ -1980,6 +1982,7 @@ def generateBranchObjects(config, name, secrets=None):
                         scriptRepo='%s%s' % (config['hgurl'],
                                              config['mozharness_repo_path']),
                         scriptName='scripts/mobile_l10n.py',
+                        use_credentials_file=True,
                         extra_args=extra_args
                     )
                     slavebuilddir = normalizeName(builddir, pf['stage_product'])
