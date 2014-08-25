@@ -575,3 +575,50 @@ def makePropertiesScheduler(base_class, propfuncs, *args, **kw):
     S.__name__ = base_class.__name__ + "-props"
 
     return S
+
+
+class EveryNthScheduler(Scheduler):
+    """
+    Triggers jobs every Nth change, or after idleTimeout seconds have elapsed
+    since the most recent change. Set idleTimeout to None to wait forever for n changes.
+    """
+
+    compare_attrs = Scheduler.compare_attrs + ('n', 'idleTimeout')
+
+    def __init__(self, name, n, idleTimeout=None, **kwargs):
+        self.n = n
+        self.idleTimeout = idleTimeout
+
+        Scheduler.__init__(self, name=name, **kwargs)
+
+    def decide_and_remove_changes(self, t, important, unimportant):
+        """
+        Based on Scheduler.decide_and_remove_changes.
+
+        If we have n or more important changes, we should trigger jobs.
+
+        If more than idleTimeout has elapsed since the last change, we should trigger jobs.
+        """
+        if not important:
+            return None
+
+        nImportant = len(important)
+        if nImportant < self.n:
+            if not self.idleTimeout:
+                log.msg("%s: skipping with %i/%i important changes since no idle timeout" %
+                        (self.name, nImportant, self.n))
+                return
+
+            most_recent = max([c.when for c in important])
+            elapsed = int(now() - most_recent)
+
+            if self.idleTimeout and elapsed < self.idleTimeout:
+                # Haven't hit the timeout yet, so let's wait more
+                log.msg("%s: skipping with %i/%i important changes since only %i/%is have elapsed" %
+                        (self.name, nImportant, self.n, elapsed, self.idleTimeout))
+                return now() + (self.idleTimeout - elapsed)
+            log.msg("%s: triggering with %i/%i important changes since %is have elapsed" % (self.name, nImportant, self.n, elapsed))
+        else:
+            log.msg("%s: triggering since we have %i/%i important changes" % (self.name, nImportant, self.n))
+
+        return Scheduler.decide_and_remove_changes(self, t, important, unimportant)
