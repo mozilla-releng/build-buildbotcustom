@@ -52,7 +52,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
     TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import RemoteUnittestFactory
 from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
-    PersistentScheduler, makePropertiesScheduler, SpecificNightly
+    PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup, ChangeNotifier
 from buildbotcustom.status.generators import buildTryChangeMessage
@@ -2878,6 +2878,18 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 extra_args['buildbotBranch'] = branch
                             else:
                                 scheduler_class = Scheduler
+                                if test_type == 'debug':
+                                    skipcount = branch_config['platforms'][platform][slave_platform].get('debug_unittest_skipcount')
+                                    skiptimeout = branch_config['platforms'][platform][slave_platform].get('debug_unittest_skiptimeout')
+                                else:
+                                    skipcount = branch_config['platforms'][platform][slave_platform].get('opt_unittest_skipcount')
+                                    skiptimeout = branch_config['platforms'][platform][slave_platform].get('opt_unittest_skiptimeout')
+
+                                if skipcount:
+                                    scheduler_class = EveryNthScheduler
+                                    extra_args['n'] = skipcount
+                                    extra_args['idleTimeout'] = skiptimeout
+
                             branchObjects['schedulers'].append(scheduler_class(
                                 name=scheduler_name,
                                 branch=scheduler_branch,
