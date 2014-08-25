@@ -579,6 +579,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mozillaDir = None
     if 'mozilla_dir' in releaseConfig:
         mozillaDir = releaseConfig['mozilla_dir']
+    partialUpdates = releaseConfig.get('partialUpdates', {}).copy()
+    partialUpdates.update(releaseConfig.get('extraPartials', {}))
 
     for platform in releaseConfig['enUSPlatforms']:
         # shorthand
@@ -649,7 +651,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 version=releaseConfig['version'],
                 appVersion=releaseConfig['appVersion'],
                 buildNumber=releaseConfig['buildNumber'],
-                partialUpdates=releaseConfig.get('partialUpdates', {}),
+                partialUpdates=partialUpdates,
                 talosMasters=talosMasters,
                 packageTests=packageTests,
                 unittestMasters=unittestMasters,
