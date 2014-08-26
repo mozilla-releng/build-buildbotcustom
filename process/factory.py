@@ -4976,7 +4976,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              name='setup virtualenv',
                              command=[
                              'python', 'resources/installmozmill.py',
-                             MOZMILL_VIRTUALENV_DIR],
+                             MOZMILL_VIRTUALENV_DIR, '../mozbase'],
                              doStepIf=isVirtualenvSetup,
                              flunkOnFailure=True,
                              haltOnFailure=True,
