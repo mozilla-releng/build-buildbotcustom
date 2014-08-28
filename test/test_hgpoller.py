@@ -335,6 +335,13 @@ class RepoBranchHandling(unittest.TestCase):
         self.assertEquals(self.changes[0].revision,
                           '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
+        titles = self.changes[0].properties.getProperty('commit_titles')
+        self.assertEquals(len(titles), 2)
+        self.assertEquals(titles[0],
+                          'Bug 563088 - Re-enable image discarding.r=joe,a=blocker')
+        self.assertEquals(titles[1],
+                          'Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking\'s push-and-run bustage.')
+
     def testRelbranch(self):
         self.doTest('GECKO20b5pre_20100820_RELBRANCH')
 
