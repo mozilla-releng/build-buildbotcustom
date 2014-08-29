@@ -51,7 +51,7 @@ from buildbotcustom.process.factory import NightlyBuildFactory, \
     NightlyRepackFactory, UnittestPackagedBuildFactory, TalosFactory, \
     TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
 from buildbotcustom.process.factory import RemoteUnittestFactory
-from buildbotcustom.scheduler import MultiScheduler, BuilderChooserScheduler, \
+from buildbotcustom.scheduler import BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
 from buildbotcustom.l10n import TriggerableL10n
 from buildbotcustom.status.mail import MercurialEmailLookup, ChangeNotifier
@@ -1404,7 +1404,6 @@ def generateBranchObjects(config, name, secrets=None):
         scheduler_class = makePropertiesScheduler(
             BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
-        extra_args['numberOfBuildsToTrigger'] = 1
         extra_args['prettyNames'] = prettyNames
         extra_args['buildbotBranch'] = name
     else:
@@ -2871,7 +2870,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if branch_config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
-                                extra_args['numberOfBuildsToTrigger'] = 1
                                 extra_args['prettyNames'] = prettyNames
                                 extra_args['unittestSuites'] = unittestSuites
                                 extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
@@ -2908,7 +2906,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             if branch_config.get('enable_try'):
                                 scheduler_class = BuilderChooserScheduler
                                 extra_args['chooserFunc'] = tryChooser
-                                extra_args['numberOfBuildsToTrigger'] = 1
                                 extra_args['prettyNames'] = prettyNames
                                 extra_args['unittestSuites'] = unittestSuites
                                 extra_args['buildbotBranch'] = branch
@@ -2925,20 +2922,15 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             # Create one scheduler per # of tests to run
             for tests, builder_names in talos_builders.items():
                 extra_args = {}
-                if tests == 1:
-                    scheduler_class = Scheduler
-                    name = 'tests-%s-%s-talos' % (branch, platform)
-                else:
-                    scheduler_class = MultiScheduler
-                    name = 'tests-%s-%s-talos-x%s' % (branch, platform, tests)
-                    extra_args['numberOfBuildsToTrigger'] = tests
+                assert tests == 1
+                scheduler_class = Scheduler
+                name = 'tests-%s-%s-talos' % (branch, platform)
 
                 if branch_config.get('enable_try'):
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
                     extra_args['prettyNames'] = prettyNames
                     extra_args['talosSuites'] = SUITES.keys()
-                    extra_args['numberOfBuildsToTrigger'] = tests
                     extra_args['buildbotBranch'] = branch
 
                 s = scheduler_class(
@@ -2952,21 +2944,15 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             # PGO Schedulers
             for tests, builder_names in talos_pgo_builders.items():
                 extra_args = {}
-                if tests == 1:
-                    scheduler_class = Scheduler
-                    name = 'tests-%s-%s-pgo-talos' % (branch, platform)
-                else:
-                    scheduler_class = MultiScheduler
-                    name = 'tests-%s-%s-pgo-talos-x%s' % (
-                        branch, platform, tests)
-                    extra_args['numberOfBuildsToTrigger'] = tests
+                assert tests == 1
+                scheduler_class = Scheduler
+                name = 'tests-%s-%s-pgo-talos' % (branch, platform)
 
                 if branch_config.get('enable_try'):
                     scheduler_class = BuilderChooserScheduler
                     extra_args['chooserFunc'] = tryChooser
                     extra_args['prettyNames'] = prettyNames
                     extra_args['talosSuites'] = SUITES.keys()
-                    extra_args['numberOfBuildsToTrigger'] = tests
                     extra_args['buildbotBranch'] = branch
 
                 s = scheduler_class(
@@ -3230,7 +3216,6 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
         scheduler_class = makePropertiesScheduler(
             BuilderChooserScheduler, [buildUIDSchedFunc])
         extra_args['chooserFunc'] = tryChooser
-        extra_args['numberOfBuildsToTrigger'] = 1
         extra_args['buildbotBranch'] = branch
     else:
         scheduler_class = Scheduler
