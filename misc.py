@@ -1723,6 +1723,8 @@ def generateBranchObjects(config, name, secrets=None):
 
         if config.get('mozilla_dir'):
             extra_args['mozillaDir'] = config['mozilla_dir']
+        if config.get('mozilla_srcdir'):
+            extra_args['mozillaSrcDir'] = config['mozilla_srcdir']
 
         multiargs = {}
         if pf.get('product_name') == 'b2g':
@@ -1802,6 +1804,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
+                'mozillaSrcDir': config.get('mozilla_srcdir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src'),
                 'tooltool_script': pf.get('tooltool_script'),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
@@ -2130,6 +2133,7 @@ def generateBranchObjects(config, name, secrets=None):
                     baseMirrorUrls=config.get('base_mirror_urls'),
                     baseBundleUrls=config.get('base_bundle_urls'),
                     mozillaDir=config.get('mozilla_dir', None),
+                    mozillaSrcDir=config.get('mozilla_srcdir', None),
                     tooltool_manifest_src=pf.get('tooltool_manifest_src'),
                     tooltool_script=pf.get('tooltool_script'),
                     tooltool_url_list=config.get('tooltool_url_list', []),
@@ -2224,6 +2228,7 @@ def generateBranchObjects(config, name, secrets=None):
                         clobberURL=config['base_clobber_url'],
                         clobberTime=clobberTime,
                         mozillaDir=config.get('mozilla_dir', None),
+                        mozillaSrcDir=config.get('mozilla_srcdir', None),
                         signingServers=secrets.get(
                             pf.get('nightly_signing_servers')),
                         baseMirrorUrls=config.get('base_mirror_urls'),
@@ -2352,6 +2357,7 @@ def generateBranchObjects(config, name, secrets=None):
                 appName=pf['app_name'],
                 enUSBinaryURL=config['enUS_binaryURL'],
                 mozillaDir=config.get('mozilla_dir', None),
+                mozillaSrcDir=config.get('mozilla_srcdir', None),
                 nightly=False,
                 l10nDatedDirs=config['l10nDatedDirs'],
                 stageServer=config['stage_server'],

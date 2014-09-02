@@ -577,8 +577,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
 
     mozillaDir = None
+    mozillaSrcDir = None
     if 'mozilla_dir' in releaseConfig:
         mozillaDir = releaseConfig['mozilla_dir']
+    if 'mozilla_srcdir' in releaseConfig:
+        mozillaSrcDir = releaseConfig['mozilla_srcdir']
+
     partialUpdates = releaseConfig.get('partialUpdates', {}).copy()
     partialUpdates.update(releaseConfig.get('extraPartials', {}))
 
@@ -681,6 +685,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 createPartial=releaseConfig.get(
                     'enablePartialMarsAtBuildTime', True),
                 mozillaDir=mozillaDir,
+                mozillaSrcDir=mozillaSrcDir,
                 enableInstaller=pf.get('enable_installer', False),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
