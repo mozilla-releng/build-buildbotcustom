@@ -985,7 +985,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         if mozillaDir:
             self.mozillaDir = '/%s' % (mozillaDir)
             self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
-            self.mozillaSrcDir = '.%s' % self.mozillaDir
+            self.mozillaSrcDir = '%s' % self.mozillaDir
         else:
             self.mozillaDir = ''
             self.mozillaObjdir = self.objdir
@@ -993,9 +993,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             # Thunderbird now doesn't have mozillaDir, but still has a
             # mozillaSrcDir
             if mozillaSrcDir:
-                self.mozillaSrcDir = './%s' % (mozillaSrcDir)
+                self.mozillaSrcDir = '/%s' % (mozillaSrcDir)
             else:
-                self.mozillaSrcDir = '.'
+                self.mozillaSrcDir = ''
 
         # These following variables are useful for sharing build steps (e.g.
         # update generation) with subclasses that don't use object dirs (e.g.
