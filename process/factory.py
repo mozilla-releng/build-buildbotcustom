@@ -3066,15 +3066,19 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         else:
             self.makeCmd = ['make']
 
+        self.linkTools = False
+
         # Mozilla subdir
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
             self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
+            self.linkTools = True
         else:
             self.mozillaDir = ''
             # Thunderbird doesn't have a mozilla in the objdir, but it
             # still does for the srcdir.
             if mozillaSrcDir:
+                self.linkTools
                 self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaSrcDir)
             else:
                 self.mozillaSrcDir = self.origSrcDir
@@ -3205,7 +3209,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                 property='basedir',
                 workdir='.'
             ))
-        if self.mozillaDir:
+        if self.linkTools:
             self.addStep(MockCommand(**self.processCommand(
                 name='link_tools',
                 env=self.env,
