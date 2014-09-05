@@ -2724,6 +2724,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'factory': pgo_factory,
                             'category': branch,
                             'properties': properties,
+                            'env': MozillaEnvironments[platform_config['env_name']],
                         }
 
                         if not merge:
