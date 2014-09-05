@@ -3078,7 +3078,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             # Thunderbird doesn't have a mozilla in the objdir, but it
             # still does for the srcdir.
             if mozillaSrcDir:
-                self.linkTools
+                self.linkTools = True
                 self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaSrcDir)
             else:
                 self.mozillaSrcDir = self.origSrcDir
