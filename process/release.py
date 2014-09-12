@@ -818,6 +818,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/mobile_l10n.py',
                         extra_args=extra_args,
+                        use_credentials_file=True,
                         env=env,
                     )
                     properties['script_repo_revision'] = releaseTag
