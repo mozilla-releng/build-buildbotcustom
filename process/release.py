@@ -818,6 +818,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/mobile_l10n.py',
                         extra_args=extra_args,
+                        use_credentials_file=True,
                         env=env,
                     )
                     properties['script_repo_revision'] = releaseTag
@@ -1217,7 +1218,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             }
         })
         post_signing_builders.append(builderPrefix('updates'))
-        important_builders.append(builderPrefix('updates'))
+
+        # Releases that aren't automatically pushed to mirrors have their
+        # updates tested on an internal channel first. For these, we need to
+        # send out mail to let people know that it's ready to test.
+        if not releaseConfig.get('enableAutomaticPushToMirrors'):
+            important_builders.append(builderPrefix('updates'))
         if not releaseConfig.get('enableSigningAtBuildTime', True) or \
                 not releaseConfig.get('enablePartialMarsAtBuildTime', True):
             deliverables_builders.append(builderPrefix('updates'))
