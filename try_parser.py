@@ -31,6 +31,8 @@ def testSuiteMatches(v, u):
         return v.startswith('mochitest-browser-chrome')
     elif u in ('reftests', 'reftest'):
         return v.startswith('reftest') or v.startswith('plain-reftest')
+    elif u in ('web-platform-tests', 'web-platform-test'):
+        return v.startswith("web-platform-tests")
     elif u == 'all':
         return True
     else:
