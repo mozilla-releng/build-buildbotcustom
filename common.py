@@ -114,6 +114,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'thunderbird': 'tb',
         'checksums': 'sums',
         'update_verify': 'uv',
+        'postrelease': 'pr',
         'spidermonkey': 'sm',
         'warnaserr': 'we',
         'warnaserrdebug': 'wed',

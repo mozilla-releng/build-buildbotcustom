@@ -2284,7 +2284,10 @@ def generateBranchObjects(config, name, secrets=None):
             scriptName = repacks['scriptName']
             l10n_chunks = repacks['l10n_chunks']
             use_credentials_file = repacks['use_credentials_file']
-            repack_config = repacks['config']
+            config_dir = 'single_locale'
+            branch_config = os.path.join(config_dir, '%s.py' % name)
+            platform_config = os.path.join(config_dir, '%s.py' % platform)
+            environment_config = os.path.join(config_dir, 'staging.py')
             # desktop repacks run in chunks...
             for n in range(1, l10n_chunks + 1):
                 l10n_scheduler_name = '%s-%s-l10n_%s' % (name, platform, str(n))
@@ -2292,7 +2295,10 @@ def generateBranchObjects(config, name, secrets=None):
                 builderName = "%s l10n %s/%s" % \
                     (pf['base_name'], n, l10n_chunks)
                 l10n_builders.append(builderName)
-                extra_args = ['--config', repack_config,
+                extra_args = ['--branch-config', branch_config,
+                              '--platform-config', platform_config,
+                              '--environment-config', environment_config,
+                              '--balrog-config', 'balrog/staging.py',
                               '--total-chunks', str(l10n_chunks),
                               '--this-chunk', str(n)]
                 signing_servers = secrets.get(pf.get('nightly_signing_servers'))
