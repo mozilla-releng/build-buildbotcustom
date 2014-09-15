@@ -1424,10 +1424,9 @@ def generateBranchObjects(config, name, secrets=None):
         if config.get('enable_try'):
             fileIsImportant = lambda c: isHgPollerTriggered(c, config['hgurl'])
         else:
-            # The per-produt build behaviour is tweakable per branch. If it's
-            # not enabled, pass None as the product, which disables the
-            # per-product build behaviour.
-            if not config.get('enable_perproduct_builds'):
+            # The per-product build behaviour is tweakable per branch, and
+            # by default is opt-out. (Bug 1056792).
+            if not config.get('enable_perproduct_builds', True):
                 fileIsImportant = makeImportantFunc(config['hgurl'], None)
             else:
                 fileIsImportant = makeImportantFunc(config['hgurl'], product)
