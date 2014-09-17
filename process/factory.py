@@ -4494,7 +4494,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             name='download_balrog_props',
             slavedest='buildprops_balrog.json',
             workdir='.',
-            flunkOnFailure=False,
+            flunkOnFailure=True,
         ))
         credentials_file = os.path.join(os.getcwd(),
                                         self.balrog_credentials_file)
