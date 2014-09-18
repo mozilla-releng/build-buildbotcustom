@@ -4158,7 +4158,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  partialUpdates,
                  ftpServer, bouncerServer, stagingServer,
                  stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
-                 ausServerUrl, hgSshKey, hgUsername, releaseChannel='release',
+                 ausServerUrl, hgSshKey, hgUsername, localTestChannel,
+                 releaseChannel='release',
                  mozRepoPath=None,
                  brandName=None, buildSpace=2, triggerSchedulers=None,
                  releaseNotesUrl=None, python='python',
@@ -4213,6 +4214,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.balrog_api_root = balrog_api_root
         self.balrog_credentials_file = balrog_credentials_file
         self.balrog_username = balrog_username
+        self.testChannel = localTestChannel
 
         # The patcher config bumper needs to know the exact previous version
         self.previousVersion = str(
@@ -4274,10 +4276,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
         # XXX: hack alert
         if 'esr' in self.version:
-            self.testChannel = 'esrtest'
             self.channels['esrtest'] = {'dir': 'aus2.test'}
-        else:
-            self.testChannel = 'betatest'
 
     def bumpConfigs(self):
         self.addStep(RetryingMockCommand(
