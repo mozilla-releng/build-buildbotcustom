@@ -148,6 +148,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         xrplatforms = list(releaseConfig.get('xulrunnerPlatforms', []))
         stage = name.replace(builderPrefix(""), "")
         releaseChannel = releaseConfig.get("releaseChannel")
+        cdnTestChannel = releaseConfig.get("cdnTestChannel")
+        localTestChannel = releaseConfig.get("localTestChannel")
+
         # Detect platform from builder name by tokenizing by '_', and matching
         # the first token after the prefix
         if stage.startswith("xulrunner"):
@@ -1173,6 +1176,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
+            localTestChannel=releaseConfig['localTestChannel'],
             releaseChannel=releaseChannel,
             clobberURL=clobberer_url,
             clobberBranch='release-%s' % sourceRepoInfo['name'],
