@@ -30,7 +30,6 @@ class TestReleaseUpdatesFactory(unittest.TestCase):
         uf = SimpleUpdatesFactory('3.6.26', 'release', True)
         self.assertEqual(uf.channels, expectedChannels)
         self.assertEqual(uf.dirMap, expectedDirMap)
-        self.assertEqual(uf.testChannel, 'betatest')
 
     def testSetChannelDataWithBetaChannelOnly(self):
         expectedChannels = {
@@ -45,7 +44,6 @@ class TestReleaseUpdatesFactory(unittest.TestCase):
         uf = SimpleUpdatesFactory('10.0b6', 'beta', False)
         self.assertEqual(uf.channels, expectedChannels)
         self.assertEqual(uf.dirMap, expectedDirMap)
-        self.assertEqual(uf.testChannel, 'betatest')
 
     def testSetChannelDataWithReleaseChannelOnly(self):
         expectedChannels = {
@@ -60,7 +58,6 @@ class TestReleaseUpdatesFactory(unittest.TestCase):
         uf = SimpleUpdatesFactory('9.0.1', 'release', False)
         self.assertEqual(uf.channels, expectedChannels)
         self.assertEqual(uf.dirMap, expectedDirMap)
-        self.assertEqual(uf.testChannel, 'betatest')
 
     def testSetChannelDataWithEsrChannelOnly(self):
         expectedChannels = {
@@ -76,4 +73,3 @@ class TestReleaseUpdatesFactory(unittest.TestCase):
         uf = SimpleUpdatesFactory('10.0esr', 'esr', False)
         self.assertEqual(uf.channels, expectedChannels)
         self.assertEqual(uf.dirMap, expectedDirMap)
-        self.assertEqual(uf.testChannel, 'esrtest')
