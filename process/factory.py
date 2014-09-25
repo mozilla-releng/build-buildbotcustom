@@ -231,6 +231,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['partialMarUrl'] = m
         elif m.find('geckoview') >= 0:
             pass
+        elif m.find('cppunit') >= 0:
+            pass
         else:
             retval['packageUrl'] = m
     return retval
