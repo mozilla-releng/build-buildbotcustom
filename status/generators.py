@@ -1,15 +1,12 @@
 import re
-import os.path
 
 
 def buildTryChangeMessage(change, packageDir):
     got_revision = revision = change.revision[:12]
     who = change.who
     branch = change.branch
-    tree = "Try"
-    if 'comm' in branch:
-        tree = "Thunderbird-Try"
-    treeherderTree = tree.lower()
+    tree = 'try-comm-central' if 'comm' in branch else 'try'
+    tbpl_tree = 'Thunderbird-Try' if 'comm' in branch else 'Try'
     packageDir = packageDir % locals()
     msgdict = {"type": "plain"}
     msgdict['subject'] = "%(tree)s submission %(revision)s" % locals()
@@ -19,11 +16,11 @@ def buildTryChangeMessage(change, packageDir):
     msgdict["body"] = """\
 Thank you for your try submission. It's the best!
 
-Results will be displayed on TBPL as they come in:
-https://tbpl.mozilla.org/?tree=%(tree)s&rev=%(revision)s
+Results will be displayed on Treeherder as they come in:
+https://treeherder.mozilla.org/ui/#/jobs?repo=%(tree)s&revision=%(revision)s
 
-Alternatively, view them on Treeherder (experimental):
-https://treeherder.mozilla.org/ui/#/jobs?repo=%(treeherderTree)s&revision=%(revision)s
+Alternatively, view them on TBPL (soon to be depreciated):
+https://tbpl.mozilla.org/?tree=%(tbpl_tree)s&rev=%(revision)s
 
 Once completed, builds and logs will be available at:
 %(packageDir)s
@@ -42,6 +39,7 @@ Summary:
 """ % locals()
 
     return msgdict
+
 
 def getSensibleCommitTitle(titles):
     """
