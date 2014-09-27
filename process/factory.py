@@ -231,6 +231,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['partialMarUrl'] = m
         elif m.find('geckoview') >= 0:
             pass
+        elif m.find('cppunit') >= 0:
+            pass
         else:
             retval['packageUrl'] = m
     return retval
@@ -2784,12 +2786,18 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 fileType='%sMar' % oldVersion,
                 haltOnFailure=True,
             )
+            self.addStep(SetBuildProperty(
+                property_name="%sBuildNumber" % oldVersion,
+                value=oldBuildNumber,
+                haltOnFailure=True,
+            ))
 
         def getPartialInfo(build, oldVersions):
             partials = []
             for v in oldVersions:
                 partials.append({
                     "previousVersion": v,
+                    "previousBuildNumber": build.getProperty("%sBuildNumber" % v),
                     "size": build.getProperty("%sMarSize" % v),
                     "hash": build.getProperty("%sMarHash" % v),
                 })
