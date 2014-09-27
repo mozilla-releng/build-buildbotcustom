@@ -19,7 +19,7 @@ Thank you for your try submission. It's the best!
 Results will be displayed on Treeherder as they come in:
 https://treeherder.mozilla.org/ui/#/jobs?repo=%(tree)s&revision=%(revision)s
 
-Alternatively, view them on TBPL (soon to be depreciated):
+Alternatively, view them on TBPL (soon to be deprecated):
 https://tbpl.mozilla.org/?tree=%(tbpl_tree)s&rev=%(revision)s
 
 Once completed, builds and logs will be available at:
