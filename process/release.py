@@ -97,8 +97,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     def getSigningServers(platform):
         signingServers = secrets.get('release-signing')
-        if releaseConfig.get('enableSigningAtBuildTime', True):
-            assert signingServers, 'Please provide a valid list of signing servers'
+        assert signingServers, 'Please provide a valid list of signing servers'
         return signingServers
 
     def builderPrefix(s, platform=None):
@@ -478,7 +477,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             configRepoPath=branchConfig['config_repo_path'],
             configSubDir=branchConfig['config_subdir'],
             signingServers=getSigningServers('linux'),
-            enableSigning=releaseConfig.get('enableSigningAtBuildTime', True),
             mozconfigBranch=releaseTag,
             use_mock=source_use_mock,
             mock_target=pf.get('mock_target'),
@@ -532,8 +530,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
                 signingServers=getSigningServers('linux'),
-                enableSigning=releaseConfig.get(
-                    'enableSigningAtBuildTime', True),
                 mozconfigBranch=releaseTag,
                 use_mock=use_mock('linux'),
                 mock_target=pf.get('mock_target'),
@@ -684,8 +680,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'enableUpdatePackaging', True),
                 mozconfigBranch=releaseTag,
                 signingServers=getSigningServers(platform),
-                enableSigning=releaseConfig.get(
-                    'enableSigningAtBuildTime', True),
                 createPartial=releaseConfig.get(
                     'enablePartialMarsAtBuildTime', True),
                 mozillaDir=mozillaDir,
@@ -773,8 +767,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 standalone_factory = SigningScriptFactory(
                     signingServers=getSigningServers(platform),
                     env=env,
-                    enableSigning=releaseConfig.get(
-                        'enableSigningAtBuildTime', True),
                     scriptRepo=tools_repo,
                     interpreter='bash',
                     scriptName='scripts/l10n/release_repacks.sh',
@@ -864,8 +856,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     repack_factory = SigningScriptFactory(
                         signingServers=getSigningServers(platform),
                         env=env,
-                        enableSigning=releaseConfig.get(
-                            'enableSigningAtBuildTime', True),
                         scriptRepo=tools_repo,
                         interpreter='bash',
                         scriptName='scripts/l10n/release_repacks.sh',
@@ -974,8 +964,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 clobberBranch='release-%s' % sourceRepoInfo['name'],
                 packageSDK=True,
                 signingServers=getSigningServers(platform),
-                enableSigning=releaseConfig.get(
-                    'enableSigningAtBuildTime', True),
                 partialUpdates=releaseConfig.get('partialUpdates', {}),
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
@@ -1049,8 +1037,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     stageUsername=branchConfig['stage_username'],
                     stageSshKey=branchConfig['stage_ssh_key'],
                     signingServers=getSigningServers(platform),
-                    enableSigning=releaseConfig.get(
-                        'enableSigningAtBuildTime', True),
                     env=pr_pf['env'],
                 )
                 partner_repack_factory = PartnerRepackFactory(**repack_params)
@@ -1073,8 +1059,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
 
-    if releaseConfig.get('enableSigningAtBuildTime', True) and \
-            releaseConfig.get('autoGenerateChecksums', True):
+    if releaseConfig.get('autoGenerateChecksums', True):
         pf = branchConfig['platforms']['linux']
         env = builder_env.copy()
         env.update(pf['env'])
@@ -1235,8 +1220,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         # send out mail to let people know that it's ready to test.
         if not releaseConfig.get('enableAutomaticPushToMirrors'):
             important_builders.append(builderPrefix('updates'))
-        if not releaseConfig.get('enableSigningAtBuildTime', True) or \
-                not releaseConfig.get('enablePartialMarsAtBuildTime', True):
+        if not releaseConfig.get('enablePartialMarsAtBuildTime', True):
             deliverables_builders.append(builderPrefix('updates'))
 
         update_shipping_factory_args = dict(
@@ -1793,6 +1777,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         else:
             post_antivirus_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
 
+    if releaseConfig.get('enableAutomaticPushToMirrors') and \
+        hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
+            post_deliverables_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
+
     if not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         schedulers.append(AggregatingScheduler(
             name=builderPrefix(
@@ -1816,8 +1804,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             upstreamBuilders=deliverables_builders,
             builderNames=post_deliverables_builders,
         ))
-    if releaseConfig.get('xulrunnerPlatforms') and \
-            releaseConfig.get('enableSigningAtBuildTime', True):
+    if releaseConfig.get('xulrunnerPlatforms'):
         if xr_deliverables_builders:
             schedulers.append(AggregatingScheduler(
                 name=builderPrefix('xulrunner_deliverables_ready'),
