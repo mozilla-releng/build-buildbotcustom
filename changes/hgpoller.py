@@ -272,8 +272,6 @@ class BaseHgPoller(BasePoller):
         # Go through the list of pushes backwards, since we want to keep the
         # latest ones and possibly discard earlier ones.
         change_list = []
-        commit_titles = []
-        commit_titles_total_length = 0
         too_many = False
         for push in reversed(pushes):
             # Used for merging push changes
@@ -283,6 +281,8 @@ class BaseHgPoller(BasePoller):
                 files=[],
                 desc="",
                 node=None,
+                commit_titles=[],
+                commit_titles_total_length=0,
             )
 
             i = 0
@@ -321,9 +321,9 @@ class BaseHgPoller(BasePoller):
                     # change_properties in buildbot/db/scheme/tables.sql). In
                     # order to avoid insert/update failures, we enforce a cap
                     # on the total length with enough room for JSON overhead.
-                    if commit_titles_total_length + len(title) <= 800:
-                        commit_titles_total_length += len(title)
-                        commit_titles.append(title)
+                    if c['commit_titles_total_length'] + len(title) <= 800:
+                        c['commit_titles_total_length'] += len(title)
+                        c['commit_titles'].append(title)
                 else:
                     c = dict(
                         user=push['user'],
@@ -379,8 +379,9 @@ class BaseHgPoller(BasePoller):
                                    revlink=link,
                                    when=change["date"],
                                    branch=self.branch)
-                if self.mergePushChanges:
-                    c.properties.setProperty('commit_titles', commit_titles,
+                if 'commit_titles' in change:
+                    c.properties.setProperty('commit_titles',
+                                             change['commit_titles'],
                                              'BaseHgPoller')
                 self.changeHook(c)
                 self.parent.addChange(c)
