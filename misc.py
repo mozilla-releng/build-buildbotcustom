@@ -50,7 +50,6 @@ from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
     NightlyRepackFactory, UnittestPackagedBuildFactory, TalosFactory, \
     TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
-from buildbotcustom.process.factory import RemoteUnittestFactory
 from buildbotcustom.scheduler import BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
 from buildbotcustom.l10n import TriggerableL10n
@@ -617,30 +616,6 @@ def _nextIdleSlave(nReserved):
         return sorted(available_slaves, _recentSort(builder))[-1]
     return _nextslave
 
-
-@safeNextSlave
-def _nextOldTegra(builder, available_slaves):
-    # XXX Bug 790698 hack for no android reftests on new tegras
-    # Purge with fire when this is no longer needed
-    valid = []
-    for s in available_slaves:
-        if 'panda-' in s.slave.slavename:
-            # exempt Panda's from this foolishness
-            valid.append(s)
-            continue
-
-        number = s.slave.slavename.replace('tegra-', '')
-        try:
-            if int(number) < 286:
-                valid.append(s)
-        except ValueError:
-            log.msg("Error parsing number out of '%s', discarding from old list" % s.slave.slavename)
-            continue
-    if valid:
-        return random.choice(valid)
-    return None
-
-
 # Globals for mergeRequests
 nomergeBuilders = set()
 # Default to max of 3 merged requests.
@@ -871,37 +846,6 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             'properties': properties,
             'nextSlave': _nextAWSSlave_nowait,
         }
-        builders.append(builder)
-    elif pf.get('is_remote', False):
-        hostUtils = pf['host_utils_url']
-        factory = RemoteUnittestFactory(
-            platform=platform,
-            productName=productName,
-            hostUtils=hostUtils,
-            suites=suites,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            branchName=branch_name,
-            remoteExtras=pf.get('remote_extras'),
-            # NB. If you change the defaults here, make sure to update the
-            # logic in generateTalosBranchObjects for test_type == "debug"
-            downloadSymbols=pf.get('download_symbols', False),
-            downloadSymbolsOnDemand=pf.get('download_symbols_ondemand', True),
-        )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': properties,
-        }
-        # XXX Bug 790698 hack for no android reftests on new tegras
-        # Purge with fire when this is no longer needed
-        if 'reftest' in suites_name:
-            builder['nextSlave'] = _nextOldTegra
         builders.append(builder)
     else:
         factory = UnittestPackagedBuildFactory(

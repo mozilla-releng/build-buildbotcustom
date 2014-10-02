@@ -37,9 +37,3 @@ talos_hgweb_errors = ((re_compile("ERROR 500: Internal Server Error"), RETRY),
                       (re_compile("ERROR: We tried to download the talos.json file but something failed"), RETRY),
                       (re_compile("command timed out:"), RETRY),
                       )
-
-tegra_errors = (
-    (re_compile(
-        "Automation error: Error receiving data from socket"), FAILURE),
-    (re_compile("Unable to ping tegra after 5 attempts"), RETRY),
-)
