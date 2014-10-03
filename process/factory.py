@@ -51,7 +51,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-    upload_errors, talos_hgweb_errors, tegra_errors
+    upload_errors, talos_hgweb_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
     Trigger, RetryingShellCommand
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -5043,299 +5043,6 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
         if self.platform.startswith('macosx64'):
             self.addStep(resolution_step())
 
-
-class RemoteUnittestFactory(MozillaTestFactory):
-    def __init__(self, platform, suites, hostUtils, productName='fennec',
-                 downloadSymbols=False, downloadTests=True, posixBinarySuffix='',
-                 remoteExtras=None, branchName=None, **kwargs):
-        self.suites = suites
-        self.hostUtils = WithProperties(hostUtils)
-
-        if remoteExtras is not None:
-            self.remoteExtras = remoteExtras
-        else:
-            self.remoteExtras = {}
-
-        env = {}
-        env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
-        env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
-
-        MozillaTestFactory.__init__(self, platform, productName=productName,
-                                    downloadSymbols=downloadSymbols,
-                                    downloadTests=downloadTests,
-                                    posixBinarySuffix=posixBinarySuffix,
-                                    env=env, **kwargs)
-
-    def addCleanupSteps(self):
-        '''Clean up the relevant places before starting a build'''
-        # On windows, we should try using cmd's attrib and native rmdir
-        self.addStep(ShellCommand(
-            name='rm_builddir',
-            command=['rm', '-rf', 'build'],
-            workdir='.'
-        ))
-
-    def addInitialSteps(self):
-        self.addStep(ShellCommand(
-                     name="set_shutdown_flag",
-                     description="Setting the shutdown flag",
-                     command=['touch', '../shutdown.stamp'],
-                     workdir='.',
-        ))
-        self.addStep(SetProperty(
-                     command=['bash', '-c', 'echo $SUT_IP'],
-                     property='sut_ip'
-                     ))
-        MozillaTestFactory.addInitialSteps(self)
-        self.addStep(ShellCommand(
-                     name="verify_tegra_state",
-                     description="Running verify.py",
-                     command=['python', '-u', '/builds/sut_tools/verify.py'],
-                     workdir='build',
-                     haltOnFailure=True,
-                     log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
-                     ))
-        self.addStep(SetProperty(
-            name="GetFoopyPlatform",
-            command=['bash', '-c', 'uname -s'],
-            property='foopy_type'
-        ))
-
-    def addSetupSteps(self):
-        self.addStep(DownloadFile(
-            url=self.hostUtils,
-            filename_property='hostutils_filename',
-            url_property='hostutils_url',
-            haltOnFailure=True,
-            ignore_certs=self.ignoreCerts,
-            name='download_hostutils',
-        ))
-        self.addStep(UnpackFile(
-            filename=WithProperties('../%(hostutils_filename)s'),
-            scripts_dir='../tools/buildfarm/utils',
-            haltOnFailure=True,
-            workdir='build/hostutils',
-            name='unpack_hostutils',
-        ))
-        self.addStep(ShellCommand(
-            name='install app on device',
-            workdir='.',
-            description="Install App on Device",
-            command=['python', '/builds/sut_tools/installApp.py',
-                     WithProperties("%(sut_ip)s"),
-                     WithProperties("build/%(build_filename)s"),
-                     WithProperties("%(remoteProcessName)s"),
-                     ],
-            haltOnFailure=True)
-        )
-
-    def addPrepareBuildSteps(self):
-        def get_build_url(build):
-            '''Make sure that there is at least one build in the file list'''
-            assert len(build.source.changes[-1]
-                       .files) > 0, 'Unittest sendchange has no files'
-            return parse_sendchange_files(
-                build, exclude_substrs=['.crashreporter-symbols.',
-                                        '.tests.'])
-        self.addStep(DownloadFile(
-            url_fn=get_build_url,
-            filename_property='build_filename',
-            url_property='build_url',
-            haltOnFailure=True,
-            ignore_certs=self.ignoreCerts,
-            name='download_build',
-        ))
-        self.addStep(UnpackFile(
-            filename=WithProperties('../%(build_filename)s'),
-            scripts_dir='../tools/buildfarm/utils',
-            haltOnFailure=True,
-            workdir='build/%s' % self.productName,
-            name='unpack_build',
-        ))
-        self.addStep(SetProperty(
-                     command=['cat', 'package-name.txt'],
-                     workdir='build/%s' % self.productName,
-                     property='remoteProcessName'
-                     ))
-
-        def get_robocop_url(build):
-            '''We assume 'robocop.apk' is in same directory as the
-            main apk, so construct url based on the build_url property
-            set when we downloaded that.
-            '''
-            build_url = build.getProperty('build_url')
-            build_url = build_url[:build_url.rfind('/')]
-            robocop_url = build_url + '/robocop.apk'
-            return robocop_url
-
-        # the goal of bug 715215 is to download robocop.apk if we
-        # think it will be needed. We can tell that by the platform
-        # being 'android' and 'robocop' being mentioned in the suite
-        # name. (The suite name must include 'robocop', as that data
-        # driven feature is used to append the robocop options to a
-        # command line.)
-        if "android" in self.platform and 'robocop' in self.suites[0]['suite']:
-            self.addStep(DownloadFile(
-                url_fn=get_robocop_url,
-                filename_property='robocop_filename',
-                url_property='robocop_url',
-                haltOnFailure=True,
-                ignore_certs=self.ignoreCerts,
-                name='download_robocop',
-            ))
-        self.addStep(SetBuildProperty(
-                     property_name="exedir",
-                     value=self.productName
-                     ))
-
-    def addRunTestSteps(self):
-        if self.downloadSymbolsOnDemand:
-            symbols_path = '%(symbols_url)s'
-        else:
-            symbols_path = '../symbols'
-
-        for suite in self.suites:
-            name = suite['suite']
-
-            self.addStep(ShellCommand(
-                name='configure device',
-                workdir='.',
-                description="Configure Device",
-                command=['python', '/builds/sut_tools/config.py',
-                         WithProperties("%(sut_ip)s"),
-                         name,
-                         ],
-                haltOnFailure=True)
-            )
-            if name.startswith('mochitest'):
-                self.addStep(UnpackTest(
-                             filename=WithProperties('../%(tests_filename)s'),
-                             testtype='mochitest',
-                             workdir='build/tests',
-                             haltOnFailure=True,
-                             ))
-                variant = name.split('-', 1)[1]
-                if 'browser-chrome' in name:
-                    stepProc = unittest_steps.RemoteMochitestBrowserChromeStep
-                else:
-                    stepProc = unittest_steps.RemoteMochitestStep
-                if suite.get('testPath', None):
-                    tp = suite.get('testPath', [])
-                    self.addStep(stepProc(
-                                 variant=variant,
-                                 symbols_path=symbols_path,
-                                 testPath=tp,
-                                 workdir='build/tests',
-                                 timeout=2400,
-                                 env=self.env,
-                                 log_eval_func=lambda c, s: regex_log_evaluator(c, s,
-                                                                                global_errors + tegra_errors),
-                                 ))
-
-                else:
-                    totalChunks = suite.get('totalChunks', None)
-                    thisChunk = suite.get('thisChunk', None)
-                    self.addStep(stepProc(
-                                 variant=variant,
-                                 symbols_path=symbols_path,
-                                 testManifest=suite.get('testManifest', None),
-                                 workdir='build/tests',
-                                 timeout=2400,
-                                 env=self.env,
-                                 totalChunks=totalChunks,
-                                 thisChunk=thisChunk,
-                                 log_eval_func=lambda c, s: regex_log_evaluator(c, s,
-                                                                                global_errors + tegra_errors),
-                                 ))
-            elif name.startswith('xpcshell'):
-                totalChunks = suite.get('totalChunks', None)
-                thisChunk = suite.get('thisChunk', None)
-                extra_args = suite.get('extra_args', None)
-                # Unpack the tests
-                self.addStep(UnpackTest(
-                             filename=WithProperties('../%(tests_filename)s'),
-                             testtype='xpcshell',
-                             workdir='build/tests',
-                             haltOnFailure=True,
-                             ))
-                self.addStep(unittest_steps.RemoteXPCShellStep(
-                             suite=name,
-                             symbols_path=symbols_path,
-                             totalChunks=totalChunks,
-                             thisChunk=thisChunk,
-                             extra_args=extra_args,
-                             workdir='build/tests',
-                             timeout=2400,
-                             env=self.env,
-                             log_eval_func=lambda c, s: regex_log_evaluator(
-                             c, s,
-                             global_errors + tegra_errors),
-                             ))
-            elif name.startswith('reftest') or name == 'crashtest':
-                totalChunks = suite.get('totalChunks', None)
-                thisChunk = suite.get('thisChunk', None)
-                extra_args = suite.get('extra_args', None)
-                # Unpack the tests
-                self.addStep(UnpackTest(
-                             filename=WithProperties('../%(tests_filename)s'),
-                             testtype='reftest',
-                             workdir='build/tests',
-                             haltOnFailure=True,
-                             ))
-                self.addStep(unittest_steps.RemoteReftestStep(
-                             suite=name,
-                             symbols_path=symbols_path,
-                             totalChunks=totalChunks,
-                             thisChunk=thisChunk,
-                             extra_args=extra_args,
-                             workdir='build/tests',
-                             timeout=2400,
-                             env=self.env,
-                             cmdOptions=self.remoteExtras.get('cmdOptions'),
-                             log_eval_func=lambda c, s: regex_log_evaluator(
-                             c, s,
-                             global_errors + tegra_errors),
-                             ))
-            elif name == 'jsreftest':
-                totalChunks = suite.get('totalChunks', None)
-                thisChunk = suite.get('thisChunk', None)
-                self.addStep(UnpackTest(
-                             filename=WithProperties('../%(tests_filename)s'),
-                             testtype='jsreftest',
-                             workdir='build/tests',
-                             haltOnFailure=True,
-                             ))
-                self.addStep(unittest_steps.RemoteReftestStep(
-                             suite=name,
-                             symbols_path=symbols_path,
-                             totalChunks=totalChunks,
-                             thisChunk=thisChunk,
-                             workdir='build/tests',
-                             timeout=2400,
-                             env=self.env,
-                             cmdOptions=self.remoteExtras.get('cmdOptions'),
-                             log_eval_func=lambda c, s: regex_log_evaluator(
-                             c, s,
-                             global_errors + tegra_errors),
-                             ))
-
-    def addTearDownSteps(self):
-        self.addCleanupSteps()
-        self.addStep(ShellCommand(
-            name='reboot device',
-            workdir='.',
-            alwaysRun=True,
-            warnOnFailure=False,
-            flunkOnFailure=False,
-            timeout=60 * 30,
-            description='Reboot Device',
-            command=['python', '-u', '/builds/sut_tools/reboot.py',
-                    WithProperties("%(sut_ip)s"),
-                     ],
-            log_eval_func=lambda c, s: SUCCESS,
-        ))
-
-
 class TalosFactory(RequestSortingBuildFactory):
     extName = 'addon.xpi'
     """Create working talos build factory"""
@@ -5392,8 +5099,6 @@ class TalosFactory(RequestSortingBuildFactory):
             self.talosBranch = talosBranch
 
         self.addInfoSteps()
-        if self.remoteTests:
-            self.addMobileCleanupSteps()
         self.addCleanupSteps()
         self.addDownloadBuildStep()
         self.addUnpackBuildSteps()
@@ -5443,16 +5148,6 @@ class TalosFactory(RequestSortingBuildFactory):
                          command=['bash', '-c', 'echo $SUT_IP'],
                          property='sut_ip'
                          ))
-
-    def addMobileCleanupSteps(self):
-        self.addStep(ShellCommand(
-                     name="verify_tegra_state",
-                     description="Running verify.py",
-                     command=['python', '-u', '/builds/sut_tools/verify.py'],
-                     workdir='build',
-                     haltOnFailure=True,
-                     log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
-                     ))
 
     def addCleanupSteps(self):
         self.addStep(ShellCommand(
@@ -5522,7 +5217,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          ))
 
     def addUnpackBuildSteps(self):
-        if self.OS.startswith('tegra_android') or self.OS.startswith('panda_android'):
+        if self.OS.startswith('panda_android'):
             self.addStep(UnpackFile(
                          filename=WithProperties("../%(filename)s"),
                          workdir="%s/%s" % (
@@ -5543,7 +5238,7 @@ class TalosFactory(RequestSortingBuildFactory):
                          name="Unpack build",
                          haltOnFailure=True,
                          ))
-        if self.OS.startswith('tegra_android') or self.OS.startswith('panda_android'):
+        if self.OS.startswith('panda_android'):
             self.addStep(SetBuildProperty(
                          property_name="exepath",
                          value="../%s/%s" % (
