@@ -5660,6 +5660,8 @@ class PartnerRepackFactory(ReleaseFactory):
         if self.enableSigning and self.signingServers:
             self.extraRepackArgs.append('--signed')
             self.addGetTokenSteps()
+        pr_env = self.env.copy()
+        pr_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
         self.addStep(RepackPartners(
             name='repack_partner_builds',
             command=[self.python, './partner-repacks.py',
@@ -5672,7 +5674,7 @@ class PartnerRepackFactory(ReleaseFactory):
                      WithProperties(
                          '%(toolsdir)s/release/common/unpack-diskimage.sh'),
                      ] + self.extraRepackArgs,
-            env=self.env,
+            env=pr_env,
             description=['repacking', 'partner', 'builds'],
             descriptionDone=['repacked', 'partner', 'builds'],
             workdir='%s/scripts' % self.partnersRepackDir,
