@@ -221,7 +221,7 @@ if __name__ == '__main__':
             msgdict = makeTryMessage(build, log_url)
 
     # Send it!
-    if msgdict != None:
+    if msgdict is not None:
         if options.to_author:
             options.to.append(msgdict['author'])
         msg = formatMessage(msgdict, options.from_, options.to)

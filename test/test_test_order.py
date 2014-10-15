@@ -297,9 +297,8 @@ class TestTestOrder(unittest.TestCase):
                     comments='really important', properties={'buildid': '20110214000001'}, when=6)
             self.dbc.addChangeToDatabase(c3)
             ss = SourceStamp(branch='b1', changes=[c3], revision='r1')
-            ss1 = ss.getAbsoluteSourceStamp('r1')
             ssid = self.dbc.get_sourcestampid(ss, t)
-            bsid = self.dbc.create_buildset(
+            self.dbc.create_buildset(
                 ssid, "rebuild", Properties(), ["b1"], t)
 
         d.addCallback(lambda ign: self.dbc.runInteractionNow(addRebuild))

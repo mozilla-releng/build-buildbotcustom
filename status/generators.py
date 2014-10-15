@@ -50,13 +50,13 @@ def getSensibleCommitTitle(titles):
         title = re.sub(r'\btry: .*', '', title)
 
         # Remove MQ cruft.
-        title = re.sub(r'^(imported patch|\[mq\]:) ', '', title);
+        title = re.sub(r'^(imported patch|\[mq\]:) ', '', title)
 
         # Remove review, feedback, etc. annotations.
         title = re.sub(r'\b(r|sr|f|a)[=\?].*', '', title)
 
         # Remove trailing punctuation and whitespace.
-        title = re.sub(r'[;,\-\. ]+$', '', title).strip();
+        title = re.sub(r'[;,\-\. ]+$', '', title).strip()
 
         if title:
             return title

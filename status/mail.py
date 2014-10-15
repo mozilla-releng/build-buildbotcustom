@@ -75,7 +75,7 @@ class ChangeNotifier(base.StatusReceiverMultiService):
             self.extraRecipients = []
 
         # you should either limit on branches or categories, not both
-        assert not (self.branches != None and self.categories != None)
+        assert not (self.branches is not None and self.categories is not None)
 
     def setServiceParent(self, parent):
         """
@@ -196,7 +196,7 @@ class ChangeNotifier(base.StatusReceiverMultiService):
             extra_recips.sort()
             m['CC'] = ", ".join(extra_recips)
         else:
-            [recipients.add(r) for r in self.extraRecipients[:]]
+            [recipients.add(r2) for r2 in self.extraRecipients[:]]
 
         rlist = list(recipients)
         rlist.sort()

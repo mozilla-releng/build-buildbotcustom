@@ -46,11 +46,11 @@ def summaryText(passCount, failCount, knownFailCount=None,
                 crashed=False, leaked=False):
     # Format the tests counts.
     if passCount < 0 or failCount < 0 or \
-            (knownFailCount != None and knownFailCount < 0):
+            (knownFailCount is not None and knownFailCount < 0):
         # Explicit failure case.
         summary = emphasizeFailureText("T-FAIL")
     elif passCount == 0 and failCount == 0 and \
-            (knownFailCount == None or knownFailCount == 0):
+            (knownFailCount is None or knownFailCount == 0):
         # Implicit failure case.
         summary = emphasizeFailureText("T-FAIL")
     else:
@@ -60,7 +60,7 @@ def summaryText(passCount, failCount, knownFailCount=None,
             failCountStr = emphasizeFailureText(failCountStr)
         # Format the counts.
         summary = "%d/%s" % (passCount, failCountStr)
-        if knownFailCount != None:
+        if knownFailCount is not None:
             summary += "/%d" % knownFailCount
 
     # Format the crash status.
@@ -68,7 +68,7 @@ def summaryText(passCount, failCount, knownFailCount=None,
         summary += "&nbsp;%s" % emphasizeFailureText("CRASH")
 
     # Format the leak status.
-    if leaked != False:
+    if leaked is not False:
         summary += "&nbsp;%s" % emphasizeFailureText(
             (leaked and "LEAK") or "L-FAIL")
 
@@ -619,6 +619,7 @@ class RemoteMochitestStep(MochitestMixin, ChunkingMixin, ShellCommandReportTimeo
             self.command.append(
                 WithProperties("--symbols-path=%s" % symbols_path))
         self.command.extend(self.getChunkOptions(totalChunks, thisChunk))
+
 
 class RemoteMochitestBrowserChromeStep(RemoteMochitestStep):
     def __init__(self, **kwargs):

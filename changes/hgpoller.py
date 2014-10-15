@@ -310,7 +310,7 @@ class BaseHgPoller(BasePoller):
                         c['desc'] = change['desc']
                         c['node'] = change['node']
 
-                    title = change['desc'].split('\n', 1)[0];
+                    title = change['desc'].split('\n', 1)[0]
                     if len(title) > 100:
                         trim_pos = title.rfind(' ', 0, 100)
                         if trim_pos == -1:

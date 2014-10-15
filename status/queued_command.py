@@ -21,7 +21,7 @@ class QueuedCommandHandler(base.StatusReceiverMultiService):
         self.builders = builders
 
         # you should either limit on builders or categories, not both
-        if self.builders != None and self.categories != None:
+        if self.builders is not None and self.categories is not None:
             twlog.err("Please specify only builders to ignore or categories to include")
             raise ValueError("Please specify only builders or categories")
 
@@ -40,7 +40,7 @@ class QueuedCommandHandler(base.StatusReceiverMultiService):
 
     def builderAdded(self, name, builder):
         # only subscribe to builders we are interested in
-        if self.categories != None and builder.category not in self.categories:
+        if self.categories is not None and builder.category not in self.categories:
             return None
 
         self.watched.append(builder)
