@@ -224,14 +224,6 @@ class TestTryParser(unittest.TestCase):
                                        valid=VALID_BUILDER_B2G_NAMES)
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
-    def test_AllPlatformsBoth(self):
-        tm = 'try: -b od -p all'
-        self.customBuilders = TryParser(
-            tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [b for b in BUILDER_PRETTY_NAMES.values(
-        ) if 'nondefault' not in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
     def test_FullPlatformsBoth(self):
         tm = 'try: -b od -p full'
         self.customBuilders = TryParser(
@@ -521,8 +513,8 @@ class TestTryParser(unittest.TestCase):
         tm = 'try: -b do -p win32 -u crashtest[5.1,Windows XP]'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [b for b in self.baselineBuilders
-                      if 'crashtest' in b
-                      and ('5.1' in b or 'Windows XP' in b)]
+                    if 'crashtest' in b
+                    and ('5.1' in b or 'Windows XP' in b)]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_HiddenCharactersAndOldSyntax(self):

@@ -28,30 +28,24 @@ def connect(url, drop_all=False, **kwargs):
     return Session
 
 file_changes = Table('file_changes', Base.metadata,
-                     Column(
-                     'file_id', Integer, ForeignKey('files.id'), nullable=False,
-                     index=True),
+                     Column('file_id', Integer, ForeignKey('files.id'),
+                            nullable=False, index=True),
                      Column('change_id', Integer, ForeignKey('changes.id'),
                             nullable=False, index=True),
                      )
 
 build_properties = Table('build_properties', Base.metadata,
-                         Column(
-                         'property_id', Integer, ForeignKey(
-                             'properties.id'),
-                         nullable=False, index=True),
+                         Column('property_id', Integer, ForeignKey('properties.id'),
+                                nullable=False, index=True),
                          Column('build_id', Integer, ForeignKey('builds.id'),
                                 nullable=False, index=True),
                          )
 
 request_properties = Table('request_properties', Base.metadata,
-                           Column(
-                           'property_id', Integer, ForeignKey(
-                               'properties.id'),
-                           nullable=False, index=True),
-                           Column(
-                           'request_id', Integer, ForeignKey('requests.id'),
-                           nullable=False, index=True),
+                           Column('property_id', Integer, ForeignKey('properties.id'),
+                                  nullable=False, index=True),
+                           Column('request_id', Integer, ForeignKey('requests.id'),
+                                  nullable=False, index=True),
                            )
 
 # TODO: track ordering?
@@ -140,7 +134,9 @@ class Property(Base):
         names = [unicode(p[0]) for p in props.asList()]
         values = [p[1] for p in props.asList()]
         sources = [unicode(p[2]) for p in props.asList()]
-        all = session.query(cls).filter(cls.name.in_(names)).filter(sqlalchemy.or_(cls.value.in_(values), cls.value == None)).filter(cls.source.in_(sources)).all()
+        all = (session.query(cls).filter(cls.name.in_(names))
+                                 .filter(sqlalchemy.or_(cls.value.in_(values), cls.value is None))
+                                 .filter(cls.source.in_(sources)).all())
 
         retval = []
         for prop in all:
@@ -264,9 +260,9 @@ class Builder(Base):
             session.add(b)
         return b
 
-Builder.slaves = relation(BuilderSlave, primaryjoin=
-                          and_(BuilderSlave.builder_id == Builder.id,
-                               BuilderSlave.removed == None))
+Builder.slaves = relation(BuilderSlave,
+                          primaryjoin=and_(BuilderSlave.builder_id == Builder.id,
+                                           BuilderSlave.removed is None))
 
 
 class Change(Base):

@@ -108,7 +108,6 @@ class TestNextAWSSlave(unittest.TestCase):
             self.assertEquals("slave-spot-001",
                               f(self.builder, spot + ondemand).slave.slavename)
 
-
     def test_nextAWSSlave_AWS_wait(self):
         """Test that we'll wait up to aws_wait for inhouse instances to become
         available"""
@@ -175,7 +174,7 @@ class TestGetPending(unittest.TestCase):
         os.makedirs(self.basedir)
         spec = dbspec.DBSpec.from_url("sqlite:///state.sqlite", self.basedir)
         # For testing against mysql, uncomment this
-        #spec = dbspec.DBSpec.from_url("mysql://buildbot@localhost/buildbot_schedulers", self.basedir)
+        # spec = dbspec.DBSpec.from_url("mysql://buildbot@localhost/buildbot_schedulers", self.basedir)
         manager = DBSchemaManager(spec, self.basedir)
         manager.upgrade()
 

@@ -1,6 +1,7 @@
 import re
 
-from buildbot.status.builder import EXCEPTION, FAILURE, RETRY, WARNINGS
+from buildbot.status.builder import FAILURE, RETRY, WARNINGS
+
 
 def re_compile(s):
     return re.compile(s)

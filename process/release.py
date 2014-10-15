@@ -68,12 +68,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mozharness_repo_path = releaseConfig.get('mozharness_repo_path',
                                              branchConfig['mozharness_repo_path'])
     mozharness_repo = '%s%s' % (branchConfig['hgurl'], mozharness_repo_path)
-    clobberer_url = releaseConfig.get(
-        'base_clobber_url', branchConfig['base_clobber_url'])
-    balrog_api_root=releaseConfig.get('balrog_api_root',
-        branchConfig.get('balrog_api_root', None))
-    balrog_username=releaseConfig.get('balrog_username',
-        branchConfig.get('balrog_username', None))
+    clobberer_url = releaseConfig.get('base_clobber_url',
+                                      branchConfig['base_clobber_url'])
+    balrog_api_root = releaseConfig.get('balrog_api_root',
+                                        branchConfig.get('balrog_api_root', None))
+    balrog_username = releaseConfig.get('balrog_username',
+                                        branchConfig.get('balrog_username', None))
 
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
@@ -319,7 +319,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     post_deliverables_builders = []
     post_antivirus_builders = []
     email_message_id = getMessageId()
-    ##### Builders
+
+    # Builders #
+
     builder_env = {
         'BUILDBOT_CONFIGS': '%s%s' % (branchConfig['hgurl'],
                                       branchConfig['config_repo_path']),
@@ -617,7 +619,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
                 'multilocale_config', {}).get('multilocaleOptions')
-            balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
+            balrog_credentials_file = releaseConfig.get('balrog_credentials_file',
                 branchConfig.get('balrog_credentials_file', None))
             # Turn pymake on by default for Windows, and off by default for
             # other platforms.
@@ -752,7 +754,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     extra_args.append('--use-pymake')
                 if pf.get('tooltool_l10n_manifest_src'):
                     extra_args.extend(['--tooltool-manifest',
-                        pf.get('tooltool_l10n_manifest_src')])
+                                      pf.get('tooltool_l10n_manifest_src')])
                 if pf.get('tooltool_script'):
                     for script in pf['tooltool_script']:
                         extra_args.extend(['--tooltool-script', script])
@@ -778,7 +780,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     use_credentials_file=True,
                     copy_properties=['buildid'],
                 )
-                # TODO: how to make this work with balrog, where we need 4 properties set (but webstatus only allows for 3). can we avoid the need for script_repo_revision or release_tag?
+                # TODO: how to make this work with balrog, where we need 4 properties
+                # set (but webstatus only allows for 3).
+                # Can we avoid the need for script_repo_revision or release_tag?
                 builders.append({
                     'name': builderPrefix("standalone_repack", platform),
                     'slavenames': pf.get('l10n_slaves', pf['slaves']),
@@ -800,8 +804,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 })
 
             for n, builderName in l10nBuilders(platform).iteritems():
-                builddir = builderPrefix('%s_repack' % platform) + \
-                           '_' + str(n)
+                builddir = builderPrefix('%s_repack' % platform) + '_' + str(n)
                 properties = {
                     'builddir': builddir,
                     'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
@@ -886,8 +889,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 slaves=all_slaves,
                 category=builderPrefix(''),
                 properties={
-                'platform': platform,
-                'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'platform': platform,
+                    'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
             ))
             updates_upstream_builders.append(
@@ -1140,7 +1143,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'sourceRepositories']['mozilla']['path']
         except KeyError:
             moz_repo_path = sourceRepoInfo['path']
-        balrog_credentials_file=releaseConfig.get('balrog_credentials_file',
+        balrog_credentials_file = releaseConfig.get('balrog_credentials_file',
             branchConfig.get('balrog_credentials_file', None))
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
@@ -1354,8 +1357,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             script_timeout=3 * 60 * 60,
             scriptName='scripts/release/stage-tasks.sh',
             extra_args=['antivirus',
-                       '--ssh-user', branchConfig['stage_username'],
-                       '--ssh-key', branchConfig['stage_ssh_key'],
+                        '--ssh-user', branchConfig['stage_username'],
+                        '--ssh-key', branchConfig['stage_ssh_key'],
                         ],
         )
 
@@ -1625,7 +1628,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             }
         })
 
-    ##### Change sources and Schedulers
+    # Change sources and Schedulers #
 
     reset_schedulers_scheduler = Scheduler(
         name=builderPrefix(
@@ -1778,8 +1781,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             post_antivirus_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
 
     if releaseConfig.get('enableAutomaticPushToMirrors') and \
-        hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
-            post_deliverables_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
+            hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
+        post_deliverables_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
 
     if not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         schedulers.append(AggregatingScheduler(
@@ -1833,7 +1836,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             schedulers.append(AggregatingScheduler(
                 name=builderPrefix(
                     '%s_l10n_done' % releaseConfig['productName'],
-                platform),
+                    platform),
                 branch=sourceRepoInfo['path'],
                 upstreamBuilders=[builderPrefix('repack_complete', platform)],
                 builderNames=[builderPrefix('partner_repack', platform)],
@@ -1913,8 +1916,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 relayhost="mail.build.mozilla.org",
                 sendToInterestedUsers=False,
                 extraRecipients=[recipient],
-                extraHeaders={'In-Reply-To':
-                         email_message_id, 'References': email_message_id},
+                extraHeaders={'In-Reply-To': email_message_id,
+                              'References': email_message_id},
                 branches=[builderPrefix('android_post_signing')],
                 messageFormatter=createReleaseChangeMessage,
                 changeIsImportant=lambda c:
@@ -1927,7 +1930,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         sendToInterestedUsers=False,
         extraRecipients=releaseConfig['ImportantRecipients'],
         extraHeaders={'In-Reply-To': email_message_id,
-                 'References': email_message_id},
+                      'References': email_message_id},
         mode='passing',
         builders=important_builders,
         relayhost='mail.build.mozilla.org',
@@ -1940,7 +1943,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         sendToInterestedUsers=False,
         extraRecipients=releaseConfig['AllRecipients'],
         extraHeaders={'In-Reply-To': email_message_id,
-                 'References': email_message_id},
+                      'References': email_message_id},
         mode='all',
         builders=[b['name'] for b in builders + test_builders],
         relayhost='mail.build.mozilla.org',
@@ -1952,8 +1955,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             fromaddr='release@mozilla.com',
             sendToInterestedUsers=False,
             extraRecipients=releaseConfig['AVVendorsRecipients'],
-            extraHeaders={'In-Reply-To':
-                     email_message_id, 'References': email_message_id},
+            extraHeaders={'In-Reply-To': email_message_id,
+                          'References': email_message_id},
             mode='passing',
             builders=[builderPrefix('updates')],
             relayhost='mail.build.mozilla.org',
@@ -1981,4 +1984,3 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         "change_source": change_source,
         "schedulers": schedulers,
     }
-

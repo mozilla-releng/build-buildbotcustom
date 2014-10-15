@@ -93,7 +93,7 @@ class L10nMixin(object):
             self.localesURL = localesURL
         else:
             # Make sure that branch is not none when using this path
-            assert branch != None
+            assert branch is not None
             # revision will be expanded later
             self.localesURL = "%s%s/raw-file/%%(revision)s/%s" % \
                 (repo, branch, localesFile)

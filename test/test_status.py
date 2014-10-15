@@ -20,6 +20,7 @@ SENSIBLE_TITLE_TESTCASES = [
     ['Bug 1', [' Bug 1;,.- ']],
 ]
 
+
 class TestGenerator(unittest.TestCase):
     def testGetSensibleCommitTitle(self):
         for case in SENSIBLE_TITLE_TESTCASES:
