@@ -48,7 +48,7 @@ reload(mozilla_buildtools.queuedir)
 from buildbotcustom.common import normalizeName
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
-    NightlyRepackFactory, UnittestPackagedBuildFactory, TalosFactory, \
+    NightlyRepackFactory, UnittestPackagedBuildFactory, \
     TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
 from buildbotcustom.scheduler import BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
@@ -2465,7 +2465,7 @@ def generateBranchObjects(config, name, secrets=None):
 
 
 def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-                               ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
+                               ACTIVE_UNITTEST_PLATFORMS):
     branchObjects = {'schedulers': [], 'builders': [], 'status': [],
                      'change_source': []}
     # prettyNames is a mapping to pass to the try_parser for validation
@@ -2628,7 +2628,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         properties['script_repo_revision'] = branch_config['mozharness_tag']
                         properties['repo_path'] = branch_config['repo_path']
                     else:
-                        factory = factory_class(**factory_kwargs)
+                        assert False
 
                     builder = {
                         'name': "%s %s talos %s" % (platform_name, branch, suite),
@@ -2663,10 +2663,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             pgo_factory = generateMozharnessTalosBuilder(**args)
                             properties['script_repo_revision'] = branch_config['mozharness_tag']
                         else:
-                            pgo_factory_kwargs = factory_kwargs.copy()
-                            pgo_factory_kwargs['branchName'] = branchName
-                            pgo_factory_kwargs['talosBranch'] = talosBranch
-                            pgo_factory = factory_class(**pgo_factory_kwargs)
+                            assert False
 
                         pgo_builder = {
                             'name': "%s %s pgo talos %s" % (platform_name, branch, suite),
@@ -2925,14 +2922,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
-                                                           branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
+                                                           branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS)
         for k, v in releaseObjects.items():
             branchObjects[k].extend(v)
     return branchObjects
 
 
 def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-                                      ACTIVE_UNITTEST_PLATFORMS, factory_class=TalosFactory):
+                                      ACTIVE_UNITTEST_PLATFORMS):
     branch_config = branch_config.copy()
     release_tests = branch_config['release_tests']
 
@@ -2955,7 +2952,7 @@ def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     # Don't fetch symbols
     branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
     return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-                                      ACTIVE_UNITTEST_PLATFORMS, factory_class)
+                                      ACTIVE_UNITTEST_PLATFORMS)
 
 
 def mirrorAndBundleArgs(config):
