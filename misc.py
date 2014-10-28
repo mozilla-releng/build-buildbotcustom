@@ -1299,19 +1299,6 @@ def generateBranchObjects(config, name, secrets=None):
                                                              '/'.join([packageUrl, packageDir])),
         ))
 
-    if config['enable_l10n']:
-        l10n_builders = []
-        for b in l10nBuilders:
-            if config['enable_l10n_onchange']:
-                l10n_builders.append(l10nBuilders[b]['l10n_builder'])
-            l10n_builders.append(
-                l10nNightlyBuilders['%s nightly' % b]['l10n_builder'])
-        l10n_binaryURL = config['enUS_binaryURL']
-        if l10n_binaryURL.endswith('/'):
-            l10n_binaryURL = l10n_binaryURL[:-1]
-        l10n_binaryURL += "-l10n"
-        nomergeBuilders.update(l10n_builders)
-
     tipsOnly = False
     maxChanges = 100
     if config.get('enable_try', False):
@@ -1388,6 +1375,7 @@ def generateBranchObjects(config, name, secrets=None):
         l10n_builders = []
         for b in l10nBuilders:
             l10n_builders.append(l10nBuilders[b]['l10n_builder'])
+        nomergeBuilders.update(l10n_builders)
         # This L10n scheduler triggers only the builders of its own branch
         branchObjects['schedulers'].append(Scheduler(
             name="%s l10n" % name,
@@ -1453,6 +1441,7 @@ def generateBranchObjects(config, name, secrets=None):
         if config['enable_l10n'] and \
                 config['enable_nightly'] and builder in l10nNightlyBuilders:
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
+            nomergeBuilders.add(l10n_builder)
             platform = l10nNightlyBuilders[builder]['platform']
             branchObjects['schedulers'].append(TriggerableL10n(
                                                name=l10n_builder,
