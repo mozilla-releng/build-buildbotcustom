@@ -816,7 +816,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'event_group': 'repack',
                 }
                 if hasPlatformSubstring(platform, 'android'):
-                    extra_args = releaseConfig['single_locale_options'][platform] + ['--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
+                    extra_args = releaseConfig['single_locale_options'][platform] + ['--cfg', branchConfig['mozharness_configs']['balrog'], '--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
                     repack_factory = SigningScriptFactory(
                         signingServers=getSigningServers(platform),
                         scriptRepo=mozharness_repo,
@@ -1199,16 +1199,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         )
 
         builders.append({
-            'name': builderPrefix('updates'),
+            'name': builderPrefix('updates_%s' % releaseConfig['productName']),
             'slavenames': branchConfig['platforms']['linux']['slaves'],
             'category': builderPrefix(''),
-            'builddir': builderPrefix('updates'),
-            'slavebuilddir': normalizeName(builderPrefix('updates'), releaseConfig['productName']),
+            'builddir': builderPrefix('updates_%s' % releaseConfig['productName']),
+            'slavebuilddir': normalizeName(builderPrefix('updates_%s' % releaseConfig['productName']), releaseConfig['productName']),
             'factory': updates_factory,
             'nextSlave': _nextSlave_skip_spot,
             'env': builder_env,
             'properties': {
-                'slavebuilddir': normalizeName(builderPrefix('updates'), releaseConfig['productName']),
+                'slavebuilddir': normalizeName(builderPrefix('updates_%s' % releaseConfig['productName']), releaseConfig['productName']),
                 'platform': platform,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'release_config': releaseConfigFile,
@@ -1216,15 +1216,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'event_group': 'update',
             }
         })
-        post_signing_builders.append(builderPrefix('updates'))
+        post_signing_builders.append(builderPrefix('updates_%s' % releaseConfig['productName']))
 
         # Releases that aren't automatically pushed to mirrors have their
         # updates tested on an internal channel first. For these, we need to
         # send out mail to let people know that it's ready to test.
         if not releaseConfig.get('enableAutomaticPushToMirrors'):
-            important_builders.append(builderPrefix('updates'))
+            important_builders.append(builderPrefix('updates_%s' % releaseConfig['productName']))
         if not releaseConfig.get('enablePartialMarsAtBuildTime', True):
-            deliverables_builders.append(builderPrefix('updates'))
+            deliverables_builders.append(builderPrefix('updates_%s' % releaseConfig['productName']))
 
         update_shipping_factory_args = dict(
             scriptRepo=tools_repo,
@@ -1261,9 +1261,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         })
         important_builders.append(builderPrefix('update_shipping'))
 
-    elif releaseConfig.get('verifyConfigs'):
+    elif releaseConfig.get('verifyConfigs') or \
+        hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         builders.append(makeDummyBuilder(
-            name=builderPrefix('updates'),
+            name=builderPrefix('updates_%s' % releaseConfig['productName']),
             slaves=all_slaves,
             category=builderPrefix(''),
             properties={
@@ -1272,7 +1273,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'event_group': 'update',
             },
         ))
-        post_signing_builders.append(builderPrefix('updates'))
+        post_signing_builders.append(builderPrefix('updates_%s' % releaseConfig['productName']))
 
     for platform in sorted(releaseConfig.get('verifyConfigs', {}).keys()):
         vpf = branchConfig['platforms'][platform]
@@ -1784,19 +1785,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         post_deliverables_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
 
-    if not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
-        schedulers.append(AggregatingScheduler(
-            name=builderPrefix(
-                '%s_signing_done' % releaseConfig['productName']),
-            branch=sourceRepoInfo['path'],
-            upstreamBuilders=updates_upstream_builders,
-            builderNames=post_signing_builders,
-        ))
+    schedulers.append(AggregatingScheduler(
+        name=builderPrefix(
+            '%s_signing_done' % releaseConfig['productName']),
+        branch=sourceRepoInfo['path'],
+        upstreamBuilders=updates_upstream_builders,
+        builderNames=post_signing_builders,
+    ))
     if releaseConfig.get('verifyConfigs'):
         schedulers.append(AggregatingScheduler(
             name=builderPrefix('updates_done'),
             branch=sourceRepoInfo['path'],
-            upstreamBuilders=[builderPrefix('updates')],
+            upstreamBuilders=[builderPrefix('updates_%s' % releaseConfig['productName'])],
             builderNames=post_update_builders,
         ))
     if post_deliverables_builders:
@@ -1843,7 +1843,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ))
     upstream_builders = [builderPrefix('%s_push_to_mirrors' % releaseConfig['productName'])]
     if releaseConfig.get('verifyConfigs'):
-        upstream_builders.append(builderPrefix('updates'))
+        upstream_builders.append(builderPrefix('updates_%s' % releaseConfig['productName']))
     if not releaseConfig.get('disableBouncerEntries'):
         schedulers.append(AggregatingScheduler(
             name=builderPrefix(
@@ -1958,7 +1958,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             extraHeaders={'In-Reply-To': email_message_id,
                           'References': email_message_id},
             mode='passing',
-            builders=[builderPrefix('updates')],
+            builders=[builderPrefix('updates_%s' % releaseConfig['productName'])],
             relayhost='mail.build.mozilla.org',
             messageFormatter=createReleaseAVVendorsMessage,
         ))
