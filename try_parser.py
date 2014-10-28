@@ -42,6 +42,10 @@ def testSuiteMatches(v, u):
         return v.startswith("web-platform-tests")
     elif u == 'e10s':
         return 'e10s' in v
+    elif u == 'gaia-js-integration':
+        return 'gaia-js-integration' in v
+    elif u == 'gaia-ui-test':
+        return 'gaia-ui-test' in v
     elif u == 'all':
         return True
     else:

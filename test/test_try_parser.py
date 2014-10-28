@@ -30,6 +30,7 @@ TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
                                  'Rev3 WINNT 6.1'],
                        'linux64': ['Rev3 Fedora 12x64'],
                        'linux': ['Rev3 Fedora 12'],
+                       'linux64_gecko': ['b2g_ubuntu64_vm'],
                        }
 TESTER_PRETTY_TB_NAMES = {'linux': ['TB Rev3 Fedora 12']}
 UNITTEST_PRETTY_NAMES = {'win32-debug': 'WINNT 5.2 try debug test'}
@@ -43,7 +44,11 @@ UNITTEST_SUITES = ['reftest',
                    'mochitest-1',
                    'mochitest-3',
                    'mochitest-browser-chrome',
-                   'mochitest-other']
+                   'mochitest-other',
+                   'gaia-js-integration-1',
+                   'gaia-js-integration-2',
+                   'gaia-ui-test-accessibility',
+                   'gaia-ui-test-unit']
 UNITTEST_SUITES_TB = ['xpcshell', 'mozmill']
 MOBILE_UNITTEST_SUITES = ['reftest-1', 'reftest-3'] + UNITTEST_SUITES[1:]
 
@@ -79,7 +84,11 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 5.1 try talos chrome',
                       'Rev3 WINNT 6.1 try talos tp4',
                       'Rev3 WINNT 5.1 try talos tp4',
-                      'Rev3 WINNT 6.1 try talos chrome']
+                      'Rev3 WINNT 6.1 try talos chrome',
+                      'b2g_ubuntu64_vm try opt test gaia-js-integration-1',
+                      'b2g_ubuntu64_vm try opt test gaia-js-integration-2',
+                      'b2g_ubuntu64_vm try opt test gaia-ui-test-unit',
+                      'b2g_ubuntu64_vm try opt test gaia-ui-test-accessibility']
 VALID_TESTER_TB_NAMES = ['TB Rev3 Fedora 12 try-comm-central opt test mozmill',
                          'TB Rev3 Fedora 12 try-comm-central opt test xpcshell']
 VALID_BUILDER_B2G_NAMES = ['b2g_try_emulator-debug build',
@@ -322,6 +331,18 @@ class TestTryParser(unittest.TestCase):
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
         builders = [BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
         builders += [t for t in VALID_UPN if 'mochitest-other' in t]
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_GijAliasOnTestMaster(self):
+        tm = 'try: -b od -p all -u gaia-js-integration'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [t for t in VALID_TESTER_NAMES if 'gaia-js-integration' in t]
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_GipAliasOnTestMaster(self):
+        tm = 'try: -b od -p all -u gaia-ui-test'
+        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [t for t in VALID_TESTER_NAMES if 'gaia-ui-test' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_MochitestAliasesOnTestMaster(self):
