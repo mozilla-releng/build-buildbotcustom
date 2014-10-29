@@ -5240,7 +5240,7 @@ def extractJSONProperties(rv, stdout, stderr):
         return props
 
 
-class ScriptFactory(RequestSortingBuildFactory):
+class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
 
     def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
                  extra_data=None, extra_args=None, use_credentials_file=False,
@@ -5249,7 +5249,11 @@ class ScriptFactory(RequestSortingBuildFactory):
                  use_mock=False, mock_target=None,
                  mock_packages=None, mock_copyin_files=None,
                  triggered_schedulers=None, env={}, copy_properties=None,
-                 properties_file='buildprops.json'):
+                 properties_file='buildprops.json',
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=None,
+                 tooltool_script=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -5265,6 +5269,13 @@ class ScriptFactory(RequestSortingBuildFactory):
         self.env = env.copy()
         self.use_credentials_file = use_credentials_file
         self.copy_properties = copy_properties or []
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list or []
+        self.tooltool_script = tooltool_script or ['/tools/tooltool.py']
+        self.tooltool_bootstrap = tooltool_bootstrap
+
+        assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
+
         if platform and 'win' in platform:
             self.get_basedir_cmd = ['cd']
         if scriptName[0] == '/':
@@ -5355,6 +5366,8 @@ class ScriptFactory(RequestSortingBuildFactory):
                 'TinderboxPrint: %s_revlink: %s/rev/%%(script_repo_revision)s' %
                 (scriptRepo.split('/')[-1], scriptRepo)),
         ))
+        if self.tooltool_manifest_src:
+            self.addTooltoolStep()
         self.runScript()
         self.addCleanupSteps()
         self.reboot()
