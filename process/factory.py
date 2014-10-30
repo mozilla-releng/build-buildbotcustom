@@ -5367,6 +5367,12 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 (scriptRepo.split('/')[-1], scriptRepo)),
         ))
         if self.tooltool_manifest_src:
+            self.addStep(SetProperty(
+                name='set_toolsdir',
+                command=['bash', '-c', 'pwd'],
+                property='toolsdir',
+                workdir='scripts',
+            ))
             self.addTooltoolStep()
         self.runScript()
         self.addCleanupSteps()
