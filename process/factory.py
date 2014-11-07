@@ -825,6 +825,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  compareLocalesTag='RELEASE_AUTOMATION',
                  mozharnessRepoPath=None,
                  mozharnessTag='default',
+                 mozharness_repo_cache=None,
+                 tools_repo_cache=None,
                  multiLocaleScript=None,
                  multiLocaleConfig=None,
                  mozharnessMultiOptions=None,
@@ -926,6 +928,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.multiLocaleScript = multiLocaleScript
         self.multiLocaleConfig = multiLocaleConfig
         self.multiLocaleMerge = multiLocaleMerge
+        self.tools_repo_cache = tools_repo_cache
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1049,6 +1052,13 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             assert mozharnessRepoPath and mozharnessTag
             self.mozharnessRepoPath = mozharnessRepoPath
             self.mozharnessTag = mozharnessTag
+            self.mozharness_repo_cache = mozharness_repo_cache
+
+            self.mozharness_path = 'mozharness'  # relative to our work dir
+            if self.mozharness_repo_cache:
+                # in this case, we need to give it an absolute path as it
+                # won't be in our work dir
+                self.mozharness_path = self.mozharness_repo_cache
             self.addMozharnessRepoSteps()
         if multiLocale:
             assert compareLocalesRepoPath and compareLocalesTag
@@ -1104,30 +1114,55 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addPeriodicRebootSteps()
 
     def addMozharnessRepoSteps(self):
-        self.addStep(ShellCommand(
-            name='rm_mozharness',
-            command=['rm', '-rf', 'mozharness'],
-            description=['removing', 'mozharness'],
-            descriptionDone=['remove', 'mozharness'],
-            haltOnFailure=True,
-            workdir='.',
-        ))
-        self.addStep(MercurialCloneCommand(
-            name='hg_clone_mozharness',
-            command=['hg', 'clone', self.getRepository(
-                self.mozharnessRepoPath), 'mozharness'],
-            description=['checking', 'out', 'mozharness'],
-            descriptionDone=['checkout', 'mozharness'],
-            haltOnFailure=True,
-            workdir='.',
-        ))
-        self.addStep(ShellCommand(
-            name='hg_update_mozharness',
-            command=['hg', 'update', '-r', self.mozharnessTag],
-            description=['updating', 'mozharness', 'to', self.mozharnessTag],
-            workdir='mozharness',
-            haltOnFailure=True
-        ))
+        if self.mozharness_repo_cache:
+            # all slaves bar win tests have a copy of hgtool in their path.
+            # However let's use runner's checkout version like we do with
+            # script_repo_cache as we want these cache repos to be the
+            # canonical truth as we roll out runner
+            assert self.tools_repo_cache
+            hgtool_path = os.path.join(self.tools_repo_cache,
+                                       'buildfarm',
+                                       'utils',
+                                       'hgtool.py')
+            hgtool_cmd = [
+                'python', hgtool_path, '--purge',
+                '-r', WithProperties('%(script_repo_revision:-default)s'),
+                self.getRepository(self.mozharnessRepoPath),
+                self.mozharness_repo_cache
+            ]
+            self.addStep(ShellCommand(
+                name="update_mozharness_repo_cache",
+                command=hgtool_cmd,
+                env=self.env,
+                haltOnFailure=True,
+                workdir=os.path.dirname(self.mozharness_repo_cache),
+            ))
+        else:
+            # fall back to legacy local mozharness full clobber/clone
+            self.addStep(ShellCommand(
+                name='rm_mozharness',
+                command=['rm', '-rf', 'mozharness'],
+                description=['removing', 'mozharness'],
+                descriptionDone=['remove', 'mozharness'],
+                haltOnFailure=True,
+                workdir='.',
+            ))
+            self.addStep(MercurialCloneCommand(
+                name='hg_clone_mozharness',
+                command=['hg', 'clone', self.getRepository(
+                    self.mozharnessRepoPath), 'mozharness'],
+                description=['checking', 'out', 'mozharness'],
+                descriptionDone=['checkout', 'mozharness'],
+                haltOnFailure=True,
+                workdir='.',
+            ))
+            self.addStep(ShellCommand(
+                name='hg_update_mozharness',
+                command=['hg', 'update', '-r', self.mozharnessTag],
+                description=['updating', 'mozharness', 'to', self.mozharnessTag],
+                workdir='mozharness',
+                haltOnFailure=True
+            ))
 
     def addMultiLocaleRepoSteps(self):
         name = self.compareLocalesRepoPath.rstrip('/').split('/')[-1]
@@ -1248,7 +1283,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         if self.gaiaLanguagesFile:
             languagesFile = '%(basedir)s/build/gaia/' + \
                 self.gaiaLanguagesFile
-            cmd = ['python', 'mozharness/%s' % self.gaiaLanguagesScript,
+            cmd = ['python', '%s/%s' % (self.mozharness_path,
+                                        self.gaiaLanguagesScript),
                    '--pull',
                    '--gaia-languages-file', WithProperties(languagesFile),
                    '--gaia-l10n-root', self.gaiaL10nRoot,
@@ -1716,7 +1752,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
     def addUploadSteps(self):
         if self.multiLocale:
             self.doUpload(postUploadBuildDir='en-US')
-            cmd = ['python', 'mozharness/%s' % self.multiLocaleScript,
+            cmd = ['python', '%s/%s' % (self.mozharness_path, self.multiLocaleScript),
                    '--config-file', self.multiLocaleConfig]
             if self.multiLocaleMerge:
                 cmd.append('--merge-locales')
@@ -5249,10 +5285,9 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                  use_mock=False, mock_target=None,
                  mock_packages=None, mock_copyin_files=None,
                  triggered_schedulers=None, env={}, copy_properties=None,
-                 properties_file='buildprops.json',
-                 tooltool_manifest_src=None,
-                 tooltool_bootstrap="setup.sh",
-                 tooltool_url_list=None,
+                 properties_file='buildprops.json', script_repo_cache=None,
+                 tools_repo_cache=None, tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh", tooltool_url_list=None,
                  tooltool_script=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
@@ -5269,6 +5304,8 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
         self.env = env.copy()
         self.use_credentials_file = use_credentials_file
         self.copy_properties = copy_properties or []
+        self.script_repo_cache = script_repo_cache
+        self.tools_repo_cache = tools_repo_cache
         self.tooltool_manifest_src = tooltool_manifest_src
         self.tooltool_url_list = tooltool_url_list or []
         self.tooltool_script = tooltool_script or ['/tools/tooltool.py']
@@ -5278,20 +5315,6 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
 
         if platform and 'win' in platform:
             self.get_basedir_cmd = ['cd']
-        if scriptName[0] == '/':
-            script_path = scriptName
-        else:
-            script_path = 'scripts/%s' % scriptName
-        if interpreter:
-            if isinstance(interpreter, (tuple, list)):
-                self.cmd = list(interpreter) + [script_path]
-            else:
-                self.cmd = [interpreter, script_path]
-        else:
-            self.cmd = [script_path]
-
-        if extra_args:
-            self.cmd.extend(extra_args)
 
         self.addStep(SetBuildProperty(
             property_name='master',
@@ -5324,35 +5347,92 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             command=['rm', '-rf', 'properties'],
             workdir=".",
         ))
-        self.addStep(ShellCommand(
-            name="clobber_scripts",
-            command=['rm', '-rf', 'scripts'],
-            workdir=".",
-            haltOnFailure=True,
-            log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
-        ))
-        self.addStep(MercurialCloneCommand(
-            name="clone_scripts",
-            command=[hg_bin, 'clone', scriptRepo, 'scripts'],
-            workdir=".",
-            haltOnFailure=True,
-            retry=False,
-            log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
-        ))
-        self.addStep(ShellCommand(
-            name="update_scripts",
-            command=[hg_bin, 'update', '-C', '-r',
-                     WithProperties('%(script_repo_revision:-default)s')],
-            haltOnFailure=True,
-            workdir='scripts'
-        ))
-        self.addStep(SetProperty(
-            name='get_script_repo_revision',
-            property='script_repo_revision',
-            command=[hg_bin, 'id', '-i'],
-            workdir='scripts',
-            haltOnFailure=False,
-        ))
+
+        if self.script_repo_cache:
+            # all slaves bar win tests have a copy of hgtool on their path.
+            # However, let's use runner's checkout version like we do for
+            # script repo
+            assert self.tools_repo_cache
+            # ScriptFactory adds the props file into its env but we don't
+            # want to pass that to the hgtool call because hgtool will assume
+            # things like ['sourcestamp']['branch'] should be our branch
+            # that script_repo pulls from
+            hg_script_repo_env = self.env.copy()
+            hg_script_repo_env.pop('PROPERTIES_FILE', None)
+            hgtool_path = os.path.join(self.tools_repo_cache,
+                                       'buildfarm',
+                                       'utils',
+                                       'hgtool.py')
+            hgtool_cmd = [
+                'python', hgtool_path, '--purge',
+                '-r', WithProperties('%(script_repo_revision:-default)s'),
+                scriptRepo, self.script_repo_cache
+            ]
+            self.addStep(ShellCommand(
+                name='update_script_repo_cache',
+                command=hgtool_cmd,
+                env=hg_script_repo_env,
+                haltOnFailure=True,
+                workdir=os.path.dirname(self.script_repo_cache),
+                flunkOnFailure=True,
+            ))
+            self.addStep(SetProperty(
+                name='get_script_repo_revision',
+                property='script_repo_revision',
+                command=[hg_bin, 'id', '-i'],
+                workdir=self.script_repo_cache,
+                haltOnFailure=False,
+            ))
+            script_path = '%s/%s' % (script_repo_cache, scriptName)
+        else:
+            # fall back to legacy clobbering + cloning script repo
+            self.addStep(ShellCommand(
+                name="clobber_scripts",
+                command=['rm', '-rf', 'scripts'],
+                workdir=".",
+                haltOnFailure=True,
+                log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
+            ))
+            self.addStep(MercurialCloneCommand(
+                name="clone_scripts",
+                command=[hg_bin, 'clone', scriptRepo, 'scripts'],
+                workdir=".",
+                haltOnFailure=True,
+                retry=False,
+                log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
+            ))
+            self.addStep(ShellCommand(
+                name="update_scripts",
+                command=[hg_bin, 'update', '-C', '-r',
+                         WithProperties('%(script_repo_revision:-default)s')],
+                haltOnFailure=True,
+                workdir='scripts'
+            ))
+            self.addStep(SetProperty(
+                name='get_script_repo_revision',
+                property='script_repo_revision',
+                command=[hg_bin, 'id', '-i'],
+                workdir='scripts',
+                haltOnFailure=False,
+            ))
+            if scriptName[0] == '/':
+                script_path = scriptName
+            else:
+                script_path = 'scripts/%s' % scriptName
+
+
+        if interpreter:
+            if isinstance(interpreter, (tuple, list)):
+                self.cmd = list(interpreter) + [script_path]
+            else:
+                self.cmd = [interpreter, script_path]
+        else:
+            self.cmd = [script_path]
+
+        if extra_args:
+            self.cmd.extend(extra_args)
+
+
         if use_credentials_file:
             self.addStep(FileDownload(
                 mastersrc=os.path.join(os.getcwd(), 'BuildSlaves.py'),
@@ -5420,12 +5500,14 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 timeout=2700,
             ))
 
-    def runScript(self):
+    def runScript(self, env=None):
+        if not env:
+            env = self.env
         self.preRunScript()
         self.addStep(MockCommand(
             name="run_script",
             command=self.cmd,
-            env=self.env,
+            env=env,
             timeout=self.script_timeout,
             maxTime=self.script_maxtime,
             log_eval_func=self.log_eval_func,
@@ -5491,6 +5573,7 @@ class SigningScriptFactory(ScriptFactory):
 
     def runScript(self):
 
+        signing_env = None
         if self.enableSigning:
             token = "token"
             nonce = "nonce"
@@ -5520,9 +5603,10 @@ class SigningScriptFactory(ScriptFactory):
                 property='basedir',
                 workdir='.',
             ))
-            self.env['MOZ_SIGN_CMD'] = WithProperties(get_signing_cmd(
+            signing_env = self.env.copy()
+            signing_env['MOZ_SIGN_CMD'] = WithProperties(get_signing_cmd(
                 self.signingServers, self.env.get('PYTHON26')))
-            self.env['MOZ_SIGNING_SERVERS'] = ",".join(
+            signing_env['MOZ_SIGNING_SERVERS'] = ",".join(
                 "%s:%s" % (":".join(s[3]), s[0]) for s in self.signingServers)
 
-        ScriptFactory.runScript(self)
+        ScriptFactory.runScript(self, env=signing_env)
