@@ -460,8 +460,8 @@ class AggregatingScheduler(BaseScheduler, Triggerable):
         newBuilds = t.fetchall()
         if newBuilds:
             log.msg(
-                '%s: new builds: %s since %s' % (self.log_prefix, newBuilds,
-                                                 lastCheck))
+                '%s: new builds: %s since %s (lastCheck: %s, lastReset: %s)' %
+                (self.log_prefix, newBuilds, cutoff, lastCheck, lastReset))
         return newBuilds
 
     def _run(self, t):
