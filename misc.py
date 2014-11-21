@@ -2651,9 +2651,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     if not merge:
                         nomergeBuilders.add(builder['name'])
 
-                    talos_builders.setdefault(
-                        tests, []).append(builder['name'])
-                    branchObjects['builders'].append(builder)
+                    pgo_only_suites = set(branch_config.get('pgo_only_suites', []))
+
+                    if suite not in pgo_only_suites:
+                        talos_builders.setdefault(
+                            tests, []).append(builder['name'])
+                        branchObjects['builders'].append(builder)
 
                     if create_pgo_builders:
                         properties = {

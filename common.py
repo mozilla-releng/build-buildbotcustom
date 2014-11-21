@@ -110,6 +110,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'v2_1': '21',
         'standalone': 'sa',
         'thunderbird': 'tb',
+        'partner': 'pner',
         'checksums': 'sums',
         'update_verify': 'uv',
         'postrelease': 'pr',
