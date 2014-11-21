@@ -70,7 +70,7 @@ from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, \
 
 import buildbotcustom.steps.unittest as unittest_steps
 
-from buildbot.status.builder import SUCCESS, FAILURE, RETRY
+from buildbot.status.builder import SUCCESS, FAILURE, EXCEPTION, RETRY
 
 from release.paths import makeCandidatesDir
 
@@ -5280,7 +5280,8 @@ def extractJSONProperties(rv, stdout, stderr):
 
 class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
 
-    def __init__(self, scriptRepo, scriptName, cwd=None, interpreter=None,
+    def __init__(self, scriptRepo, scriptName, script_repo_manifest=None,
+                 cwd=None, interpreter=None,
                  extra_data=None, extra_args=None, use_credentials_file=False,
                  script_timeout=1200, script_maxtime=None, log_eval_func=None,
                  reboot_command=None, hg_bin='hg', platform=None,
@@ -5349,6 +5350,12 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             command=['rm', '-rf', 'properties'],
             workdir=".",
         ))
+        self.addStep(SetProperty(
+            name='set_script_repo_url',
+            command=['echo', scriptRepo],
+            property='script_repo_url',
+        ))
+        script_repo_url = WithProperties('%(script_repo_url)s')
 
         if self.script_repo_cache:
             # all slaves bar win tests have a copy of hgtool on their path.
@@ -5388,6 +5395,33 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             script_path = '%s/%s' % (script_repo_cache, scriptName)
         else:
             # fall back to legacy clobbering + cloning script repo
+            if script_repo_manifest:
+                # By setting scriptRepoManifest we indicate that we don't
+                # want to use scriptRepo but we want to let the manifest associated
+                # to set the repo to checkout and which revision/branch to update to
+                # If the repo specified in the manifest matches scriptRepo we will
+                # use the cached version if available (i.e. script_repo_cache has
+                # been set)
+                self.addStep(ShellCommand(
+                    command=['bash', '-c',
+                             WithProperties('wget -Orepository_manifest.py ' + \
+                             '--no-check-certificate --tries=10 --waitretry=3 ' + \
+                             'http://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/repository_manifest.py')],
+                    haltOnFailure=True,
+                ))
+                self.addStep(SetProperty(
+                    name="set_script_repo_url_and_script_repo_revision",
+                    extract_fn=extractProperties,
+                    command=['bash', '-c',
+                        WithProperties(
+                        'python repository_manifest.py ' +
+                        '--default-repo %s ' % scriptRepo +
+                        '--default-revision %(script_repo_revision)s ' +
+                        '--manifest-url %s' % script_repo_manifest)],
+                    log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
+                    haltOnFailure=True,
+                ))
+
             self.addStep(ShellCommand(
                 name="clobber_scripts",
                 command=['rm', '-rf', 'scripts'],
@@ -5397,7 +5431,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             ))
             self.addStep(MercurialCloneCommand(
                 name="clone_scripts",
-                command=[hg_bin, 'clone', scriptRepo, 'scripts'],
+                command=[hg_bin, 'clone', script_repo_url, 'scripts'],
                 workdir=".",
                 haltOnFailure=True,
                 retry=False,
@@ -5445,9 +5479,8 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
         self.addStep(OutputStep(
             name='tinderboxprint_script_revlink',
             data=WithProperties(
-                'TinderboxPrint: %s_revlink: %s/rev/%%(script_repo_revision)s' %
-                (scriptRepo.split('/')[-1], scriptRepo)),
-        ))
+                'TinderboxPrint: script_revlink: %(script_repo_url)s/rev/%(script_repo_revision)s'
+        )))
         if self.tooltool_manifest_src:
             self.addStep(SetProperty(
                 name='set_toolsdir',

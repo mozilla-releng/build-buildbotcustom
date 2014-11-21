@@ -778,7 +778,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         mozharness=False, mozharness_python=None,
                         mozharness_suite_config=None,
                         mozharness_repo=None, mozharness_tag='production',
-                        is_debug=None):
+                        script_repo_manifest=None, is_debug=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves is None:
@@ -833,6 +833,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             use_credentials_file=True,
             script_maxtime=suites.get('script_maxtime', 7200),
             script_timeout=suites.get('timeout', 1800),
+            script_repo_manifest=script_repo_manifest,
             reboot_command=reboot_command,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
@@ -2778,6 +2779,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
+                                test_builder_kwargs['script_repo_manifest'] = branch_config.get('script_repo_manifest')
                                 # allow mozharness_python to be overridden per test slave platform in case Python
                                 # not installed to a consistent location.
                                 if 'mozharness_config' in platform_config[slave_platform] and \
