@@ -25,7 +25,7 @@ from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import get_l10n_repositories, \
     generateTestBuilderNames, generateTestBuilder, \
     changeContainsProduct, nomergeBuilders, changeContainsProperties, \
-    changeBaseTagContainsScriptRepoRevision, _nextSlave_skip_spot
+    changeContainsScriptRepoRevision, _nextSlave_skip_spot
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
@@ -1638,9 +1638,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         treeStableTimer=None,
         builderNames=[builderPrefix(
             '%s_reset_schedulers' % releaseConfig['productName'])],
-        fileIsImportant=lambda c: changeContainsProduct(c,
-                                                        releaseConfig['productName']) \
-            and changeBaseTagContainsScriptRepoRevision(c, releaseConfig['baseTag']),
+        fileIsImportant=lambda c: changeContainsProduct(c, releaseConfig['productName']) \
+            and changeContainsScriptRepoRevision(c, releaseTag),
     )
     schedulers.append(reset_schedulers_scheduler)
     if releaseConfig.get('enable_repo_setup'):
@@ -1906,7 +1905,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             messageFormatter=createReleaseChangeMessage,
             changeIsImportant=lambda c:
             changeContainsProduct(c, releaseConfig['productName']) and
-            changeBaseTagContainsScriptRepoRevision(c, releaseConfig['baseTag'])
+            changeContainsScriptRepoRevision(c, releaseTag)
         ))
     for recipient in releaseConfig['ImportantRecipients']:
         if hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
