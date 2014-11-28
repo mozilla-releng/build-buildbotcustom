@@ -7,9 +7,8 @@ def base_platform(platform):
 
 ###### TEST CASES #####
 
-BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
-                        'macosx64-debug': 'OS X 10.6.2 try leak test build',
-                        'macosx-debug': 'OS X 10.5.2 try leak test build',
+BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.7 try build',
+                        'macosx64-debug': 'OS X 10.7 64-bit try leak test build',
                         'win32': 'WINNT 5.2 try build',
                         'win32-debug': 'WINNT 5.2 try leak test build',
                         'win64': 'WINNT 6.1 try try-nondefault build',
@@ -22,9 +21,8 @@ BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
                         'maemo5-gtk': 'Maemo 5 GTK try build',
                         }
 # TODO -- need to check on how to separate out the two win32 prettynames
-TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
-                       'macosx64': ['Rev3 MacOSX Snow Leopard 10.6.2',
-                                    'Rev3 MacOSX Leopard 9.0 try-nondefault'],
+TESTER_PRETTY_NAMES = {'macosx64': ['Rev4 MacOSX Snow Leopard 10.6',
+                                    'Rev5 MacOSX Mountain Lion 10.8 try-nondefault'],
                        'win32': ['Rev3 WINNT 5.1',
                                  'Windows XP 32-bit',
                                  'Rev3 WINNT 6.1'],
@@ -78,9 +76,9 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 6.1 try debug test mochitest-browser-chrome',
                       'Rev3 WINNT 6.1 try debug test mochitest-other',
                       'Rev3 WINNT 6.1 try debug test mochitest-3',
-                      'Rev3 MacOSX Snow Leopard 10.6.2 try debug test crashtest',
-                      'Rev3 MacOSX Leopard 9.0 try debug test crashtest',
-                      'Rev3 MacOSX Leopard 9.0 try talos tp4',
+                      'Rev4 MacOSX Snow Leopard 10.6 try debug test crashtest',
+                      'Rev5 MacOSX Mountain Lion 10.8 try debug test crashtest',
+                      'Rev5 MacOSX Mountain Lion 10.8 try talos tp4',
                       'Rev3 WINNT 5.1 try talos chrome',
                       'Rev3 WINNT 6.1 try talos tp4',
                       'Rev3 WINNT 5.1 try talos tp4',
@@ -212,7 +210,7 @@ class TestTryParser(unittest.TestCase):
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = [BUILDER_PRETTY_NAMES[p] for p in ['macosx64',
-                                                      'macosx64-debug', 'macosx-debug']]
+                                                      'macosx64-debug']]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_B2GPlatform(self):
