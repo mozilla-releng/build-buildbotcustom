@@ -495,7 +495,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
                      description=['clone', 'build tools'],
                      log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
                      workdir='.',
-                     retry=False  # We cannot use retry.py until we have this repo checked out
+                     retry=False,  # We cannot use retry.py until we have this repo checked out
+                     env = self.env,
                      ))
         self.addStep(SetProperty(
             name='set_toolsdir',
@@ -4713,6 +4714,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             haltOnFailure=True,
             ignore_certs=self.ignoreCerts,
             name='download_build',
+            env = self.env,
         ))
         self.addStep(UnpackFile(
             filename=WithProperties('%(build_filename)s'),
@@ -4780,7 +4782,8 @@ class MozillaTestFactory(MozillaBuildFactory):
                 url_property='symbols_url',
                 name='download_symbols',
                 ignore_certs=self.ignoreCerts,
-                workdir='build/symbols'
+                workdir='build/symbols',
+                env = self.env,
             ))
             self.addStep(UnpackFile(
                 filename=WithProperties('%(symbols_filename)s'),
@@ -4812,6 +4815,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             haltOnFailure=True,
             ignore_certs=self.ignoreCerts,
             name='download tests',
+            env = self.env,
         ))
 
     def addIdentifySteps(self):
@@ -4869,14 +4873,17 @@ class MozillaTestFactory(MozillaBuildFactory):
             self.addPeriodicRebootSteps()
 
 
-def resolution_step():
+def resolution_step(env=None):
+    if env is None:
+        env = {}
     return ShellCommand(
         name='show_resolution',
         flunkOnFailure=False,
         warnOnFailure=False,
         haltOnFailure=False,
         workdir='/Users/cltbld',
-        command=['bash', '-c', 'screenresolution get && screenresolution list && system_profiler SPDisplaysDataType']
+        command=['bash', '-c', 'screenresolution get && screenresolution list && system_profiler SPDisplaysDataType'],
+        env = env.copy(),
     )
 
 
@@ -4928,7 +4935,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
 
     def addRunTestSteps(self):
         if self.platform.startswith('macosx64'):
-            self.addStep(resolution_step())
+            self.addStep(resolution_step(env=self.env))
         # Run them!
         if self.downloadSymbolsOnDemand:
             symbols_path = '%(symbols_url)s'
@@ -5073,7 +5080,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              )
 
         if self.platform.startswith('macosx64'):
-            self.addStep(resolution_step())
+            self.addStep(resolution_step(env=self.env))
 
 
 class PartnerRepackFactory(ReleaseFactory):
@@ -5436,13 +5443,15 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 haltOnFailure=True,
                 retry=False,
                 log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
+                env=self.env,
             ))
             self.addStep(ShellCommand(
                 name="update_scripts",
                 command=[hg_bin, 'update', '-C', '-r',
                          WithProperties('%(script_repo_revision:-default)s')],
                 haltOnFailure=True,
-                workdir='scripts'
+                workdir='scripts',
+                env=self.env,
             ))
             self.addStep(SetProperty(
                 name='get_script_repo_revision',
@@ -5450,6 +5459,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 command=[hg_bin, 'id', '-i'],
                 workdir='scripts',
                 haltOnFailure=False,
+                env=self.env,
             ))
             if scriptName[0] == '/':
                 script_path = scriptName
