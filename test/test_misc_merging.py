@@ -3,6 +3,7 @@ import collections
 from twisted.trial import unittest
 
 import buildbotcustom.misc as misc
+from buildbot.process.properties import Properties
 
 import mock
 
@@ -15,6 +16,7 @@ def makeRequest(builder, _id=None, reason=""):
     request.id = _id
     request.canBeMergedWith = lambda r2: r2.builder.name == builder.name
     request.reason = reason
+    request.properties = Properties()
     return request
 
 
@@ -91,6 +93,16 @@ class TestMergeRequsets(unittest.TestCase):
         b1 = makeBuilder("b1")
         r1 = makeRequest(b1)
         r2 = makeRequest(b1, reason="Retriggered via Self-serve")
+
+        self.assertFalse(misc.mergeRequests(b1, r1, r2))
+        self.assertFalse(misc.mergeRequests(b1, r2, r1))
+
+    def testMergeNightly(self):
+        "Test that jobs with the 'nightly_build' property set to True don't get merged"
+        b1 = makeBuilder("b1")
+        r1 = makeRequest(b1)
+        r2 = makeRequest(b1)
+        r2.properties.setProperty('nightly_build', True, 'testharness')
 
         self.assertFalse(misc.mergeRequests(b1, r1, r2))
         self.assertFalse(misc.mergeRequests(b1, r2, r1))

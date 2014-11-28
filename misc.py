@@ -658,6 +658,11 @@ def mergeRequests(builder, req1, req2):
         log.msg("mergeRequests: self-serve; returning False")
         return False
 
+    # Disable merging of nightly jobs
+    if req1.properties.getProperty('nightly_build', False) or req2.properties.getProperty('nightly_build', False):
+        log.msg("mergeRequests: nightly_build; returning False")
+        return False
+
     # We're merging a different request now; reset the state
     # This works because buildbot calls this function with the same req1 for
     # all pending requests for the builder, only req2 varies between calls.
@@ -1345,7 +1350,7 @@ def generateBranchObjects(config, name, secrets=None):
         scheduler_class = makePropertiesScheduler(
             Scheduler, [buildIDSchedFunc, buildUIDSchedFunc])
 
-    if not config.get('enable_merging', True):
+    if not config.get('enable_merging', True) or not config.get('merge_builds', True):
         nomergeBuilders.update(builders)
     # these should never, ever merge
     nomergeBuilders.update(periodicBuilders)
