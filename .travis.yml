@@ -1,0 +1,20 @@
+language: python
+python:
+  - "2.7"
+
+install:
+  - pip install tox
+
+script:
+# top level dir has a __init__.py so the package name is the same as the directory
+# name the repo is checked out in - so if this is not buildbotcustom (e.g.
+# build-buildbotcustom) then we should rename it to buildbotcustom.
+  - mv "${TRAVIS_BUILD_DIR}" "${TRAVIS_BUILD_DIR%/*}/buildbotcustom" || true
+  - tox
+
+# currently cannot customise per user fork, see:
+# https://github.com/travis-ci/travis-ci/issues/1094
+# notifications:
+    irc: "irc.mozilla.org#releng"
+    on_success: always
+    on_failure: always

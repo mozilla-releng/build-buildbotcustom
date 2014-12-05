@@ -1,5 +1,6 @@
 from twisted.trial import unittest
 import threading
+import socket
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 from buildbot.util import json
@@ -8,8 +9,7 @@ if not hasattr(json.decoder, 'JSONDecodeError'):
 else:
     JSONDecodeError = json.JSONDecodeError
 
-from buildbotcustom.changes.hgpoller import BasePoller, BaseHgPoller, HgPoller, \
-    HgLocalePoller, HgAllLocalesPoller, _parse_changes
+from buildbotcustom.changes import hgpoller
 
 
 class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -26,34 +26,49 @@ class VerySimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         pass
 
 
-def startHTTPServer(contents):
-    # Starts up a simple HTTPServer that processes requests with
-    # VerySimpleHTTPRequestHandler (subclassed to make sure it's unique
-    # for each instance), and serving the contents passed as contents
-    # Returns a tuple containing the HTTPServer instance and the port it is
-    # listening on. The caller is responsible for shutting down the HTTPServer.
-    class OurHandler(VerySimpleHTTPRequestHandler):
-        pass
-    OurHandler.contents = contents
-    server = HTTPServer(('', 0), OurHandler)
-    ip, port = server.server_address
-    server_thread = threading.Thread(target=server.serve_forever)
-    server_thread.setDaemon(True)
-    server_thread.start()
-    return (server, port)
+class TestHTTPServer(object):
+
+    def __init__(self, contents):
+        # Starts up a simple HTTPServer that processes requests with
+        # VerySimpleHTTPRequestHandler (subclassed to make sure it's unique for
+        # each instance), and serving the contents passed as contents 
+        class OurHandler(VerySimpleHTTPRequestHandler):
+            pass
+        OurHandler.contents = contents
+        server = HTTPServer(('', 0), OurHandler)
+        ip, port = server.server_address
+        def serve_forever_and_catch():
+            try:
+                server.serve_forever()
+            except socket.error:
+                pass
+        server_thread = threading.Thread(target=serve_forever_and_catch)
+        server_thread.setDaemon(True)
+        server_thread.start()
+
+        self.server = server
+        self.server_thread = server_thread
+        self.port = port
+
+    def stop(self):
+        # This is ugly.  There's a running thread waiting on a socket.  The
+        # call to server_stop here closes that socket, which results in a
+        # socket error in the thread, which we catch and then exit.
+        self.server.server_close()
+        self.server_thread.join()
 
 
 class UrlCreation(unittest.TestCase):
     def testSimpleUrl(self):
         correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1'
-        poller = BaseHgPoller(
+        poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithLastChangeset(self):
         correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
-        poller = BaseHgPoller(
+        poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = '123456'
         url = poller._make_url()
@@ -61,7 +76,7 @@ class UrlCreation(unittest.TestCase):
 
     def testTipsOnlyUrl(self):
         correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&tipsonly=1'
-        poller = BaseHgPoller(
+        poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
             tipsOnly=True)
         url = poller._make_url()
@@ -73,7 +88,7 @@ class UrlCreation(unittest.TestCase):
             'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&fromchange=123456&tipsonly=1',
             'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&tipsonly=1&fromchange=123456'
         ]
-        poller = BaseHgPoller(hgURL='https://hg.mozilla.org',
+        poller = hgpoller.BaseHgPoller(hgURL='https://hg.mozilla.org',
                               branch='releases/mozilla-1.9.1', tipsOnly=True)
         poller.lastChangeset = '123456'
         url = poller._make_url()
@@ -81,7 +96,7 @@ class UrlCreation(unittest.TestCase):
 
     def testOverrideUrl(self):
         correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?full=1&fromchange=123456'
-        poller = BaseHgPoller(
+        poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
             pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?full=1')
         poller.lastChangeset = '123456'
@@ -90,7 +105,7 @@ class UrlCreation(unittest.TestCase):
 
     def testUrlWithUnicodeLastChangeset(self):
         correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
-        poller = BaseHgPoller(
+        poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = u'123456'
         url = poller._make_url()
@@ -106,20 +121,22 @@ fakeLocalesFile = """/l10n-central/af/
 /l10n-central/zh-TW/"""
 
 
-class FakeHgAllLocalesPoller(HgAllLocalesPoller):
-    def __init__(self):
-        HgAllLocalesPoller.__init__(
-            self, hgURL='fake', repositoryIndex='fake', branch='fake')
-
-    def pollNextLocale(self):
-        pass
-
-
 class RepositoryIndexParsing(unittest.TestCase):
     def testRepositoryIndexParsing(self):
         correctLocales = [('af', 'l10n-central'), ('be', 'l10n-central'),
                           ('de', 'l10n-central'), ('hi', 'l10n-central'),
                           ('kk', 'l10n-central'), ('zh-TW', 'l10n-central')]
+        # this must be defined inline, because the `hgpoller` module gets dynamically
+        # reloaded via the `misc` module.
+        class FakeHgAllLocalesPoller(hgpoller.HgAllLocalesPoller):
+            def __init__(self):
+                hgpoller.HgAllLocalesPoller.__init__(
+                    self, hgURL='fake', repositoryIndex='fake', branch='fake')
+
+            def pollNextLocale(self):
+                pass
+
+
         poller = FakeHgAllLocalesPoller()
         poller.processData(fakeLocalesFile)
         self.failUnlessEqual(poller.pendingLocales, correctLocales)
@@ -127,12 +144,10 @@ class RepositoryIndexParsing(unittest.TestCase):
 
 class TestPolling(unittest.TestCase):
     def setUp(self):
-        self.server, self.portnum = startHTTPServer('testcontents')
+        x = self.server = TestHTTPServer('testcontents')
 
     def tearDown(self):
-        self.server.server_close()
-        self.portnum = None
-        self.server = None
+        self.server.stop()
 
     def success(self, res):
         self.failUnless(self.fp.success)
@@ -168,17 +183,17 @@ class TestPolling(unittest.TestCase):
         return d
 
     def testHgPoller(self):
-        url = 'http://localhost:%s' % str(self.portnum)
-        return self.doPollingTest(HgPoller, hgURL=url, branch='whatever')
+        url = 'http://localhost:%s' % str(self.server.port)
+        return self.doPollingTest(hgpoller.HgPoller, hgURL=url, branch='whatever')
 
     def testHgLocalePoller(self):
-        url = 'http://localhost:%s' % str(self.portnum)
-        return self.doPollingTest(HgLocalePoller, locale='fake', parent='fake',
+        url = 'http://localhost:%s' % str(self.server.port)
+        return self.doPollingTest(hgpoller.HgLocalePoller, locale='fake', parent='fake',
                                   hgURL=url, branch='whatever')
 
     def testHgAllLocalesPoller(self):
-        url = 'http://localhost:%s' % str(self.portnum)
-        return self.doPollingTest(HgAllLocalesPoller, hgURL=url,
+        url = 'http://localhost:%s' % str(self.server.port)
+        return self.doPollingTest(hgpoller.HgAllLocalesPoller, hgURL=url,
                                   repositoryIndex='foobar')
 
 
@@ -263,7 +278,7 @@ malformedPushlog = """
 
 class PushlogParsing(unittest.TestCase):
     def testValidPushlog(self):
-        pushes = _parse_changes(validPushlog)
+        pushes = hgpoller._parse_changes(validPushlog)
         self.failUnlessEqual(len(pushes), 2)
 
         self.failUnlessEqual(pushes[0]['changesets'][0]['node'],
@@ -294,10 +309,10 @@ class PushlogParsing(unittest.TestCase):
 
     def testMalformedPushlog(self):
         self.failUnlessRaises(
-            JSONDecodeError, _parse_changes, malformedPushlog)
+            JSONDecodeError, hgpoller._parse_changes, malformedPushlog)
 
     def testEmptyPushlog(self):
-        self.failUnlessRaises(JSONDecodeError, _parse_changes, "")
+        self.failUnlessRaises(JSONDecodeError, hgpoller._parse_changes, "")
 
 
 class RepoBranchHandling(unittest.TestCase):
@@ -307,9 +322,9 @@ class RepoBranchHandling(unittest.TestCase):
     def doTest(self, repo_branch):
         changes = self.changes
 
-        class TestPoller(BaseHgPoller):
+        class TestPoller(hgpoller.BaseHgPoller):
             def __init__(self):
-                BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
+                hgpoller.BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
                                       repo_branch=repo_branch)
                 self.emptyRepo = True
 
@@ -357,9 +372,9 @@ class MaxChangesHandling(unittest.TestCase):
     def doTest(self, repo_branch, maxChanges, mergePushChanges):
         changes = self.changes
 
-        class TestPoller(BaseHgPoller):
+        class TestPoller(hgpoller.BaseHgPoller):
             def __init__(self):
-                BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
+                hgpoller.BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
                                       repo_branch=repo_branch, maxChanges=maxChanges, mergePushChanges=mergePushChanges)
                 self.emptyRepo = True
 
