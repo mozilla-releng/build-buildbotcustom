@@ -590,19 +590,6 @@ def _nextSlave(builder, available_slaves):
         return None
 
 
-@safeNextSlave
-@J
-def _nextSlave_skip_spot(builder, available_slaves):
-    if available_slaves:
-        no_spot_slaves = [s for s in available_slaves if not
-                          is_spot(s.slave.slavename)]
-        if not no_spot_slaves:
-            return None
-        return sorted(no_spot_slaves, _recentSort(builder))[-1]
-    else:
-        return None
-
-
 def _nextIdleSlave(nReserved):
     """Return a nextSlave function that will only return a slave to run a build
     if there are at least nReserved slaves available."""
