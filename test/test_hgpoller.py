@@ -40,7 +40,7 @@ class TestHTTPServer(object):
         def serve_forever_and_catch():
             try:
                 server.serve_forever()
-            except socket.error:
+            except Exception:
                 pass
         server_thread = threading.Thread(target=serve_forever_and_catch)
         server_thread.setDaemon(True)

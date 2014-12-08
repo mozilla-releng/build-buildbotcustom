@@ -1,4 +1,3 @@
-\.pyc$
-\.tox/
+.tox/
 _trial_temp/
 .coverage
