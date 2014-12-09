@@ -2991,8 +2991,11 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             factory_kwargs['env'] = env
 
             extra_args = ['-r', WithProperties("%(revision)s")]
+            extra_args += ['--platform', platform]  # distinguish win64
             extra_args += mirrorAndBundleArgs(bconfig)
             extra_args += [variant]
+            for server in config.get('tooltool_url_list', []):
+                extra_args += ['--ttserver', server]
 
             f = ScriptFactory(
                 config['scripts_repo'],
