@@ -885,7 +885,8 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
                                    hg_bin, mozharness_python,
                                    reboot_command, extra_args=None,
                                    script_timeout=3600,
-                                   script_maxtime=7200):
+                                   script_maxtime=7200,
+                                   script_repo_manifest=None):
     if extra_args is None:
         extra_args = []
     return ScriptFactory(
@@ -897,6 +898,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         use_credentials_file=True,
         script_timeout=script_timeout,
         script_maxtime=script_maxtime,
+        script_repo_manifest=script_repo_manifest,
         reboot_command=reboot_command,
         platform=platform,
         log_eval_func=rc_eval_func({
@@ -2622,6 +2624,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'script_maxtime': (platform_config['mozharness_config'].get('talos_script_maxtime', platform_config['mozharness_config'].get('script_maxtime', 7200))),
                             'reboot_command': platform_config[
                                 'mozharness_config'].get('reboot_command'),
+                            'script_repo_manifest': branch_config.get(
+                                 'script_repo_manifest'),
                         }
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
