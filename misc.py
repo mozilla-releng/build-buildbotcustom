@@ -885,7 +885,8 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
                                    hg_bin, mozharness_python,
                                    reboot_command, extra_args=None,
                                    script_timeout=3600,
-                                   script_maxtime=7200):
+                                   script_maxtime=7200,
+                                   script_repo_manifest=None):
     if extra_args is None:
         extra_args = []
     return ScriptFactory(
@@ -897,6 +898,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         use_credentials_file=True,
         script_timeout=script_timeout,
         script_maxtime=script_maxtime,
+        script_repo_manifest=script_repo_manifest,
         reboot_command=reboot_command,
         platform=platform,
         log_eval_func=rc_eval_func({
@@ -1003,10 +1005,13 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
     # grab the l10n schedulers that nightlies will trigger (if any)
     triggered_nightly_schedulers = []
     if (config['enable_l10n'] and platform in config['l10n_platforms'] and
-               '%s nightly' % pf['base_name'] in l10nNightlyBuilders):
+            '%s nightly' % pf['base_name'] in l10nNightlyBuilders):
         triggered_nightly_schedulers = [
             l10nNightlyBuilders['%s nightly' % pf['base_name']]['l10n_builder']
         ]
+    elif is_l10n_with_mh(config, platform):
+        scheduler_name = mh_l10n_scheduler_name(config, platform)
+        triggered_nightly_schedulers.append(scheduler_name)
 
     # if we do a generic dep build
     if pf.get('enable_dep', True):
@@ -1050,6 +1055,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
 
     # if do nightly:
     if config['enable_nightly'] and pf.get('enable_nightly', True):
+
         nightly_extra_args = base_extra_args + config['mozharness_desktop_extra_options']['nightly']
         # include use_credentials_file for balrog step
         nightly_factory = makeMHFactory(config, pf, mh_cfg=mh_cfg,
@@ -1071,6 +1077,11 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         }
         desktop_mh_builders.append(nightly_builder)
         builds_created['done_nightly_build'] = True
+        if is_l10n_with_mh(config, platform):
+            l10n_builders = mh_l10n_builders(config, platform, name, secrets,
+                                             is_nightly=True)
+            desktop_mh_builders.extend(l10n_builders)
+            builds_created['done_l10n_repacks'] = True
 
     # if we_do_pgo:
     if (config['pgo_strategy'] in ('periodic', 'try') and
@@ -1247,15 +1258,29 @@ def generateBranchObjects(config, name, secrets=None):
 
         if do_nightly:
             builder = '%s nightly' % base_name
+            l10n_builder = '%s %s %s l10n nightly' % (
+                pf['product_name'].capitalize(), name, platform
+            )
             nightlyBuilders.append(builder)
             # Fill the l10nNightly dict
-            if config['enable_l10n'] and platform in config['l10n_platforms']:
+            # trying to do repacks with mozharness
+            if is_l10n_with_mh(config, platform):
+                # we need this later...
+                builder_names = mh_l10n_builder_names(config, platform,
+                                                      is_nightly=True)
+                scheduler_name = mh_l10n_scheduler_name(config, platform)
                 l10nNightlyBuilders[builder] = {}
-                l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
-                l10nNightlyBuilders[builder]['l10n_builder'] = \
-                    '%s %s %s l10n nightly' % (pf['product_name'].capitalize(),
-                                               name, platform)
+                l10nNightlyBuilders[builder]['l10n_builder'] = builder_names
                 l10nNightlyBuilders[builder]['platform'] = platform
+                l10nNightlyBuilders[builder]['scheduler_name'] = scheduler_name
+                l10nNightlyBuilders[builder]['l10n_repacks_with_mh'] = True
+            else:
+                # no repacks with mozharness, old style repacks
+                if config['enable_l10n'] and platform in config['l10n_platforms']:
+                    l10nNightlyBuilders[builder] = {}
+                    l10nNightlyBuilders[builder]['tree'] = config['l10n_tree']
+                    l10nNightlyBuilders[builder]['l10n_builder'] = l10n_builder
+                    l10nNightlyBuilders[builder]['platform'] = platform
         if platform in ('linux64',):
             if config.get('enable_blocklist_update', False) or \
                config.get('enable_hsts_update', False) or \
@@ -1433,8 +1458,21 @@ def generateBranchObjects(config, name, secrets=None):
         branchObjects['schedulers'].append(periodic_scheduler)
 
     for builder in nightlyBuilders + xulrunnerNightlyBuilders:
-        if config['enable_l10n'] and \
+        # looping through l10n builders
+
+        if builder in l10nNightlyBuilders and \
+           'l10n_repacks_with_mh' in l10nNightlyBuilders[builder]:
+            # it's a repacks with mozharness
+            l10n_builders = l10nNightlyBuilders[builder]['l10n_builder']
+            nomergeBuilders.update(l10n_builders)
+            triggerable_name = l10nNightlyBuilders[builder]['scheduler_name']
+            triggerable = Triggerable(name=triggerable_name,
+                                      builderNames=l10n_builders)
+            branchObjects['schedulers'].append(triggerable)
+
+        elif config['enable_l10n'] and \
                 config['enable_nightly'] and builder in l10nNightlyBuilders:
+            # classic repacks
             l10n_builder = l10nNightlyBuilders[builder]['l10n_builder']
             nomergeBuilders.add(l10n_builder)
             platform = l10nNightlyBuilders[builder]['platform']
@@ -1483,6 +1521,7 @@ def generateBranchObjects(config, name, secrets=None):
             'done_pgo_build': False,  # generic pf + pgo
             'done_nightly_build': False,  # generic pf + nightly
             'done_nonunified_build': False,  # generic pf + nonunified
+            'done_l10n_repacks': False,  # generic pf + l10n
         }
 
         if 'mozharness_desktop_build' in pf:
@@ -1492,8 +1531,7 @@ def generateBranchObjects(config, name, secrets=None):
                 branchObjects['builders'].extend(
                     generateDesktopMozharnessBuilders(
                         name, platform, config, secrets,
-                        l10nNightlyBuilders, builds_created=builder_tracker
-                    )
+                        l10nNightlyBuilders, builds_created=builder_tracker)
                 )
             # now crawl outside this condition and see what builders are left
             #  to do in MBF land
@@ -1801,8 +1839,8 @@ def generateBranchObjects(config, name, secrets=None):
             # builders to mozharness we won't need pgo_builder at
             # all
             if (config['pgo_strategy'] in ('periodic', 'try') and
-                       platform in config['pgo_platforms'] and not
-                       builder_tracker['done_pgo_build']):
+                    platform in config['pgo_platforms'] and not
+                    builder_tracker['done_pgo_build']):
                 pgo_kwargs = factory_kwargs.copy()
                 pgo_kwargs["doPostLinkerSize"] = pf.get('enable_post_linker_size', False)
                 pgo_kwargs['profiledBuild'] = True
@@ -1830,6 +1868,7 @@ def generateBranchObjects(config, name, secrets=None):
             # builders to mozharness we won't need this builder at all
             if (pf.get('enable_nonunified_build') and not
                     builder_tracker['done_nonunified_build']):
+
                 kwargs = factory_kwargs.copy()
                 kwargs['stagePlatform'] += '-nonunified'
                 kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-nonunified'
@@ -2119,7 +2158,8 @@ def generateBranchObjects(config, name, secrets=None):
                 }
                 branchObjects['builders'].append(mozilla2_nightly_builder)
 
-            if config['enable_l10n']:
+            if config['enable_l10n'] and \
+               not builder_tracker['done_l10n_repacks']:
                 if platform in config['l10n_platforms']:
                     mozconfig = os.path.join(os.path.dirname(
                         pf['src_mozconfig']), 'l10n-mozconfig')
@@ -2212,149 +2252,78 @@ def generateBranchObjects(config, name, secrets=None):
 
         # end do_nightly
 
-        # enable mozharness desktop repacks
-        # mozharnes repacks are enabled only on ash
-        # standard repacks might be enabled there as well.
-        # this is expected for early versions of desktop_repacks in mozharness
-        if pf.get('desktop_mozharness_repacks_enabled'):
-            l10n_builders = []
-            platform_env = pf['env'].copy()
-            builder_env = platform_env.copy()
-            # reboot command and python interpreter are defined per platform
-            mozharness_python = pf.get('mozharness_python')
-            reboot_command = pf['reboot_command']
-            scriptRepo = '%s%s' % (config['hgurl'],
-                                   config['mozharness_repo_path'])
-            # repacks specific configuration is in:
-            # platform > mozharness_desktop_l10n
-            repacks = pf['mozharness_desktop_l10n']
-            scriptName = repacks['scriptName']
-            l10n_chunks = repacks['l10n_chunks']
-            use_credentials_file = repacks['use_credentials_file']
-            config_dir = 'single_locale'
-            branch_config = os.path.join(config_dir, '%s.py' % name)
-            platform_config = os.path.join(config_dir, '%s.py' % platform)
-            environment_config = os.path.join(config_dir, 'production.py')
-            # desktop repacks run in chunks...
-            for n in range(1, l10n_chunks + 1):
-                l10n_scheduler_name = '%s-%s-l10n_%s' % (name, platform, str(n))
-                builddir = '%s-%s-l10n_%s' % (name, platform, str(n))
-                builderName = "%s l10n %s/%s" % \
-                    (pf['base_name'], n, l10n_chunks)
-                l10n_builders.append(builderName)
-                extra_args = ['--branch-config', branch_config,
-                              '--platform-config', platform_config,
-                              '--environment-config', environment_config,
-                              '--balrog-config', 'balrog/production.py',
-                              '--total-chunks', str(l10n_chunks),
-                              '--this-chunk', str(n)]
-                signing_servers = secrets.get(pf.get('nightly_signing_servers'))
-                factory = SigningScriptFactory(
-                    signingServers=signing_servers,
-                    scriptRepo=scriptRepo,
-                    scriptName=scriptName,
-                    use_credentials_file=use_credentials_file,
-                    interpreter=mozharness_python,
-                    extra_args=extra_args,
-                    reboot_command=reboot_command,
+        # We still want l10n_dep builds if nightlies are off
+        if config['enable_l10n'] and config['enable_l10n_onchange'] and \
+           platform in config['l10n_platforms']:
+                dep_kwargs = {}
+                if config.get('call_client_py', False):
+                    dep_kwargs['callClientPy'] = True
+                    dep_kwargs['clientPyConfig'] = {
+                        'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
+                        'cvsroot': config.get('cvsroot', ''),
+                        'inspector_repo_path': config.get('inspector_repo_path', ''),
+                        'moz_repo_path': config.get('moz_repo_path', ''),
+                        'skip_blank_repos': config.get('skip_blank_repos', False),
+                        'venkman_repo_path': config.get('venkman_repo_path', ''),
+                    }
+                mozconfig = os.path.join(
+                    os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
+                mozilla2_l10n_dep_factory = NightlyRepackFactory(
+                    env=platform_env,
+                    objdir=l10n_objdir,
+                    platform=platform,
+                    hgHost=config['hghost'],
+                    tree=config['l10n_tree'],
+                    project=pf['product_name'],
+                    appName=pf['app_name'],
+                    enUSBinaryURL=config['enUS_binaryURL'],
+                    mozillaDir=config.get('mozilla_dir', None),
+                    mozillaSrcDir=config.get('mozilla_srcdir', None),
+                    nightly=False,
+                    l10nDatedDirs=config['l10nDatedDirs'],
+                    stageServer=config['stage_server'],
+                    stageUsername=config['stage_username'],
+                    stageSshKey=config['stage_ssh_key'],
+                    repoPath=config['repo_path'],
+                    l10nRepoPath=config['l10n_repo_path'],
+                    buildToolsRepoPath=config['build_tools_repo_path'],
+                    compareLocalesRepoPath=config['compare_locales_repo_path'],
+                    compareLocalesTag=config['compare_locales_tag'],
+                    buildSpace=l10nSpace,
+                    clobberURL=config['base_clobber_url'],
+                    clobberTime=clobberTime,
+                    signingServers=secrets.get(pf.get('dep_signing_servers')),
+                    baseMirrorUrls=config.get('base_mirror_urls'),
+                    extraConfigureArgs=config.get('l10n_extra_configure_args', []),
+                    buildsBeforeReboot=pf.get('builds_before_reboot', 0),
+                    use_mock=pf.get('use_mock'),
+                    mock_target=pf.get('mock_target'),
+                    mock_packages=pf.get('mock_packages'),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
+                    mozconfig=mozconfig,
+                    enable_pymake=enable_pymake,
+                    tooltool_manifest_src=pf.get('tooltool_l10n_manifest_src'),
+                    tooltool_script=pf.get('tooltool_script'),
+                    tooltool_url_list=config.get('tooltool_url_list', []),
+                    **dep_kwargs
                 )
-                slavebuilddir = normalizeName(builddir, pf['stage_product'])
-                branchObjects['builders'].append({
-                    'name': builderName,
-                    'slavenames': pf.get('slaves'),
-                    'builddir': builddir,
+                # eg. Thunderbird comm-central linux l10n dep
+                slavebuilddir = normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product'], max_=50)
+                mozilla2_l10n_dep_builder = {
+                    'name': l10nBuilders[pf['base_name']]['l10n_builder'],
+                    'slavenames': pf.get('l10n_slaves', pf['slaves']),
+                    'builddir': '%s-%s-l10n-dep' % (name, platform),
                     'slavebuilddir': slavebuilddir,
-                    'factory': factory,
+                    'factory': mozilla2_l10n_dep_factory,
                     'category': name,
                     'nextSlave': _nextAWSSlave_wait_sort,
                     'properties': {'branch': name,
-                                   'builddir': '%s-l10n_%s' % (builddir, str(n)),
+                                   'platform': platform,
                                    'stage_platform': stage_platform,
                                    'product': pf['stage_product'],
-                                   'platform': platform,
-                                   'slavebuilddir': slavebuilddir,
-                                   'script_repo_revision': config['mozharness_tag'], },
-                    'env': builder_env
-                })
-
-                branchObjects["schedulers"].append(Triggerable(
-                    name=l10n_scheduler_name,
-                    builderNames=l10n_builders
-                ))
-                triggeredSchedulers = [l10n_scheduler_name]
-
-        # We still want l10n_dep builds if nightlies are off
-        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-                config['enable_l10n_onchange']:
-            dep_kwargs = {}
-            if config.get('call_client_py', False):
-                dep_kwargs['callClientPy'] = True
-                dep_kwargs['clientPyConfig'] = {
-                    'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
-                    'cvsroot': config.get('cvsroot', ''),
-                    'inspector_repo_path': config.get('inspector_repo_path', ''),
-                    'moz_repo_path': config.get('moz_repo_path', ''),
-                    'skip_blank_repos': config.get('skip_blank_repos', False),
-                    'venkman_repo_path': config.get('venkman_repo_path', ''),
+                                   'slavebuilddir': slavebuilddir},
                 }
-            mozconfig = os.path.join(
-                os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
-            mozilla2_l10n_dep_factory = NightlyRepackFactory(
-                env=platform_env,
-                objdir=l10n_objdir,
-                platform=platform,
-                hgHost=config['hghost'],
-                tree=config['l10n_tree'],
-                project=pf['product_name'],
-                appName=pf['app_name'],
-                enUSBinaryURL=config['enUS_binaryURL'],
-                mozillaDir=config.get('mozilla_dir', None),
-                mozillaSrcDir=config.get('mozilla_srcdir', None),
-                nightly=False,
-                l10nDatedDirs=config['l10nDatedDirs'],
-                stageServer=config['stage_server'],
-                stageUsername=config['stage_username'],
-                stageSshKey=config['stage_ssh_key'],
-                repoPath=config['repo_path'],
-                l10nRepoPath=config['l10n_repo_path'],
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                compareLocalesRepoPath=config['compare_locales_repo_path'],
-                compareLocalesTag=config['compare_locales_tag'],
-                buildSpace=l10nSpace,
-                clobberURL=config['base_clobber_url'],
-                clobberTime=clobberTime,
-                signingServers=secrets.get(pf.get('dep_signing_servers')),
-                baseMirrorUrls=config.get('base_mirror_urls'),
-                extraConfigureArgs=config.get('l10n_extra_configure_args', []),
-                buildsBeforeReboot=pf.get('builds_before_reboot', 0),
-                use_mock=pf.get('use_mock'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                mozconfig=mozconfig,
-                enable_pymake=enable_pymake,
-                tooltool_manifest_src=pf.get('tooltool_l10n_manifest_src'),
-                tooltool_script=pf.get('tooltool_script'),
-                tooltool_url_list=config.get('tooltool_url_list', []),
-                **dep_kwargs
-            )
-            # eg. Thunderbird comm-central linux l10n dep
-            slavebuilddir = normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product'], max_=50)
-            mozilla2_l10n_dep_builder = {
-                'name': l10nBuilders[pf['base_name']]['l10n_builder'],
-                'slavenames': pf.get('l10n_slaves', pf['slaves']),
-                'builddir': '%s-%s-l10n-dep' % (name, platform),
-                'slavebuilddir': slavebuilddir,
-                'factory': mozilla2_l10n_dep_factory,
-                'category': name,
-                'nextSlave': _nextAWSSlave_wait_sort,
-                'properties': {'branch': name,
-                               'platform': platform,
-                               'stage_platform': stage_platform,
-                               'product': pf['stage_product'],
-                               'slavebuilddir': slavebuilddir},
-            }
-            branchObjects['builders'].append(mozilla2_l10n_dep_builder)
+                branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
         if config['enable_valgrind'] and \
                 platform in config['valgrind_platforms']:
@@ -2622,6 +2591,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                             'script_maxtime': (platform_config['mozharness_config'].get('talos_script_maxtime', platform_config['mozharness_config'].get('script_maxtime', 7200))),
                             'reboot_command': platform_config[
                                 'mozharness_config'].get('reboot_command'),
+                            'script_repo_manifest': branch_config.get(
+                                 'script_repo_manifest'),
                         }
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
@@ -3376,3 +3347,131 @@ def makeLogUploadCommand(branch_name, config, is_try=False, is_shadow=False,
         logUploadCmd.append('--shadow')
 
     return logUploadCmd
+
+
+def _is_l10n_enabled(config):
+    """returns True if mozharness desktop repacks are enabled"""
+    # l10n with mozharness enabled per branch?
+    try:
+        return config['desktop_mozharness_repacks_enabled']
+    except KeyError:
+        return False
+
+
+def _is_l10n_capable(config, platform):
+    """returns True if the platform can do desktop repacks with mozharness"""
+    # l10n with mozharness enabled per project?
+    # platform config
+    pf = config['platforms'][platform]
+    try:
+        return pf['mozharness_desktop_l10n']['capable']
+    except KeyError:
+        return False
+
+
+def is_l10n_with_mh(config, platform):
+    """mozharness desktop repacks are enabled if they are active on the project
+       and 'platform' is capable of creating repacks.
+    """
+    return _is_l10n_enabled(config) and _is_l10n_capable(config, platform)
+
+
+def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
+    """ returns a dictionary with builders and schedulers
+        """
+    # let's check if we need to create builders for this config/platform
+    builders = []
+    pf = config['platforms'][platform]
+    name = pf['base_name']
+    platform_env = pf['env'].copy()
+    builder_env = platform_env.copy()
+    stage_platform = pf.get('stage_platform', platform)
+    # reboot command and python interpreter are defined per platform
+    mozharness_python = pf.get('mozharness_python')
+    reboot_command = pf['reboot_command']
+    scriptRepo = '%s%s' % (config['hgurl'],
+                           config['mozharness_repo_path'])
+    # repacks specific configuration is in:
+    # platform > mozharness_desktop_l10n
+    repacks = pf['mozharness_desktop_l10n']
+    scriptName = repacks['scriptName']
+    l10n_chunks = repacks['l10n_chunks']
+    use_credentials_file = repacks['use_credentials_file']
+    config_dir = 'single_locale'
+    branch_config = os.path.join(config_dir, '%s.py' % branch)
+    platform_config = os.path.join(config_dir, '%s.py' % platform)
+    environment_config = os.path.join(config_dir, 'production.py')
+    balrog_config = os.path.join('balrog', 'production.py')
+    if config.get('staging', False):
+        environment_config = os.path.join(config_dir, 'staging.py')
+        balrog_config = os.path.join('balrog', 'staging.py')
+    # desktop repacks run in chunks...
+    builder_names = mh_l10n_builder_names(config, platform, is_nightly)
+    this_chunk = 0
+    for bn in builder_names:
+        this_chunk += 1
+        builderName = bn
+        builddir = mh_l10n_builddir_from_builder_name(bn)
+        extra_args = ['--branch-config', branch_config,
+                      '--platform-config', platform_config,
+                      '--environment-config', environment_config,
+                      '--balrog-config', balrog_config,
+                      '--total-chunks', str(l10n_chunks),
+                      '--this-chunk', str(this_chunk)]
+        signing_servers = secrets.get(pf.get('nightly_signing_servers'))
+        factory = SigningScriptFactory(
+            signingServers=signing_servers,
+            scriptRepo=scriptRepo,
+            scriptName=scriptName,
+            use_credentials_file=use_credentials_file,
+            interpreter=mozharness_python,
+            extra_args=extra_args,
+            reboot_command=reboot_command,
+        )
+        slavebuilddir = normalizeName(builddir)
+        # was: slavebuilddir = normalizeName(builddir, pf['stage_product'])
+        builders.append({
+            'name': builderName,
+            'slavenames': pf.get('slaves'),
+            'builddir': builddir,
+            'slavebuilddir': slavebuilddir,
+            'factory': factory,
+            'category': name,
+            'nextSlave': _nextAWSSlave_wait_sort,
+            'properties': {'branch': name,
+                           'builddir': builddir,
+                           'stage_platform': stage_platform,
+                           'product': pf['stage_product'],
+                           'platform': platform,
+                           'slavebuilddir': slavebuilddir,
+                           'script_repo_revision': config['mozharness_tag'], },
+            'env': builder_env
+        })
+    return builders
+
+
+def mh_l10n_builddir_from_builder_name(builder_name):
+    """transforms a builder name into a builddir"""
+    b_dir = builder_name.replace(' nightly', '')
+    b_dir = b_dir.replace(' ', '-')
+    return b_dir.replace('/', '_')
+
+
+def mh_l10n_scheduler_name(config, platform):
+    pf = config['platforms'][platform]
+    return '%s nightly l10n' % (pf['base_name'])
+
+
+def mh_l10n_builder_names(config, platform, is_nightly):
+    # let's check if we need to create builders for this config/platform
+    names = []
+    pf = config['platforms'][platform]
+    name = pf['base_name']
+    if is_nightly:
+        name = '%s nightly' % (pf['base_name'])
+    repacks = pf['mozharness_desktop_l10n']
+    l10n_chunks = repacks['l10n_chunks']
+    for chunk in range(1, l10n_chunks + 1):
+        builder_name = "%s l10n %s/%s" % (name, chunk, l10n_chunks)
+        names.append(builder_name)
+    return names
