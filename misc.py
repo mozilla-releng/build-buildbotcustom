@@ -715,6 +715,7 @@ def makeMHFactory(config, pf, mh_cfg=None, extra_args=None, **kwargs):
         script_timeout=mh_cfg.get('script_timeout', pf.get('timeout', 3600)),
         script_maxtime=mh_cfg.get('script_maxtime', pf.get('maxTime', 4 * 3600)),
         script_repo_cache=script_repo_cache,
+        script_repo_manifest=config.get('script_repo_manifest'),
         tools_repo_cache=mh_cfg.get('tools_repo_cache',
                                     pf.get('tools_repo_cache')),
         **kwargs
@@ -998,6 +999,8 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         'branch': name,
         'platform': platform,
         'product': pf['stage_product'],
+        'repo_path': config['repo_path'],
+        'script_repo_revision': config["mozharness_tag"],
     }
     dep_signing_servers = secrets.get(pf.get('dep_signing_servers'))
     nightly_signing_servers = secrets.get(pf.get('nightly_signing_servers'))

@@ -5350,10 +5350,9 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             command=['rm', '-rf', 'properties'],
             workdir=".",
         ))
-        self.addStep(SetProperty(
-            name='set_script_repo_url',
-            command=['echo', scriptRepo],
-            property='script_repo_url',
+        self.addStep(SetBuildProperty(
+            property_name='script_repo_url',
+            value=scriptRepo,
         ))
         script_repo_url = WithProperties('%(script_repo_url)s')
 
@@ -5366,33 +5365,63 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             # want to pass that to the hgtool call because hgtool will assume
             # things like ['sourcestamp']['branch'] should be our branch
             # that script_repo pulls from
+            hgtool_path = \
+                    os.path.join(self.tools_repo_cache,
+                                 'buildfarm',
+                                 'utils',
+                                 'hgtool.py')
+            repository_manifest_path = \
+                    os.path.join(self.tools_repo_cache,
+                                'buildfarm',
+                                'utils',
+                                'repository_manifest.py')
+
+            if script_repo_manifest:
+                self.addStep(SetProperty(
+                    name="set_script_repo_url_and_script_repo_revision",
+                    extract_fn=extractProperties,
+                    command=['bash', '-c',
+                        WithProperties(
+                        'python %s ' % repository_manifest_path +
+                        '--default-repo %s ' % scriptRepo +
+                        '--default-revision %(script_repo_revision:-default)s ' +
+                        '--default-checkout %s ' % self.script_repo_cache +
+                        '--checkout %(basedir)s/build/scripts ' +
+                        '--manifest-url %s' % script_repo_manifest)],
+                    log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
+                    haltOnFailure=True,
+                ))
+            else:
+                self.addStep(SetBuildProperty(
+                    property_name='script_repo_checkout',
+                    value=self.script_repo_cache,
+                ))
+
             hg_script_repo_env = self.env.copy()
             hg_script_repo_env.pop('PROPERTIES_FILE', None)
-            hgtool_path = os.path.join(self.tools_repo_cache,
-                                       'buildfarm',
-                                       'utils',
-                                       'hgtool.py')
+
             hgtool_cmd = [
                 'python', hgtool_path, '--purge',
                 '-r', WithProperties('%(script_repo_revision:-default)s'),
-                scriptRepo, self.script_repo_cache
+                WithProperties('%(script_repo_url)s'),
+                WithProperties('%(script_repo_checkout)s'),
             ]
+
             self.addStep(ShellCommand(
                 name='update_script_repo_cache',
                 command=hgtool_cmd,
                 env=hg_script_repo_env,
                 haltOnFailure=True,
-                workdir=os.path.dirname(self.script_repo_cache),
                 flunkOnFailure=True,
             ))
             self.addStep(SetProperty(
                 name='get_script_repo_revision',
                 property='script_repo_revision',
                 command=[hg_bin, 'id', '-i'],
-                workdir=self.script_repo_cache,
+                workdir=WithProperties('%(script_repo_checkout)s'),
                 haltOnFailure=False,
             ))
-            script_path = '%s/%s' % (script_repo_cache, scriptName)
+            script_path = WithProperties('%(script_repo_checkout)s/' + scriptName)
         else:
             # fall back to legacy clobbering + cloning script repo
             if script_repo_manifest:
