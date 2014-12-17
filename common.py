@@ -127,12 +127,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'nonunified': 'nu',
         'graphics': 'gfx',
         'flame': 'flm',
-        'firefox_tag_source': 'fx_tag_src',
-        'firefox_tag_l10n': 'fx_tag_l10n',
-        'fennec_tag_source': 'm_tag_src',
-        'fennec_tag_l10n': 'm_tag_l10n',
-        'thunderbird_tag_source': 't_tag_src',
-        'thunderbird_tag_l10n': 't_tag_l10n',
     }
     for word, replacement in mappings.iteritems():
         # Regexes are slow, so make sure the word is there at all before

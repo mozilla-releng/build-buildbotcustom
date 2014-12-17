@@ -68,9 +68,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     mozharness_repo_path = releaseConfig.get('mozharness_repo_path',
                                              branchConfig['mozharness_repo_path'])
     mozharness_repo = '%s%s' % (branchConfig['hgurl'], mozharness_repo_path)
-    with_l10n = len(releaseConfig['l10nPlatforms']) > 0 or \
-        (releaseConfig.get('enableMultiLocale') and \
-        releaseConfig.get('multilocale_config', {}).get('platforms'))
     clobberer_url = releaseConfig.get('base_clobber_url',
                                       branchConfig['base_clobber_url'])
     balrog_api_root = releaseConfig.get('balrog_api_root',
@@ -344,7 +341,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 clone_repositories.update({sr['clonePath']: {}})
             # get_l10n_repositories spits out more than just the repoPath
             # It's easier to just pass it along rather than strip it out
-            if with_l10n:
+            if len(releaseConfig['l10nPlatforms']) > 0:
                 l10n_clone_repos = get_l10n_repositories(
                     releaseConfig['l10nRevisionFile'],
                     releaseConfig['l10nRepoClonePath'],
@@ -400,7 +397,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 },
             ))
 
-    dummy_tag_builders = []
     if not releaseConfig.get('skip_tag'):
         pf = branchConfig['platforms']['linux']
         tag_env = builder_env.copy()
@@ -409,8 +405,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if pf['env'].get('HG_SHARE_BASE_DIR', None):
             tag_env['HG_SHARE_BASE_DIR'] = pf['env']['HG_SHARE_BASE_DIR']
 
-        # Other includes mozharness, required for Mobile Builds
-        tag_source_factory = ScriptFactory(
+        tag_factory = ScriptFactory(
             scriptRepo=tools_repo,
             scriptName='scripts/release/tagging.sh',
             use_mock=use_mock('linux'),
@@ -418,78 +413,38 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_packages=pf.get('mock_packages'),
             mock_copyin_files=pf.get('mock_copyin_files'),
             env=tag_env,
-            extra_data={"tag_args": "--tag-source  --tag-other"}
         )
 
         builders.append({
-            'name': builderPrefix('%s_tag_source' % releaseConfig['productName']),
+            'name': builderPrefix('%s_tag' % releaseConfig['productName']),
             'slavenames': pf['slaves'],
             'category': builderPrefix(''),
-            'builddir': builderPrefix('%s_tag_source' % releaseConfig['productName']),
+            'builddir': builderPrefix('%s_tag' % releaseConfig['productName']),
             'slavebuilddir': normalizeName(
                 builderPrefix('%s_tag' % releaseConfig['productName'])),
-            'factory': tag_source_factory,
+            'factory': tag_factory,
             'env': tag_env,
             'properties': {
                 'builddir': builderPrefix(
-                    '%s_tag_source' % releaseConfig['productName']),
+                    '%s_tag' % releaseConfig['productName']),
                 'slavebuilddir': normalizeName(
-                    builderPrefix('%s_tag_source' % releaseConfig['productName'])),
+                    builderPrefix('%s_tag' % releaseConfig['productName'])),
                 'release_config': releaseConfigFile,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'event_group': 'tag',
-                'script_repo_revision': releaseTag,
             }
         })
-
-        if with_l10n:
-            tag_l10n_factory = ScriptFactory(
-                scriptRepo=tools_repo,
-                scriptName='scripts/release/tagging.sh',
-                use_mock=use_mock('linux'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                env=tag_env,
-                extra_data={"tag_args": "--tag-l10n"},
-            )
-
-            builders.append({
-                'name': builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
-                'slavenames': pf['slaves'] + branchConfig['platforms']['linux64']['slaves'],
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
-                'slavebuilddir': normalizeName(
-                    builderPrefix('%s_tag_l10n' % releaseConfig['productName'])),
-                'factory': tag_l10n_factory,
-                'env': tag_env,
-                'properties': {
-                    'builddir': builderPrefix(
-                        '%s_tag_l10n' % releaseConfig['productName']),
-                    'slavebuilddir': normalizeName(
-                        builderPrefix('%s_tag_l10n' % releaseConfig['productName'])),
-                    'release_config': releaseConfigFile,
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                    'script_repo_revision': releaseTag,
-                }
-            })
-        else:
-            dummy_tag_builders.append("l10n")
     else:
-        dummy_tag_builders.extend(["source", "l10n"])
-        for dummy in dummy_tag_builders:
-            builders.append(makeDummyBuilder(
-                            name=builderPrefix('%s_tag_%s' %
-                                               releaseConfig['productName'], dummy),
-                            slaves=all_slaves,
-                            category=builderPrefix(''),
-                            properties={
-                                'platform': None,
-                                'branch': 'release-%s' % sourceRepoInfo['name'],
-                            },
-                            ))
+        builders.append(makeDummyBuilder(
+            name=builderPrefix('%s_tag' % releaseConfig['productName']),
+            slaves=all_slaves,
+            category=builderPrefix(''),
+            properties={
+                'platform': None,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            },
+        ))
 
     if not releaseConfig.get('skip_source'):
         pf = branchConfig['platforms']['linux']
@@ -655,12 +610,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             platform_env['MOZ_UPDATE_CHANNEL'] = releaseChannel
             platform_env['COMM_REV'] = releaseTag
             platform_env['MOZILLA_REV'] = releaseTag
+            if platform in releaseConfig['l10nPlatforms']:
+                triggeredSchedulers = [builderPrefix('%s_repack' % platform)]
+            else:
+                triggeredSchedulers = None
             multiLocaleConfig = releaseConfig.get(
                 'multilocale_config', {}).get('platforms', {}).get(platform)
             mozharnessMultiOptions = releaseConfig.get(
                 'multilocale_config', {}).get('multilocaleOptions')
             balrog_credentials_file = releaseConfig.get('balrog_credentials_file',
-                                                        branchConfig.get('balrog_credentials_file', None))
+                branchConfig.get('balrog_credentials_file', None))
             # Turn pymake on by default for Windows, and off by default for
             # other platforms.
             if 'win' in platform:
@@ -705,6 +664,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 clobberURL=clobberer_url,
                 clobberBranch='release-%s' % sourceRepoInfo['name'],
                 triggerBuilds=True,
+                triggeredSchedulers=triggeredSchedulers,
                 stagePlatform=buildbot2ftp(platform),
                 multiLocale=bool(releaseConfig.get('enableMultiLocale', False) and
                                  pf.get('multi_locale', False)),
@@ -881,7 +841,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args.append('--generate-partials')
                     if pf.get('tooltool_l10n_manifest_src'):
                         extra_args.extend(['--tooltool-manifest',
-                                          pf.get('tooltool_l10n_manifest_src')])
+                            pf.get('tooltool_l10n_manifest_src')])
                     if pf.get('tooltool_script'):
                         for script in pf['tooltool_script']:
                             extra_args.extend(['--tooltool-script', script])
@@ -1179,7 +1139,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         except KeyError:
             moz_repo_path = sourceRepoInfo['path']
         balrog_credentials_file = releaseConfig.get('balrog_credentials_file',
-                                                    branchConfig.get('balrog_credentials_file', None))
+            branchConfig.get('balrog_credentials_file', None))
         updates_factory = ReleaseUpdatesFactory(
             hgHost=branchConfig['hghost'],
             repoPath=sourceRepoInfo['path'],
@@ -1639,7 +1599,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         )
 
         builders.append({
-            'name': builderPrefix('%s_bouncer_submitter' % releaseConfig['productName']),
+            'name': builderPrefix('%s_bouncer_submitter' % releaseConfig['productName'] ),
             'slavenames': branchConfig['platforms']['linux']['slaves'] +
             branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
@@ -1676,38 +1636,30 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 '%s_repo_setup' % releaseConfig['productName'])],
         )
         schedulers.append(repo_setup_scheduler)
-        tag_source_scheduler = Dependent(
-            name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
+        tag_scheduler = Dependent(
+            name=builderPrefix('%s_tag' % releaseConfig['productName']),
             upstream=repo_setup_scheduler,
             builderNames=[builderPrefix(
-                '%s_tag_source' % releaseConfig['productName'])],
+                '%s_tag' % releaseConfig['productName'])],
         )
     else:
-        tag_source_scheduler = Dependent(
-            name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
+        tag_scheduler = Dependent(
+            name=builderPrefix('%s_tag' % releaseConfig['productName']),
             upstream=reset_schedulers_scheduler,
             builderNames=[builderPrefix(
-                '%s_tag_source' % releaseConfig['productName'])],
+                '%s_tag' % releaseConfig['productName'])],
         )
+    schedulers.append(tag_scheduler)
 
-        tag_l10n_scheduler = Dependent(
-            name=builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
-            upstream=reset_schedulers_scheduler,
-            builderNames=[builderPrefix(
-                '%s_tag_l10n' % releaseConfig['productName'])],
-        )
-    schedulers.append(tag_source_scheduler)
-    schedulers.append(tag_l10n_scheduler)
-
-    tag_source_downstream = [builderPrefix('%s_source' % releaseConfig[
-                                           'productName'])]
+    tag_downstream = [builderPrefix('%s_source' % releaseConfig[
+                                    'productName'])]
 
     if releaseConfig['buildNumber'] == 1 \
             and not releaseConfig.get('disableBouncerEntries'):
-        tag_source_downstream.append(builderPrefix('%s_bouncer_submitter' % releaseConfig['productName']))
+        tag_downstream.append(builderPrefix('%s_bouncer_submitter' % releaseConfig['productName']))
 
     if releaseConfig.get('xulrunnerPlatforms'):
-        tag_source_downstream.append(builderPrefix('xulrunner_source'))
+        tag_downstream.append(builderPrefix('xulrunner_source'))
         xr_postrelease_scheduler = Triggerable(
             name=builderPrefix('xr_postrelease'),
             builderNames=[builderPrefix('xr_postrelease')],
@@ -1715,25 +1667,17 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         schedulers.append(xr_postrelease_scheduler)
 
     for platform in releaseConfig['enUSPlatforms']:
-        tag_source_downstream.append(builderPrefix('%s_build' % platform))
+        tag_downstream.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['notifyPlatforms']:
             important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
             if platform in releaseConfig.get('l10nNotifyPlatforms', []):
                 important_builders.append(builderPrefix('%s_repack_complete' % platform))
             l10nBuilderNames = l10nBuilders(platform).values()
-            repack_upstream = [
-                builderPrefix('%s_build' % platform),
-                builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
-            ]
-
-            repack_scheduler = AggregatingScheduler(
-                 name=builderPrefix('%s_repack' % platform),
-                 branch=sourceRepoInfo['path'],
-                 upstreamBuilders=repack_upstream,
-                 builderNames=l10nBuilderNames,
-                 properties={'script_repo_revision': releaseTag, },)
-
+            repack_scheduler = Triggerable(
+                name=builderPrefix('%s_repack' % platform),
+                builderNames=l10nBuilderNames,
+            )
             schedulers.append(repack_scheduler)
             repack_complete_scheduler = AggregatingScheduler(
                 name=builderPrefix('%s_repack_complete' % platform),
@@ -1744,7 +1688,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             schedulers.append(repack_complete_scheduler)
 
     for platform in releaseConfig.get('xulrunnerPlatforms', []):
-        tag_source_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
+        tag_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
 
     DependentID = makePropertiesScheduler(
         Dependent, [buildIDSchedFunc, buildUIDSchedFunc])
@@ -1752,8 +1696,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     schedulers.append(
         DependentID(
             name=builderPrefix('%s_build' % releaseConfig['productName']),
-            upstream=tag_source_scheduler,
-            builderNames=tag_source_downstream,
+            upstream=tag_scheduler,
+            builderNames=tag_downstream,
         ))
 
     for platform in releaseConfig['unittestPlatforms']:
