@@ -67,9 +67,7 @@ def makeTryMessage(build, log_url):
         else:
             raise ValueError("I don't know who did this build")
 
-    branch = props['branch']
-    tree = 'try-comm-central' if 'comm' in branch else 'try'
-    tbpl_tree = 'Thunderbird-Try' if 'comm' in branch else 'Try'
+    tree = props['branch']
 
     if 'got_revision' in props:
         revision = props['got_revision'][:12]
@@ -125,12 +123,12 @@ Your %(tree)s Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder
         log_url = log_url.replace('://stage', '://ftp')
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n\n" % locals()
 
-    text += "For an overview of all results see <a href=\"https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s\">Treeherder</a>.\n" % locals()
-    text += "Alternatively, view them on <a href=\"https://tbpl.mozilla.org/?tree=%(tbpl_tree)s&rev=%(revision)s\">TBPL</a> (soon to be deprecated).\n" % locals()
+    treeherder_url = "https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s" % locals()
+    text += "For an overview of all results see <a href=\"%(treeherder_url)\">Treeherder</a>.\n" % locals()
     text = re.sub("\n", "<br>\n", text)
 
-    headers = {"In-Reply-To": "<%(branch)s-%(revision)s>" % locals(),
-               "References": "<%(branch)s-%(revision)s>" % locals(),
+    headers = {"In-Reply-To": "<%(tree)s-%(revision)s>" % locals(),
+               "References": "<%(tree)s-%(revision)s>" % locals(),
                }
 
     return dict(
