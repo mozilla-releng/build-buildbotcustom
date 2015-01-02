@@ -4,23 +4,18 @@ import re
 def buildTryChangeMessage(change, packageDir):
     got_revision = revision = change.revision[:12]
     who = change.who
-    branch = change.branch
-    tree = 'try-comm-central' if 'comm' in branch else 'try'
-    tbpl_tree = 'Thunderbird-Try' if 'comm' in branch else 'Try'
+    tree = change.branch
     packageDir = packageDir % locals()
     msgdict = {"type": "plain"}
     msgdict['subject'] = "%(tree)s submission %(revision)s" % locals()
-    msgdict['headers'] = {"In-Reply-To": "<%(branch)s-%(revision)s>" % locals(),
-                          "References": "<%(branch)s-%(revision)s>" % locals(),
+    msgdict['headers'] = {"In-Reply-To": "<%(tree)s-%(revision)s>" % locals(),
+                          "References": "<%(tree)s-%(revision)s>" % locals(),
                           }
     msgdict["body"] = """\
 Thank you for your try submission. It's the best!
 
 Results will be displayed on Treeherder as they come in:
 https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s
-
-Alternatively, view them on TBPL (soon to be deprecated):
-https://tbpl.mozilla.org/?tree=%(tbpl_tree)s&rev=%(revision)s
 
 Once completed, builds and logs will be available at:
 %(packageDir)s
