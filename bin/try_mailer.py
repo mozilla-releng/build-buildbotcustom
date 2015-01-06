@@ -124,7 +124,7 @@ Your %(tree)s Server %(task)s (%(revision)s) %(result_msg)s on builder %(builder
         text += "The full log for this %(task)s run is available at <a href=\"%(log_url)s\">%(log_url)s</a>.\n\n" % locals()
 
     treeherder_url = "https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s" % locals()
-    text += "For an overview of all results see <a href=\"%(treeherder_url)\">Treeherder</a>.\n" % locals()
+    text += "For an overview of all results see <a href=\"%(treeherder_url)s\">Treeherder</a>.\n" % locals()
     text = re.sub("\n", "<br>\n", text)
 
     headers = {"In-Reply-To": "<%(tree)s-%(revision)s>" % locals(),
