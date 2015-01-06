@@ -1627,6 +1627,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                       "--version", releaseConfig['version'],
                       "--credentials-file", "oauth.txt",
                       "--bouncer-api-prefix", releaseConfig['tuxedoServerUrl'],
+                      "--build-number", releaseConfig['buildNumber'],
                       ]
         for partial in releaseConfig.get('partialUpdates', {}).iterkeys():
             extra_args.extend(["--previous-version", partial])
