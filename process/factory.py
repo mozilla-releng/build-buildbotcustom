@@ -4558,7 +4558,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             name='submit_balrog_updates',
             command=cmd,
             workdir='.',
-            flunkOnFailure=False,
+            flunkOnFailure=True,
         ))
 
     def verifySnippets(self):
