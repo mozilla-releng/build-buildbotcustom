@@ -1469,6 +1469,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'script_repo_revision': releaseTag,
             'platform': None,
             'branch': 'release-%s' % sourceRepoInfo['name'],
+            'event_group': 'postrelease',
         },
     })
 
@@ -1526,6 +1527,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'script_repo_revision': releaseTag,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                'event_group': 'postrelease',
             },
         })
 
