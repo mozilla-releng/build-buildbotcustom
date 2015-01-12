@@ -5386,7 +5386,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                         '--default-repo %s ' % scriptRepo +
                         '--default-revision %(script_repo_revision:-default)s ' +
                         '--default-checkout %s ' % self.script_repo_cache +
-                        '--checkout %(basedir)s/build/scripts ' +
+                        '--checkout %(basedir)s/scripts ' +
                         '--manifest-url %s' % script_repo_manifest)],
                     log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
                     haltOnFailure=True,
