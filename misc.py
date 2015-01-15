@@ -972,12 +972,6 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         branch_and_pool_args.extend(['--build-pool', 'production'])
     base_extra_args.extend(branch_and_pool_args)
 
-    # we need non_unified here since we can not create another platform in
-    # config.py for non-unified. This still allows us to still define what
-    # non-unifed looks like at a config.py level
-    non_unified_extra_args = pf.get("mozharness_non_unified_extra_args", [])
-    non_unified_extra_args.extend(branch_and_pool_args)
-
     base_builder_dir = '%s-%s' % (name, platform)
     # let's assign next_slave here so we only have to change it in
     # this location for mozharness builds if we swap it out again.
@@ -1034,27 +1028,6 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         }
         desktop_mh_builders.append(generic_builder)
         builds_created['done_generic_build'] = True
-
-    # if we_do_non_unified_builds:
-    if (pf.get('enable_nonunified_build') and
-            pf.get("mozharness_non_unified_extra_args")):
-        non_unified_factory = makeMHFactory(config, pf, mh_cfg=mh_cfg,
-                                            extra_args=non_unified_extra_args,
-                                            signingServers=dep_signing_servers,
-                                            log_eval_func=return_codes_func)
-        nonunified_builder = {
-            'name': '%s non-unified' % pf['base_name'],
-            'builddir': '%s-nonunified' % base_builder_dir,
-            'slavebuilddir': normalizeName(
-                '%s-nonunified' % base_builder_dir),
-            'slavenames': pf['slaves'],
-            'nextSlave': next_slave,
-            'factory': non_unified_factory,
-            'category': name,
-            'properties': mh_build_properties.copy(),
-        }
-        desktop_mh_builders.append(nonunified_builder)
-        builds_created['done_nonunified_build'] = True
 
     # if do nightly:
     if config['enable_nightly'] and pf.get('enable_nightly', True):
@@ -1197,9 +1170,6 @@ def generateBranchObjects(config, name, secrets=None):
                 buildername = '%s_nightly' % pf['base_name']
                 nightlyBuilders.append(buildername)
 
-            if pf.get('enable_nonunified_build'):
-                periodicBuilders.append('%s_nonunified' % pf['base_name'])
-
             continue
 
         values = {'basename': base_name,
@@ -1252,9 +1222,6 @@ def generateBranchObjects(config, name, secrets=None):
             builders.append('%s pgo-build' % pf['base_name'])
             buildersByProduct.setdefault(pf['stage_product'], []).append(
                 '%s pgo-build' % pf['base_name'])
-
-        if pf.get('enable_nonunified_build'):
-            periodicBuilders.append('%s non-unified' % pf['base_name'])
 
         if pf.get('enable_noprofiling_build'):
             nightlyBuilders.append('%s no-profiling' % pf['base_name'])
@@ -1523,7 +1490,6 @@ def generateBranchObjects(config, name, secrets=None):
             'done_generic_build': False,  # this is the basic pf
             'done_pgo_build': False,  # generic pf + pgo
             'done_nightly_build': False,  # generic pf + nightly
-            'done_nonunified_build': False,  # generic pf + nonunified
             'done_l10n_repacks': False,  # generic pf + l10n
         }
 
@@ -1582,27 +1548,6 @@ def generateBranchObjects(config, name, secrets=None):
             elif pf.get('enable_periodic', False):
                 builder['name'] = '%s_periodic' % pf['base_name']
                 branchObjects['builders'].append(builder)
-
-            if pf.get('enable_nonunified_build'):
-                # We need a new factory for new extra_args
-                extra_args = pf['mozharness_config'].get('extra_args', [])[:]
-                extra_args += pf['mozharness_config'].get('non_unified_extra_args', [])
-                non_unified_factory = makeMHFactory(
-                    config, pf, extra_args=extra_args,
-                    signingServers=secrets.get(pf.get('dep_signing_servers')),
-                    use_credentials_file=True
-                )
-                non_unified_builder = {
-                    'name': '%s_nonunified' % pf['base_name'],
-                    'slavenames': pf['slaves'],
-                    'nextSlave': _nextAWSSlave_wait_sort,
-                    'builddir': '%s_nonunified' % pf['base_name'],
-                    'slavebuilddir': normalizeName('%s_nonunified' % pf['base_name']),
-                    'factory': non_unified_factory,
-                    'category': name,
-                    'properties': builder['properties'].copy(),
-                }
-                branchObjects['builders'].append(non_unified_builder)
 
             if pf.get('enable_nightly'):
                 if pf.get('dep_signing_servers') != pf.get('nightly_signing_servers'):
@@ -1865,41 +1810,6 @@ def generateBranchObjects(config, name, secrets=None):
                                    'slavebuilddir': normalizeName('%s-%s-pgo' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(pgo_builder)
-
-            # builder_tracker just checks to see if we used
-            # mozharness to create this builder already. Once we port all
-            # builders to mozharness we won't need this builder at all
-            if (pf.get('enable_nonunified_build') and not
-                    builder_tracker['done_nonunified_build']):
-
-                kwargs = factory_kwargs.copy()
-                kwargs['stagePlatform'] += '-nonunified'
-                kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-nonunified'
-                # We don't need to upload these packages
-                # This also disables sendchanges, etc.
-                kwargs['uploadPackages'] = False
-                # Don't need to run checktests
-                kwargs['checkTest'] = False
-                # Do pretty names testing
-                if platform in ('linux', 'linux64', 'macosx64', 'win32', 'win64'):
-                    kwargs['testPrettyNames'] = True
-
-                factory = factory_class(**kwargs)
-                builder = {
-                    'name': '%s non-unified' % pf['base_name'],
-                    'slavenames': pf['slaves'],
-                    'builddir': '%s-%s-nonunified' % (name, platform),
-                    'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product']),
-                    'factory': factory,
-                    'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
-                    'properties': {'branch': name,
-                                   'platform': platform,
-                                   'stage_platform': stage_platform + '-nonunified',
-                                   'product': pf['stage_product'],
-                                   'slavebuilddir': normalizeName('%s-%s-nonunified' % (name, platform), pf['stage_product'])},
-                }
-                branchObjects['builders'].append(builder)
 
             if pf.get('enable_noprofiling_build'):
                 kwargs = factory_kwargs.copy()
