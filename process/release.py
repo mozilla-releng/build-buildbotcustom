@@ -927,6 +927,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 properties={
                     'platform': platform,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
+                    'event_group': 'repack',
                 },
             ))
             updates_upstream_builders.append(
