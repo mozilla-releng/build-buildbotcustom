@@ -123,7 +123,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'emulator': 'emu',
         'hamachi': 'ham',
         'wasabi': 'wsb',
-        'nonunified': 'nu',
         'graphics': 'gfx',
         'flame': 'flm',
         'firefox_tag_source': 'fx_tag_src',
