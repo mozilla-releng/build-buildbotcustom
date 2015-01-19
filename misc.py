@@ -857,6 +857,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             repoPath=config['repo_path'],
             productName=productName,
             posixBinarySuffix=posixBinarySuffix,
+            macResSubdir=pf.get('mac_res_subdir', 'Resources'),
             buildToolsRepoPath=config['build_tools_repo_path'],
             buildSpace=1.0,
             buildsBeforeReboot=config['platforms'][
