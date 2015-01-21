@@ -99,7 +99,8 @@ class DummyFactory(BuildFactory):
             ))
 
 
-def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None, properties=None):
+def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None,
+                     properties=None, env=None):
     properties = properties or {}
     builder = {
         'name': name,
@@ -110,6 +111,8 @@ def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None, proper
     }
     if category:
         builder['category'] = category
+    if env:
+        builder['env'] = env.copy()
     return builder
 
 

@@ -332,6 +332,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                     branchConfig['buildbotcustom_repo_path']),
         'CLOBBERER_URL': clobberer_url,
     }
+    # The following variable is used to make buildbot reload dummy builders
+    dummy_builder_env = {
+        'DUMMY_RELEASE_PREFIX': releasePrefix(),
+    }
+
 
     if use_mock('linux'):
         unix_slaves = mock_slaves
@@ -398,6 +403,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'platform': None,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
+                env=dummy_builder_env,
             ))
 
     dummy_tag_builders = []
@@ -489,6 +495,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                 'platform': None,
                                 'branch': 'release-%s' % sourceRepoInfo['name'],
                             },
+                            env=dummy_builder_env,
                             ))
 
     if not releaseConfig.get('skip_source'):
@@ -609,6 +616,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             },
+            env=dummy_builder_env,
         ))
         if releaseConfig.get('xulrunnerPlatforms'):
             builders.append(makeDummyBuilder(
@@ -619,6 +627,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'platform': None,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                 },
+                env=dummy_builder_env,
             ))
             xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
 
@@ -764,6 +773,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                     'event_group': 'build',
                 },
+                env=dummy_builder_env,
             ))
         updates_upstream_builders.append(builderPrefix('%s_build' % platform))
         deliverables_builders.append(builderPrefix('%s_build' % platform))
@@ -929,6 +939,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                     'event_group': 'repack',
                 },
+                env=dummy_builder_env,
             ))
             updates_upstream_builders.append(
                 builderPrefix('repack_complete', platform))
@@ -1039,6 +1050,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'branch': 'release-%s' % sourceRepoInfo['name'],
                     'product': 'xulrunner',
                 },
+                env=dummy_builder_env,
             ))
         xr_deliverables_builders.append(
             builderPrefix('xulrunner_%s_build' % platform))
@@ -1306,6 +1318,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'event_group': 'update',
             },
+            env=dummy_builder_env,
         ))
         post_signing_builders.append(builderPrefix('%s_updates' % releaseConfig['productName']))
 
@@ -1597,6 +1610,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'event_group': 'releasetest',
             },
+            env=dummy_builder_env,
         ))
         important_builders.append(
             builderPrefix('%s_ready_for_releasetest_testing' % releaseConfig['productName']))
@@ -1609,6 +1623,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             },
+            env=dummy_builder_env,
         ))
 
         builders.append(makeDummyBuilder(
@@ -1620,6 +1635,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'event_group': 'release',
             },
+            env=dummy_builder_env,
         ))
         important_builders.append(builderPrefix('%s_ready_for_release' % releaseConfig['productName']))
 
@@ -1931,6 +1947,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
             },
+            env=dummy_builder_env,
         ))
 
     # Separate email messages per list. Mailman doesn't try to avoid duplicate
