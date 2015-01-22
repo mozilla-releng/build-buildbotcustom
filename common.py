@@ -125,6 +125,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'wasabi': 'wsb',
         'graphics': 'gfx',
         'flame': 'flm',
+        'dolphin': 'dph',
         'firefox_tag_source': 'fx_tag_src',
         'firefox_tag_l10n': 'fx_tag_l10n',
         'fennec_tag_source': 'm_tag_src',
