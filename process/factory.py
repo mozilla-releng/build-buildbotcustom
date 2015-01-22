@@ -99,7 +99,8 @@ class DummyFactory(BuildFactory):
             ))
 
 
-def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None, properties=None):
+def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None,
+                     properties=None, env=None):
     properties = properties or {}
     builder = {
         'name': name,
@@ -110,6 +111,8 @@ def makeDummyBuilder(name, slaves, category=None, delay=0, triggers=None, proper
     }
     if category:
         builder['category'] = category
+    if env:
+        builder['env'] = env.copy()
     return builder
 
 
@@ -4625,7 +4628,7 @@ class MozillaTestFactory(MozillaBuildFactory):
     def __init__(self, platform, productName='firefox',
                  downloadSymbols=True, downloadSymbolsOnDemand=True,
                  downloadTests=False, posixBinarySuffix='-bin',
-                 resetHwClock=False, **kwargs):
+                 resetHwClock=False, macResSubdir='Resources', **kwargs):
         # Note: the posixBinarySuffix is needed because some products (firefox)
         # use 'firefox-bin' and some (fennec) use 'fennec' for the name of the
         # actual application binary.  This is only applicable to posix-like
@@ -4638,6 +4641,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             self.posixBinarySuffix = ''
         else:
             self.posixBinarySuffix = posixBinarySuffix
+        self.macResSubdir = macResSubdir
         self.downloadSymbols = downloadSymbols
         self.downloadSymbolsOnDemand = downloadSymbolsOnDemand
         self.downloadTests = downloadTests
@@ -4749,6 +4753,19 @@ class MozillaTestFactory(MozillaBuildFactory):
                      value=get_exedir,
                      ))
 
+        # OSX 10.9.5+ requires putting extensions and plugins into
+        # Contents/Resources, this property sets up that directory.
+        def get_xredir(build):
+            if self.platform.startswith("macosx"):
+                contentsdir = os.path.dirname(get_exedir(build))
+                return os.path.join(contentsdir, self.macResSubdir)
+            else:
+                return get_exedir(build)
+        self.addStep(SetBuildProperty(
+                     property_name="xredir",
+                     value=get_xredir,
+                     ))
+
         # Need to override toolsdir as set by MozillaBuildFactory because
         # we need Windows-style paths for the stack walker.
         if self.platform.startswith('win'):
@@ -4827,7 +4844,7 @@ class MozillaTestFactory(MozillaBuildFactory):
             return retval
         self.addStep(SetProperty(
                      command=['python', WithProperties('%(toolsdir)s/buildfarm/utils/printbuildrev.py'),
-                              WithProperties('%(exedir)s')],
+                              WithProperties('%(xredir)s')],
                      workdir='build',
                      extract_fn=get_build_info,
                      name='get build info',
@@ -5006,10 +5023,10 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                              name='unpack mozmill tests',
                              ))
 
-                installscript = " && ".join(["if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi",
-                                             "if [ ! -d %(exedir)s/extensions ]; then mkdir %(exedir)s/extensions; fi",
-                                             "cp -R bin/plugins/* %(exedir)s/plugins/",
-                                             "if [ -d extensions ]; then cp -R extensions/* %(exedir)s/extensions/; fi"])
+                installscript = " && ".join(["if [ ! -d %(xredir)s/plugins ]; then mkdir %(xredir)s/plugins; fi",
+                                             "if [ ! -d %(xredir)s/extensions ]; then mkdir %(xredir)s/extensions; fi",
+                                             "cp -R bin/plugins/* %(xredir)s/plugins/",
+                                             "if [ -d extensions ]; then cp -R extensions/* %(xredir)s/extensions/; fi"])
                 self.addStep(ShellCommand(
                              name='install plugins and extensions',
                              command=['sh', '-c', WithProperties(installscript)],

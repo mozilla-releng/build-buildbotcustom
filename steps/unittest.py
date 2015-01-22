@@ -496,16 +496,16 @@ class MozillaPackagedXPCShellTests(XPCShellMixin, ShellCommandReportTimeout):
         bin_extension = ""
         if platform.startswith('win'):
             bin_extension = ".exe"
-        script = " && ".join(["if [ ! -d %(exedir)s/plugins ]; then mkdir %(exedir)s/plugins; fi",
-                              "if [ ! -d %(exedir)s/components ]; then mkdir %(exedir)s/components; fi",
-                              "if [ ! -d %(exedir)s/extensions ]; then mkdir %(exedir)s/extensions; fi",
+        script = " && ".join(["if [ ! -d %(xredir)s/plugins ]; then mkdir %(xredir)s/plugins; fi",
+                              "if [ ! -d %(xredir)s/components ]; then mkdir %(xredir)s/components; fi",
+                              "if [ ! -d %(xredir)s/extensions ]; then mkdir %(xredir)s/extensions; fi",
                               "cp bin/xpcshell" +
                               bin_extension + " %(exedir)s",
                               "cp bin/ssltunnel" +
                               bin_extension + " %(exedir)s",
-                              "cp -R bin/components/* %(exedir)s/components/",
-                              "cp -R bin/plugins/* %(exedir)s/plugins/",
-                              "if [ -d extensions ]; then cp -R extensions/* %(exedir)s/extensions/; fi",
+                              "cp -R bin/components/* %(xredir)s/components/",
+                              "cp -R bin/plugins/* %(xredir)s/plugins/",
+                              "if [ -d extensions ]; then cp -R extensions/* %(xredir)s/extensions/; fi",
                               "python -u xpcshell/runxpcshelltests.py"])
 
         if symbols_path:
