@@ -1722,9 +1722,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     tag_source_downstream = [builderPrefix('%s_source' % releaseConfig[
                                            'productName'])]
 
-    if releaseConfig['buildNumber'] == 1 \
-            and not releaseConfig.get('disableBouncerEntries'):
-        tag_source_downstream.append(builderPrefix('%s_bouncer_submitter' % releaseConfig['productName']))
+    if not releaseConfig.get('disableBouncerEntries'):
+        tag_source_downstream.append(builderPrefix(
+            '%s_bouncer_submitter' % releaseConfig['productName']))
 
     if releaseConfig.get('xulrunnerPlatforms'):
         tag_source_downstream.append(builderPrefix('xulrunner_source'))
