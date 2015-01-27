@@ -2557,6 +2557,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                                                            factory_kwargs, branch_config, platform_config)
                             pgo_factory = generateMozharnessTalosBuilder(**args)
                             properties['script_repo_revision'] = branch_config['mozharness_tag']
+                            properties['repo_path'] = branch_config['repo_path']
                         else:
                             assert False
 
