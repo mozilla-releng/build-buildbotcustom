@@ -1016,6 +1016,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         factory = makeMHFactory(config, pf, mh_cfg=mh_cfg,
                                 extra_args=base_extra_args,
                                 signingServers=dep_signing_servers,
+                                use_credentials_file=True,
                                 log_eval_func=return_codes_func)
         generic_builder = {
             'name': '%s build' % pf['base_name'],
@@ -1066,6 +1067,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         pgo_extra_args = base_extra_args + config['mozharness_desktop_extra_options']['pgo']
         pgo_factory = makeMHFactory(
             config, pf, mh_cfg=mh_cfg, extra_args=pgo_extra_args,
+            use_credentials_file=True,
             signingServers=dep_signing_servers, log_eval_func=return_codes_func
         )
         pgo_builder = {
