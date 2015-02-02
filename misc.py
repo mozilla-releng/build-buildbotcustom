@@ -1681,7 +1681,7 @@ def generateBranchObjects(config, name, secrets=None):
             mozharness_repo_cache = pf.get('mozharness_repo_cache')
 
         # Some platforms shouldn't do dep builds (i.e. RPM)
-        if pf.get('enable_dep', True):
+        if pf.get('enable_dep', True) or pf.get('enable_periodic', False):
             factory_kwargs = {
                 'env': pf['env'],
                 'objdir': pf['platform_objdir'],
