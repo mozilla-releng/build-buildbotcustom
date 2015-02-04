@@ -499,8 +499,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             ))
 
     if not releaseConfig.get('skip_source'):
-        pf = branchConfig['platforms']['linux']
-        mozconfig = 'linux/%s/release' % sourceRepoInfo['name']
+        pf = branchConfig['platforms']['linux64']
+        mozconfig = '%s/config/mozconfigs/linux64/release' % releaseConfig['appName']
         platform_env = pf['env'].copy()
         platform_env['COMM_REV'] = releaseTag
         platform_env['MOZILLA_REV'] = releaseTag
@@ -527,14 +527,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             clobberURL=clobberer_url,
             clobberBranch='release-%s' % sourceRepoInfo['name'],
             mozconfig=mozconfig,
-            configRepoPath=branchConfig['config_repo_path'],
-            configSubDir=branchConfig['config_subdir'],
             signingServers=getSigningServers('linux'),
-            mozconfigBranch=releaseTag,
             use_mock=source_use_mock,
             mock_target=pf.get('mock_target'),
             mock_packages=pf.get('mock_packages'),
             mock_copyin_files=pf.get('mock_copyin_files'),
+            tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+            tooltool_url_list=branchConfig.get('tooltool_url_list', []),
+            tooltool_script=pf.get('tooltool_script'),
         )
 
         builders.append({
@@ -561,7 +561,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderPrefix('%s_source' % releaseConfig['productName']))
 
         if releaseConfig.get('xulrunnerPlatforms'):
-            mozconfig = 'linux/%s/xulrunner' % sourceRepoInfo['name']
+            mozconfig = '%s/config/mozconfigs/linux64/release' % releaseConfig['appName']
             xulrunner_source_factory = SingleSourceFactory(
                 env=pf['env'],
                 objdir=pf['platform_objdir'],
@@ -580,14 +580,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 clobberURL=clobberer_url,
                 clobberBranch='release-%s' % sourceRepoInfo['name'],
                 mozconfig=mozconfig,
-                configRepoPath=branchConfig['config_repo_path'],
-                configSubDir=branchConfig['config_subdir'],
                 signingServers=getSigningServers('linux'),
-                mozconfigBranch=releaseTag,
                 use_mock=use_mock('linux'),
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=branchConfig.get('tooltool_url_list', []),
+                tooltool_script=pf.get('tooltool_script'),
             )
 
             builders.append({
@@ -684,7 +684,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 repoPath=sourceRepoInfo['path'],
                 buildToolsRepoPath=tools_repo_path,
                 configRepoPath=branchConfig['config_repo_path'],
-                configSubDir=branchConfig['config_subdir'],
                 profiledBuild=pf['profiled_build'],
                 mozconfig=mozconfig,
                 srcMozconfig=releaseConfig.get('mozconfigs', {}).get(platform),
@@ -728,7 +727,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 usePrettyNames=releaseConfig.get('usePrettyNames', True),
                 enableUpdatePackaging=releaseConfig.get(
                     'enableUpdatePackaging', True),
-                mozconfigBranch=releaseTag,
                 signingServers=getSigningServers(platform),
                 createPartial=releaseConfig.get(
                     'enablePartialMarsAtBuildTime', True),
@@ -988,7 +986,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 repoPath=sourceRepoInfo['path'],
                 buildToolsRepoPath=tools_repo_path,
                 configRepoPath=branchConfig['config_repo_path'],
-                configSubDir=branchConfig['config_subdir'],
                 profiledBuild=None,
                 mozconfig='%s/%s/xulrunner' % (
                     platform, sourceRepoInfo['name']),
