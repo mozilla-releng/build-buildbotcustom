@@ -21,7 +21,7 @@ def getPlatformFtpDir(platform):
         'macosx': 'mac',
         'macosx64': 'mac',
         'win32': 'win32',
-        'win64': 'win64-x86_64',
+        'win64': 'win64',
         'android': 'android-r7',
     }
     return platform_ftp_map.get(platform)

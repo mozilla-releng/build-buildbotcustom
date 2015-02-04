@@ -644,7 +644,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         elif platform.startswith("win32"):
             packageFilename = '*.win32.zip'
         elif platform.startswith("win64"):
-            packageFilename = '*.win64-x86_64.zip'
+            packageFilename = '*.win64.zip'
         else:
             return False
         return packageFilename
