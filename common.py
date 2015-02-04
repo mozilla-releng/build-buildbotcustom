@@ -126,6 +126,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'graphics': 'gfx',
         'flame': 'flm',
         'dolphin': 'dph',
+        'nexus-5': 'n5',
         'firefox_tag_source': 'fx_tag_src',
         'firefox_tag_l10n': 'fx_tag_l10n',
         'fennec_tag_source': 'm_tag_src',
