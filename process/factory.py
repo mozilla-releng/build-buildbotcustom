@@ -644,7 +644,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         elif platform.startswith("win32"):
             packageFilename = '*.win32.zip'
         elif platform.startswith("win64"):
-            packageFilename = '*.win64-x86_64.zip'
+            packageFilename = '*.win64.zip'
         else:
             return False
         return packageFilename
@@ -801,7 +801,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
 
 
 class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
-    def __init__(self, objdir, platform, configRepoPath, configSubDir,
+    def __init__(self, objdir, platform, configRepoPath,
                  profiledBuild, mozconfig, srcMozconfig=None,
                  productName=None,
                  buildRevision=None, stageServer=None, stageUsername=None,
@@ -818,7 +818,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  mozillaSrcDir=None,
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
-                 mozconfigBranch="production", useSharedCheckouts=False,
+                 useSharedCheckouts=False,
                  stagePlatform=None, testPrettyNames=False, l10nCheckTest=False,
                  disableSymbols=False,
                  doBuildAnalysis=False,
@@ -861,7 +861,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.objdir = objdir
         self.platform = platform
         self.configRepoPath = configRepoPath
-        self.configSubDir = configSubDir
         self.profiledBuild = profiledBuild
         self.mozconfig = mozconfig
         self.srcMozconfig = srcMozconfig
@@ -905,7 +904,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.enable_ccache = enable_ccache
         self.triggeredSchedulers = triggeredSchedulers
         self.triggerBuilds = triggerBuilds
-        self.mozconfigBranch = mozconfigBranch
         self.post_upload_include_platform = post_upload_include_platform
         self.useSharedCheckouts = useSharedCheckouts
         self.testPrettyNames = testPrettyNames
@@ -1357,28 +1355,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         ))
 
     def addConfigSteps(self):
-        assert self.configRepoPath is not None
-        assert self.configSubDir is not None
-        assert self.mozconfig is not None
-
-        configRepo = self.getRepository(self.configRepoPath)
-        hg_mozconfig = '%s/raw-file/%s/%s/%s/mozconfig' % (
-            configRepo, self.mozconfigBranch, self.configSubDir, self.mozconfig)
-        if self.srcMozconfig:
-            cmd = ['bash', '-c',
-                   '''if [ -f "%(src_mozconfig)s" ]; then
-                        echo Using in-tree mozconfig;
-                        cp %(src_mozconfig)s .mozconfig;
-                    else
-                        echo Downloading mozconfig;
-                        wget -O .mozconfig %(hg_mozconfig)s;
-                    fi'''.replace("\n", "") % {'src_mozconfig': self.srcMozconfig, 'hg_mozconfig': hg_mozconfig}]
-        else:
-            cmd = ['wget', '-O', '.mozconfig', hg_mozconfig]
-
-        self.addStep(RetryingShellCommand(
+        self.addStep(ShellCommand(
             name='get_mozconfig',
-            command=cmd,
+            command=['cp', self.srcMozconfig, '.mozconfig'],
             description=['getting', 'mozconfig'],
             descriptionDone=['got', 'mozconfig'],
             haltOnFailure=True
@@ -3058,8 +3037,8 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
 
     def __init__(self, project, appName, l10nRepoPath,
                  compareLocalesRepoPath, compareLocalesTag, stageServer,
-                 stageUsername, stageSshKey=None, objdir='', platform='',
-                 mozconfig=None,
+                 stageUsername, mozconfig, stageSshKey=None, objdir='',
+                 platform='',
                  tree="notset", mozillaDir=None, mozillaSrcDir=None,
                  l10nTag='default',
                  mergeLocales=True,
@@ -3220,21 +3199,9 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         return kwargs
 
     def getMozconfig(self):
-        if not self.mozconfig:
-            return
-
-        cmd = ['bash', '-c',
-               '''if [ -f "%(mozconfig)s" ]; then
-                    echo Using in-tree mozconfig;
-                    cp %(mozconfig)s .mozconfig;
-                else
-                    echo Could not find in-tree mozconfig;
-                    exit 1;
-                fi'''.replace("\n", "") % {'mozconfig': self.mozconfig}]
-
-        self.addStep(RetryingShellCommand(
+        self.addStep(ShellCommand(
             name='get_mozconfig',
-            command=cmd,
+            command=['cp', self.mozconfig, '.mozconfig'],
             description=['getting', 'mozconfig'],
             descriptionDone=['got', 'mozconfig'],
             workdir='build/' + self.origSrcDir,
@@ -4030,20 +3997,35 @@ class StagingRepositorySetupFactory(ReleaseFactory):
                      ))
 
 
-class SingleSourceFactory(ReleaseFactory):
-    def __init__(self, productName, version, baseTag, stagingServer,
-                 stageUsername, stageSshKey, buildNumber, mozconfig,
-                 configRepoPath, configSubDir, objdir='',
-                 mozillaDir=None, mozillaSrcDir=None, autoconfDirs=['.'], buildSpace=2,
-                 mozconfigBranch="production", appVersion=None, **kwargs):
+class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
+    def __init__(self,
+                 productName,
+                 version,
+                 baseTag,
+                 stagingServer,
+                 stageUsername,
+                 stageSshKey,
+                 buildNumber,
+                 mozconfig,
+                 appVersion=None,
+                 objdir='',
+                 mozillaDir=None,
+                 mozillaSrcDir=None,
+                 autoconfDirs=['.'],
+                 buildSpace=2,
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=None,
+                 tooltool_script=None,
+                 **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.mozconfig = mozconfig
-        self.configRepoPath = configRepoPath
-        self.configSubDir = configSubDir
-        self.mozconfigBranch = mozconfigBranch
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list or []
+        self.tooltool_script = tooltool_script or ['/tools/tooltool.py']
+        self.tooltool_bootstrap = tooltool_bootstrap
         self.releaseTag = '%s_RELEASE' % (baseTag)
-
         self.origSrcDir = self.branchName
 
         # Mozilla subdir
@@ -4109,6 +4091,8 @@ class SingleSourceFactory(ReleaseFactory):
                      workdir=self.mozillaSrcDir,
                      haltOnFailure=True
                      ))
+        if self.tooltool_manifest_src:
+            self.addTooltoolStep(workdir=self.origSrcDir)
         self.addConfigSteps(workdir=self.mozillaSrcDir)
         self.addStep(MockCommand(
                      name='configure',
@@ -4145,45 +4129,13 @@ class SingleSourceFactory(ReleaseFactory):
         ))
 
     def addConfigSteps(self, workdir='build'):
-        assert self.configRepoPath is not None
-        assert self.configSubDir is not None
-        assert self.mozconfig is not None
-        configRepo = self.getRepository(self.configRepoPath)
-
-        self.mozconfig = 'configs/%s/%s/mozconfig' % (self.configSubDir,
-                                                      self.mozconfig)
         self.addStep(ShellCommand(
-                     name='rm_configs',
-                     command=['rm', '-rf', 'configs'],
-                     description=['removing', 'configs'],
-                     descriptionDone=['remove', 'configs'],
-                     haltOnFailure=True,
-                     workdir='.'
-                     ))
-        self.addStep(MercurialCloneCommand(
-                     name='hg_clone_configs',
-                     command=['hg', 'clone', configRepo, 'configs'],
-                     description=['checking', 'out', 'configs'],
-                     descriptionDone=['checkout', 'configs'],
-                     haltOnFailure=True,
-                     workdir='.'
-                     ))
-        self.addStep(ShellCommand(
-                     name='hg_update',
-                     command=['hg', 'update', '-r', self.mozconfigBranch],
-                     description=['updating', 'mozconfigs'],
-                     haltOnFailure=True,
-                     workdir='./configs'
-                     ))
-        self.addStep(ShellCommand(
-                     # cp configs/mozilla2/$platform/$repo/$type/mozconfig
-                     # .mozconfig
                      name='cp_mozconfig',
-                     command=['cp', self.mozconfig, '%s/.mozconfig' % workdir],
+                     command=['cp', self.mozconfig, '.mozconfig'],
                      description=['copying', 'mozconfig'],
                      descriptionDone=['copy', 'mozconfig'],
                      haltOnFailure=True,
-                     workdir='.'
+                     workdir=workdir,
                      ))
         self.addStep(ShellCommand(
                      name='cat_mozconfig',

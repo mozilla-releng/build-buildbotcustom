@@ -21,7 +21,7 @@ def getPlatformFtpDir(platform):
         'macosx': 'mac',
         'macosx64': 'mac',
         'win32': 'win32',
-        'win64': 'win64-x86_64',
+        'win64': 'win64',
         'android': 'android-r7',
     }
     return platform_ftp_map.get(platform)
@@ -126,6 +126,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'graphics': 'gfx',
         'flame': 'flm',
         'dolphin': 'dph',
+        'nexus-5': 'n5',
         'firefox_tag_source': 'fx_tag_src',
         'firefox_tag_l10n': 'fx_tag_l10n',
         'fennec_tag_source': 'm_tag_src',
