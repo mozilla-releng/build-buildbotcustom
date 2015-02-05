@@ -500,7 +500,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if not releaseConfig.get('skip_source'):
         pf = branchConfig['platforms']['linux64']
-        mozconfig = '%s/config/mozconfigs/linux64/release' % releaseConfig['appName']
+        # Everywhere except Thunderbird we use browser mozconfigs to generate
+        # source tarballs. This includes Android and Xulrunner
+        mozconfig = releaseConfig.get(
+            'source_mozconfig',
+            'browser/config/mozconfigs/linux64/release')
         platform_env = pf['env'].copy()
         platform_env['COMM_REV'] = releaseTag
         platform_env['MOZILLA_REV'] = releaseTag
@@ -561,7 +565,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             builderPrefix('%s_source' % releaseConfig['productName']))
 
         if releaseConfig.get('xulrunnerPlatforms'):
-            mozconfig = '%s/config/mozconfigs/linux64/release' % releaseConfig['appName']
+            mozconfig = releaseConfig.get(
+                'source_mozconfig',
+                'browser/config/mozconfigs/linux64/release')
             xulrunner_source_factory = SingleSourceFactory(
                 env=pf['env'],
                 objdir=pf['platform_objdir'],
