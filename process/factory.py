@@ -20,7 +20,6 @@ import buildbotcustom.common
 import buildbotcustom.status.errors
 import buildbotcustom.steps.base
 import buildbotcustom.steps.misc
-import buildbotcustom.steps.release
 import buildbotcustom.steps.source
 import buildbotcustom.steps.test
 import buildbotcustom.steps.updates
@@ -35,7 +34,6 @@ import release.paths
 reload(buildbotcustom.status.errors)
 reload(buildbotcustom.steps.base)
 reload(buildbotcustom.steps.misc)
-reload(buildbotcustom.steps.release)
 reload(buildbotcustom.steps.source)
 reload(buildbotcustom.steps.test)
 reload(buildbotcustom.steps.updates)
@@ -55,7 +53,6 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
     MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
     SetBuildProperty, DisconnectStep, OutputStep, \
     RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps
-from buildbotcustom.steps.release import SnippetComparison
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import GraphServerPost
 from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
@@ -4147,33 +4144,14 @@ class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
 class ReleaseUpdatesFactory(ReleaseFactory):
     snippetStagingDir = '/opt/aus2/snippets/staging'
 
-    def __init__(self, patcherConfig, verifyConfigs,
-                 appName, productName, configRepoPath,
-                 version, appVersion, baseTag, buildNumber,
-                 partialUpdates,
-                 ftpServer, bouncerServer, stagingServer,
-                 stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
-                 ausServerUrl, hgSshKey, hgUsername, localTestChannel,
-                 releaseChannel='release',
-                 mozRepoPath=None,
-                 brandName=None, buildSpace=2, triggerSchedulers=None,
-                 releaseNotesUrl=None, python='python',
-                 testOlderPartials=False,
-                 longVersion=None, schema=None,
-                 useBetaChannelForRelease=False, useChecksums=False,
-                 promptWaitTime=None, balrog_api_root=None,
-                 balrog_credentials_file=None, balrog_username=None, **kwargs):
-        """patcherConfig: The filename of the patcher config file to bump,
-                          and pass to patcher.
-           mozRepoPath: The path for the Mozilla repo to hand patcher as the
-                        HGROOT (if omitted, the default repoPath is used).
-                        Apps not rooted in the Mozilla repo need this.
-           brandName: The brand name as used on the updates server. If omitted,
-                      the first letter of the brand name is uppercased.
-           schema: The style of snippets to write (changed in bug 459972)
-        """
-        if useChecksums:
-            buildSpace = 1
+    def __init__(self, patcherConfig, verifyConfigs, appName, productName,
+                 configRepoPath, version, appVersion, baseTag, buildNumber,
+                 partialUpdates, ftpServer, bouncerServer, stagingServer,
+                 hgSshKey, hgUsername, localTestChannel, brandName=None,
+                 buildSpace=2, triggerSchedulers=None, releaseNotesUrl=None,
+                 python='python', schema=None, promptWaitTime=None,
+                 balrog_api_root=None, balrog_credentials_file=None,
+                 balrog_username=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.patcherConfig = patcherConfig
@@ -4188,21 +4166,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.ftpServer = ftpServer
         self.bouncerServer = bouncerServer
         self.stagingServer = stagingServer
-        self.stageUsername = stageUsername
-        self.stageSshKey = stageSshKey
-        self.ausUser = ausUser
-        self.ausSshKey = ausSshKey
-        self.ausHost = ausHost
-        self.ausServerUrl = ausServerUrl
         self.hgSshKey = hgSshKey
         self.hgUsername = hgUsername
-        self.releaseChannel = releaseChannel
         self.triggerSchedulers = triggerSchedulers
-        self.testOlderPartials = testOlderPartials
-        self.longVersion = longVersion or self.version
         self.schema = schema
-        self.useBetaChannelForRelease = useBetaChannelForRelease
-        self.useChecksums = useChecksums
         self.python = python
         self.configRepoPath = configRepoPath
         self.promptWaitTime = promptWaitTime
@@ -4211,67 +4178,19 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.balrog_username = balrog_username
         self.testChannel = localTestChannel
 
-        # The patcher config bumper needs to know the exact previous version
+#        # The patcher config bumper needs to know the exact previous version
         self.previousVersion = str(
             max(LooseVersion(v) for v in self.partialUpdates))
-        self.previousAppVersion = self.partialUpdates[
-            self.previousVersion].get('appVersion', self.previousVersion)
-        self.previousBuildNumber = self.partialUpdates[
-            self.previousVersion]['buildNumber']
         self.patcherConfigFile = 'tools/release/patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
                                                      appName)
-        self.candidatesDir = self.getCandidatesDir(
-            productName, version, buildNumber)
-
-        if mozRepoPath:
-            self.mozRepository = self.getRepository(mozRepoPath)
-        else:
-            self.mozRepository = self.repository
-
         self.brandName = brandName or productName.capitalize()
         self.releaseNotesUrl = releaseNotesUrl
 
-        self.setChannelData()
         self.bumpConfigs()
-        self.createPatches()
-        if buildNumber >= 2:
-            self.createBuildNSnippets()
-        self.uploadSnippets()
         if self.balrog_api_root:
             self.submitBalrogUpdates()
-        self.verifySnippets()
         self.trigger()
-
-    def setChannelData(self):
-        # This method figures out all the information needed to push snippets
-        # to AUS, push test snippets live, and do basic verifications on them.
-        # Test snippets and whatever channel self.relesaeChannel is always end
-        # up in the same local and remote directories.
-        # When useBetaChannelForRelease is True, we have a 'beta' channel
-        # in addition to whatever the releaseChannel.
-        baseSnippetDir = self.getSnippetDir()
-        self.dirMap = {
-            'aus2.test': '%s-test' % baseSnippetDir,
-            'aus2': baseSnippetDir
-        }
-
-        self.channels = {
-            'betatest': {'dir': 'aus2.test'},
-            'releasetest': {'dir': 'aus2.test'},
-            self.releaseChannel: {
-                'dir': 'aus2',
-                'compareTo': 'releasetest',
-            }
-        }
-
-        if self.useBetaChannelForRelease:
-            self.dirMap['aus2.beta'] = '%s-beta' % baseSnippetDir
-            self.channels['beta'] = {'dir': 'aus2.beta'}
-
-        # XXX: hack alert
-        if 'esr' in self.version:
-            self.channels['esrtest'] = {'dir': 'aus2.test'}
 
     def bumpConfigs(self):
         self.addStep(RetryingMockCommand(
@@ -4296,8 +4215,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.extend(['--partial-version', previousVersion])
         for platform in sorted(self.verifyConfigs.keys()):
             bumpCommand.extend(['--platform', platform])
-        if self.useBetaChannelForRelease:
-            bumpCommand.append('-u')
         if self.promptWaitTime:
             bumpCommand.extend(['--prompt-wait-time', self.promptWaitTime])
         if self.releaseNotesUrl:
@@ -4395,94 +4312,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                      haltOnFailure=True
                      ))
 
-    def createPatches(self):
-        command = [self.python, 'tools/scripts/updates/create-snippets.py',
-                   '--config', WithProperties(self.patcherConfigFile),
-                   # XXX: should put this outside of the build dir somewhere
-                   '--checksums-dir', 'checksums',
-                   '--snippet-dir', 'aus2',
-                   '--test-snippet-dir', 'aus2.test',
-                   '-v']
-        snippet_env = self.env.copy()
-        snippet_env['PYTHONPATH'] = 'tools/lib/python:tools/lib/python/vendor'
-        self.addStep(MockCommand(
-                     name='create_snippets',
-                     command=command,
-                     env=snippet_env,
-                     description=['create', 'snippets'],
-                     workdir='.',
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     haltOnFailure=True
-                     ))
-
-    def createBuildNSnippets(self):
-        command = [self.python,
-                   WithProperties('%(toolsdir)s/release/generate-candidate-build-updates.py'),
-                   '--brand', self.brandName,
-                   '--product', self.productName,
-                   '--app-name', self.appName,
-                   '--version', self.version,
-                   '--app-version', self.appVersion,
-                   # XXX: needs to be updated for partialUpdates
-                   '--old-version', self.previousVersion,
-                   '--old-app-version', self.previousAppVersion,
-                   '--build-number', self.buildNumber,
-                   '--old-build-number', self.previousBuildNumber,
-                   '--channel', 'betatest', '--channel', 'releasetest',
-                   '--channel', self.releaseChannel,
-                   '--stage-server', self.stagingServer,
-                   '--old-base-snippet-dir', '.',
-                   '--workdir', '.',
-                   '--hg-server', self.getRepository('/'),
-                   '--source-repo', self.repoPath,
-                   '--verbose']
-        for p in (self.verifyConfigs.keys()):
-            command.extend(['--platform', p])
-        if self.useBetaChannelForRelease:
-            command.extend(['--channel', 'beta'])
-        if self.testOlderPartials:
-            command.extend(['--generate-partials'])
-        snippet_env = self.env.copy()
-        snippet_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
-        self.addStep(MockCommand(
-                     name='create_buildN_snippets',
-                     command=command,
-                     description=['generate snippets', 'for prior',
-                                  '%s builds' % self.version],
-                     env=snippet_env,
-                     haltOnFailure=False,
-                     flunkOnFailure=False,
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     workdir='.'
-                     ))
-
-    def uploadSnippets(self):
-        for localDir, remoteDir in self.dirMap.iteritems():
-            snippetDir = self.snippetStagingDir + '/' + remoteDir
-            self.addStep(RetryingShellCommand(
-                         name='upload_snippets',
-                         command=['rsync', '-av',
-                                  '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.ausSshKey,
-                                  localDir + '/',
-                                  '%s@%s:%s' % (self.ausUser, self.ausHost, snippetDir)],
-                         workdir='.',
-                         description=['upload', '%s snippets' % localDir],
-                         haltOnFailure=True
-                         ))
-            # We only push test channel snippets from automation.
-            if localDir.endswith('test'):
-                self.addStep(RetryingShellCommand(
-                             name='pushsnip',
-                             command=['ssh', '-t', '-l', self.ausUser,
-                                      '-oIdentityFile=~/.ssh/%s' % self.ausSshKey,
-                                      self.ausHost, '~/bin/pushsnip %s' % remoteDir],
-                             timeout=7200,  # 2 hours
-                             description=['pushsnip'],
-                             haltOnFailure=True
-                             ))
-
     def submitBalrogUpdates(self):
         self.addStep(JSONPropertiesDownload(
             name='download_balrog_props',
@@ -4516,27 +4345,12 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             flunkOnFailure=True,
         ))
 
-    def verifySnippets(self):
-        channelComparisons = [(c, self.channels[c]['compareTo']) for c in self.channels if 'compareTo' in self.channels[c]]
-        for chan1, chan2 in channelComparisons:
-            self.addStep(SnippetComparison(
-                chan1=chan1,
-                chan2=chan2,
-                dir1=self.channels[chan1]['dir'],
-                dir2=self.channels[chan2]['dir'],
-                workdir='.'
-            ))
-
     def trigger(self):
         if self.triggerSchedulers:
             self.addStep(Trigger(
                          schedulerNames=self.triggerSchedulers,
                          waitForFinish=False
                          ))
-
-    def getSnippetDir(self):
-        return build.paths.getSnippetDir(self.brandName, self.version,
-                                         self.buildNumber)
 
 
 class ReleaseFinalVerification(ReleaseFactory):
