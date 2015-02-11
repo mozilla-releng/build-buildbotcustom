@@ -315,6 +315,8 @@ class JacuzziAllocator(object):
         # Cache of builder name -> timestamp
         self.missing_cache = {}
 
+        self.jacuzzi_enabled = True
+
         self.log("created")
 
     def log(self, msg, exc_info=False):
@@ -338,6 +340,9 @@ class JacuzziAllocator(object):
 
         This can return cached results.
         """
+        if not self.jacuzzi_enabled:
+            return available_slaves
+
         self.log("checking cache allocated slaves")
         if self.allocated_cache:
             cache_expiry_time, slaves = self.allocated_cache
@@ -371,6 +376,9 @@ class JacuzziAllocator(object):
             None if no slaves are suitable for building this builder, otherwise
             returns a list of slaves to use
         """
+        if not self.jacuzzi_enabled:
+            return available_slaves
+
         # Check the cache for this builder
         self.log("checking cache for builder %s" % str(buildername))
         c = self.cache.get(buildername)
@@ -452,7 +460,6 @@ class JacuzziAllocator(object):
             if my_available_slaves is None:
                 return func(builder, available_slaves)
             return func(builder, my_available_slaves)
-        _nextSlave.jacuzzi_enabled = True
         return _nextSlave
 
 J = JacuzziAllocator()
@@ -577,7 +584,7 @@ def _nextAWSSlave(aws_wait=None, recentSort=False):
             return None
     return _nextSlave
 
-_nextAWSSlave_wait_sort = safeNextSlave(J(_nextAWSSlave(aws_wait=60, recentSort=True)))
+_nextAWSSlave_sort = safeNextSlave(J(_nextAWSSlave(aws_wait=0, recentSort=True)))
 _nextAWSSlave_nowait = safeNextSlave(_nextAWSSlave())
 
 
@@ -751,7 +758,7 @@ def makeBundleBuilder(config, name):
         'slavebuilddir': normalizeName('%s-bundle' % (name,)),
         'factory': bundle_factory,
         'category': name,
-        'nextSlave': _nextAWSSlave_wait_sort,
+        'nextSlave': _nextAWSSlave_sort,
         'properties': {'slavebuilddir': normalizeName('%s-bundle' % (name,)),
                        'branch': name,
                        'platform': None,
@@ -976,7 +983,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
     base_builder_dir = '%s-%s' % (name, platform)
     # let's assign next_slave here so we only have to change it in
     # this location for mozharness builds if we swap it out again.
-    next_slave = _nextAWSSlave_wait_sort
+    next_slave = _nextAWSSlave_sort
 
     return_codes_func = rc_eval_func({
         0: SUCCESS,
@@ -1525,7 +1532,7 @@ def generateBranchObjects(config, name, secrets=None):
             builder = {
                 'name': '%s_dep' % pf['base_name'],
                 'slavenames': pf['slaves'],
-                'nextSlave': _nextAWSSlave_wait_sort,
+                'nextSlave': _nextAWSSlave_sort,
                 'builddir': '%s_dep' % pf['base_name'],
                 'slavebuilddir': normalizeName('%s_dep' % pf['base_name']),
                 'factory': factory,
@@ -1562,7 +1569,7 @@ def generateBranchObjects(config, name, secrets=None):
                 nightly_builder = {
                     'name': '%s_nightly' % pf['base_name'],
                     'slavenames': pf['slaves'],
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_sort,
                     'builddir': '%s_nightly' % pf['base_name'],
                     'slavebuilddir': normalizeName('%s_nightly' % pf['base_name']),
                     'factory': factory,
@@ -1772,7 +1779,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s' % (name, platform), pf['stage_product']),
                     'factory': mozilla2_dep_factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_sort,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform,
@@ -1804,7 +1811,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-pgo' % (name, platform), pf['stage_product']),
                     'factory': pgo_factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_sort,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform + '-pgo',
@@ -1832,7 +1839,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-noprofiling' % (name, platform), pf['stage_product']),
                     'factory': factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_sort,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform + '-noprofiling',
@@ -1894,7 +1901,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'slavebuilddir': slavebuilddir,
                         'factory': factory,
                         'category': name,
-                        'nextSlave': _nextAWSSlave_wait_sort,
+                        'nextSlave': _nextAWSSlave_sort,
                         'properties': {'branch': name,
                                        'builddir': '%s-l10n_%s' % (builddir, str(n)),
                                        'stage_platform': stage_platform,
@@ -2040,7 +2047,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': normalizeName('%s-%s-nightly' % (name, platform), pf['stage_product']),
                     'factory': mozilla2_nightly_factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_sort,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform,
@@ -2131,7 +2138,7 @@ def generateBranchObjects(config, name, secrets=None):
                         'slavebuilddir': slavebuilddir,
                         'factory': mozilla2_l10n_nightly_factory,
                         'category': name,
-                        'nextSlave': _nextAWSSlave_wait_sort,
+                        'nextSlave': _nextAWSSlave_sort,
                         'properties': {'branch': name,
                                        'platform': platform,
                                        'product': pf['stage_product'],
@@ -2207,7 +2214,7 @@ def generateBranchObjects(config, name, secrets=None):
                     'slavebuilddir': slavebuilddir,
                     'factory': mozilla2_l10n_dep_factory,
                     'category': name,
-                    'nextSlave': _nextAWSSlave_wait_sort,
+                    'nextSlave': _nextAWSSlave_sort,
                     'properties': {'branch': name,
                                    'platform': platform,
                                    'stage_platform': stage_platform,
@@ -2246,7 +2253,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'factory': mozilla2_valgrind_factory,
                 'category': name,
                 'env': valgrind_env,
-                'nextSlave': _nextAWSSlave_wait_sort,
+                'nextSlave': _nextAWSSlave_sort,
                 'properties': {'branch': name,
                                'platform': platform,
                                'stage_platform': stage_platform,
@@ -2317,7 +2324,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform), pf['stage_product']),
                 'factory': mozilla2_xulrunner_factory,
                 'category': name,
-                'nextSlave': _nextAWSSlave_wait_sort,
+                'nextSlave': _nextAWSSlave_sort,
                 'properties': {'branch': name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform)), 'product': 'xulrunner'},
             }
             branchObjects['builders'].append(mozilla2_xulrunner_builder)
@@ -3330,7 +3337,7 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
             'slavebuilddir': slavebuilddir,
             'factory': factory,
             'category': name,
-            'nextSlave': _nextAWSSlave_wait_sort,
+            'nextSlave': _nextAWSSlave_sort,
             'properties': {'branch': name,
                            'builddir': builddir,
                            'stage_platform': stage_platform,
