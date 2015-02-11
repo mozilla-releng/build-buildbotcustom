@@ -4,6 +4,8 @@ from __future__ import absolute_import
 
 import os
 import hashlib
+from distutils.version import LooseVersion
+
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.scheduler import Scheduler, Dependent, Triggerable
 from buildbot.status.mail import MailNotifier
@@ -648,6 +650,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     partialUpdates.update(releaseConfig.get('extraPartials', {}))
 
     for platform in releaseConfig['enUSPlatforms']:
+        # FIXME: the follwong hack can be removed when win64 has the same list
+        # of partial update as other platforms. Check mozilla-esr38 to be sure.
+        if platform in releaseConfig.get('HACK_first_released_version', {}):
+            partialUpdates_hacked = {
+                k: v for k, v in partialUpdates.iteritems() if
+                LooseVersion(k) >= LooseVersion(releaseConfig['HACK_first_released_version'][platform])
+            }
+        else:
+            partialUpdates_hacked = partialUpdates
+        # FIXME: end of hack
         # shorthand
         pf = branchConfig['platforms'][platform]
         mozconfig = '%s/%s/release' % (platform, sourceRepoInfo['name'])
@@ -701,7 +713,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageBasePath=branchConfig['stage_base_path'],
                 uploadPackages=True,
                 uploadSymbols=True,
-                createSnippet=False,
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -711,7 +722,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 version=releaseConfig['version'],
                 appVersion=releaseConfig['appVersion'],
                 buildNumber=releaseConfig['buildNumber'],
-                partialUpdates=partialUpdates,
+                partialUpdates=partialUpdates_hacked,  # FIXME: hack
                 talosMasters=talosMasters,
                 packageTests=packageTests,
                 unittestMasters=unittestMasters,
@@ -1005,7 +1016,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageBasePath=branchConfig['stage_base_path'] + '/xulrunner',
                 uploadPackages=True,
                 uploadSymbols=True,
-                createSnippet=False,
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -1018,7 +1028,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 clobberBranch='release-%s' % sourceRepoInfo['name'],
                 packageSDK=True,
                 signingServers=getSigningServers(platform),
-                partialUpdates=releaseConfig.get('partialUpdates', {}),
+                partialUpdates={},  # no updates for Xulrunner
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
                 tooltool_script=pf.get('tooltool_script'),
@@ -1213,28 +1223,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
             stagingServer=releaseConfig['stagingServer'],
-            stageUsername=branchConfig['stage_username'],
-            stageSshKey=branchConfig['stage_ssh_key'],
-            ausUser=releaseConfig['ausUser'],
-            ausSshKey=releaseConfig['ausSshKey'],
-            ausHost=releaseConfig['ausHost'],
-            ausServerUrl=releaseConfig['ausServerUrl'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
             localTestChannel=releaseConfig['localTestChannel'],
-            releaseChannel=releaseChannel,
             clobberURL=clobberer_url,
             clobberBranch='release-%s' % sourceRepoInfo['name'],
             releaseNotesUrl=releaseConfig['releaseNotesUrl'],
-            testOlderPartials=releaseConfig['testOlderPartials'],
-            longVersion=releaseConfig.get('longVersion', None),
-            schema=releaseConfig.get('snippetSchema', None),
-            useBetaChannelForRelease=releaseConfig.get(
-                'useBetaChannelForRelease', False),
             signingServers=getSigningServers('linux'),
-            useChecksums=releaseConfig.get(
-                'enablePartialMarsAtBuildTime', True),
-            mozRepoPath=moz_repo_path,
             env=branchConfig['platforms']['linux']['env'],
             python=branchConfig['platforms']['linux'][
                 'env'].get('PYTHON26', 'python'),
