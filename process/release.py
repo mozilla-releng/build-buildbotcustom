@@ -1259,6 +1259,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'release_config': releaseConfigFile,
                 'script_repo_revision': releaseTag,
                 'event_group': 'update',
+                "update_channel": releaseConfig["localTestChannel"],
             }
         })
         post_signing_builders.append(builderPrefix('%s_updates' % releaseConfig['productName']))
@@ -1301,6 +1302,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'script_repo_revision': releaseTag,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
+                "update_channel": releaseConfig["releaseChannel"],
             },
         })
         important_builders.append(builderPrefix('update_shipping'))
@@ -1607,6 +1609,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 'platform': None,
                 'branch': 'release-%s' % sourceRepoInfo['name'],
                 'event_group': 'releasetest',
+                "update_channel": releaseConfig["cdnTestChannel"],
             },
             env=dummy_builder_env,
         ))
