@@ -713,7 +713,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageBasePath=branchConfig['stage_base_path'],
                 uploadPackages=True,
                 uploadSymbols=True,
-                createSnippet=False,
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -1017,7 +1016,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageBasePath=branchConfig['stage_base_path'] + '/xulrunner',
                 uploadPackages=True,
                 uploadSymbols=True,
-                createSnippet=False,
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -1231,7 +1229,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             clobberURL=clobberer_url,
             clobberBranch='release-%s' % sourceRepoInfo['name'],
             releaseNotesUrl=releaseConfig['releaseNotesUrl'],
-            schema=releaseConfig.get('snippetSchema', None),
             signingServers=getSigningServers('linux'),
             env=branchConfig['platforms']['linux']['env'],
             python=branchConfig['platforms']['linux'][

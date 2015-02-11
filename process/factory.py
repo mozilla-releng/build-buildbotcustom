@@ -10,7 +10,8 @@ from twisted.python import log
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.process.factory import BuildFactory
 from buildbot.steps.shell import WithProperties
-from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, JSONStringDownload
+from buildbot.steps.transfer import FileDownload, JSONPropertiesDownload, \
+    JSONStringDownload
 from buildbot.steps.dummy import Dummy
 from buildbot import locks
 from buildbot.status.builder import worst_status
@@ -22,7 +23,6 @@ import buildbotcustom.steps.base
 import buildbotcustom.steps.misc
 import buildbotcustom.steps.source
 import buildbotcustom.steps.test
-import buildbotcustom.steps.updates
 import buildbotcustom.steps.unittest
 import buildbotcustom.steps.signing
 import buildbotcustom.steps.mock
@@ -36,7 +36,6 @@ reload(buildbotcustom.steps.base)
 reload(buildbotcustom.steps.misc)
 reload(buildbotcustom.steps.source)
 reload(buildbotcustom.steps.test)
-reload(buildbotcustom.steps.updates)
 reload(buildbotcustom.steps.unittest)
 reload(buildbotcustom.steps.signing)
 reload(buildbotcustom.steps.mock)
@@ -46,7 +45,7 @@ reload(release.info)
 reload(release.paths)
 
 from buildbotcustom.status.errors import purge_error, global_errors, \
-    upload_errors, talos_hgweb_errors
+    upload_errors
 from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
     Trigger, RetryingShellCommand
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
@@ -55,8 +54,6 @@ from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
     RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import GraphServerPost
-from buildbotcustom.steps.updates import CreateCompleteUpdateSnippet, \
-    CreatePartialUpdateSnippet
 from buildbotcustom.steps.signing import SigningServerAuthenication
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
@@ -804,13 +801,12 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  buildRevision=None, stageServer=None, stageUsername=None,
                  stageGroup=None, stageSshKey=None, stageBasePath=None,
                  stageProduct=None, post_upload_include_platform=False,
-                 ausBaseUploadDir=None, updatePlatform=None,
-                 downloadBaseURL=None, ausUser=None, ausSshKey=None,
-                 ausHost=None, nightly=False,
+                 updatePlatform=None,
+                 downloadBaseURL=None, nightly=False,
                  checkTest=False, valgrindCheck=False,
                  graphServer=None, graphSelector=None, graphBranch=None,
                  baseName=None, uploadPackages=True, uploadSymbols=True,
-                 createSnippet=False, createPartial=False, doCleanup=True,
+                 updates_enabled=False, createPartial=False, doCleanup=True,
                  packageSDK=False, packageTests=False, mozillaDir=None,
                  mozillaSrcDir=None,
                  enable_ccache=False, stageLogBaseUrl=None,
@@ -820,7 +816,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  disableSymbols=False,
                  doBuildAnalysis=False,
                  doPostLinkerSize=False,
-                 downloadSubdir=None,
                  multiLocale=False,
                  multiLocaleMerge=True,
                  compareLocalesRepoPath=None,
@@ -874,13 +869,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.stageProduct = stageProduct
         self.doBuildAnalysis = doBuildAnalysis
         self.doPostLinkerSize = doPostLinkerSize
-        self.ausBaseUploadDir = ausBaseUploadDir
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
-        self.downloadSubdir = downloadSubdir
-        self.ausUser = ausUser
-        self.ausSshKey = ausSshKey
-        self.ausHost = ausHost
         self.nightly = nightly
         self.checkTest = checkTest
         self.valgrindCheck = valgrindCheck
@@ -891,7 +881,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.uploadPackages = uploadPackages
         self.uploadSymbols = uploadSymbols
         self.disableSymbols = disableSymbols
-        self.createSnippet = createSnippet
+        self.updates_enabled = updates_enabled
         self.createPartial = createPartial
         self.doCleanup = doCleanup
         self.packageSDK = packageSDK
@@ -935,27 +925,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         if self.uploadPackages:
             assert productName and stageServer and stageUsername
             assert stageBasePath
-        if self.createSnippet:
-            if 'android' in platform:  # happens before we trim platform
-                assert downloadSubdir
-            assert ausBaseUploadDir and updatePlatform and downloadBaseURL
-            assert ausUser and ausSshKey and ausHost
-
-            # To preserve existing behavior, we need to set the
-            # ausFullUploadDir differently for when we are create all the
-            # mars (complete+partial) ourselves.
-            if self.createPartial:
-                # e.g.:
-                # /opt/aus2/incoming/2/Firefox/mozilla-central/WINNT_x86-msvc
-                self.ausFullUploadDir = '%s/%s' % (self.ausBaseUploadDir,
-                                                   self.updatePlatform)
-            else:
-                # this is a tad ugly because we need python interpolation
-                # as well as WithProperties, e.g.:
-                # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/en-US
-                self.ausFullUploadDir = '%s/%s/%%(buildid)s/en-US' % \
-                    (self.ausBaseUploadDir,
-                     self.updatePlatform)
 
         self.complete_platform = self.platform
         # we don't need the extra cruft in 'platform' anymore
@@ -1098,10 +1067,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addCheckTestSteps()
         if self.valgrindCheck:
             self.addValgrindCheckSteps()
-        if self.createSnippet:
-            self.addUpdateSteps()
-            if self.balrog_api_root:
-                self.addSubmitBalrogUpdates()
+        if self.updates_enabled and self.balrog_api_root:
+            self.submitBalrogUpdates()
         if self.triggerBuilds:
             self.addTriggeredBuildsSteps()
         if self.doCleanup:
@@ -1766,80 +1733,25 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                                             fileType='package',
                                             haltOnFailure=True)
 
-        if self.createSnippet and 'android' not in self.complete_platform:
+        if self.updates_enabled and 'android' not in self.complete_platform:
             self.addCreateUpdateSteps()
 
         # Call out to a subclass to do the actual uploading
         self.doUpload(uploadMulti=self.multiLocale)
 
-    def addCreateSnippetsSteps(self, milestone_extra=''):
+    def submitBalrogUpdates(self, type_='nightly'):
         if 'android' in self.complete_platform:
-            cmd = [
-                'python',
-                WithProperties(
-                    '%(toolsdir)s/scripts/android/android_snippet.py'),
-                '--download-base-url', self.downloadBaseURL,
-                '--download-subdir', self.downloadSubdir,
-                '--abi', self.updatePlatform,
-                '--aus-base-path', self.ausBaseUploadDir,
-                '--aus-host', self.ausHost,
-                '--aus-user', self.ausUser,
-                '--aus-ssh-key', '~/.ssh/%s' % self.ausSshKey,
-                '--properties-dir', WithProperties('%(basedir)s/properties'),
-                WithProperties(self.objdir + '/dist/%(packageFilename)s')
-            ]
-            self.addStep(ShellCommand(
-                name='create_android_snippet',
-                command=cmd,
-                haltOnFailure=False,
-            ))
-            self.addStep(SetProperty(
-                name='set_script_properties',
-                command=['bash', '-c', 'for file in `ls -1`; do cat $file; done'],
-                workdir='properties',
-                extract_fn=extractProperties,
-                warnOnFailure=False,
-                flunkOnFailure=False,
-            ))
-        else:
-            milestone = self.branchName + milestone_extra
-            self.addStep(CreateCompleteUpdateSnippet(
-                name='create_complete_snippet',
-                objdir=self.absMozillaObjDir,
-                milestone=milestone,
-                baseurl='%s/nightly' % self.downloadBaseURL,
-                hashType=self.hashType,
-            ))
-            self.addStep(ShellCommand(
-                name='cat_complete_snippet',
-                description=['cat', 'complete', 'snippet'],
-                command=['cat', 'complete.update.snippet'],
-                workdir='%s/dist/update' % self.absMozillaObjDir,
+            self.addFilePropertiesSteps(
+                filename=self.packageFilename,
+                directory='build/%s/dist' % self.mozillaObjdir,
+                fileType='completeMar',
+                haltOnFailure=True)
+            self.addStep(SetBuildProperty(
+                name='set_completeMarUrl',
+                property_name='completeMarUrl',
+                value=lambda b: b.getProperty('packageUrl'),
             ))
 
-    def addUploadSnippetsSteps(self):
-        self.addStep(RetryingShellCommand(
-            name='create_aus_updir',
-            command=['bash', '-c',
-                     WithProperties('ssh -l %s ' % self.ausUser +
-                                    '-i ~/.ssh/%s %s ' % (self.ausSshKey, self.ausHost) +
-                                    'mkdir -p %s' % self.ausFullUploadDir)],
-            description=['create', 'aus', 'upload', 'dir'],
-            haltOnFailure=True,
-        ))
-        self.addStep(RetryingShellCommand(
-            name='upload_complete_snippet',
-            command=['scp', '-o', 'User=%s' % self.ausUser,
-                     '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
-                     'dist/update/complete.update.snippet',
-                     WithProperties('%s:%s/complete.txt' % (self.ausHost,
-                                                            self.ausFullUploadDir))],
-            workdir=self.absMozillaObjDir,
-            description=['upload', 'complete', 'snippet'],
-            haltOnFailure=True,
-        ))
-
-    def addSubmitBalrogUpdates(self, type_='nightly'):
         self.addStep(JSONPropertiesDownload(
             name='download_balrog_props',
             slavedest='buildprops_balrog.json',
@@ -1872,10 +1784,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             workdir='.',
             flunkOnFailure=True,
         ))
-
-    def addUpdateSteps(self):
-        self.addCreateSnippetsSteps()
-        self.addUploadSnippetsSteps()
 
     def addBuildSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
@@ -2338,116 +2246,6 @@ class NightlyBuildFactory(MercurialBuildFactory):
         MercurialBuildFactory.addCreateUpdateSteps(self)
         if self.createPartial:
             self.addCreatePartialUpdateSteps()
-
-    def addCreateSnippetsSteps(self, milestone_extra=''):
-        MercurialBuildFactory.addCreateSnippetsSteps(self, milestone_extra)
-        milestone = self.branchName + milestone_extra
-        if self.createPartial:
-            self.addStep(CreatePartialUpdateSnippet(
-                name='create_partial_snippet',
-                doStepIf=self.previousMarExists,
-                objdir=self.absMozillaObjDir,
-                milestone=milestone,
-                baseurl='%s/nightly' % self.downloadBaseURL,
-                hashType=self.hashType,
-            ))
-            self.addStep(ShellCommand(
-                name='cat_partial_snippet',
-                description=['cat', 'partial', 'snippet'],
-                doStepIf=self.previousMarExists,
-                command=['cat', 'partial.update.snippet'],
-                workdir='%s/dist/update' % self.absMozillaObjDir,
-            ))
-
-    def getPreviousBuildUploadDir(self):
-        # Uploading the complete snippet occurs regardless of whether we are
-        # generating partials on the slave or not, it just goes to a different
-        # path for eventual consumption by the central update generation
-        # server.
-
-        # ausFullUploadDir is expected to point to the correct base path on the
-        # AUS server for each case:
-        #
-        # updates generated centrally: /opt/aus2/build/0/...
-        # updates generated on slave:  /opt/aus2/incoming/2/...
-        if self.createPartial:
-            return "%s/%%(previous_buildid)s/en-US" % \
-                self.ausFullUploadDir
-        else:
-            return self.ausFullUploadDir
-
-    def getCurrentBuildUploadDir(self):
-        if self.createPartial:
-            return "%s/%%(buildid)s/en-US" % self.ausFullUploadDir
-        else:
-            return self.ausFullUploadDir
-
-    def addUploadSnippetsSteps(self):
-        ausPreviousBuildUploadDir = self.getPreviousBuildUploadDir()
-        self.addStep(RetryingShellCommand(
-            name='create_aus_previous_updir',
-            doStepIf=self.previousMarExists,
-            command=['bash', '-c',
-                     WithProperties('ssh -l %s ' % self.ausUser +
-                                    '-i ~/.ssh/%s %s ' % (self.ausSshKey, self.ausHost) +
-                                    'mkdir -p %s' % ausPreviousBuildUploadDir)],
-            description=['create', 'aus', 'previous', 'upload', 'dir'],
-            haltOnFailure=True,
-        ))
-        self.addStep(RetryingShellCommand(
-            name='upload_complete_snippet',
-            description=['upload', 'complete', 'snippet'],
-            doStepIf=self.previousMarExists,
-            command=['scp', '-o', 'User=%s' % self.ausUser,
-                     '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
-                     'dist/update/complete.update.snippet',
-                     WithProperties('%s:%s/complete.txt' % (self.ausHost,
-                                                            ausPreviousBuildUploadDir))],
-            workdir=self.absMozillaObjDir,
-            haltOnFailure=True,
-        ))
-
-        # We only need to worry about empty snippets (and partials obviously)
-        # if we are creating partial patches on the slaves.
-        if self.createPartial:
-            self.addStep(RetryingShellCommand(
-                name='upload_partial_snippet',
-                doStepIf=self.previousMarExists,
-                command=['scp', '-o', 'User=%s' % self.ausUser,
-                         '-o', 'IdentityFile=~/.ssh/%s' % self.ausSshKey,
-                         'dist/update/partial.update.snippet',
-                         WithProperties('%s:%s/partial.txt' % (self.ausHost,
-                                                               ausPreviousBuildUploadDir))],
-                workdir=self.absMozillaObjDir,
-                description=['upload', 'partial', 'snippet'],
-                haltOnFailure=True,
-            ))
-            ausCurrentBuildUploadDir = self.getCurrentBuildUploadDir()
-            self.addStep(RetryingShellCommand(
-                name='create_aus_current_updir',
-                doStepIf=self.previousMarExists,
-                command=['bash', '-c',
-                         WithProperties('ssh -l %s ' % self.ausUser +
-                                        '-i ~/.ssh/%s %s ' % (self.ausSshKey, self.ausHost) +
-                                        'mkdir -p %s' % ausCurrentBuildUploadDir)],
-                description=['create', 'aus', 'current', 'upload', 'dir'],
-                haltOnFailure=True,
-            ))
-            # Create remote empty complete/partial snippets for current build.
-            # Also touch the remote platform dir to defeat NFS caching on the
-            # AUS webheads.
-            self.addStep(RetryingShellCommand(
-                name='create_empty_snippets',
-                doStepIf=self.previousMarExists,
-                command=['bash', '-c',
-                         WithProperties('ssh -l %s ' % self.ausUser +
-                                        '-i ~/.ssh/%s %s ' % (self.ausSshKey, self.ausHost) +
-                                        'touch %s/complete.txt %s/partial.txt %s' % (ausCurrentBuildUploadDir,
-                                                                                     ausCurrentBuildUploadDir,
-                                                                                     self.ausFullUploadDir))],
-                description=['create', 'empty', 'snippets'],
-                haltOnFailure=True,
-            ))
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
         # Because of how the RPM packaging works,
@@ -2960,7 +2758,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                          env=self.env,
                          ))
         if self.balrog_api_root:
-            self.addSubmitBalrogUpdates(type_='release')
+            self.submitBalrogUpdates(type_='release')
 
 
 class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
@@ -3559,18 +3357,13 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     extraConfigureArgs = []
 
     def __init__(self, enUSBinaryURL, nightly=False, env={},
-                 ausBaseUploadDir=None, updatePlatform=None,
-                 downloadBaseURL=None, ausUser=None, ausSshKey=None,
-                 ausHost=None, l10nNightlyUpdate=False, l10nDatedDirs=False,
+                 updatePlatform=None, downloadBaseURL=None,
+                 l10nNightlyUpdate=False, l10nDatedDirs=False,
                  createPartial=False, extraConfigureArgs=[], **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
-        self.ausBaseUploadDir = ausBaseUploadDir
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
-        self.ausUser = ausUser
-        self.ausSshKey = ausSshKey
-        self.ausHost = ausHost
         self.createPartial = createPartial
         self.extraConfigureArgs = extraConfigureArgs
 
@@ -3628,43 +3421,10 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         BaseRepackFactory.__init__(self, env=env, **kwargs)
 
         if l10nNightlyUpdate:
-            assert ausBaseUploadDir and updatePlatform and downloadBaseURL
-            assert ausUser and ausSshKey and ausHost
-
-            # To preserve existing behavior, we need to set the
-            # ausFullUploadDir differently for when we are create all the
-            # mars (complete+partial) ourselves.
-            if self.createPartial:
-                # e.g.:
-                # /opt/aus2/incoming/2/Firefox/mozilla-central/WINNT_x86-msvc
-                self.ausFullUploadDir = '%s/%s' % (self.ausBaseUploadDir,
-                                                   self.updatePlatform)
-            else:
-                # this is a tad ugly because we need python interpolation
-                # as well as WithProperties, e.g.:
-                # /opt/aus2/build/0/Firefox/mozilla-central/WINNT_x86-msvc/2008010103/en-US
-                self.ausFullUploadDir = '%s/%s/%%(buildid)s/%%(locale)s' % \
-                    (self.ausBaseUploadDir, self.updatePlatform)
-            NightlyBuildFactory.addCreateSnippetsSteps(self,
-                                                       milestone_extra='-l10n')
-            NightlyBuildFactory.addUploadSnippetsSteps(self)
-            NightlyBuildFactory.addSubmitBalrogUpdates(self)
+            NightlyBuildFactory.submitBalrogUpdates(self)
 
         if self.buildsBeforeReboot and self.buildsBeforeReboot > 0:
             self.addPeriodicRebootSteps()
-
-    def getPreviousBuildUploadDir(self):
-        if self.createPartial:
-            return "%s/%%(previous_buildid)s/%%(locale)s" % \
-                self.ausFullUploadDir
-        else:
-            return self.ausFullUploadDir
-
-    def getCurrentBuildUploadDir(self):
-        if self.createPartial:
-            return "%s/%%(buildid)s/%%(locale)s" % self.ausFullUploadDir
-        else:
-            return self.ausFullUploadDir
 
     def updateSources(self):
         self.addStep(ShellCommand(
@@ -3853,7 +3613,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             env=self.env,
             property='buildid',
         ))
-        # We need the appVersion to create snippets
         self.addStep(SetProperty(
             command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
                      WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
@@ -4142,14 +3901,13 @@ class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
 
 
 class ReleaseUpdatesFactory(ReleaseFactory):
-    snippetStagingDir = '/opt/aus2/snippets/staging'
 
     def __init__(self, patcherConfig, verifyConfigs, appName, productName,
                  configRepoPath, version, appVersion, baseTag, buildNumber,
                  partialUpdates, ftpServer, bouncerServer, stagingServer,
                  hgSshKey, hgUsername, localTestChannel, brandName=None,
                  buildSpace=2, triggerSchedulers=None, releaseNotesUrl=None,
-                 python='python', schema=None, promptWaitTime=None,
+                 python='python', promptWaitTime=None,
                  balrog_api_root=None, balrog_credentials_file=None,
                  balrog_username=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
@@ -4169,7 +3927,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.hgSshKey = hgSshKey
         self.hgUsername = hgUsername
         self.triggerSchedulers = triggerSchedulers
-        self.schema = schema
         self.python = python
         self.configRepoPath = configRepoPath
         self.promptWaitTime = promptWaitTime
@@ -4222,8 +3979,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             if self.use_mock:
                 rnurl = self.releaseNotesUrl.replace('%', '%%')
             bumpCommand.extend(['-n', rnurl])
-        if self.schema:
-            bumpCommand.extend(['-s', str(self.schema)])
         bump_env = self.env.copy()
         bump_env['PERL5LIB'] = 'tools/lib/perl'
         self.addStep(MockCommand(

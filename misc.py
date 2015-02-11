@@ -1858,7 +1858,7 @@ def generateBranchObjects(config, name, secrets=None):
             nightly_builder = '%s nightly' % pf['base_name']
 
             platform_env = pf['env'].copy()
-            if 'update_channel' in config and config.get('create_snippet'):
+            if config.get('update_channel') and config.get('updates_enabled'):
                 platform_env['MOZ_UPDATE_CHANNEL'] = config['update_channel']
 
             triggeredSchedulers = None
@@ -1918,33 +1918,17 @@ def generateBranchObjects(config, name, secrets=None):
                     triggeredSchedulers = [
                         l10nNightlyBuilders[nightly_builder]['l10n_builder']]
 
-            create_snippet = config['create_snippet']
-            if 'create_snippet' in pf and config['create_snippet']:
-                create_snippet = pf.get('create_snippet')
-            if create_snippet and 'android' in platform:
-                # Ideally, this woud use some combination of product name and
-                # stage_platform, but that can be done in a follow up.
-                # Android doesn't create updates for all the branches that
-                # Firefox desktop does.
-                if config.get('create_mobile_snippet'):
-                    ausargs = {
-                        'downloadBaseURL': config['mobile_download_base_url'],
-                        'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                        'ausBaseUploadDir': config['aus2_mobile_base_upload_dir'],
-                    }
-                else:
-                    create_snippet = False
-                    ausargs = {}
-            else:
-                ausargs = {
-                    'downloadBaseURL': config['download_base_url'],
-                    'downloadSubdir': '%s-%s' % (name, pf.get('stage_platform', platform)),
-                    'ausBaseUploadDir': config['aus2_base_upload_dir'],
-                }
-
             nightly_kwargs = {}
             nightly_kwargs.update(multiargs)
-            nightly_kwargs.update(ausargs)
+
+            # Platform can override branch config
+            updates_enabled = pf.get(
+                'updates_enabled', config.get('updates_enabled'))
+
+            if updates_enabled:
+                nightly_kwargs.update({
+                    'downloadBaseURL': config['download_base_url'],
+                })
 
             # We make the assumption that *all* nightly builds
             # are to be done with PGO.  This is to ensure that all
@@ -1995,13 +1979,10 @@ def generateBranchObjects(config, name, secrets=None):
                     uploadSymbols=pf.get('upload_symbols', False),
                     disableSymbols=pf.get('disable_symbols', False),
                     nightly=True,
-                    createSnippet=create_snippet,
+                    updates_enabled=updates_enabled,
                     createPartial=pf.get(
                         'create_partial', config['create_partial']),
                     updatePlatform=pf['update_platform'],
-                    ausUser=config['aus2_user'],
-                    ausSshKey=config['aus2_ssh_key'],
-                    ausHost=config['aus2_host'],
                     hashType=config['hash_type'],
                     balrog_api_root=config.get('balrog_api_root', None),
                     balrog_credentials_file=config['balrog_credentials_file'],
@@ -2104,12 +2085,8 @@ def generateBranchObjects(config, name, secrets=None):
                         l10nDatedDirs=config['l10nDatedDirs'],
                         createPartial=pf.get(
                             'create_partial_l10n', config['create_partial_l10n']),
-                        ausBaseUploadDir=config['aus2_base_upload_dir_l10n'],
                         updatePlatform=pf['update_platform'],
                         downloadBaseURL=config['download_base_url'],
-                        ausUser=config['aus2_user'],
-                        ausSshKey=config['aus2_ssh_key'],
-                        ausHost=config['aus2_host'],
                         balrog_api_root=config.get('balrog_api_root', None),
                         balrog_credentials_file=config[
                             'balrog_credentials_file'],
@@ -2318,7 +2295,6 @@ def generateBranchObjects(config, name, secrets=None):
                 uploadPackages=uploadPackages,
                 uploadSymbols=True,
                 nightly=True,
-                createSnippet=False,
                 buildSpace=buildSpace,
                 clobberURL=config['base_clobber_url'],
                 clobberTime=clobberTime,
