@@ -3338,7 +3338,7 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
             'factory': factory,
             'category': name,
             'nextSlave': _nextAWSSlave_sort,
-            'properties': {'branch': name,
+            'properties': {'branch': branch,
                            'builddir': builddir,
                            'stage_platform': stage_platform,
                            'product': pf['stage_product'],
