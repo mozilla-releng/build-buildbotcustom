@@ -321,8 +321,8 @@ class BaseHgPoller(BasePoller):
                     # change_properties in buildbot/db/scheme/tables.sql). In
                     # order to avoid insert/update failures, we enforce a cap
                     # on the total length with enough room for JSON overhead.
-                    if c['commit_titles_total_length'] + len(title) <= 800:
-                        c['commit_titles_total_length'] += len(title)
+                    if c['commit_titles_total_length'] + len(title) + 5 <= 800:
+                        c['commit_titles_total_length'] += len(title) + 5  # for json encoding like , " etc.
                         c['commit_titles'].append(title)
                 else:
                     c = dict(
