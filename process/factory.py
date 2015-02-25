@@ -3753,7 +3753,7 @@ class StagingRepositorySetupFactory(ReleaseFactory):
                      ))
 
 
-class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
+class SingleSourceFactory(ReleaseFactory):
     def __init__(self,
                  productName,
                  version,
@@ -3769,18 +3769,10 @@ class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
                  mozillaSrcDir=None,
                  autoconfDirs=['.'],
                  buildSpace=2,
-                 tooltool_manifest_src=None,
-                 tooltool_bootstrap="setup.sh",
-                 tooltool_url_list=None,
-                 tooltool_script=None,
                  **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.mozconfig = mozconfig
-        self.tooltool_manifest_src = tooltool_manifest_src
-        self.tooltool_url_list = tooltool_url_list or []
-        self.tooltool_script = tooltool_script or ['/tools/tooltool.py']
-        self.tooltool_bootstrap = tooltool_bootstrap
         self.releaseTag = '%s_RELEASE' % (baseTag)
         self.origSrcDir = self.branchName
 
@@ -3810,6 +3802,7 @@ class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
                 (self.branchName == 'mozilla-1.9.2' and productName == 'xulrunner'):
             self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
+        self.env['no_tooltool'] = "1"
 
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
@@ -3847,8 +3840,6 @@ class SingleSourceFactory(ReleaseFactory, TooltoolMixin):
                      workdir=self.mozillaSrcDir,
                      haltOnFailure=True
                      ))
-        if self.tooltool_manifest_src:
-            self.addTooltoolStep(workdir=self.origSrcDir)
         self.addConfigSteps(workdir=self.mozillaSrcDir)
         self.addStep(MockCommand(
                      name='configure',

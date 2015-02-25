@@ -538,9 +538,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_target=pf.get('mock_target'),
             mock_packages=pf.get('mock_packages'),
             mock_copyin_files=pf.get('mock_copyin_files'),
-            tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
-            tooltool_url_list=branchConfig.get('tooltool_url_list', []),
-            tooltool_script=pf.get('tooltool_script'),
         )
 
         builders.append({
@@ -593,9 +590,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
-                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
-                tooltool_url_list=branchConfig.get('tooltool_url_list', []),
-                tooltool_script=pf.get('tooltool_script'),
             )
 
             builders.append({
