@@ -314,7 +314,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     test_builders = []
     schedulers = []
     change_source = []
-    important_builders = []
     status = []
     updates_upstream_builders = []
     post_signing_builders = []
@@ -1258,11 +1257,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         })
         post_signing_builders.append(builderPrefix('%s_updates' % releaseConfig['productName']))
 
-        # Releases that aren't automatically pushed to mirrors have their
-        # updates tested on an internal channel first. For these, we need to
-        # send out mail to let people know that it's ready to test.
-        if not releaseConfig.get('enableAutomaticPushToMirrors'):
-            important_builders.append(builderPrefix('%s_updates' % releaseConfig['productName']))
         if not releaseConfig.get('enablePartialMarsAtBuildTime', True):
             deliverables_builders.append(builderPrefix('%s_updates' % releaseConfig['productName']))
 
@@ -1299,7 +1293,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 "update_channel": releaseConfig["releaseChannel"],
             },
         })
-        important_builders.append(builderPrefix('update_shipping'))
 
     elif releaseConfig.get('verifyConfigs') or \
         hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
@@ -1607,8 +1600,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             },
             env=dummy_builder_env,
         ))
-        important_builders.append(
-            builderPrefix('%s_ready_for_releasetest_testing' % releaseConfig['productName']))
 
         builders.append(makeDummyBuilder(
             name=builderPrefix('%s_almost_ready_for_release' % releaseConfig['productName']),
@@ -1632,7 +1623,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             },
             env=dummy_builder_env,
         ))
-        important_builders.append(builderPrefix('%s_ready_for_release' % releaseConfig['productName']))
 
     if not releaseConfig.get('disableBouncerEntries'):
         extra_args = ["-c", releaseConfig["bouncer_submitter_config"],
@@ -1731,11 +1721,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     for platform in releaseConfig['enUSPlatforms']:
         tag_source_downstream.append(builderPrefix('%s_build' % platform))
-        if platform in releaseConfig['notifyPlatforms']:
-            important_builders.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
-            if platform in releaseConfig.get('l10nNotifyPlatforms', []):
-                important_builders.append(builderPrefix('%s_repack_complete' % platform))
             l10nBuilderNames = l10nBuilders(platform).values()
             repack_upstream = [
                 builderPrefix('%s_build' % platform),
@@ -1979,19 +1965,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 changeIsImportant=lambda c:
                 changeContainsProperties(c, dict(who=enUS_signed_apk_url))
             ))
-
-    # send the nice(passing) release messages
-    status.append(MailNotifier(
-        fromaddr='release@mozilla.com',
-        sendToInterestedUsers=False,
-        extraRecipients=releaseConfig['ImportantRecipients'],
-        extraHeaders={'In-Reply-To': email_message_id,
-                      'References': email_message_id},
-        mode='passing',
-        builders=important_builders,
-        relayhost='mail.build.mozilla.org',
-        messageFormatter=createReleaseMessage,
-    ))
 
     # send all release messages
     status.append(MailNotifier(
