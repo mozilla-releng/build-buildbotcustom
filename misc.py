@@ -1238,16 +1238,18 @@ def generateBranchObjects(config, name, secrets=None):
 
         if do_nightly:
             builder = '%s nightly' % base_name
-            l10n_builder = '%s %s %s l10n nightly' % (
-                pf['product_name'].capitalize(), name, platform
-            )
             nightlyBuilders.append(builder)
+            if config["enable_l10n"]:
+                l10n_builder = '%s %s %s l10n nightly' % (
+                    pf['product_name'].capitalize(), name, platform
+                )
+
             # Fill the l10nNightly dict
             # trying to do repacks with mozharness
             if is_l10n_with_mh(config, platform):
                 # we need this later...
                 builder_names = mh_l10n_builder_names(config, platform,
-                                                      is_nightly=True)
+                                                    is_nightly=True)
                 scheduler_name = mh_l10n_scheduler_name(config, platform)
                 l10nNightlyBuilders[builder] = {}
                 l10nNightlyBuilders[builder]['l10n_builder'] = builder_names
