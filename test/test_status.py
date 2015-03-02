@@ -9,6 +9,9 @@ SENSIBLE_TITLE_TESTCASES = [
 
     ['Bug 1', ['try: -b d -p all', 'Bug 1']],
     ['Bug 1', ['try: -b d -p all', 'try: -b d -p none', 'Bug 1']],
+    ['Bug 1', ['"try: -b d -p linux -u all -t none"', 'Bug 1']],
+
+    ['Bug 1', ['zz', 'Bug 1']],
 
     ['test.patch', ['[mq]: test.patch']],
     ['test.patch', ['imported patch test.patch']],

@@ -53,7 +53,7 @@ def getSensibleCommitTitle(titles):
         # Remove trailing punctuation and whitespace.
         title = re.sub(r'[;,\-\. ]+$', '', title).strip()
 
-        if title:
+        if len(title) > 2:
             return title
 
     return titles[0]
