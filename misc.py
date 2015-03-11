@@ -1019,7 +1019,7 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
         triggered_nightly_schedulers.append(scheduler_name)
 
     # if we do a generic dep build
-    if pf.get('enable_dep', True):
+    if pf.get('enable_dep', True) or pf.get('enable_periodic', False):
         factory = makeMHFactory(config, pf, mh_cfg=mh_cfg,
                                 extra_args=base_extra_args,
                                 signingServers=dep_signing_servers,
