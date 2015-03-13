@@ -170,7 +170,7 @@ if __name__ == '__main__':
         to=[],
         from_=None,
         log_url=None,
-        relayhost='mail.build.mozilla.org'
+        relayhost='localhost'
     )
 
     options, args = parser.parse_known_args()
