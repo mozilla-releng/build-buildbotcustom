@@ -1293,7 +1293,6 @@ def generateBranchObjects(config, name, secrets=None):
         branchObjects['status'].append(ChangeNotifier(
             fromaddr="tryserver@build.mozilla.org",
             lookup=MercurialEmailLookup(),
-            relayhost="mail.build.mozilla.org",
             sendToInterestedUsers=sendToInterestedUsers,
             extraRecipients=extraRecipients,
             branches=[config['repo_path']],
