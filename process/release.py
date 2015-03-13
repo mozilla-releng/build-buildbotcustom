@@ -1940,7 +1940,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         # send a message when we receive the sendchange and start tagging
         status.append(ChangeNotifier(
             fromaddr="release@mozilla.com",
-            relayhost="mail.build.mozilla.org",
             sendToInterestedUsers=False,
             extraRecipients=[recipient],
             extraHeaders={'Message-Id': email_message_id},
@@ -1955,7 +1954,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             # send a message when android signing is complete
             status.append(ChangeNotifier(
                 fromaddr="release@mozilla.com",
-                relayhost="mail.build.mozilla.org",
                 sendToInterestedUsers=False,
                 extraRecipients=[recipient],
                 extraHeaders={'In-Reply-To': email_message_id,
@@ -1975,7 +1973,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                       'References': email_message_id},
         mode='all',
         builders=[b['name'] for b in builders + test_builders],
-        relayhost='mail.build.mozilla.org',
         messageFormatter=createReleaseMessage,
     ))
 
@@ -1988,7 +1985,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                           'References': email_message_id},
             mode='passing',
             builders=[builderPrefix('%s_updates' % releaseConfig['productName'])],
-            relayhost='mail.build.mozilla.org',
             messageFormatter=createReleaseAVVendorsMessage,
         ))
 
