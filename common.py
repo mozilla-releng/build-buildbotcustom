@@ -69,7 +69,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'win32': 'w32',
         'win64': 'w64',
         'macosx': 'osx',
-        'macosx64': 'osx64',
+        'macosx64': 'm64',
         'linux64': 'l64',
         'android': 'and',
         'release': 'rel',
@@ -136,7 +136,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'final': 'fnl',
         'verification': 'vrfy',
         'shipping': 'shp',
-        'update': 'upd',
+        'update': 'u',
         'verify': 'v',
         'updates': 'upds',
     }
