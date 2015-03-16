@@ -228,16 +228,19 @@ class TriggerBouncerCheck(Triggerable):
 
     def __init__(self, minUptake, configRepo, checkMARs=True,
                  username=None, password=None, pollInterval=5 * 60,
-                 pollTimeout=12 * 60 * 60, **kwargs):
+                 pollTimeout=12 * 60 * 60, appendBuildNumber=False,
+                 checkInstallers=True, **kwargs):
         self.minUptake = minUptake
         self.configRepo = configRepo
         self.checkMARs = checkMARs
+        self.checkInstallers = checkInstallers
         self.username = username
         self.password = password
         self.pollInterval = pollInterval
         self.pollTimeout = pollTimeout
         self.ss = None
         self.set_props = None
+        self.appendBuildNumber = appendBuildNumber
         Triggerable.__init__(self, **kwargs)
 
     def trigger(self, ss, set_props=None):
@@ -296,13 +299,22 @@ class TriggerBouncerCheck(Triggerable):
         log.msg('%s: polling' % self.__class__.__name__)
         bouncerProductName = self.release_config.get('bouncerProductName') or \
             self.release_config.get('productName').capitalize()
+        version = self.release_config.get('version')
+        partialVersions = []
+        if self.appendBuildNumber:
+            version += 'build%s' % self.release_config.get('buildNumber')
+            for partialVersion, info in self.releaseConfig.get("partialUpdates").iteritems():
+                partialVersions.append("%sbuild%s" % partialVersion, info["buildNumber"])
+        if not partialVersions:
+            partialVersions = self.release_config.get("partialUpdates").keys()
         d = get_release_uptake(
             tuxedoServerUrl=self.release_config.get('tuxedoServerUrl'),
             bouncerProductName=bouncerProductName,
-            version=self.release_config.get('version'),
+            version=version,
             platforms=self.release_config.get('enUSPlatforms'),
-            partialVersions=self.release_config.get('partialUpdates').keys(),
+            partialVersions=partialVersions,
             checkMARs=self.checkMARs,
+            checkInstallers=self.checkInstallers,
             username=self.username,
             password=self.password)
         d.addCallback(self.checkUptake)
