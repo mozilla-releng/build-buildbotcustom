@@ -3896,7 +3896,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
     def __init__(self, patcherConfig, verifyConfigs, appName, productName,
                  configRepoPath, version, appVersion, baseTag, buildNumber,
                  partialUpdates, ftpServer, bouncerServer, stagingServer,
-                 hgSshKey, hgUsername, localTestChannel, brandName=None,
+                 hgSshKey, hgUsername, releaseChannel, localTestChannel, brandName=None,
                  buildSpace=2, triggerSchedulers=None, releaseNotesUrl=None,
                  python='python', promptWaitTime=None,
                  balrog_api_root=None, balrog_credentials_file=None,
@@ -3925,6 +3925,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.balrog_credentials_file = balrog_credentials_file
         self.balrog_username = balrog_username
         self.testChannel = localTestChannel
+        self.releaseChannel = releaseChannel
 
 #        # The patcher config bumper needs to know the exact previous version
         self.previousVersion = str(
@@ -4017,6 +4018,20 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                      workdir='tools',
                      ignoreCodes=[0, 1]
                      ))
+        # Before committing we pull and update in an effort to reduce the
+        # potential of hitting a push race.
+        self.addStep(ShellCommand(
+            name='repull_configs',
+            command=["hg", "pull"],
+            workdir='tools',
+            haltOnFailure=True
+        ))
+        self.addStep(ShellCommand(
+            name='reupdate_configs',
+            command=["hg", "up"],
+            workdir='tools',
+            haltOnFailure=True
+        ))
         self.addStep(MockCommand(
                      name='commit_configs',
                      command=['hg', 'commit', '-u', self.hgUsername, '-m',
@@ -4083,6 +4098,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             '--release-config', WithProperties('%(release_config)s'),
             '--credentials-file', target_file_name,
             '--username', self.balrog_username,
+            '--release-channel', self.releaseChannel,
         ]
         self.addStep(RetryingShellCommand(
             name='submit_balrog_updates',
