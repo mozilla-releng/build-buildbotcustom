@@ -113,7 +113,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'thunderbird': 'tb',
         'partner': 'pner',
         'checksums': 'sums',
-        'update_verify': 'uv',
         'postrelease': 'pr',
         'spidermonkey': 'sm',
         'warnaserr': 'we',
@@ -138,6 +137,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'verification': 'vrfy',
         'shipping': 'shp',
         'update': 'upd',
+        'verify': 'v',
         'updates': 'upds',
     }
     for word, replacement in mappings.iteritems():
