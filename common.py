@@ -140,7 +140,8 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'verify': 'v',
         'updates': 'upds',
     }
-    for word, replacement in mappings.iteritems():
+    for word in sorted(mappings):
+        replacement = mappings[word]
         # Regexes are slow, so make sure the word is there at all before
         # trying to do a substitution.
         if word in name:
