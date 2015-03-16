@@ -35,7 +35,7 @@ from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
     ReleaseUpdatesFactory, ReleaseFinalVerification, \
     PartnerRepackFactory, XulrunnerReleaseBuildFactory, \
-    makeDummyBuilder, SigningScriptFactory
+    makeDummyBuilder, SigningScriptFactory, DummyFactory
 from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, \
@@ -1571,17 +1571,20 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     for channel, updateConfig in updateChannels.iteritems():
         if not releaseConfig.get('disableBouncerEntries'):
-            trigger_uptake_factory = BuildFactory()
             schedulerNames = []
             if updateConfig.get('verifyConfigs'):
                 schedulerNames.append(builderPrefix('ready-for-%s' % updateConfig["cdnTestChannel"]))
-            trigger_uptake_factory.addStep(Trigger(
-                schedulerNames=schedulerNames,
-                set_properties={
-                    'release_config': releaseConfigFile,
-                    'script_repo_revision': releaseTag,
-                },
-            ))
+            if schedulerNames:
+                trigger_uptake_factory = BuildFactory()
+                trigger_uptake_factory.addStep(Trigger(
+                    schedulerNames=schedulerNames,
+                    set_properties={
+                        'release_config': releaseConfigFile,
+                        'script_repo_revision': releaseTag,
+                    },
+                ))
+            else:
+                trigger_uptake_factory = DummyFactory(0, None)
 
             builderName = builderPrefix("%s_%s_start_uptake_monitoring" % (releaseConfig["productName"], channel))
             builders.append({
