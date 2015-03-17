@@ -1573,7 +1573,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if not releaseConfig.get('disableBouncerEntries'):
             schedulerNames = []
             if updateConfig.get('verifyConfigs'):
-                schedulerNames.append(builderPrefix('ready-for-%s' % updateConfig["cdnTestChannel"]))
+                schedulerNames.append(builderPrefix('%s_ready-for-%s' % (channel, updateConfig["cdnTestChannel"])))
             if schedulerNames:
                 trigger_uptake_factory = BuildFactory()
                 trigger_uptake_factory.addStep(Trigger(
