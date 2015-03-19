@@ -9,9 +9,7 @@ def getSupportedPlatforms():
             'win64', 'android',
             'gb_armv7a_gecko', 'linux32_gecko',
             'macosx64_gecko', 'win32_gecko',
-            'linux64_gecko', 'linux32_gecko_localizer',
-            'macosx64_gecko_localizer', 'win32_gecko_localizer',
-            'linux64_gecko_localizer')
+            'linux64_gecko')
 
 
 def getPlatformFtpDir(platform):
