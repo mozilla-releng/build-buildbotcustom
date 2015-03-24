@@ -1993,6 +1993,7 @@ def generateBranchObjects(config, name, secrets=None):
                     updatePlatform=pf['update_platform'],
                     hashType=config['hash_type'],
                     balrog_api_root=config.get('balrog_api_root', None),
+                    balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', None),
                     balrog_credentials_file=config['balrog_credentials_file'],
                     balrog_username=config['balrog_username'],
                     buildSpace=buildSpace,
@@ -2096,6 +2097,7 @@ def generateBranchObjects(config, name, secrets=None):
                         updatePlatform=pf['update_platform'],
                         downloadBaseURL=config['download_base_url'],
                         balrog_api_root=config.get('balrog_api_root', None),
+                        balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', None),
                         balrog_credentials_file=config[
                             'balrog_credentials_file'],
                         balrog_username=config['balrog_username'],

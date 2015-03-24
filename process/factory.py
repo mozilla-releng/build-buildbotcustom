@@ -405,9 +405,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
                  hashType='sha512', baseMirrorUrls=None, baseBundleUrls=None,
                  signingServers=None, enableSigning=True, env={},
                  balrog_api_root=None, balrog_credentials_file=None,
-                 balrog_username=None, use_mock=False, mock_target=None,
-                 mock_packages=None, mock_copyin_files=None,
-                 enable_pymake=False, **kwargs):
+                 balrog_submitter_extra_args=None, balrog_username=None,
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, enable_pymake=False, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -430,6 +430,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         self.balrog_api_root = balrog_api_root
         self.balrog_credentials_file = balrog_credentials_file
         self.balrog_username = balrog_username
+        self.balrog_submitter_extra_args = balrog_submitter_extra_args
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
@@ -1767,6 +1768,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             '--username', self.balrog_username,
             '-t', type_, '--verbose',
         ]
+        if self.balrog_submitter_extra_args:
+            cmd.extend(self.balrog_submitter_extra_args)
         if self.balrog_credentials_file:
             credentialsFile = os.path.join(os.getcwd(),
                                            self.balrog_credentials_file)
