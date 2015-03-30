@@ -2,11 +2,25 @@ language: python
 python:
   - "2.7"
 
+sudo: false
+
+env:
+  global:
+    - PIP_FIND_LINKS=file://$HOME/.cache/pip
+    - PIP_CACHE_DIR=$HOME/.cache/pip
+
+cache:
+  directories:
+    - $HOME/.cache/pip
+    - $TRAVIS_BUILD_DIR/.tox
+
 install:
   - pip install tox
 
 script:
   - tox
+  # Remove logs to avoid cache uploads
+  - rm -rf $HOME/.cache/pip/log
 
 after_script:
   - tox -e py27-coveralls
