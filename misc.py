@@ -1248,8 +1248,8 @@ def generateBranchObjects(config, name, secrets=None):
             # trying to do repacks with mozharness
             if is_l10n_with_mh(config, platform):
                 # we need this later...
-                builder_names = mh_l10n_builder_names(config, platform,
-                                                    is_nightly=True)
+                builder_names = mh_l10n_builder_names(config, platform, branch=name,
+                                                      is_nightly=True)
                 scheduler_name = mh_l10n_scheduler_name(config, platform)
                 l10nNightlyBuilders[builder] = {}
                 l10nNightlyBuilders[builder]['l10n_builder'] = builder_names
@@ -3297,6 +3297,7 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
     # repacks specific configuration is in:
     # platform > mozharness_desktop_l10n
     repacks = pf['mozharness_desktop_l10n']
+    product_name = pf['product_name'].capitalize()
     scriptName = repacks['scriptName']
     l10n_chunks = repacks['l10n_chunks']
     use_credentials_file = repacks['use_credentials_file']
@@ -3309,12 +3310,12 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
         environment_config = os.path.join(config_dir, 'staging.py')
         balrog_config = os.path.join('balrog', 'staging.py')
     # desktop repacks run in chunks...
-    builder_names = mh_l10n_builder_names(config, platform, is_nightly)
+    builder_names = mh_l10n_builder_names(config, platform, branch, is_nightly)
     this_chunk = 0
     for bn in builder_names:
         this_chunk += 1
         builderName = bn
-        builddir = mh_l10n_builddir_from_builder_name(bn)
+        builddir = mh_l10n_builddir_from_builder_name(bn, product_name)
         extra_args = ['--branch-config', branch_config,
                       '--platform-config', platform_config,
                       '--environment-config', environment_config,
@@ -3353,10 +3354,15 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
     return builders
 
 
-def mh_l10n_builddir_from_builder_name(builder_name):
+def mh_l10n_builddir_from_builder_name(builder_name, product_name):
     """transforms a builder name into a builddir"""
-    b_dir = builder_name.replace(' nightly', '')
-    b_dir = b_dir.replace(' ', '-')
+    # builder name is Firefox ash linux nightly l10n 1/3
+    # we need: ash-lx-ntly-l10n-1_3-000000000
+    # replace spaces with -
+    b_dir = builder_name.replace(' ', '-')
+    # remove product name
+    b_dir = b_dir.replace('%s-' % product_name, '')
+    # replaces / with _
     return b_dir.replace('/', '_')
 
 
@@ -3365,14 +3371,17 @@ def mh_l10n_scheduler_name(config, platform):
     return '%s nightly l10n' % (pf['base_name'])
 
 
-def mh_l10n_builder_names(config, platform, is_nightly):
+def mh_l10n_builder_names(config, platform, branch, is_nightly):
     # let's check if we need to create builders for this config/platform
     names = []
     pf = config['platforms'][platform]
-    name = pf['base_name']
+    product_name = pf['product_name']
+    name = '%s %s %s' % (product_name, branch, platform)
+    name = name.capitalize()
     if is_nightly:
-        name = '%s nightly' % (pf['base_name'])
+        name = '%s nightly' % (name)
     repacks = pf['mozharness_desktop_l10n']
+
     l10n_chunks = repacks['l10n_chunks']
     for chunk in range(1, l10n_chunks + 1):
         builder_name = "%s l10n %s/%s" % (name, chunk, l10n_chunks)
