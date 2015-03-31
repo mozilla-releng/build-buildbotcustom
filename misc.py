@@ -2334,6 +2334,10 @@ def generateBranchObjects(config, name, secrets=None):
 
         # -- end of per-platform loop --
 
+    if config.get('enable_release_promotion'):
+        promotionObjects = generateReleasePromotionObjects(config, name, secrets)
+        branchObjects = mergeBuildObjects(branchObjects, promotionObjects)
+
     return branchObjects
 
 
@@ -3387,3 +3391,60 @@ def mh_l10n_builder_names(config, platform, branch, is_nightly):
         builder_name = "%s l10n %s/%s" % (name, chunk, l10n_chunks)
         names.append(builder_name)
     return names
+
+
+def generateReleasePromotionObjects(config, name, secrets):
+    builders = []
+    schedulers = []
+    change_sources = []
+    status = []
+    buildObjects = {
+        'builders': builders,
+        'schedulers': schedulers,
+        'status': status,
+        'change_source': change_sources,
+    }
+
+    topLevelBuilders = []
+    pf_linux64 = config['platforms']['linux64']
+    signing_servers = secrets.get(pf_linux64.get('dep_signing_servers'))
+
+    # source builder
+    source_buildername = '%s_source' % name
+    source_factory = makeMHFactory(config, pf_linux64,
+            mh_cfg=pf_linux64['mozharness_desktop_build'],
+            extra_args=pf_linux64['mozharness_desktop_build'].get('extra_args', []) + \
+                       ['--custom-build-variant-cfg', 'source'],
+            signingServers=signing_servers)
+
+    source_builder = {
+        'name': source_buildername,
+        'factory': source_factory,
+        'builddir': source_buildername,
+        'slavenames': pf_linux64['slaves'],
+        'category': name,
+        'properties': {
+            'branch': name,
+            'platform': 'source',
+            'product': pf_linux64['stage_product'],
+            'repo_path': config['repo_path'],
+            'script_repo_revision': config["mozharness_tag"],
+        },
+    }
+    topLevelBuilders.append(source_buildername)
+    builders.append(source_builder)
+
+    # To add short-term: partner-repack
+    # Longer-term: l10n repacks, funsize partials, antivirus, checksums etc
+
+    # sendchange listener
+    starting_scheduler = Scheduler(
+        name='%s_start_promotion' % name,
+        branch='%s-build-promotion' % name,
+        treeStableTimer=None,
+        builderNames=topLevelBuilders,
+    )
+    schedulers.append(starting_scheduler)
+
+    return buildObjects
+
