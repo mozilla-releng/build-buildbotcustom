@@ -513,7 +513,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         for dummy in dummy_tag_builders:
             builders.append(makeDummyBuilder(
                             name=builderPrefix('%s_tag_%s' %
-                                               releaseConfig['productName'], dummy),
+                                               (releaseConfig['productName'], dummy)),
                             slaves=all_slaves,
                             category=builderPrefix(''),
                             properties={
