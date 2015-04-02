@@ -1010,15 +1010,16 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
 
     # grab the l10n schedulers that nightlies will trigger (if any)
     triggered_nightly_schedulers = []
-    if (config['enable_l10n'] and platform in config['l10n_platforms'] and
-            '%s nightly' % pf['base_name'] in l10nNightlyBuilders):
-        triggered_nightly_schedulers = [
-            l10nNightlyBuilders['%s nightly' % pf['base_name']]['l10n_builder']
-        ]
-    elif is_l10n_with_mh(config, platform):
+    if is_l10n_with_mh(config, platform):
         scheduler_name = mh_l10n_scheduler_name(config, platform)
         triggered_nightly_schedulers.append(scheduler_name)
-
+    elif (config['enable_l10n'] and platform in config['l10n_platforms'] and
+            '%s nightly' % pf['base_name'] in l10nNightlyBuilders):
+        base_name = '%s nightly' % pf['base_name']
+        # see bug 1150015
+        l10n_builder = l10nNightlyBuilders[base_name]['l10n_builder']
+        assert(isinstance(l10n_builder, str))
+        triggered_nightly_schedulers.append(l10n_builder)
     # if we do a generic dep build
     if pf.get('enable_dep', True) or pf.get('enable_periodic', False):
         factory = makeMHFactory(config, pf, mh_cfg=mh_cfg,
@@ -3374,7 +3375,6 @@ def mh_l10n_builddir_from_builder_name(builder_name, product_name):
 def mh_l10n_scheduler_name(config, platform):
     pf = config['platforms'][platform]
     return '%s nightly l10n' % (pf['base_name'])
-
 
 def mh_l10n_builder_names(config, platform, branch, is_nightly):
     # let's check if we need to create builders for this config/platform
