@@ -49,7 +49,8 @@ from buildbotcustom.common import normalizeName
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
     NightlyRepackFactory, UnittestPackagedBuildFactory, \
-    TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
+    TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func, \
+    PartnerRepackFactory
 from buildbotcustom.scheduler import BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
 from buildbotcustom.l10n import TriggerableL10n
@@ -3407,6 +3408,7 @@ def generateReleasePromotionObjects(config, name, secrets):
 
     topLevelBuilders = []
     pf_linux64 = config['platforms']['linux64']
+    pf_macosx64 = config['platforms']['macosx64']
     signing_servers = secrets.get(pf_linux64.get('dep_signing_servers'))
 
     # source builder
@@ -3421,12 +3423,13 @@ def generateReleasePromotionObjects(config, name, secrets):
         'name': source_buildername,
         'factory': source_factory,
         'builddir': source_buildername,
+        'slavebuilddir': normalizeName(source_buildername, config['product_name']),
         'slavenames': pf_linux64['slaves'],
         'category': name,
         'properties': {
             'branch': name,
             'platform': 'source',
-            'product': pf_linux64['stage_product'],
+            'product': config['product_name'],
             'repo_path': config['repo_path'],
             'script_repo_revision': config["mozharness_tag"],
         },
@@ -3434,13 +3437,50 @@ def generateReleasePromotionObjects(config, name, secrets):
     topLevelBuilders.append(source_buildername)
     builders.append(source_builder)
 
-    # To add short-term: partner-repack
-    # Longer-term: l10n repacks, funsize partials, antivirus, checksums etc
+    # partner repacks
+    base_partner_repack_params = dict(
+        hgHost=config['hghost'],
+        repoPath=config['repo_path'],
+        buildToolsRepoPath=config['build_tools_repo_path'],
+        productName=config['product_name'],
+        partnersRepoPath=config['partners_repo_path'],
+        partnersRepoRevision='default',
+        stagingServer=config['stage_server'],
+        stageUsername=config['stage_username'],
+        stageSshKey=config['stage_ssh_key'],
+        signingServers=signing_servers,
+        env=pf_macosx64['env'],
+        nightlyDir=None,
+        releasePromotion=True,
+    )
+    for platform in config['partner_repack_platforms']:
+        partner_repack_params = base_partner_repack_params.copy()
+        partner_repack_params['platformList'] = [platform]
+        partner_repack_factory = PartnerRepackFactory(**partner_repack_params)
+
+        partner_buildername = '%s_%s_partner_repack' % (name, platform)
+        builders.append({
+           'name': partner_buildername,
+           'slavenames': pf_macosx64['slaves'],
+           'category': name,
+           'builddir': partner_buildername,
+           'slavebuilddir': normalizeName(partner_buildername, config['product_name']),
+           'factory': partner_repack_factory,
+           'properties': {
+               'slavebuilddir': normalizeName(partner_buildername, config['product_name']),
+               'branch': name,
+               'platform': platform,
+               'product': config['product_name'],
+            }
+        })
+        topLevelBuilders.append(partner_buildername)
+
+    # To add longer-term: l10n repacks, funsize partials, antivirus, checksums etc
 
     # sendchange listener
     starting_scheduler = Scheduler(
         name='%s_start_promotion' % name,
-        branch='%s-build-promotion' % name,
+        branch='%s-release-promotion' % name,
         treeStableTimer=None,
         builderNames=topLevelBuilders,
     )
