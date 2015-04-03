@@ -346,7 +346,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     deliverables_builders = []
     xr_deliverables_builders = []
     post_deliverables_builders = []
-    post_antivirus_builders = []
     email_message_id = getMessageId()
 
     # Builders #
@@ -514,7 +513,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         for dummy in dummy_tag_builders:
             builders.append(makeDummyBuilder(
                             name=builderPrefix('%s_tag_%s' %
-                                               releaseConfig['productName'], dummy),
+                                               (releaseConfig['productName'], dummy)),
                             slaves=all_slaves,
                             category=builderPrefix(''),
                             properties={
@@ -1435,10 +1434,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         )
 
         builders.append({
-            'name': builderPrefix('antivirus'),
+            'name': builderPrefix('%s_antivirus' % releaseConfig['productName']),
             'slavenames': unix_slaves,
             'category': builderPrefix(''),
-            'builddir': builderPrefix('antivirus'),
+            'builddir': builderPrefix('%s_antivirus' % releaseConfig['productName']),
             'slavebuilddir': normalizeName(builderPrefix('av'), releaseConfig['productName']),
             'factory': antivirus_factory,
             'env': builder_env,
@@ -1449,7 +1448,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                            'branch': 'release-%s' % sourceRepoInfo['name'],
                            }
         })
-        post_deliverables_builders.append(builderPrefix('antivirus'))
+        post_deliverables_builders.append(builderPrefix('%s_antivirus' % releaseConfig['productName']))
 
     push_to_mirrors_factory = ScriptFactory(
         scriptRepo=tools_repo,
@@ -1811,7 +1810,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     for channel, updateConfig in updateChannels.iteritems():
         if not releaseConfig.get('disableBouncerEntries'):
-            readyForReleaseUpstreams = [builderPrefix("antivirus")]
+            readyForReleaseUpstreams = [builderPrefix("%s_antivirus" % releaseConfig["productName"])]
             if updateConfig.get("requiresMirrors", True):
                 appendBuildNumber = False
                 checkInstallers = True
@@ -1844,10 +1843,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ))
 
     if releaseConfig.get('enableAutomaticPushToMirrors') and not releaseConfig.get("skip_updates"):
-        if releaseConfig.get('disableVirusCheck'):
-            post_update_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
-        else:
-            post_antivirus_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
+        post_update_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
 
     if releaseConfig.get('enableAutomaticPushToMirrors') and \
             hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
@@ -1891,13 +1887,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             branch=sourceRepoInfo['path'],
             upstreamBuilders=[builderPrefix('xulrunner_checksums')],
             builderNames=[builderPrefix('xulrunner_push_to_mirrors')],
-        ))
-    if post_antivirus_builders:
-        schedulers.append(AggregatingScheduler(
-            name=builderPrefix('av_done'),
-            branch=sourceRepoInfo['path'],
-            upstreamBuilders=[builderPrefix('antivirus')],
-            builderNames=post_antivirus_builders,
         ))
     if releaseConfig['doPartnerRepacks'] and \
             not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):

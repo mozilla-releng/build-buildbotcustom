@@ -1,3 +1,4 @@
+
 from __future__ import absolute_import
 
 import os.path
@@ -4630,12 +4631,13 @@ class PartnerRepackFactory(ReleaseFactory):
             str(version).replace('.', '_') + '_' + \
             'RELEASE'
 
-    def __init__(self, productName, version, partnersRepoPath,
+    def __init__(self, productName, partnersRepoPath,
                  stagingServer, stageUsername, stageSshKey,
-                 buildNumber=1, partnersRepoRevision='default',
+                 version=None, buildNumber=1, partnersRepoRevision='default',
                  nightlyDir="nightly", platformList=None, packageDmg=True,
                  partnerUploadDir='unsigned/partner-repacks',
-                 baseWorkDir='.', python='python', **kwargs):
+                 baseWorkDir='.', python='python', releasePromotion=False,
+                 **kwargs):
         ReleaseFactory.__init__(self, baseWorkDir=baseWorkDir, **kwargs)
         self.productName = productName
         self.version = version
@@ -4650,11 +4652,15 @@ class PartnerRepackFactory(ReleaseFactory):
         self.packageDmg = packageDmg
         self.python = python
         self.platformList = platformList
-        self.candidatesDir = self.getCandidatesDir(productName,
-                                                   version,
-                                                   buildNumber,
-                                                   nightlyDir=nightlyDir)
-        self.releaseTag = self.getReleaseTag(productName, version)
+        self.releasePromotion = releasePromotion
+
+        if not self.releasePromotion:
+            self.candidatesDir = self.getCandidatesDir(productName,
+                                                       version,
+                                                       buildNumber,
+                                                       nightlyDir=nightlyDir)
+            self.releaseTag = self.getReleaseTag(productName, version)
+
         self.extraRepackArgs = []
         if nightlyDir:
             self.extraRepackArgs.extend(['--nightly-dir', '%s/%s' %
@@ -4688,10 +4694,16 @@ class PartnerRepackFactory(ReleaseFactory):
             use_properties=False,
         ))
         if self.packageDmg:
+            if self.releasePromotion:
+                command=['bash', '-c',
+                         WithProperties('wget https://hg.mozilla.org/' + self.repoPath +
+                                        '/raw-file/%(revision)s/build/package/mac_osx/pkg-dmg')]
+            else:
+                command=['bash', '-c',
+                         'wget https://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)]
             self.addStep(ShellCommand(
                 name='download_pkg-dmg',
-                command=['bash', '-c',
-                         'wget https://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
+                command=command,
                 description=['download', 'pkg-dmg'],
                 workdir='%s/scripts' % self.partnersRepackDir,
                 haltOnFailure=True
@@ -4709,25 +4721,40 @@ class PartnerRepackFactory(ReleaseFactory):
                 property='scriptsdir',
                 workdir='%s/scripts' % self.partnersRepackDir,
             ))
+            if self.releasePromotion:
+                self.addStep(SetProperty(
+                    name='set_version',
+                    command=['wget', '-q', '-O-',
+                              WithProperties('https://hg.mozilla.org/' + self.repoPath +
+                                             '/raw-file/%(revision)s/browser/' +
+                                             'config/version.txt')],
+                    property='version',
+                    workdir='%s/scripts' % self.partnersRepackDir,
+                ))
 
     def doPartnerRepacks(self):
         if self.enableSigning and self.signingServers:
-            self.extraRepackArgs.append('--signed')
             self.addGetTokenSteps()
         pr_env = self.env.copy()
         pr_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
+        command=[self.python, './partner-repacks.py',
+                 '--repo', self.repoPath,
+                 '--hgroot', 'https://%s' % self.hgHost,
+                 '--dmg-extract-script',
+                 WithProperties(
+                     '%(toolsdir)s/release/common/unpack-diskimage.sh'),
+                ]
+        if self.releasePromotion:
+            command.extend(['--use-tinderbox-builds',
+                            '--revision', WithProperties('%(revision)s')])
+        else:
+            command.extend(['--version', str(self.version),
+                            '--build-number', str(self.buildNumber),
+                            '--staging-server', self.stagingServer])
+
         self.addStep(RepackPartners(
             name='repack_partner_builds',
-            command=[self.python, './partner-repacks.py',
-                     '--version', str(self.version),
-                     '--build-number', str(self.buildNumber),
-                     '--repo', self.repoPath,
-                     '--hgroot', 'https://%s' % self.hgHost,
-                     '--staging-server', self.stagingServer,
-                     '--dmg-extract-script',
-                     WithProperties(
-                         '%(toolsdir)s/release/common/unpack-diskimage.sh'),
-                     ] + self.extraRepackArgs,
+            command=command + self.extraRepackArgs,
             env=pr_env,
             description=['repacking', 'partner', 'builds'],
             descriptionDone=['repacked', 'partner', 'builds'],
@@ -4736,48 +4763,36 @@ class PartnerRepackFactory(ReleaseFactory):
         ))
 
     def uploadPartnerRepacks(self):
-        self.addStep(ShellCommand(
-                     name='upload_partner_builds',
-                     command=['rsync', '-av',
-                              '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
-                              'build%s/' % str(self.buildNumber),
-                              '%s@%s:%s/' % (self.stageUsername,
-                                             self.stagingServer,
-                                             self.candidatesDir)
-                              ],
-                     workdir='%s/scripts/repacked_builds/%s' % (self.partnersRepackDir,
-                                                                self.version),
-                     description=['upload', 'partner', 'builds'],
-                     haltOnFailure=True
-                     ))
-
-        if not self.enableSigning or not self.signingServers:
-            for platform in self.platformList:
-                self.addStep(ShellCommand(
-                             name='create_partner_build_directory',
-                             description=['create', 'partner', 'directory'],
-                             command=['bash', '-c',
-                                      'ssh -oIdentityFile=~/.ssh/%s %s@%s mkdir -p %s/%s/'
-                                      % (self.stageSshKey, self.stageUsername,
-                                         self.stagingServer, self.candidatesDir,
-                                         self.partnerUploadDir),
-                                      ],
-                             workdir='.',
-                             ))
-                self.addStep(ShellCommand(
-                             name='upload_partner_build_status',
-                             command=['bash', '-c',
-                                      'ssh -oIdentityFile=~/.ssh/%s %s@%s touch %s/%s/%s'
-                                      % (self.stageSshKey, self.stageUsername,
-                                         self.stagingServer, self.candidatesDir,
-                                         self.partnerUploadDir, 'partner_build_%s' % platform),
-                                      ],
-                             workdir='%s/scripts/repacked_builds/%s/build%s' % (self.partnersRepackDir,
-                                                                                self.version,
-                                                                                str(self.buildNumber)),
-                             description=['upload', 'partner', 'status'],
-                             haltOnFailure=True
-                             ))
+        if self.releasePromotion:
+            self.addStep(ShellCommand(
+                 name='upload_partner_builds',
+                 command=['rsync', '-av',
+                          '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
+                          'build%s/partner-repacks/' % str(self.buildNumber),
+                          WithProperties(self.stageUsername + '@' + self.stagingServer +
+                                         ':/pub/mozilla.org/firefox/tinderbox-builds/' +
+                                         '%(branch)s-%(platform)s-partner_repack/'),
+                          ],
+                 workdir=WithProperties(self.partnersRepackDir +
+                                        '/scripts/repacked_builds/%(version)s'),
+                 description=['upload', 'partner', 'builds'],
+                 haltOnFailure=True
+            ))
+        else:
+            self.addStep(ShellCommand(
+                 name='upload_partner_builds',
+                 command=['rsync', '-av',
+                          '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
+                          'build%s/' % str(self.buildNumber),
+                          '%s@%s:%s/' % (self.stageUsername,
+                                         self.stagingServer,
+                                         self.candidatesDir)
+                          ],
+                 workdir='%s/scripts/repacked_builds/%s' % (self.partnersRepackDir,
+                                                            self.version),
+                 description=['upload', 'partner', 'builds'],
+                 haltOnFailure=True
+            ))
 
 
 def rc_eval_func(exit_statuses):
