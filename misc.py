@@ -2716,27 +2716,47 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 extra_args['unittestSuites'] = unittestSuites
                                 extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
                                 extra_args['buildbotBranch'] = branch
+                                branchObjects['schedulers'].append(scheduler_class(
+                                        name=scheduler_name,
+                                        branch=scheduler_branch,
+                                        builderNames=test_builders,
+                                        treeStableTimer=None,
+                                        **extra_args
+                                ))
                             else:
                                 scheduler_class = Scheduler
-                                if test_type == 'debug':
-                                    skipcount = branch_config['platforms'][platform][slave_platform].get('debug_unittest_skipcount')
-                                    skiptimeout = branch_config['platforms'][platform][slave_platform].get('debug_unittest_skiptimeout')
-                                else:
-                                    skipcount = branch_config['platforms'][platform][slave_platform].get('opt_unittest_skipcount')
-                                    skiptimeout = branch_config['platforms'][platform][slave_platform].get('opt_unittest_skiptimeout')
+                                suites_by_skipconfig = collections.defaultdict(list)
+                                skipcount = 0
+                                skiptimeout = 0
+                                for test in test_builders:
+                                    skipcount = 0
+                                    skiptimeout = 0
+                                    if branch_config['platforms'][platform][slave_platform].get('skipconfig'):
+                                        #extract last word in the test string as it should correspond to the name of the test
+                                        test_name = test.split()[-1]
+                                        if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
+                                            skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
+                                    suites_by_skipconfig[skipcount, skiptimeout].append(test)
+                                
+                                # Create a new Scheduler for every skip config
+                                for (skipcount, skiptimeout), test_builders in suites_by_skipconfig.items():
+                                    scheduler_class = Scheduler
+                                    s_name = scheduler_name
+                                    extra_args = {}
 
-                                if skipcount:
-                                    scheduler_class = EveryNthScheduler
-                                    extra_args['n'] = skipcount
-                                    extra_args['idleTimeout'] = skiptimeout
+                                    if skipcount > 0:
+                                        scheduler_class = EveryNthScheduler
+                                        extra_args['n'] = skipcount
+                                        extra_args['idleTimeout'] = skiptimeout
+                                        s_name = scheduler_name + "-" + str(skipcount) + "-"  + str(skiptimeout)
 
-                            branchObjects['schedulers'].append(scheduler_class(
-                                name=scheduler_name,
-                                branch=scheduler_branch,
-                                builderNames=test_builders,
-                                treeStableTimer=None,
-                                **extra_args
-                            ))
+                                    branchObjects['schedulers'].append(scheduler_class(
+                                        name=s_name,
+                                        branch=scheduler_branch,
+                                        builderNames=test_builders,
+                                        treeStableTimer=None,
+                                        **extra_args
+                                    ))
                         for scheduler_name, test_builders, merge in pgoUnittestBuilders:
                             for test in test_builders:
                                 unittestSuites.append(test.split(' ')[-1])
