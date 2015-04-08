@@ -2737,7 +2737,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                         if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
                                             skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
                                     suites_by_skipconfig[skipcount, skiptimeout].append(test)
-                                
+
                                 # Create a new Scheduler for every skip config
                                 for (skipcount, skiptimeout), test_builders in suites_by_skipconfig.items():
                                     scheduler_class = Scheduler
@@ -3401,7 +3401,7 @@ def mh_l10n_builder_names(config, platform, branch, is_nightly):
     names = []
     pf = config['platforms'][platform]
     product_name = pf['product_name']
-    name = '%s %s %s' % (product_name, branch, platform)
+    name = '%s %s %s l10n' % (product_name, branch, platform)
     name = name.capitalize()
     if is_nightly:
         name = '%s nightly' % (name)
@@ -3409,7 +3409,7 @@ def mh_l10n_builder_names(config, platform, branch, is_nightly):
 
     l10n_chunks = repacks['l10n_chunks']
     for chunk in range(1, l10n_chunks + 1):
-        builder_name = "%s l10n %s/%s" % (name, chunk, l10n_chunks)
+        builder_name = "%s-%s" % (name, chunk)
         names.append(builder_name)
     return names
 
