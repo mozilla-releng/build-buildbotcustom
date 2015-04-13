@@ -342,7 +342,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     updates_upstream_builders = []
     post_signing_builders = []
     update_verify_builders = defaultdict(list)
-    post_update_builders = []
     deliverables_builders = []
     xr_deliverables_builders = []
     post_deliverables_builders = []
@@ -1842,13 +1841,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderNames=[builderPrefix('%s_%s_ready_for_release' % (releaseConfig['productName'], channel))],
             ))
 
-    if releaseConfig.get('enableAutomaticPushToMirrors') and not releaseConfig.get("skip_updates"):
-        post_update_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
-
-    if releaseConfig.get('enableAutomaticPushToMirrors') and \
-            hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
-        post_deliverables_builders.append(builderPrefix('%s_push_to_mirrors' % releaseConfig['productName']))
-
     schedulers.append(AggregatingScheduler(
         name=builderPrefix(
             '%s_signing_done' % releaseConfig['productName']),
@@ -1856,16 +1848,32 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         upstreamBuilders=updates_upstream_builders,
         builderNames=post_signing_builders,
     ))
+
+    push_to_mirrors_upstreams = []
     for channel, updateConfig in updateChannels.iteritems():
+        push_to_mirrors_upstreams.append(builderPrefix("%s_%s_updates" % (releaseConfig["productName"], channel)))
         if updateConfig.get('verifyConfigs'):
-            downstreams = post_update_builders[:]
-            downstreams.extend(update_verify_builders[channel])
             schedulers.append(AggregatingScheduler(
                 name=builderPrefix('%s_updates_done' % channel),
                 branch=sourceRepoInfo['path'],
                 upstreamBuilders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], channel))],
-                builderNames=downstreams,
+                builderNames=update_verify_builders[channel],
             ))
+
+    if releaseConfig.get('enableAutomaticPushToMirrors'):
+        if not hasPlatformSubstring(releaseConfig["enUSPlatforms"], "android"):
+            push_to_mirrors_upstreams.extend([
+                builderPrefix("%s_checksums" % releaseConfig["productName"]),
+                builderPrefix("check_permissions"),
+            ])
+
+        schedulers.append(AggregatingScheduler(
+            name=builderPrefix("%s_push_to_mirrors" % releaseConfig["productName"]),
+            branch=sourceRepoInfo["path"],
+            upstreamBuilders=push_to_mirrors_upstreams,
+            builderNames=[builderPrefix("%s_push_to_mirrors" % releaseConfig["productName"])],
+        ))
+
     if post_deliverables_builders:
         schedulers.append(AggregatingScheduler(
             name=builderPrefix(
