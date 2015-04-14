@@ -2736,6 +2736,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                         test_name = test.split()[-1]
                                         if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
                                             skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
+                                            builderMergeLimits[test] = skipcount
                                     suites_by_skipconfig[skipcount, skiptimeout].append(test)
 
                                 # Create a new Scheduler for every skip config
