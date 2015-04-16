@@ -483,21 +483,26 @@ class DisconnectStep(ShellCommand):
     def start(self):
         # If a graceful shutdown was requested it doesn't make sense to reboot
         # the slave - so let's not do anything!
+        if self.build.slavebuilder.slave is None:
+            # bug 1136765 - The slave isn't connected and there's no benefit
+            # from trying to disconnect it.
+            return SKIPPED
+
         if self.build.slavebuilder.slave.slave_status.getGraceful():
             return SKIPPED
-        else:
-            # Give the machine 60 seconds to go away on its own
-            def die():
-                self._deferred_death = None
-                log.msg("Forcibly disconnecting %s" % self.getSlaveName())
-                self.buildslave.disconnect()
-                try:
-                    # Try to close the socket too
-                    self.buildslave.slave.broker.transport._closeSocket()
-                except:
-                    log.err()
-            self._deferred_death = reactor.callLater(60, die)
-            return self.super_class.start(self)
+
+        # Give the machine 60 seconds to go away on its own
+        def die():
+            self._deferred_death = None
+            log.msg("Forcibly disconnecting %s" % self.getSlaveName())
+            self.buildslave.disconnect()
+            try:
+                # Try to close the socket too
+                self.buildslave.slave.broker.transport._closeSocket()
+            except:
+                log.err()
+        self._deferred_death = reactor.callLater(60, die)
+        return self.super_class.start(self)
 
     def checkDisconnect(self, f):
         # This is called if there's a problem executing the command because the connection was disconnected.
