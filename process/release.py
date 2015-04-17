@@ -1264,6 +1264,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             balrog_api_root=balrog_api_root,
             balrog_username=balrog_username,
             balrog_credentials_file=balrog_credentials_file,
+            mar_channel_ids=updateConfig.get("marChannelIds", []),
         )
 
         builderName = builderPrefix("%s_%s_updates" % (releaseConfig["productName"], channel))
