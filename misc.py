@@ -946,18 +946,24 @@ def generateChunkedUnittestBuilders(total_chunks, *args, **kwargs):
         )
     builders = []
     for i in range(1, total_chunks + 1):
-        kwargs_copy = deepcopy(kwargs)
+        kwargs_copy = kwargs.copy()
         kwargs_copy['suites_name'] = '%s-%d' % (kwargs_copy['suites_name'], i)
         chunk_args = [
             '--total-chunks', str(total_chunks),
             '--this-chunk', str(i)
         ]
         if 'extra_args' in kwargs_copy['mozharness_suite_config']:
-            kwargs_copy['mozharness_suite_config']['extra_args'].extend(chunk_args)
+            # Not used any more
+            assert False
         elif 'extra_args' in kwargs_copy['suites']:
+            kwargs_copy['suites'] = deepcopy(kwargs['suites'])
             kwargs_copy['suites']['extra_args'].extend(chunk_args)
+            # We should have only one set of --this-chunk and --total-chunks here
+            assert kwargs_copy['suites']['extra_args'].count('--this-chunk') == 1
+            assert kwargs_copy['suites']['extra_args'].count('--total-chunks') == 1
         else:
-            kwargs_copy['mozharness_suite_config']['extra_args'] = chunk_args
+            # Not used any more
+            assert False
         builders.extend(generateUnittestBuilders(
             *args, **kwargs_copy
         ))
@@ -1234,9 +1240,6 @@ def generateBranchObjects(config, name, secrets=None):
             builders.append('%s pgo-build' % pf['base_name'])
             buildersByProduct.setdefault(pf['stage_product'], []).append(
                 '%s pgo-build' % pf['base_name'])
-
-        if pf.get('enable_noprofiling_build'):
-            nightlyBuilders.append('%s no-profiling' % pf['base_name'])
 
         if do_nightly:
             builder = '%s nightly' % base_name
@@ -1822,34 +1825,6 @@ def generateBranchObjects(config, name, secrets=None):
                                    'slavebuilddir': normalizeName('%s-%s-pgo' % (name, platform), pf['stage_product'])},
                 }
                 branchObjects['builders'].append(pgo_builder)
-
-            if pf.get('enable_noprofiling_build'):
-                kwargs = factory_kwargs.copy()
-                kwargs['stagePlatform'] += '-noprofiling'
-                kwargs['srcMozconfig'] = kwargs['srcMozconfig'] + '-noprofiling'
-                # We do need to upload these packages
-                kwargs['uploadPackages'] = True
-                # Disable sendchanges
-                kwargs['talosMasters'] = None
-                kwargs['unittestMasters'] = None
-                # Enable nightly stuff, e.g. upload location
-                kwargs['nightly'] = True
-                factory = factory_class(**kwargs)
-                builder = {
-                    'name': '%s no-profiling' % pf['base_name'],
-                    'slavenames': pf['slaves'],
-                    'builddir': '%s-%s-noprofiling' % (name, platform),
-                    'slavebuilddir': normalizeName('%s-%s-noprofiling' % (name, platform), pf['stage_product']),
-                    'factory': factory,
-                    'category': name,
-                    'nextSlave': _nextAWSSlave_sort,
-                    'properties': {'branch': name,
-                                   'platform': platform,
-                                   'stage_platform': stage_platform + '-noprofiling',
-                                   'product': pf['stage_product'],
-                                   'slavebuilddir': normalizeName('%s-%s-noprofiling' % (name, platform), pf['stage_product'])},
-                }
-                branchObjects['builders'].append(builder)
 
         # skip nightlies for debug builds unless requested at platform level
         if platform.endswith("-debug") and not pf.get('enable_nightly'):
@@ -2827,39 +2802,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 )
                 branchObjects['schedulers'].append(s)
 
-    if branch_config.get('release_tests'):
-        releaseObjects = generateTalosReleaseBranchObjects(branch,
-                                                           branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS)
-        for k, v in releaseObjects.items():
-            branchObjects[k].extend(v)
     return branchObjects
-
-
-def generateTalosReleaseBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-                                      ACTIVE_UNITTEST_PLATFORMS):
-    branch_config = branch_config.copy()
-    release_tests = branch_config['release_tests']
-
-    # Update the # of tests to run with our release_tests number
-    # Force no merging
-    for suite, talosConfig in SUITES.items():
-        tests, merge, extra, platforms = branch_config['%s_tests' % suite]
-        if tests > 0:
-            branch_config['%s_tests' % suite] = (release_tests,
-                                                 False, extra, platforms)
-
-    # Update the TinderboxTree and the branch_name
-    branch_config['tinderbox_tree'] += '-Release'
-    branch_config['branch_name'] += '-Release'
-    branch = "release-" + branch
-
-    # Remove the release_tests key so we don't call ourselves again
-    del branch_config['release_tests']
-
-    # Don't fetch symbols
-    branch_config['fetch_symbols'] = branch_config['fetch_release_symbols']
-    return generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
-                                      ACTIVE_UNITTEST_PLATFORMS)
 
 
 def mirrorAndBundleArgs(config):
@@ -3173,28 +3116,6 @@ def generateJetpackObjects(config, SLAVES):
     }
 
 
-def generateGaiaTryObjects(config, all_builders):
-    # Set up polling
-    assert all_builders
-    builder_names = [x['name'] for x in all_builders if 'gaia-try' in x['name']]
-    poller = HgPoller(
-        hgURL=config['hgurl'],
-        branch=config['repo_path'],
-        pollInterval=5 * 60,
-    )
-    # Set up scheduler
-    scheduler = Scheduler(
-        name="gaia-try",
-        branch=config['repo_path'],
-        treeStableTimer=None,
-        builderNames=builder_names,
-    )
-    return {
-        'change_source': [poller],
-        'schedulers': [scheduler],
-    }
-
-
 def generateProjectObjects(project, config, SLAVES, all_builders=None):
     builders = []
     schedulers = []
@@ -3222,11 +3143,6 @@ def generateProjectObjects(project, config, SLAVES, all_builders=None):
         spiderMonkeyObjects = generateSpiderMonkeyObjects(
             project, config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
-
-    # Gaia-Try
-    elif project == "gaia-try":
-        gaiaTryObjects = generateGaiaTryObjects(config, all_builders)
-        buildObjects = mergeBuildObjects(buildObjects, gaiaTryObjects)
 
     return buildObjects
 
