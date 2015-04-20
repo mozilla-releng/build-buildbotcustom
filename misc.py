@@ -3243,6 +3243,8 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
     product_name = pf['product_name'].capitalize()
     scriptName = repacks['scriptName']
     l10n_chunks = repacks['l10n_chunks']
+    script_timeout = repacks['script_timeout']
+    script_maxtime = repacks['script_maxtime']
     use_credentials_file = repacks['use_credentials_file']
     config_dir = 'single_locale'
     branch_config = os.path.join(config_dir, '%s.py' % branch)
@@ -3270,13 +3272,14 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
             signingServers=signing_servers,
             scriptRepo=scriptRepo,
             scriptName=scriptName,
+            script_timeout=script_timeout,
+            script_maxtime=script_maxtime,
             use_credentials_file=use_credentials_file,
             interpreter=mozharness_python,
             extra_args=extra_args,
             reboot_command=reboot_command,
         )
         slavebuilddir = normalizeName(builddir)
-        # was: slavebuilddir = normalizeName(builddir, pf['stage_product'])
         builders.append({
             'name': builderName,
             'slavenames': pf.get('slaves'),
@@ -3294,6 +3297,7 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
                            'script_repo_revision': config['mozharness_tag'], },
             'env': builder_env
         })
+
     return builders
 
 
