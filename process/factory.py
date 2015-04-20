@@ -3903,7 +3903,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  buildSpace=2, triggerSchedulers=None, releaseNotesUrl=None,
                  python='python', promptWaitTime=None,
                  balrog_api_root=None, balrog_credentials_file=None,
-                 balrog_username=None, **kwargs):
+                 balrog_username=None, mar_channel_ids=[], **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.patcherConfig = patcherConfig
@@ -3929,6 +3929,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.balrog_username = balrog_username
         self.testChannel = localTestChannel
         self.releaseChannel = releaseChannel
+        self.mar_channel_ids = mar_channel_ids
 
         self.previousVersion = getPreviousVersion(self.version,
                                                   self.partialUpdates.keys())
@@ -3968,6 +3969,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.extend(['--platform', platform])
         if self.promptWaitTime:
             bumpCommand.extend(['--prompt-wait-time', self.promptWaitTime])
+        for c in self.mar_channel_ids:
+            bumpCommand.extend(["--mar-channel-id", c])
         if self.releaseNotesUrl:
             rnurl = self.releaseNotesUrl
             if self.use_mock:
