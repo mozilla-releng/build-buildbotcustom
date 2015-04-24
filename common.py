@@ -1,7 +1,6 @@
 import re
 import time
 import uuid
-from distutils.version import LooseVersion, StrictVersion
 
 
 def getSupportedPlatforms():
@@ -164,16 +163,3 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
     while len(name) < min_:
         name += filler
     return name
-
-
-def getPreviousVersion(version, partialVersions):
-    """ The patcher config bumper needs to know the exact previous version
-    We use LooseVersion for ESR because StrictVersion can't parse the trailing
-    'esr', but StrictVersion otherwise because it can sort X.0bN lower than X.0.
-    The current version is excluded to avoid an error if build1 is aborted
-    before running the updates builder and now we're doing build2
-    """
-    if version.endswith('esr'):
-        return str(max(LooseVersion(v) for v in partialVersions if v != version))
-    else:
-        return str(max(StrictVersion(v) for v in partialVersions if v != version))
