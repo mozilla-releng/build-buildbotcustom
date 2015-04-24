@@ -4,7 +4,6 @@ from __future__ import absolute_import
 import os.path
 import re
 import random
-from distutils.version import LooseVersion
 
 from twisted.python import log
 
@@ -58,7 +57,7 @@ from buildbotcustom.steps.test import GraphServerPost
 from buildbotcustom.steps.signing import SigningServerAuthenication
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
-    genBuildID, normalizeName
+    genBuildID, normalizeName, getPreviousVersion
 from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, \
     MockInstall, MockMozillaCheck, MockProperty, RetryingMockProperty, \
     RetryingMockCommand
@@ -3932,9 +3931,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.releaseChannel = releaseChannel
         self.mar_channel_ids = mar_channel_ids
 
-#        # The patcher config bumper needs to know the exact previous version
-        self.previousVersion = str(
-            max(LooseVersion(v) for v in self.partialUpdates))
+        self.previousVersion = getPreviousVersion(self.version,
+                                                  self.partialUpdates.keys())
         self.patcherConfigFile = 'tools/release/patcher-configs/%s' % patcherConfig
         self.shippedLocales = self.getShippedLocales(self.repository, baseTag,
                                                      appName)
