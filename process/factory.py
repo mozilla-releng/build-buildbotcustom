@@ -816,7 +816,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  stagePlatform=None, testPrettyNames=False, l10nCheckTest=False,
                  disableSymbols=False,
                  doBuildAnalysis=False,
-                 doPostLinkerSize=False,
                  multiLocale=False,
                  multiLocaleMerge=True,
                  compareLocalesRepoPath=None,
@@ -869,7 +868,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         else:
             self.stageProduct = stageProduct
         self.doBuildAnalysis = doBuildAnalysis
-        self.doPostLinkerSize = doPostLinkerSize
         self.updatePlatform = updatePlatform
         self.downloadBaseURL = downloadBaseURL
         self.nightly = nightly
@@ -1188,8 +1186,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.addDoBuildSteps()
         if self.doBuildAnalysis:
             self.addBuildAnalysisSteps()
-        if self.doPostLinkerSize:
-            self.addPostLinkerSizeSteps()
 
     def addPreBuildSteps(self):
         if self.nightly:
@@ -1426,34 +1422,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                     data=WithProperties(
                         'TinderboxPrint: num_ctors: %(num_ctors:-unknown)s'),
                 ))
-
-    def addPostLinkerSizeSteps(self):
-        # Analyze the linker max vsize
-        def get_linker_vsize(rc, stdout, stderr):
-            try:
-                vsize = int(stdout)
-                testresults = [('libxul_link', 'libxul_link', vsize, str(vsize))]
-                return dict(vsize=vsize, testresults=testresults)
-            except:
-                return {'testresults': []}
-
-        self.addStep(SetProperty(
-            name='get_linker_vsize',
-            command=['cat', '%s\\toolkit\\library\\linker-vsize' % self.mozillaObjdir],
-            extract_fn=get_linker_vsize,
-            ))
-        self.addBuildInfoSteps()
-        self.addStep(JSONPropertiesDownload(slavedest="properties.json"))
-        gs_env = self.env.copy()
-        gs_env['PYTHONPATH'] = WithProperties('%(toolsdir)s/lib/python')
-        self.addStep(GraphServerPost(server=self.graphServer,
-                                     selector=self.graphSelector,
-                                     branch=self.graphBranch,
-                                     resultsname=self.baseName,
-                                     env=gs_env,
-                                     flunkOnFailure=False,
-                                     haltOnFailure=False,
-                                     propertiesFile="properties.json"))
 
     def addCheckTestSteps(self):
         env = self.env.copy()
