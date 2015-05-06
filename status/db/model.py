@@ -135,7 +135,7 @@ class Property(Base):
         values = [p[1] for p in props.asList()]
         sources = [unicode(p[2]) for p in props.asList()]
         all = (session.query(cls).filter(cls.name.in_(names))
-                                 .filter(sqlalchemy.or_(cls.value.in_(values), cls.value is None))
+                                 .filter(sqlalchemy.or_(cls.value.in_(values), cls.value == None))
                                  .filter(cls.source.in_(sources)).all())
 
         retval = []
