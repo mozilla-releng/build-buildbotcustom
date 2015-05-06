@@ -42,6 +42,11 @@ from mozilla_buildtools.queuedir import QueueDir
 
 from util.commands import get_output
 
+def ts2dt(t):
+    if t:
+        return datetime.utcfromtimestamp(t)
+    return t
+
 
 class PostRunner(object):
     def __init__(self, config):
@@ -230,6 +235,10 @@ class PostRunner(object):
             starttime=starttime,
         )
         db_build = q.first()
+        # Force start/endtime to None initially so that we get all the
+        # properties, steps, etc. populated
+        old_times = build.started, build.finished
+        build.started, build.finished = None, None
         if not db_build:
             log.debug("creating new build")
             db_build = model.Build.fromBBBuild(
@@ -239,6 +248,12 @@ class PostRunner(object):
             db_build.updateFromBBBuild(session, build)
         session.commit()
         log.debug("committed")
+
+        # Now we can record the actual build times
+        log.debug("updating times")
+        old_times = [ts2dt(t) for t in old_times]
+        db_build.starttime, db_build.endtime = old_times
+        session.commit()
 
         log.debug("updating schedulerdb_requests table")
 
