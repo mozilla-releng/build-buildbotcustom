@@ -176,4 +176,9 @@ def getPreviousVersion(version, partialVersions):
     if version.endswith('esr'):
         return str(max(LooseVersion(v) for v in partialVersions if v != version))
     else:
-        return str(max(StrictVersion(v) for v in partialVersions if v != version))
+        # StrictVersion truncates trailing zero in versions with more than 1
+        # dot. Compose a structure that will be sorted by StrictVersion and
+        # return untouched version
+        composed = sorted([(v, StrictVersion(v)) for v in partialVersions if v
+                           != version], key=lambda x: x[1], reverse=True)
+        return composed[0][0]

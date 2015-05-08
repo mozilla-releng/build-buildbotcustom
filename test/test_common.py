@@ -50,3 +50,7 @@ class TestGetPreviousVersion(unittest.TestCase):
     def testBetaFirstInCycle(self):
         self.assertEquals('37.0',
             getPreviousVersion('38.0b1', ['37.0', '37.0b7']))
+
+    def testTwoDots(self):
+        self.assertEquals('37.1.0',
+            getPreviousVersion('38.0b1', ['37.1.0', '36.0']))
