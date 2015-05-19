@@ -2682,131 +2682,133 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 )
                             )
 
-                        for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
-                            for test in test_builders:
-                                unittestSuites.append(test.split(' ')[-1])
-                            scheduler_branch = ('%s-%s-%s-unittest' %
-                                                (branch, platform, test_type))
-                            if not merge:
-                                nomergeBuilders.update(test_builders)
-                            extra_args = {}
-                            if branch_config.get('enable_try'):
-                                scheduler_class = BuilderChooserScheduler
-                                extra_args['chooserFunc'] = tryChooser
-                                extra_args['prettyNames'] = prettyNames
-                                extra_args['unittestSuites'] = unittestSuites
-                                extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
-                                extra_args['buildbotBranch'] = branch
-                                branchObjects['schedulers'].append(scheduler_class(
-                                        name=scheduler_name,
-                                        branch=scheduler_branch,
-                                        builderNames=test_builders,
-                                        treeStableTimer=None,
-                                        **extra_args
-                                ))
-                            else:
-                                scheduler_class = Scheduler
-                                suites_by_skipconfig = collections.defaultdict(list)
-                                skipcount = 0
-                                skiptimeout = 0
+                        if branch_config.get("enable_test_schedulers", True):
+                            for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
                                 for test in test_builders:
+                                    unittestSuites.append(test.split(' ')[-1])
+                                scheduler_branch = ('%s-%s-%s-unittest' %
+                                                    (branch, platform, test_type))
+                                if not merge:
+                                    nomergeBuilders.update(test_builders)
+                                extra_args = {}
+                                if branch_config.get('enable_try'):
+                                    scheduler_class = BuilderChooserScheduler
+                                    extra_args['chooserFunc'] = tryChooser
+                                    extra_args['prettyNames'] = prettyNames
+                                    extra_args['unittestSuites'] = unittestSuites
+                                    extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
+                                    extra_args['buildbotBranch'] = branch
+                                    branchObjects['schedulers'].append(scheduler_class(
+                                            name=scheduler_name,
+                                            branch=scheduler_branch,
+                                            builderNames=test_builders,
+                                            treeStableTimer=None,
+                                            **extra_args
+                                    ))
+                                else:
+                                    scheduler_class = Scheduler
+                                    suites_by_skipconfig = collections.defaultdict(list)
                                     skipcount = 0
                                     skiptimeout = 0
-                                    if branch_config['platforms'][platform][slave_platform].get('skipconfig'):
-                                        #extract last word in the test string as it should correspond to the name of the test
-                                        test_name = test.split()[-1]
-                                        if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
-                                            skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
-                                            builderMergeLimits[test] = skipcount
-                                    suites_by_skipconfig[skipcount, skiptimeout].append(test)
+                                    for test in test_builders:
+                                        skipcount = 0
+                                        skiptimeout = 0
+                                        if branch_config['platforms'][platform][slave_platform].get('skipconfig'):
+                                            #extract last word in the test string as it should correspond to the name of the test
+                                            test_name = test.split()[-1]
+                                            if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
+                                                skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
+                                                builderMergeLimits[test] = skipcount
+                                        suites_by_skipconfig[skipcount, skiptimeout].append(test)
 
-                                # Create a new Scheduler for every skip config
-                                for (skipcount, skiptimeout), test_builders in suites_by_skipconfig.items():
+                                    # Create a new Scheduler for every skip config
+                                    for (skipcount, skiptimeout), test_builders in suites_by_skipconfig.items():
+                                        scheduler_class = Scheduler
+                                        s_name = scheduler_name
+                                        extra_args = {}
+
+                                        if skipcount > 0:
+                                            scheduler_class = EveryNthScheduler
+                                            extra_args['n'] = skipcount
+                                            extra_args['idleTimeout'] = skiptimeout
+                                            s_name = scheduler_name + "-" + str(skipcount) + "-"  + str(skiptimeout)
+
+                                        branchObjects['schedulers'].append(scheduler_class(
+                                            name=s_name,
+                                            branch=scheduler_branch,
+                                            builderNames=test_builders,
+                                            treeStableTimer=None,
+                                            **extra_args
+                                        ))
+                            for scheduler_name, test_builders, merge in pgoUnittestBuilders:
+                                for test in test_builders:
+                                    unittestSuites.append(test.split(' ')[-1])
+                                scheduler_branch = '%s-%s-pgo-unittest' % (
+                                    branch, platform)
+                                if not merge:
+                                    nomergeBuilders.update(pgo_builders)
+                                extra_args = {}
+                                if branch_config.get('enable_try'):
+                                    scheduler_class = BuilderChooserScheduler
+                                    extra_args['chooserFunc'] = tryChooser
+                                    extra_args['prettyNames'] = prettyNames
+                                    extra_args['unittestSuites'] = unittestSuites
+                                    extra_args['buildbotBranch'] = branch
+                                else:
                                     scheduler_class = Scheduler
-                                    s_name = scheduler_name
-                                    extra_args = {}
+                                branchObjects['schedulers'].append(scheduler_class(
+                                    name=scheduler_name,
+                                    branch=scheduler_branch,
+                                    builderNames=pgo_builders,
+                                    treeStableTimer=None,
+                                    **extra_args
+                                ))
 
-                                    if skipcount > 0:
-                                        scheduler_class = EveryNthScheduler
-                                        extra_args['n'] = skipcount
-                                        extra_args['idleTimeout'] = skiptimeout
-                                        s_name = scheduler_name + "-" + str(skipcount) + "-"  + str(skiptimeout)
+            if branch_config.get("enable_test_schedulers", True):
+                # Create one scheduler per # of tests to run
+                for tests, builder_names in talos_builders.items():
+                    extra_args = {}
+                    assert tests == 1
+                    scheduler_class = Scheduler
+                    name = 'tests-%s-%s-talos' % (branch, platform)
 
-                                    branchObjects['schedulers'].append(scheduler_class(
-                                        name=s_name,
-                                        branch=scheduler_branch,
-                                        builderNames=test_builders,
-                                        treeStableTimer=None,
-                                        **extra_args
-                                    ))
-                        for scheduler_name, test_builders, merge in pgoUnittestBuilders:
-                            for test in test_builders:
-                                unittestSuites.append(test.split(' ')[-1])
-                            scheduler_branch = '%s-%s-pgo-unittest' % (
-                                branch, platform)
-                            if not merge:
-                                nomergeBuilders.update(pgo_builders)
-                            extra_args = {}
-                            if branch_config.get('enable_try'):
-                                scheduler_class = BuilderChooserScheduler
-                                extra_args['chooserFunc'] = tryChooser
-                                extra_args['prettyNames'] = prettyNames
-                                extra_args['unittestSuites'] = unittestSuites
-                                extra_args['buildbotBranch'] = branch
-                            else:
-                                scheduler_class = Scheduler
-                            branchObjects['schedulers'].append(scheduler_class(
-                                name=scheduler_name,
-                                branch=scheduler_branch,
-                                builderNames=pgo_builders,
-                                treeStableTimer=None,
-                                **extra_args
-                            ))
+                    if branch_config.get('enable_try'):
+                        scheduler_class = BuilderChooserScheduler
+                        extra_args['chooserFunc'] = tryChooser
+                        extra_args['prettyNames'] = prettyNames
+                        extra_args['talosSuites'] = SUITES.keys()
+                        extra_args['buildbotBranch'] = branch
 
-            # Create one scheduler per # of tests to run
-            for tests, builder_names in talos_builders.items():
-                extra_args = {}
-                assert tests == 1
-                scheduler_class = Scheduler
-                name = 'tests-%s-%s-talos' % (branch, platform)
+                    s = scheduler_class(
+                        name=name,
+                        branch='%s-%s-talos' % (branch, platform),
+                        treeStableTimer=None,
+                        builderNames=builder_names,
+                        **extra_args
+                    )
+                    branchObjects['schedulers'].append(s)
+                # PGO Schedulers
+                for tests, builder_names in talos_pgo_builders.items():
+                    extra_args = {}
+                    assert tests == 1
+                    scheduler_class = Scheduler
+                    name = 'tests-%s-%s-pgo-talos' % (branch, platform)
 
-                if branch_config.get('enable_try'):
-                    scheduler_class = BuilderChooserScheduler
-                    extra_args['chooserFunc'] = tryChooser
-                    extra_args['prettyNames'] = prettyNames
-                    extra_args['talosSuites'] = SUITES.keys()
-                    extra_args['buildbotBranch'] = branch
+                    if branch_config.get('enable_try'):
+                        scheduler_class = BuilderChooserScheduler
+                        extra_args['chooserFunc'] = tryChooser
+                        extra_args['prettyNames'] = prettyNames
+                        extra_args['talosSuites'] = SUITES.keys()
+                        extra_args['buildbotBranch'] = branch
 
-                s = scheduler_class(
-                    name=name,
-                    branch='%s-%s-talos' % (branch, platform),
-                    treeStableTimer=None,
-                    builderNames=builder_names,
-                    **extra_args
-                )
-                branchObjects['schedulers'].append(s)
-            # PGO Schedulers
-            for tests, builder_names in talos_pgo_builders.items():
-                extra_args = {}
-                assert tests == 1
-                scheduler_class = Scheduler
-                name = 'tests-%s-%s-pgo-talos' % (branch, platform)
-
-                if branch_config.get('enable_try'):
-                    scheduler_class = BuilderChooserScheduler
-                    extra_args['chooserFunc'] = tryChooser
-                    extra_args['prettyNames'] = prettyNames
-                    extra_args['talosSuites'] = SUITES.keys()
-                    extra_args['buildbotBranch'] = branch
-
-                s = scheduler_class(
-                    name=name,
-                    branch='%s-%s-pgo-talos' % (branch, platform),
-                    treeStableTimer=None,
-                    builderNames=builder_names,
-                    **extra_args
-                )
-                branchObjects['schedulers'].append(s)
+                    s = scheduler_class(
+                        name=name,
+                        branch='%s-%s-pgo-talos' % (branch, platform),
+                        treeStableTimer=None,
+                        builderNames=builder_names,
+                        **extra_args
+                    )
+                    branchObjects['schedulers'].append(s)
 
     return branchObjects
 
