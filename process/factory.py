@@ -387,6 +387,13 @@ class TooltoolMixin(object):
         ]
         if self.tooltool_script:
             command.extend(self.tooltool_script)
+
+        # include relengapi authentication information
+        relengapi_tok = '/builds/relengapi.tok'
+        if self.platform.startswith('win'):
+            relengapi_tok = r'c:\builds\relengapi.tok'
+        command.extend(['--authentication-file', relengapi_tok])
+
         self.addStep(ShellCommand(
             name='run_tooltool',
             command=command,
