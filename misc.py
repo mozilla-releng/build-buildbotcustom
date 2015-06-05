@@ -791,7 +791,8 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
     posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     properties = {'branch': branchProperty, 'platform': platform,
                   'slavebuilddir': 'test', 'stage_platform': stagePlatform,
-                  'product': stageProduct, 'repo_path': config['repo_path']}
+                  'product': stageProduct, 'repo_path': config['repo_path'],
+                  'moz_repo_path': config.get('moz_repo_path', '')}
     if mozharness:
         # suites is a dict!
         if mozharness_suite_config is None:
