@@ -63,6 +63,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_PARALLELIZATION)
     updateVerifyChunks = releaseConfig.get(
         'updateVerifyChunks', DEFAULT_PARALLELIZATION)
+    # Re-use the same chunking configuration
+    ui_update_verify_chunks = releaseConfig.get(
+        'updateVerifyChunks', DEFAULT_PARALLELIZATION)
     tools_repo_path = releaseConfig.get('build_tools_repo_path',
                                         branchConfig['build_tools_repo_path'])
     tools_repo = '%s%s' % (branchConfig['hgurl'], tools_repo_path)
@@ -132,11 +135,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         assert signingServers, 'Please provide a valid list of signing servers'
         return signingServers
 
-    def builderPrefix(s, platform=None):
+    def builderPrefix(postfix, platform=None):
         if platform:
-            return "release-%s-%s_%s" % (sourceRepoInfo['name'], platform, s)
+            return "release-%s-%s_%s" % (sourceRepoInfo['name'], platform, postfix)
         else:
-            return "release-%s-%s" % (sourceRepoInfo['name'], s)
+            return "release-%s-%s" % (sourceRepoInfo['name'], postfix)
 
     def releasePrefix():
         """Construct a standard format product release name from the
@@ -316,6 +319,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         return parallelizeBuilders("update_verify_%s" % channel, platform,
                                    updateVerifyChunks)
 
+    def ui_update_verify_builders(platform, channel):
+        return parallelizeBuilders("ui_update_verify_%s" % channel, platform,
+                                   ui_update_verify_chunks)
+
     def hasPlatformSubstring(platforms, substring):
         if isinstance(platforms, basestring):
             platforms = (platforms,)
@@ -342,6 +349,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     updates_upstream_builders = []
     post_signing_builders = []
     update_verify_builders = defaultdict(list)
+    ui_update_tests_builders = defaultdict(list)
     deliverables_builders = []
     xr_deliverables_builders = []
     post_deliverables_builders = []
@@ -1374,6 +1382,48 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 })
                 update_verify_builders[channel].append(builderName)
 
+            if releaseConfig.get('ui_update_tests'):
+                # Append Firefox UI update verify tests
+                for n, builder_name in ui_update_verify_builders(platform, channel).iteritems():
+                    ui_uv_factory = ScriptFactory(
+                        scriptRepo=mozharness_repo,
+                        scriptName='scripts/firefox_ui_updates.py',
+                        extra_args=[
+                            ['--cfg', 'generic_releng_config.py',
+                             '--cfg update_tests/%s.py' % sourceRepoInfo['name'],
+                             '--tools-tag', releaseTag,
+                             '--total-chunks', str(ui_update_verify_chunks),
+                             '--this-chunk', str(n)]
+                        ],
+                    )
+
+                    builddir = '%(prefix)s_%(this_chunk)s' % {
+                        'prefix': builderPrefix(postfix='%s_%s_update_tests' % (platform, channel)),
+                        'this_chunk': str(n)
+                    }
+
+                    builders.append({
+                        'name': builder_name,
+                        'slavenames': branchConfig['platforms'][platform]['slaves'],
+                        'category': builderPrefix(''),
+                        'builddir': builddir,
+                        'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
+                        'factory': ui_uv_factory,
+                        'properties': {
+                            'builddir': builddir,
+                            'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
+                            'script_repo_revision': runtimeTag,
+                            'release_tag': releaseTag,
+                            'release_config': releaseConfigFile,
+                            'platform': platform,
+                            'branch': 'release-%s' % sourceRepoInfo['name'],
+                            'chunkTotal': int(ui_update_verify_chunks),
+                            'chunkNum': int(n),
+                            'event_group': 'update_verify',
+                        },
+                    })
+                    ui_update_tests_builders[channel].append(builder_name)
+
     if not releaseConfig.get("updateChannels") or \
       hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         builders.append(makeDummyBuilder(
@@ -1859,6 +1909,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 branch=sourceRepoInfo['path'],
                 upstreamBuilders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], channel))],
                 builderNames=update_verify_builders[channel],
+            ))
+            # Add Firefox UI update test builders
+            schedulers.append(AggregatingScheduler(
+                name=builderPrefix('%s_ui_update_verify' % channel),
+                branch=sourceRepoInfo['path'],
+                upstreamBuilders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], channel))],
+                builderNames=ui_update_tests_builders[channel],
             ))
 
     if releaseConfig.get('enableAutomaticPushToMirrors'):
