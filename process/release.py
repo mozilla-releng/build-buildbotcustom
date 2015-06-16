@@ -1391,7 +1391,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args=[
                             ['--cfg', 'generic_releng_config.py',
                              '--cfg update_tests/%s.py' % sourceRepoInfo['name'],
-                             '--tools-tag', releaseTag,
+                             '--tools-tag', runtimeTag,
                              '--total-chunks', str(ui_update_verify_chunks),
                              '--this-chunk', str(n)]
                         ],
@@ -1412,7 +1412,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         'properties': {
                             'builddir': builddir,
                             'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
-                            'script_repo_revision': runtimeTag,
+                            'script_repo_revision': releaseTag,
                             'release_tag': releaseTag,
                             'release_config': releaseConfigFile,
                             'platform': platform,
