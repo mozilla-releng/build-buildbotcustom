@@ -1394,7 +1394,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             '--cfg update_tests/%s.py' % sourceRepoInfo['name'],
                             '--tools-tag', runtimeTag,
                             '--total-chunks', str(ui_update_verify_chunks),
-                            '--this-chunk', str(n)]
+                            '--this-chunk', str(n)
                         ],
                     )
 
