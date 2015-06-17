@@ -1386,14 +1386,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 # Append Firefox UI update verify tests
                 for n, builder_name in ui_update_verify_builders(platform, channel).iteritems():
                     ui_uv_factory = ScriptFactory(
+                        interpreter='python',
                         scriptRepo=mozharness_repo,
                         scriptName='scripts/firefox_ui_updates.py',
                         extra_args=[
-                            ['--cfg', 'generic_releng_config.py',
-                             '--cfg update_tests/%s.py' % sourceRepoInfo['name'],
-                             '--tools-tag', runtimeTag,
-                             '--total-chunks', str(ui_update_verify_chunks),
-                             '--this-chunk', str(n)]
+                            '--cfg', 'generic_releng_config.py',
+                            '--cfg update_tests/%s.py' % sourceRepoInfo['name'],
+                            '--tools-tag', runtimeTag,
+                            '--total-chunks', str(ui_update_verify_chunks),
+                            '--this-chunk', str(n)
                         ],
                     )
 
