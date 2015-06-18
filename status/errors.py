@@ -9,7 +9,7 @@ def re_compile(s):
 global_errors = ((re_compile("No space left on device"), RETRY),
                  # Bug 1018531: only RETRY with "Remote Device Error" if *not* preceded by "Caught Exception: "
                  (re_compile("(?<!INFO -  Caught Exception: )Remote Device Error"), RETRY),
-                 (re_compile("devicemanager.DMError"), RETRY),
+                 (re_compile("DMError"), RETRY),
                  (re_compile("Connection to the other side was lost in a non-clean fashion"), RETRY),
                  (re_compile("program finished with exit code 80"), RETRY),
                  (re_compile("INFRA-ERROR"), RETRY),
