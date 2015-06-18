@@ -1028,6 +1028,8 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
             l10n_builder = l10nNightlyBuilders[base_name]['l10n_builder']
             assert(isinstance(l10n_builder, str))
             triggered_nightly_schedulers.append(l10n_builder)
+        elif config['enable_l10n'] and pf.get('is_mobile_l10n') and pf.get('l10n_chunks'):
+            triggered_nightly_schedulers.append('%s-%s-l10n' % (name, platform))
 
     # if we do a generic dep build
     if pf.get('enable_dep', True) or pf.get('enable_periodic', False):
