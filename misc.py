@@ -724,6 +724,7 @@ def makeMHFactory(config, pf, mh_cfg=None, extra_args=None, **kwargs):
         script_maxtime=mh_cfg.get('script_maxtime', pf.get('maxTime', 4 * 3600)),
         script_repo_cache=script_repo_cache,
         script_repo_manifest=config.get('script_repo_manifest'),
+        relengapi_archiver=config.get('mozharness_archiver_endpoint'),
         tools_repo_cache=mh_cfg.get('tools_repo_cache',
                                     pf.get('tools_repo_cache')),
         **kwargs
@@ -777,7 +778,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         mozharness=False, mozharness_python=None,
                         mozharness_suite_config=None,
                         mozharness_repo=None, mozharness_tag='production',
-                        script_repo_manifest=None, is_debug=None):
+                        script_repo_manifest=None, relengapi_archiver=None, is_debug=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves is None:
@@ -834,6 +835,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             script_maxtime=suites.get('script_maxtime', 7200),
             script_timeout=suites.get('timeout', 1800),
             script_repo_manifest=script_repo_manifest,
+            relengapi_archiver=relengapi_archiver,
             reboot_command=reboot_command,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
@@ -897,7 +899,8 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
                                    reboot_command, extra_args=None,
                                    script_timeout=3600,
                                    script_maxtime=7200,
-                                   script_repo_manifest=None):
+                                   script_repo_manifest=None,
+                                   relengapi_archiver=None):
     if extra_args is None:
         extra_args = []
     return ScriptFactory(
@@ -910,6 +913,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         script_timeout=script_timeout,
         script_maxtime=script_maxtime,
         script_repo_manifest=script_repo_manifest,
+        relengapi_archiver=relengapi_archiver,
         reboot_command=reboot_command,
         platform=platform,
         log_eval_func=rc_eval_func({
@@ -2482,6 +2486,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 'mozharness_config'].get('reboot_command'),
                             'script_repo_manifest': branch_config.get(
                                  'script_repo_manifest'),
+                            'relengapi_archiver': branch_config.get('mozharness_archiver_endpoint'),
                         }
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
@@ -2642,6 +2647,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['script_repo_manifest'] = branch_config.get('script_repo_manifest')
+                                test_builder_kwargs['relengapi_archiver'] = branch_config.get('mozharness_archiver_endpoint')
                                 # allow mozharness_python to be overridden per test slave platform in case Python
                                 # not installed to a consistent location.
                                 if 'mozharness_config' in platform_config[slave_platform] and \
