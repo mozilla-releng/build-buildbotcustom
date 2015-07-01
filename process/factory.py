@@ -4807,7 +4807,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                  properties_file='buildprops.json', script_repo_cache=None,
                  tools_repo_cache=None, tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh", tooltool_url_list=None,
-                 tooltool_script=None):
+                 tooltool_script=None, relengapi_archiver=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -4872,7 +4872,50 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
         ))
         script_repo_url = WithProperties('%(script_repo_url)s')
 
-        if self.script_repo_cache:
+        if relengapi_archiver:
+            if self.script_repo_cache:
+                assert self.tools_repo_cache
+                archiver_client_path = \
+                    os.path.join(self.tools_repo_cache,
+                                 'buildfarm',
+                                 'utils',
+                                 'archiver_client.py')
+            else:
+                self.addStep(ShellCommand(
+                    command=['bash', '-c',
+                             'wget -Oarchiver_client.py ' +
+                             '--no-check-certificate --tries=10 --waitretry=3 ' +
+                             'http://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
+                    haltOnFailure=True,
+                ))
+                archiver_client_path = 'archiver_client.py'
+
+            self.addStep(ShellCommand(
+                name="clobber_scripts",
+                command=['rm', '-rf', 'scripts'],
+                workdir=".",
+                haltOnFailure=True,
+                log_eval_func=rc_eval_func({0: SUCCESS, None: RETRY}),
+            ))
+            self.addStep(ShellCommand(
+                name="download_and_extract_scripts_archive",
+                command=['bash', '-c',
+                         WithProperties(
+                             'python %s ' % archiver_client_path +
+                             '%s ' % relengapi_archiver +
+                             '--repo %(repo_path)s ' +
+                             '--rev %(revision)s ' +
+                             '--destination %(basedir)s/scripts ' +
+                             '--debug')],
+                log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
+                haltOnFailure=True,
+            ))
+            if scriptName.startswith('/'):
+                script_path = scriptName
+            else:
+                script_path = 'scripts/%s' % scriptName
+
+        elif self.script_repo_cache:
             # all slaves bar win tests have a copy of hgtool on their path.
             # However, let's use runner's checkout version like we do for
             # script repo
