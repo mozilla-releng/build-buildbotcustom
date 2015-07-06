@@ -4885,8 +4885,9 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                     command=['bash', '-c',
                              'wget -Oarchiver_client.py ' +
                              '--no-check-certificate --tries=10 --waitretry=3 ' +
-                             'http://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
+                             'https://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
                     haltOnFailure=True,
+                    workdir=".",
                 ))
                 archiver_client_path = 'archiver_client.py'
 
@@ -4905,16 +4906,16 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                              '%s ' % relengapi_archiver +
                              '--repo %(repo_path)s ' +
                              '--rev %(revision)s ' +
-                             '--destination %(basedir)s/scripts ' +
+                             '--destination scripts ' +
                              '--debug')],
                 log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
                 haltOnFailure=True,
+                workdir=".",
             ))
             if scriptName.startswith('/'):
                 script_path = scriptName
             else:
                 script_path = 'scripts/%s' % scriptName
-
         elif self.script_repo_cache:
             # all slaves bar win tests have a copy of hgtool on their path.
             # However, let's use runner's checkout version like we do for

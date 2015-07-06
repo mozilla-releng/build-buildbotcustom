@@ -1391,7 +1391,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         scriptName='scripts/firefox_ui_updates.py',
                         extra_args=[
                             '--cfg', 'generic_releng_config.py',
-                            '--cfg', 'update_tests/{}.py'.format(sourceRepoInfo["name"]),
+                            '--firefox-ui-branch', sourceRepoInfo['name'],
+                            '--update-verify-config', updateConfig['verifyConfigs'][platform],
                             '--tools-tag', runtimeTag,
                             '--total-chunks', str(ui_update_verify_chunks),
                             '--this-chunk', str(n)
