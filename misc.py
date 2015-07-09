@@ -778,7 +778,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         mozharness=False, mozharness_python=None,
                         mozharness_suite_config=None,
                         mozharness_repo=None, mozharness_tag='production',
-                        script_repo_manifest=None, relengapi_archiver=None, is_debug=None):
+                        script_repo_manifest=None, relengapi_archiver_repo_path=None, is_debug=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves is None:
@@ -835,7 +835,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             script_maxtime=suites.get('script_maxtime', 7200),
             script_timeout=suites.get('timeout', 1800),
             script_repo_manifest=script_repo_manifest,
-            relengapi_archiver=relengapi_archiver,
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
             reboot_command=reboot_command,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
@@ -900,7 +900,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
                                    script_timeout=3600,
                                    script_maxtime=7200,
                                    script_repo_manifest=None,
-                                   relengapi_archiver=None):
+                                   relengapi_archiver_repo_path=None):
     if extra_args is None:
         extra_args = []
     return ScriptFactory(
@@ -913,7 +913,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         script_timeout=script_timeout,
         script_maxtime=script_maxtime,
         script_repo_manifest=script_repo_manifest,
-        relengapi_archiver=relengapi_archiver,
+        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
         reboot_command=reboot_command,
         platform=platform,
         log_eval_func=rc_eval_func({
