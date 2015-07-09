@@ -724,7 +724,7 @@ def makeMHFactory(config, pf, mh_cfg=None, extra_args=None, **kwargs):
         script_maxtime=mh_cfg.get('script_maxtime', pf.get('maxTime', 4 * 3600)),
         script_repo_cache=script_repo_cache,
         script_repo_manifest=config.get('script_repo_manifest'),
-        relengapi_archiver=config.get('mozharness_archiver_endpoint'),
+        relengapi_archiver_repo_path=config.get('mozharness_archiver_repo_path'),
         tools_repo_cache=mh_cfg.get('tools_repo_cache',
                                     pf.get('tools_repo_cache')),
         **kwargs
@@ -2486,7 +2486,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 'mozharness_config'].get('reboot_command'),
                             'script_repo_manifest': branch_config.get(
                                  'script_repo_manifest'),
-                            'relengapi_archiver': branch_config.get('mozharness_archiver_endpoint'),
+                            'relengapi_archiver_repo_path': branch_config.get('mozharness_archiver_repo_path'),
                         }
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
@@ -2647,7 +2647,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['script_repo_manifest'] = branch_config.get('script_repo_manifest')
-                                test_builder_kwargs['relengapi_archiver'] = branch_config.get('mozharness_archiver_endpoint')
+                                test_builder_kwargs['relengapi_archiver_repo_path'] = branch_config.get('mozharness_archiver_repo_path')
                                 # allow mozharness_python to be overridden per test slave platform in case Python
                                 # not installed to a consistent location.
                                 if 'mozharness_config' in platform_config[slave_platform] and \

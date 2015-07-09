@@ -4807,7 +4807,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                  properties_file='buildprops.json', script_repo_cache=None,
                  tools_repo_cache=None, tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh", tooltool_url_list=None,
-                 tooltool_script=None, relengapi_archiver=None):
+                 tooltool_script=None, relengapi_archiver_repo_path=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -4872,7 +4872,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
         ))
         script_repo_url = WithProperties('%(script_repo_url)s')
 
-        if relengapi_archiver:
+        if relengapi_archiver_repo_path:
             if self.script_repo_cache:
                 assert self.tools_repo_cache
                 archiver_client_path = \
@@ -4903,8 +4903,8 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 command=['bash', '-c',
                          WithProperties(
                              'python %s ' % archiver_client_path +
-                             '%s ' % relengapi_archiver +
-                             '--repo %(repo_path)s ' +
+                             'mozharness ' +
+                             '--repo %s ' % relengapi_archiver_repo_path +
                              '--rev %(revision)s ' +
                              '--destination scripts ' +
                              '--debug')],
