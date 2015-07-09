@@ -724,7 +724,7 @@ def makeMHFactory(config, pf, mh_cfg=None, extra_args=None, **kwargs):
         script_maxtime=mh_cfg.get('script_maxtime', pf.get('maxTime', 4 * 3600)),
         script_repo_cache=script_repo_cache,
         script_repo_manifest=config.get('script_repo_manifest'),
-        relengapi_archiver=config.get('mozharness_archiver_endpoint'),
+        relengapi_archiver_repo_path=config.get('mozharness_archiver_repo_path'),
         tools_repo_cache=mh_cfg.get('tools_repo_cache',
                                     pf.get('tools_repo_cache')),
         **kwargs
@@ -778,7 +778,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         mozharness=False, mozharness_python=None,
                         mozharness_suite_config=None,
                         mozharness_repo=None, mozharness_tag='production',
-                        script_repo_manifest=None, relengapi_archiver=None, is_debug=None):
+                        script_repo_manifest=None, relengapi_archiver_repo_path=None, is_debug=None):
     builders = []
     pf = config['platforms'].get(platform, {})
     if slaves is None:
@@ -835,7 +835,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
             script_maxtime=suites.get('script_maxtime', 7200),
             script_timeout=suites.get('timeout', 1800),
             script_repo_manifest=script_repo_manifest,
-            relengapi_archiver=relengapi_archiver,
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
             reboot_command=reboot_command,
             platform=platform,
             env=mozharness_suite_config.get('env', {}),
@@ -900,7 +900,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
                                    script_timeout=3600,
                                    script_maxtime=7200,
                                    script_repo_manifest=None,
-                                   relengapi_archiver=None):
+                                   relengapi_archiver_repo_path=None):
     if extra_args is None:
         extra_args = []
     return ScriptFactory(
@@ -913,7 +913,7 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
         script_timeout=script_timeout,
         script_maxtime=script_maxtime,
         script_repo_manifest=script_repo_manifest,
-        relengapi_archiver=relengapi_archiver,
+        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
         reboot_command=reboot_command,
         platform=platform,
         log_eval_func=rc_eval_func({
@@ -1880,7 +1880,8 @@ def generateBranchObjects(config, name, secrets=None):
                                              config['mozharness_repo_path']),
                         scriptName='scripts/mobile_l10n.py',
                         use_credentials_file=True,
-                        extra_args=extra_args
+                        extra_args=extra_args,
+                        relengapi_archiver_repo_path=config.get('mozharness_archiver_repo_path'),
                     )
                     slavebuilddir = normalizeName(builddir, pf['stage_product'])
                     branchObjects['builders'].append({
@@ -1898,6 +1899,7 @@ def generateBranchObjects(config, name, secrets=None):
                                        'platform': platform,
                                        'slavebuilddir': slavebuilddir,
                                        'script_repo_revision': config['mozharness_tag'],
+                                       'repo_path': config['repo_path'],
                                        },
                         'env': builder_env
                     })
@@ -2486,7 +2488,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 'mozharness_config'].get('reboot_command'),
                             'script_repo_manifest': branch_config.get(
                                  'script_repo_manifest'),
-                            'relengapi_archiver': branch_config.get('mozharness_archiver_endpoint'),
+                            'relengapi_archiver_repo_path': branch_config.get('mozharness_archiver_repo_path'),
                         }
                         return args
                         # end of _makeGenerateMozharnessTalosBuilderArgs
@@ -2647,7 +2649,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                 test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
                                 test_builder_kwargs['mozharness'] = True
                                 test_builder_kwargs['script_repo_manifest'] = branch_config.get('script_repo_manifest')
-                                test_builder_kwargs['relengapi_archiver'] = branch_config.get('mozharness_archiver_endpoint')
+                                test_builder_kwargs['relengapi_archiver_repo_path'] = branch_config.get('mozharness_archiver_repo_path')
                                 # allow mozharness_python to be overridden per test slave platform in case Python
                                 # not installed to a consistent location.
                                 if 'mozharness_config' in platform_config[slave_platform] and \
@@ -3296,6 +3298,7 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
             interpreter=mozharness_python,
             extra_args=extra_args,
             reboot_command=reboot_command,
+            relengapi_archiver_repo_path=config.get('mozharness_archiver_repo_path')
         )
         slavebuilddir = normalizeName(builddir)
         builders.append({
@@ -3312,7 +3315,9 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
                            'product': pf['stage_product'],
                            'platform': platform,
                            'slavebuilddir': slavebuilddir,
-                           'script_repo_revision': config['mozharness_tag'], },
+                           'script_repo_revision': config['mozharness_tag'],
+                           'repo_path': config['repo_path'],
+                           },
             'env': builder_env
         })
 
