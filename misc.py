@@ -1880,7 +1880,8 @@ def generateBranchObjects(config, name, secrets=None):
                                              config['mozharness_repo_path']),
                         scriptName='scripts/mobile_l10n.py',
                         use_credentials_file=True,
-                        extra_args=extra_args
+                        extra_args=extra_args,
+                        relengapi_archiver_repo_path=config.get('mozharness_archiver_repo_path'),
                     )
                     slavebuilddir = normalizeName(builddir, pf['stage_product'])
                     branchObjects['builders'].append({
@@ -1898,6 +1899,7 @@ def generateBranchObjects(config, name, secrets=None):
                                        'platform': platform,
                                        'slavebuilddir': slavebuilddir,
                                        'script_repo_revision': config['mozharness_tag'],
+                                       'repo_path': config['repo_path'],
                                        },
                         'env': builder_env
                     })
@@ -3296,6 +3298,7 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
             interpreter=mozharness_python,
             extra_args=extra_args,
             reboot_command=reboot_command,
+            relengapi_archiver_repo_path=config.get('mozharness_archiver_repo_path')
         )
         slavebuilddir = normalizeName(builddir)
         builders.append({
@@ -3312,7 +3315,9 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
                            'product': pf['stage_product'],
                            'platform': platform,
                            'slavebuilddir': slavebuilddir,
-                           'script_repo_revision': config['mozharness_tag'], },
+                           'script_repo_revision': config['mozharness_tag'],
+                           'repo_path': config['repo_path'],
+                           },
             'env': builder_env
         })
 
