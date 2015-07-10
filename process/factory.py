@@ -841,7 +841,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  gaiaL10nRoot=None,
                  geckoL10nRoot=None,
                  geckoLanguagesFile=None,
-                 relengapi_archiver_release_tag=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -919,7 +918,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.multiLocaleConfig = multiLocaleConfig
         self.multiLocaleMerge = multiLocaleMerge
         self.tools_repo_cache = tools_repo_cache
-        self.relengapi_archiver_release_tag = relengapi_archiver_release_tag
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1082,50 +1080,55 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addPeriodicRebootSteps()
 
     def addMozharnessRepoSteps(self):
-        if self.relengapi_archiver_release_tag:
-            archiver_revision = "--tag %s " % self.relengapi_archiver_release_tag
-        else:
-            archiver_revision = "--rev %(revision)s "
         if self.mozharness_repo_cache:
+            # all slaves bar win tests have a copy of hgtool in their path.
+            # However let's use runner's checkout version like we do with
+            # script_repo_cache as we want these cache repos to be the
+            # canonical truth as we roll out runner
             assert self.tools_repo_cache
-            archiver_client_path = \
-                os.path.join(self.tools_repo_cache,
-                             'buildfarm',
-                             'utils',
-                             'archiver_client.py')
-        else:
+            hgtool_path = os.path.join(self.tools_repo_cache,
+                                       'buildfarm',
+                                       'utils',
+                                       'hgtool.py')
+            hgtool_cmd = [
+                'python', hgtool_path, '--purge',
+                '-r', WithProperties('%(script_repo_revision:-default)s'),
+                self.getRepository(self.mozharnessRepoPath),
+                self.mozharness_repo_cache
+            ]
             self.addStep(ShellCommand(
-                command=['bash', '-c',
-                         'wget -Oarchiver_client.py ' +
-                         '--no-check-certificate --tries=10 --waitretry=3 ' +
-                         'http://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
+                name="update_mozharness_repo_cache",
+                command=hgtool_cmd,
+                env=self.env,
+                haltOnFailure=True,
+                workdir=os.path.dirname(self.mozharness_repo_cache),
+            ))
+        else:
+            # fall back to legacy local mozharness full clobber/clone
+            self.addStep(ShellCommand(
+                name='rm_mozharness',
+                command=['rm', '-rf', 'mozharness'],
+                description=['removing', 'mozharness'],
+                descriptionDone=['remove', 'mozharness'],
                 haltOnFailure=True,
                 workdir='.',
             ))
-            archiver_client_path = 'archiver_client.py'
-
-
-        self.addStep(ShellCommand(
-            name='rm_mozharness',
-            command=['rm', '-rf', 'mozharness'],
-            description=['removing', 'mozharness'],
-            descriptionDone=['remove', 'mozharness'],
-            haltOnFailure=True,
-            workdir='.',
-        ))
-        self.addStep(ShellCommand(
-            name="download_and_extract_mozharness_archive",
-            command=['bash', '-c',
-                     WithProperties(
-                         'python %s ' % archiver_client_path +
-                         'mozharness ' +
-                         '--repo %s ' % self.repoPath +
-                         archiver_revision +
-                         '--debug')],
-            log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
-            workdir='.',
-            haltOnFailure=True,
-        ))
+            self.addStep(MercurialCloneCommand(
+                name='hg_clone_mozharness',
+                command=['hg', 'clone', self.getRepository(
+                    self.mozharnessRepoPath), 'mozharness'],
+                description=['checking', 'out', 'mozharness'],
+                descriptionDone=['checkout', 'mozharness'],
+                haltOnFailure=True,
+                workdir='.',
+            ))
+            self.addStep(ShellCommand(
+                name='hg_update_mozharness',
+                command=['hg', 'update', '-r', self.mozharnessTag],
+                description=['updating', 'mozharness', 'to', self.mozharnessTag],
+                workdir='mozharness',
+                haltOnFailure=True
+            ))
 
     def addMultiLocaleRepoSteps(self):
         name = self.compareLocalesRepoPath.rstrip('/').split('/')[-1]
@@ -4804,8 +4807,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                  properties_file='buildprops.json', script_repo_cache=None,
                  tools_repo_cache=None, tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh", tooltool_url_list=None,
-                 tooltool_script=None, relengapi_archiver_repo_path=None,
-                 relengapi_archiver_release_tag=None):
+                 tooltool_script=None, relengapi_archiver_repo_path=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -4871,10 +4873,6 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
         script_repo_url = WithProperties('%(script_repo_url)s')
 
         if relengapi_archiver_repo_path:
-            if relengapi_archiver_release_tag:
-                archiver_revision = "--tag %s " % relengapi_archiver_release_tag
-            else:
-                archiver_revision = "--rev %(revision)s "
             if self.script_repo_cache:
                 assert self.tools_repo_cache
                 archiver_client_path = \
@@ -4907,7 +4905,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                              'python %s ' % archiver_client_path +
                              'mozharness ' +
                              '--repo %s ' % relengapi_archiver_repo_path +
-                             archiver_revision +
+                             '--rev %(revision)s ' +
                              '--destination scripts ' +
                              '--debug')],
                 log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),

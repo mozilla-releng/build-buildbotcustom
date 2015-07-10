@@ -56,10 +56,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     # This variable is one thing that forces us into reconfiging prior to a
     # release. It should be removed as soon as nothing depends on it.
     sourceRepoInfo = releaseConfig['sourceRepositories'][sourceRepoKey]
-    # Bug 1179476 - use in gecko tree mozharness for release jobs
-    relengapi_archiver_repo_path = sourceRepoInfo['path']
-    if sourceRepoKey == "comm":
-        relengapi_archiver_repo_path = releaseConfig['sourceRepositories']['mozilla']['path']
     releaseTag = getReleaseTag(releaseConfig['baseTag'])
     # This tag is created post-signing, when we do some additional
     # config file bumps
@@ -765,7 +761,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'compare_locales_repo_path'],
                 mozharnessRepoPath=mozharness_repo_path,
                 mozharnessTag=releaseTag,
-                relengapi_archiver_release_tag=releaseTag,
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
                 mozharnessMultiOptions=mozharnessMultiOptions,
@@ -914,8 +909,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args=extra_args,
                         use_credentials_file=True,
                         env=env,
-                        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
-                        relengapi_archiver_release_tag=releaseTag,
                     )
                     properties['script_repo_revision'] = releaseTag
                 else:
@@ -1114,8 +1107,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     scriptName=mh_cfg['script'],
                     extra_args=extra_args,
                     env=builder_env,
-                    relengapi_archiver_repo_path=relengapi_archiver_repo_path,
-                    relengapi_archiver_release_tag=releaseTag,
                 )
             else:
                 pr_pf = branchConfig['platforms']['macosx64']
@@ -1406,8 +1397,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             '--total-chunks', str(ui_update_verify_chunks),
                             '--this-chunk', str(n)
                         ],
-                        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
-                        relengapi_archiver_release_tag=releaseTag,
                     )
 
                     builddir = '%(prefix)s_%(this_chunk)s' % {
@@ -1739,8 +1728,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             scriptName="scripts/bouncer_submitter.py",
             extra_args=extra_args,
             use_credentials_file=True,
-            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
-            relengapi_archiver_release_tag=releaseTag,
         )
 
         builders.append({
