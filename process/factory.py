@@ -1081,45 +1081,54 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
 
     def addMozharnessRepoSteps(self):
         if self.mozharness_repo_cache:
+            # all slaves bar win tests have a copy of hgtool in their path.
+            # However let's use runner's checkout version like we do with
+            # script_repo_cache as we want these cache repos to be the
+            # canonical truth as we roll out runner
             assert self.tools_repo_cache
-            archiver_client_path = \
-                os.path.join(self.tools_repo_cache,
-                             'buildfarm',
-                             'utils',
-                             'archiver_client.py')
-        else:
+            hgtool_path = os.path.join(self.tools_repo_cache,
+                                       'buildfarm',
+                                       'utils',
+                                       'hgtool.py')
+            hgtool_cmd = [
+                'python', hgtool_path, '--purge',
+                '-r', WithProperties('%(script_repo_revision:-default)s'),
+                self.getRepository(self.mozharnessRepoPath),
+                self.mozharness_repo_cache
+            ]
             self.addStep(ShellCommand(
-                command=['bash', '-c',
-                         'wget -Oarchiver_client.py ' +
-                         '--no-check-certificate --tries=10 --waitretry=3 ' +
-                         'http://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
+                name="update_mozharness_repo_cache",
+                command=hgtool_cmd,
+                env=self.env,
+                haltOnFailure=True,
+                workdir=os.path.dirname(self.mozharness_repo_cache),
+            ))
+        else:
+            # fall back to legacy local mozharness full clobber/clone
+            self.addStep(ShellCommand(
+                name='rm_mozharness',
+                command=['rm', '-rf', 'mozharness'],
+                description=['removing', 'mozharness'],
+                descriptionDone=['remove', 'mozharness'],
                 haltOnFailure=True,
                 workdir='.',
             ))
-            archiver_client_path = 'archiver_client.py'
-
-
-        self.addStep(ShellCommand(
-            name='rm_mozharness',
-            command=['rm', '-rf', 'mozharness'],
-            description=['removing', 'mozharness'],
-            descriptionDone=['remove', 'mozharness'],
-            haltOnFailure=True,
-            workdir='.',
-        ))
-        self.addStep(ShellCommand(
-            name="download_and_extract_mozharness_archive",
-            command=['bash', '-c',
-                     WithProperties(
-                         'python %s ' % archiver_client_path +
-                         'mozharness ' +
-                         '--repo %s ' % self.repoPath +
-                         '--rev %(revision)s ' +
-                         '--debug')],
-            log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
-            workdir='.',
-            haltOnFailure=True,
-        ))
+            self.addStep(MercurialCloneCommand(
+                name='hg_clone_mozharness',
+                command=['hg', 'clone', self.getRepository(
+                    self.mozharnessRepoPath), 'mozharness'],
+                description=['checking', 'out', 'mozharness'],
+                descriptionDone=['checkout', 'mozharness'],
+                haltOnFailure=True,
+                workdir='.',
+            ))
+            self.addStep(ShellCommand(
+                name='hg_update_mozharness',
+                command=['hg', 'update', '-r', self.mozharnessTag],
+                description=['updating', 'mozharness', 'to', self.mozharnessTag],
+                workdir='mozharness',
+                haltOnFailure=True
+            ))
 
     def addMultiLocaleRepoSteps(self):
         name = self.compareLocalesRepoPath.rstrip('/').split('/')[-1]
