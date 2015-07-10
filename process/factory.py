@@ -841,6 +841,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  gaiaL10nRoot=None,
                  geckoL10nRoot=None,
                  geckoLanguagesFile=None,
+                 relengapi_archiver_release_tag=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
 
@@ -918,6 +919,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.multiLocaleConfig = multiLocaleConfig
         self.multiLocaleMerge = multiLocaleMerge
         self.tools_repo_cache = tools_repo_cache
+        self.relengapi_archiver_release_tag = relengapi_archiver_release_tag
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -1080,6 +1082,10 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addPeriodicRebootSteps()
 
     def addMozharnessRepoSteps(self):
+        if self.relengapi_archiver_release_tag:
+            archiver_revision = "--tag %s " % self.relengapi_archiver_release_tag
+        else:
+            archiver_revision = "--rev %(revision)s "
         if self.mozharness_repo_cache:
             assert self.tools_repo_cache
             archiver_client_path = \
@@ -1114,7 +1120,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                          'python %s ' % archiver_client_path +
                          'mozharness ' +
                          '--repo %s ' % self.repoPath +
-                         '--rev %(revision)s ' +
+                         archiver_revision +
                          '--debug')],
             log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
             workdir='.',
