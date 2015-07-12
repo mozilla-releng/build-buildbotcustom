@@ -3021,7 +3021,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         self.addStep(MockCommand(**self.processCommand(
                                  name='compile_nsinstall',
                                  env=self.env,
-                                 command=self.makeCmd,
+                                 command=self.makeCmd + ['export'],
                                  workdir='%s/config' % self.absMozillaObjDir,
                                  description=['compile nsinstall'],
                                  haltOnFailure=True,
