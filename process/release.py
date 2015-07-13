@@ -1397,6 +1397,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             '--tools-tag', runtimeTag,
                             '--total-chunks', str(ui_update_verify_chunks),
                             '--this-chunk', str(n),
+                            "--build-number", releaseConfig['buildNumber'],
                         ],
                     )
 
