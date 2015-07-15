@@ -773,7 +773,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mozillaDir=mozillaDir,
                 mozillaSrcDir=mozillaSrcDir,
                 enableInstaller=pf.get('enable_installer', False),
-                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src'),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
                 tooltool_script=pf.get('tooltool_script'),
                 use_mock=use_mock(platform),
@@ -838,9 +838,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 if releaseConfig.get('l10nUsePymake', True) and \
                    platform in ('win32', 'win64'):
                     extra_args.append('--use-pymake')
-                if pf.get('tooltool_l10n_manifest_src'):
+                if pf.get('tooltool_manifest_src'):
                     extra_args.extend(['--tooltool-manifest',
-                                      pf.get('tooltool_l10n_manifest_src')])
+                                      pf.get('tooltool_manifest_src')])
                 if pf.get('tooltool_script'):
                     for script in pf['tooltool_script']:
                         extra_args.extend(['--tooltool-script', script])
@@ -927,9 +927,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         extra_args.append('--use-pymake')
                     if releaseConfig.get('enablePartialMarsAtBuildTime', True):
                         extra_args.append('--generate-partials')
-                    if pf.get('tooltool_l10n_manifest_src'):
+                    if pf.get('tooltool_manifest_src'):
                         extra_args.extend(['--tooltool-manifest',
-                                          pf.get('tooltool_l10n_manifest_src')])
+                                          pf.get('tooltool_manifest_src')])
                     if pf.get('tooltool_script'):
                         for script in pf['tooltool_script']:
                             extra_args.extend(['--tooltool-script', script])
@@ -1052,7 +1052,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 packageSDK=True,
                 signingServers=getSigningServers(platform),
                 partialUpdates={},  # no updates for Xulrunner
-                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src'),
                 tooltool_url_list=branchConfig.get('tooltool_url_list', []),
                 tooltool_script=pf.get('tooltool_script'),
                 use_mock=use_mock(platform),
@@ -1391,11 +1391,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         scriptName='scripts/firefox_ui_updates.py',
                         extra_args=[
                             '--cfg', 'generic_releng_config.py',
+                            '--cfg', 'generic_releng_%s.py' % platform,
                             '--firefox-ui-branch', sourceRepoInfo['name'],
                             '--update-verify-config', updateConfig['verifyConfigs'][platform],
                             '--tools-tag', runtimeTag,
                             '--total-chunks', str(ui_update_verify_chunks),
-                            '--this-chunk', str(n)
+                            '--this-chunk', str(n),
+                            "--build-number", releaseConfig['buildNumber'],
                         ],
                     )
 
