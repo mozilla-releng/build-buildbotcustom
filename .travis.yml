@@ -25,13 +25,12 @@ script:
 after_script:
   - tox -e py27-coveralls
 
-# currently cannot customise per user fork, see:
-# https://github.com/travis-ci/travis-ci/issues/1094
-# please comment out this section in your personal fork!
+# The channel name "irc.mozilla.org#releng" is encrypted against mozilla/build-buildbotcustom to prevent IRC spam of forks
+# Generated with: travis encrypt --repo mozilla/build-buildbotcustom  --skip-version-check irc.mozilla.org#releng
 notifications:
   irc:
     channels:
-      - "irc.mozilla.org#releng"
+      - secure: "IZKaFWxMsbk1bMYNXSKXclQkFS4dqXyfjS8a4+YyFbe/hLfa0hlAHhNOPhOL2CFFv8TU2mTCWQlWLa5N6kWzrr3z+VY8cAPqTbxuHJVudVBHFBtyVn3me6NM0i0dlU9e/McEiOwCnYndABvt6sM2LYzGMeG0h6UbmK8Q7efb1FI="
     on_success: always
     on_failure: always
     template:
