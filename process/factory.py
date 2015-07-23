@@ -4732,7 +4732,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                  tools_repo_cache=None, tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh", tooltool_url_list=None,
                  tooltool_script=None, relengapi_archiver_repo_path=None,
-                 relengapi_archiver_release_tag=None):
+                 relengapi_archiver_release_tag=None, relengapi_archiver_rev=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -4801,7 +4801,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             if relengapi_archiver_release_tag:
                 archiver_revision = "--tag %s " % relengapi_archiver_release_tag
             else:
-                archiver_revision = "--rev %(revision)s "
+                archiver_revision = "--rev %s " % (relengapi_archiver_rev or '%(revision)s',)
             if self.script_repo_cache:
                 assert self.tools_repo_cache
                 archiver_client_path = \
