@@ -63,55 +63,6 @@ from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
 
-
-def get_l10n_repositories(file, l10nRepoPath, relbranch):
-    """Reads in a list of locale names and revisions for their associated
-       repository from 'file'.
-    """
-    if not l10nRepoPath.endswith('/'):
-        l10nRepoPath = l10nRepoPath + '/'
-    repositories = {}
-    for localeLine in open(file).readlines():
-        locale, revision = localeLine.rstrip().split()
-        if revision == 'FIXME':
-            raise Exception('Found FIXME in %s for locale "%s"' %
-                            (file, locale))
-        locale = urljoin(l10nRepoPath, locale)
-        repositories[locale] = {
-            'revision': revision,
-            'relbranchOverride': relbranch,
-            'bumpFiles': []
-        }
-
-    return repositories
-
-
-def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
-    if not l10nRepoPath.endswith('/'):
-        l10nRepoPath = l10nRepoPath + '/'
-
-    l10nRepositories = {}
-    platformLocales = collections.defaultdict(dict)
-
-    file = open(jsonFile)
-    localesJson = json.load(file)
-    for locale in localesJson.keys():
-        revision = localesJson[locale]['revision']
-        if revision == 'FIXME':
-            raise Exception('Found FIXME in %s for locale "%s"' %
-                            (jsonFile, locale))
-        localeUrl = urljoin(l10nRepoPath, locale)
-        l10nRepositories[localeUrl] = {
-            'revision': revision,
-            'relbranchOverride': relbranch,
-            'bumpFiles': []
-        }
-        for platform in localesJson[locale]['platforms']:
-            platformLocales[platform][locale] = localesJson[
-                locale]['platforms']
-
-    return (l10nRepositories, platformLocales)
-
 # This function is used as fileIsImportant parameter for Buildbots that do both
 # dep/nightlies and release builds. Because they build the same "branch" this
 # allows us to have the release builder ignore HgPoller triggered changse
