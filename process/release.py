@@ -26,16 +26,16 @@ reload(build.paths)
 reload(release.info)
 
 from buildbotcustom.status.mail import ChangeNotifier
-from buildbotcustom.misc import get_l10n_repositories, \
-    generateTestBuilderNames, generateTestBuilder, \
-    changeContainsProduct, nomergeBuilders, changeContainsProperties, \
-    changeContainsScriptRepoRevision
+from buildbotcustom.misc import (
+    generateTestBuilderNames, generateTestBuilder, changeContainsProduct,
+    nomergeBuilders, changeContainsProperties,
+    changeContainsScriptRepoRevision)
 from buildbotcustom.common import normalizeName
-from buildbotcustom.process.factory import StagingRepositorySetupFactory, \
-    ScriptFactory, SingleSourceFactory, ReleaseBuildFactory, \
-    ReleaseUpdatesFactory, ReleaseFinalVerification, \
-    PartnerRepackFactory, XulrunnerReleaseBuildFactory, \
-    makeDummyBuilder, SigningScriptFactory, DummyFactory
+from buildbotcustom.process.factory import (
+    ScriptFactory, SingleSourceFactory, ReleaseBuildFactory,
+    ReleaseUpdatesFactory, ReleaseFinalVerification, PartnerRepackFactory,
+    XulrunnerReleaseBuildFactory, makeDummyBuilder, SigningScriptFactory,
+    DummyFactory)
 from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, \
@@ -372,75 +372,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     dummy_builder_env = {
         'DUMMY_RELEASE_PREFIX': releasePrefix(),
     }
-
-
     if use_mock('linux'):
         unix_slaves = mock_slaves
-    if releaseConfig.get('enable_repo_setup'):
-        if not releaseConfig.get('skip_repo_setup'):
-            clone_repositories = dict()
-            # The repo_setup builder only needs to the repoPath, so we only
-            # give it that
-            for sr in releaseConfig['sourceRepositories'].values():
-                clone_repositories.update({sr['clonePath']: {}})
-            # get_l10n_repositories spits out more than just the repoPath
-            # It's easier to just pass it along rather than strip it out
-            if with_l10n:
-                l10n_clone_repos = get_l10n_repositories(
-                    releaseConfig['l10nRevisionFile'],
-                    releaseConfig['l10nRepoClonePath'],
-                    sourceRepoInfo['relbranch'])
-                clone_repositories.update(l10n_clone_repos)
-
-            pf = branchConfig['platforms']['linux']
-            hgSshKey = releaseConfig['hgSshKey']
-            repository_setup_factory = StagingRepositorySetupFactory(
-                hgHost=branchConfig['hghost'],
-                buildToolsRepoPath=tools_repo_path,
-                username=releaseConfig['hgUsername'],
-                sshKey=hgSshKey,
-                repositories=clone_repositories,
-                clobberURL=clobberer_url,
-                clobberBranch='release-%s' % sourceRepoInfo['name'],
-                userRepoRoot=releaseConfig['userRepoRoot'],
-                use_mock=use_mock('linux'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                env=pf['env'],
-            )
-
-            builders.append({
-                'name': builderPrefix(
-                    '%s_repo_setup' % releaseConfig['productName']),
-                'slavenames': unix_slaves,
-                'category': builderPrefix(''),
-                'builddir': builderPrefix(
-                    '%s_repo_setup' % releaseConfig['productName']),
-                'slavebuilddir': normalizeName(builderPrefix(
-                    '%s_repo_setup' % releaseConfig['productName']), releaseConfig['productName']),
-                'factory': repository_setup_factory,
-                'env': builder_env,
-                'properties': {
-                    'slavebuilddir': normalizeName(builderPrefix(
-                        '%s_repo_setup' % releaseConfig['productName']), releaseConfig['productName']),
-                    'release_config': releaseConfigFile,
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                },
-            })
-        else:
-            builders.append(makeDummyBuilder(
-                name=builderPrefix(
-                    '%s_repo_setup' % releaseConfig['productName']),
-                slaves=all_slaves,
-                category=builderPrefix(''),
-                properties={
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                },
-                env=dummy_builder_env,
-            ))
 
     dummy_tag_builders = []
     if not releaseConfig.get('skip_tag'):
@@ -763,8 +696,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
                 compareLocalesRepoPath=branchConfig[
                     'compare_locales_repo_path'],
+                # mozharnessRepoPath and mozharnessTag are legacy.
+                # tracking the deletion of these is  managed in https://bugzil.la/1180060
                 mozharnessRepoPath=mozharness_repo_path,
                 mozharnessTag=releaseTag,
+                # normally archiver gets Mozharness from repoPath which normally points to a ff
+                # gecko repo. But for Thunderbird, repoPath points to a comm- repo. Here we will
+                # pass an explicit repo for archiver to use
+                relengapi_archiver_repo_path=relengapi_archiver_repo_path,
                 relengapi_archiver_release_tag=releaseTag,
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
@@ -1775,34 +1714,19 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             and changeContainsScriptRepoRevision(c, releaseTag),
     )
     schedulers.append(reset_schedulers_scheduler)
-    if releaseConfig.get('enable_repo_setup'):
-        repo_setup_scheduler = Dependent(
-            name=builderPrefix('%s_repo_setup' % releaseConfig['productName']),
-            upstream=reset_schedulers_scheduler,
-            builderNames=[builderPrefix(
-                '%s_repo_setup' % releaseConfig['productName'])],
-        )
-        schedulers.append(repo_setup_scheduler)
-        tag_source_scheduler = Dependent(
-            name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
-            upstream=repo_setup_scheduler,
-            builderNames=[builderPrefix(
-                '%s_tag_source' % releaseConfig['productName'])],
-        )
-    else:
-        tag_source_scheduler = Dependent(
-            name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
-            upstream=reset_schedulers_scheduler,
-            builderNames=[builderPrefix(
-                '%s_tag_source' % releaseConfig['productName'])],
-        )
+    tag_source_scheduler = Dependent(
+        name=builderPrefix('%s_tag_source' % releaseConfig['productName']),
+        upstream=reset_schedulers_scheduler,
+        builderNames=[builderPrefix(
+            '%s_tag_source' % releaseConfig['productName'])],
+    )
 
-        tag_l10n_scheduler = Dependent(
-            name=builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
-            upstream=reset_schedulers_scheduler,
-            builderNames=[builderPrefix(
-                '%s_tag_l10n' % releaseConfig['productName'])],
-        )
+    tag_l10n_scheduler = Dependent(
+        name=builderPrefix('%s_tag_l10n' % releaseConfig['productName']),
+        upstream=reset_schedulers_scheduler,
+        builderNames=[builderPrefix(
+            '%s_tag_l10n' % releaseConfig['productName'])],
+    )
     schedulers.append(tag_source_scheduler)
     schedulers.append(tag_l10n_scheduler)
 

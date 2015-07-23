@@ -841,6 +841,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  gaiaL10nRoot=None,
                  geckoL10nRoot=None,
                  geckoLanguagesFile=None,
+                 relengapi_archiver_repo_path=None,
                  relengapi_archiver_release_tag=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, **kwargs)
@@ -919,6 +920,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.multiLocaleConfig = multiLocaleConfig
         self.multiLocaleMerge = multiLocaleMerge
         self.tools_repo_cache = tools_repo_cache
+        self.relengapi_archiver_repo_path = relengapi_archiver_repo_path
         self.relengapi_archiver_release_tag = relengapi_archiver_release_tag
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
@@ -1082,10 +1084,13 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addPeriodicRebootSteps()
 
     def addMozharnessRepoSteps(self):
+        # e.g. thunderbird releases define relengapi_archiver_repo_path
+        # otherwise fall back on repoPath which is the Firefox Gecko repo
+        archiver_repo = "--repo %s" % (self.relengapi_archiver_repo_path or self.repoPath,)
         if self.relengapi_archiver_release_tag:
-            archiver_revision = "--tag %s " % self.relengapi_archiver_release_tag
+            archiver_revision = "--tag %s" % self.relengapi_archiver_release_tag
         else:
-            archiver_revision = "--rev %(revision)s "
+            archiver_revision = "--rev %(revision)s"
         if self.mozharness_repo_cache:
             assert self.tools_repo_cache
             archiver_client_path = \
@@ -1115,13 +1120,12 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         ))
         self.addStep(ShellCommand(
             name="download_and_extract_mozharness_archive",
-            command=['bash', '-c',
-                     WithProperties(
-                         'python %s ' % archiver_client_path +
-                         'mozharness ' +
-                         '--repo %s ' % self.repoPath +
-                         archiver_revision +
-                         '--debug')],
+            command=[
+                'bash', '-c',
+                WithProperties('python %s mozharness %s %s --debug' % (archiver_client_path,
+                                                                       archiver_repo,
+                                                                       archiver_revision))
+            ],
             log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
             workdir='.',
             haltOnFailure=True,
@@ -3644,83 +3648,6 @@ class ReleaseFactory(MozillaBuildFactory):
         return version
 
 
-class StagingRepositorySetupFactory(ReleaseFactory):
-    """This Factory should be run at the start of a staging release run. It
-       deletes and reclones all of the repositories in 'repositories'. Note that
-       the staging buildTools repository should _not_ be recloned, as it is
-       used by many other builders, too.
-    """
-    def __init__(self, username, sshKey, repositories, userRepoRoot,
-                 **kwargs):
-        # MozillaBuildFactory needs the 'repoPath' argument, but we don't
-        ReleaseFactory.__init__(self, repoPath='nothing', **kwargs)
-        for repoPath in sorted(repositories.keys()):
-            repo = self.getRepository(repoPath)
-            repoName = self.getRepoName(repoPath)
-            # Don't use cache for user repos
-            rnd = random.randint(100000, 999999)
-            userRepoURL = '%s/%s?rnd=%s' % (self.getRepository(userRepoRoot),
-                                            repoName, rnd)
-
-            # test for existence
-            command = 'wget -O /dev/null %s' % repo
-            command += ' && { '
-            command += 'if wget -q -O /dev/null %s; then ' % userRepoURL
-            # if it exists, delete it
-            command += 'echo "Deleting %s"; sleep 2; ' % repoName
-            command += 'ssh -l %s -i %s %s edit %s delete YES; ' % \
-                (username, sshKey, self.hgHost, repoName)
-            command += 'else echo "Not deleting %s"; exit 0; fi }' % repoName
-
-            self.addStep(MockCommand(
-                         name='delete_repo',
-                         command=['bash', '-c', command],
-                         description=['delete', repoName],
-                         haltOnFailure=True,
-                         timeout=30 * 60,  # 30 minutes
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         workdir=WithProperties('%(basedir)s'),
-                         mock_workdir_prefix=None,
-                         env=self.env,
-                         ))
-
-        # Wait for hg.m.o to catch up
-        self.addStep(ShellCommand(
-                     name='wait_for_hg',
-                     command=['sleep', '600'],
-                     description=['wait', 'for', 'hg'],
-                     ))
-
-        for repoPath in sorted(repositories.keys()):
-            repo = self.getRepository(repoPath)
-            repoName = self.getRepoName(repoPath)
-            timeout = 60 * 60
-            command = ['python',
-                       WithProperties('%(toolsdir)s/buildfarm/utils/retry.py'),
-                       '--timeout', timeout,
-                       'ssh', '-l', username, '-oIdentityFile=%s' % sshKey,
-                       self.hgHost, 'clone', repoName, repoPath]
-
-            self.addStep(MockCommand(
-                         name='recreate_repo',
-                         command=command,
-                         description=['recreate', repoName],
-                         timeout=timeout,
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         workdir=WithProperties('%(basedir)s'),
-                         mock_workdir_prefix=None,
-                         ))
-
-        # Wait for hg.m.o to catch up
-        self.addStep(ShellCommand(
-                     name='wait_for_hg',
-                     command=['sleep', '600'],
-                     description=['wait', 'for', 'hg'],
-                     ))
-
-
 class SingleSourceFactory(ReleaseFactory):
     def __init__(self,
                  productName,
@@ -4805,7 +4732,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                  tools_repo_cache=None, tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh", tooltool_url_list=None,
                  tooltool_script=None, relengapi_archiver_repo_path=None,
-                 relengapi_archiver_release_tag=None):
+                 relengapi_archiver_release_tag=None, relengapi_archiver_rev=None):
         BuildFactory.__init__(self)
         self.script_timeout = script_timeout
         self.log_eval_func = log_eval_func
@@ -4874,7 +4801,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             if relengapi_archiver_release_tag:
                 archiver_revision = "--tag %s " % relengapi_archiver_release_tag
             else:
-                archiver_revision = "--rev %(revision)s "
+                archiver_revision = "--rev %s " % (relengapi_archiver_rev or '%(revision)s',)
             if self.script_repo_cache:
                 assert self.tools_repo_cache
                 archiver_client_path = \
