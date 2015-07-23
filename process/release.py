@@ -696,8 +696,14 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 multiLocaleMerge=releaseConfig.get('mergeLocales', False),
                 compareLocalesRepoPath=branchConfig[
                     'compare_locales_repo_path'],
+                # mozharnessRepoPath and mozharnessTag are legacy.
+                # tracking the deletion of these is  managed in https://bugzil.la/1180060
                 mozharnessRepoPath=mozharness_repo_path,
                 mozharnessTag=releaseTag,
+                # normally archiver gets Mozharness from repoPath which normally points to a ff
+                # gecko repo. But for Thunderbird, repoPath points to a comm- repo. Here we will
+                # pass an explicit repo for archiver to use
+                relengapi_archiver_repo_path=relengapi_archiver_repo_path,
                 relengapi_archiver_release_tag=releaseTag,
                 multiLocaleScript=pf.get('multi_locale_script'),
                 multiLocaleConfig=multiLocaleConfig,
