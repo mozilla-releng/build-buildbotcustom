@@ -101,7 +101,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'panda': 'p',
         'b2g34': 'b34',
         'b2g37': 'b37',
-        'v2_1': '21',
         'v2_1s': '21s',
         'v2_2': '22',
         'v2_2r': '22r',
