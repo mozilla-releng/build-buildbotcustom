@@ -2013,7 +2013,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             extraHeaders={'In-Reply-To': email_message_id,
                           'References': email_message_id},
             mode='passing',
-            builders=[builderPrefix('%s_updates' % releaseConfig['productName'])],
+            builders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], releaseChannel))],
             messageFormatter=createReleaseAVVendorsMessage,
         ))
 
