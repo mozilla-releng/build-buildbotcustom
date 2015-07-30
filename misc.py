@@ -2806,6 +2806,10 @@ def generatePeriodicFileUpdateBuilder(config, branch_name, platform, base_name, 
     pf = config['platforms'].get(platform, {})
     extra_args = ['-b', config['repo_path']]
 
+    env = pf['env'].copy()
+    kwargs = {}
+    kwargs['env'] = env
+
     extra_args += mirrorAndBundleArgs(config)
     if pf['product_name'] is not None:
         extra_args.extend(['-p', pf['product_name']])
@@ -2830,6 +2834,7 @@ def generatePeriodicFileUpdateBuilder(config, branch_name, platform, base_name, 
         'scripts/periodic_file_updates/periodic_file_updates.sh',
         interpreter='bash',
         extra_args=extra_args,
+        **kwargs
     )
     periodic_file_update_builder = {
         'name': '%s periodic file update' % base_name,
