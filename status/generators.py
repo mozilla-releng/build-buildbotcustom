@@ -16,9 +16,6 @@ Thank you for your try submission. It's the best!
 
 Results will be displayed on Treeherder as they come in:
 https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s
-
-Once completed, builds and logs will be available at:
-%(packageDir)s
 """ % locals()
 
     commitTitles = change.properties.getProperty('commit_titles')
@@ -26,8 +23,19 @@ Once completed, builds and logs will be available at:
         title = getSensibleCommitTitle(commitTitles)
         allTitles = '\n  * '.join(commitTitles)
 
+        if ((' -t ' in allTitles or ' --talos ' in allTitles) and
+            '-t none' not in allTitles and '--talos none' not in allTitles):
+            msgdict['body'] += """\
+
+It looks like this submission has talos jobs. You can compare the performance of your push against a baseline revision here:
+https://treeherder.mozilla.org/perf.html?newProject=try&newRevision=%(revision)s
+""" % locals()
+
         msgdict['subject'] += ': %(title)s' % locals()
         msgdict['body'] += """\
+
+Once completed, builds and logs will be available at:
+%(packageDir)s
 
 Summary:
   * %(allTitles)s
