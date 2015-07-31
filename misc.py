@@ -1238,7 +1238,7 @@ def generateBranchObjects(config, name, secrets=None):
                config.get('enable_hsts_update', False) or \
                config.get('enable_hpkp_update', False):
                 weeklyBuilders.append('%s periodic file update' % base_name)
-        if pf.get('enable_xulrunner', config['enable_xulrunner']):
+        if pf.get('enable_xulrunner', False) and config.get('enable_xulrunner', False):
             xulrunnerNightlyBuilders.append('%s xulrunner nightly' % base_name)
 
     if config['enable_weekly_bundle']:
@@ -2222,7 +2222,7 @@ def generateBranchObjects(config, name, secrets=None):
                     config, name, platform, pf['base_name'], pf['slaves'])
                 branchObjects['builders'].append(periodicFileUpdateBuilder)
 
-        if pf.get('enable_xulrunner', config['enable_xulrunner']):
+        if pf.get('enable_xulrunner', False) and config.get('enable_xulrunner', False):
             xr_env = pf['env'].copy()
             xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
             xr_env['SYMBOL_SERVER_PATH'] = config[
