@@ -1993,6 +1993,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 changeContainsProperties(c, dict(who=enUS_signed_apk_url))
             ))
 
+
+    ui_uv_builders = []
+    for b in ui_update_tests_builders.values():
+        ui_uv_builders.extend(b)
+    print ui_uv_builders
     # send all release messages
     status.append(MailNotifier(
         fromaddr='release@mozilla.com',
@@ -2003,7 +2008,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         mode='all',
         # HACK ALERT: shut off e-mail for ui update verify builders
         # because they're not expected to be green in the near future
-        builders=set([b['name'] for b in builders + test_builders]) - set(ui_update_verify_builders),
+        builders=set([b['name'] for b in builders + test_builders]) - set(ui_uv_builders),
         messageFormatter=createReleaseMessage,
     ))
 
