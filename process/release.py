@@ -1997,7 +1997,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     ui_uv_builders = []
     for b in ui_update_tests_builders.values():
         ui_uv_builders.extend(b)
-    print ui_uv_builders
     # send all release messages
     status.append(MailNotifier(
         fromaddr='release@mozilla.com',
