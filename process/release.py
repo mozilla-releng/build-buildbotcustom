@@ -154,16 +154,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             releaseConfig['version'],
             releaseConfig['buildNumber'], )
 
-    def genericFtpUrl():
-        """ Generate an FTP URL pointing to the uploaded release builds for
-        sticking into release notification messages """
-        return makeCandidatesDir(
-            releaseConfig['productName'],
-            releaseConfig['version'],
-            releaseConfig['buildNumber'],
-            protocol='ftp',
-            server=releaseConfig['ftpServer'])
-
     def genericHttpsUrl():
         """ Generate an HTTPS URL pointing to the uploaded release builds for
         sticking into release notification messages """
@@ -200,7 +190,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if master_status.getURLForThing(build):
             buildbot_url = "Full details are available at:\n %s\n" % master_status.getURLForThing(build)
         # Use a generic ftp URL non-specific to any locale
-        ftpURL = genericFtpUrl()
+        ftpURL = genericHttpsUrl()
         if 'xulrunner' in platform:
             ftpURL = ftpURL.replace(releaseConfig['productName'], 'xulrunner')
         isPlatformUnsigned = False
@@ -255,7 +245,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         releaseName = releasePrefix()
         message_tag = getMessageTag()
         step = None
-        ftpURL = genericFtpUrl()
+        ftpURL = genericHttpsUrl()
         if change.branch.endswith('signing'):
             step = "signing"
         else:
