@@ -1983,6 +1983,12 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 changeContainsProperties(c, dict(who=enUS_signed_apk_url))
             ))
 
+    non_ui_update_verify_builders = [b["name"] for b in builders[:] if "ui_update_verify" not in b["name"]]
+    non_ui_update_verify_builders.extend([b["name"] for b in test_builders])
+    for b in ui_update_tests_builders.values():
+        if b in non_ui_update_verify_builders:
+            non_ui_update_verify_builders.remove(b)
+
     # send all release messages
     status.append(MailNotifier(
         fromaddr='release@mozilla.com',
@@ -1991,7 +1997,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         extraHeaders={'In-Reply-To': email_message_id,
                       'References': email_message_id},
         mode='all',
-        builders=[b['name'] for b in builders + test_builders],
+        builders=non_ui_update_verify_builders,
         messageFormatter=createReleaseMessage,
     ))
 
