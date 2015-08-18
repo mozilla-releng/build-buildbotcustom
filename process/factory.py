@@ -3279,7 +3279,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         )))
         self.addStep(MockCommand( **self.processCommand(
          name='make_config',
-         command=self.makeCmd,
+         command=self.makeCmd + ['export'],
          workdir='%s/config' % self.absMozillaObjDir,
          description=['make config'],
          env=self.env,
