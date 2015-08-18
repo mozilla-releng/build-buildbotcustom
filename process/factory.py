@@ -436,7 +436,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             branchName=None, baseWorkDir='build', hashType='sha512',
             baseMirrorUrls=None, baseBundleUrls=None, signingServers=None,
             enableSigning=True, env={}, enable_pymake=False, use_mock=False,
-            mock_target=None, mock_packages=None, mock_copyin_files=None, **kwargs):
+            mock_target=None, mock_packages=None, mock_copyin_files=None,
+            mozillaDir=None, mozillaSrcDir=None, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -823,6 +824,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  baseName=None, uploadPackages=True, uploadSymbols=True,
                  createSnippet=False, createPartial=False, doCleanup=True,
                  packageSDK=False, packageTests=False, mozillaDir=None,
+                 mozillaSrcDir=None,
                  enable_ccache=False, stageLogBaseUrl=None,
                  triggeredSchedulers=None, triggerBuilds=False,
                  mozconfigBranch="production", useSharedCheckouts=False,
@@ -917,6 +919,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
+        self.mozillaDir = mozillaDir
+        self.mozillaSrcDir = mozillaSrcDir
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -972,9 +976,15 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         if mozillaDir:
             self.mozillaDir = '/%s' % mozillaDir
             self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+            self.mozillaSrcDir = '%s' % self.mozillaDir
         else:
             self.mozillaDir = ''
             self.mozillaObjdir = self.objdir
+
+            if mozillaSrcDir:
+                self.mozillaSrcDir = '/%s' % (mozillaSrcDir)
+            else:
+                self.mozillaSrcDir = ''
 
         # These following variables are useful for sharing build steps (e.g.
         # update generation) with subclasses that don't use object dirs (e.g.
@@ -982,8 +992,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         # 
         # We also concatenate the baseWorkDir at the outset to avoid having to
         # do that everywhere.
-        self.mozillaSrcDir = '.%s' % self.mozillaDir
-        self.absMozillaSrcDir = '%s%s' % (self.baseWorkDir, self.mozillaDir)
+        self.absMozillaSrcDir = '%s%s' % (self.baseWorkDir, self.mozillaSrcDir)
         self.absMozillaObjDir = '%s/%s' % (self.baseWorkDir, self.mozillaObjdir)
 
         self.latestDir = '/pub/mozilla.org/%s' % self.stageProduct + \
@@ -1329,7 +1338,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         once."""
         if not getattr(self, '_gotBuildInfo', False):
             self.addStep(SetProperty(
-                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                 'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                 'App', 'BuildID'],
                 property='buildid',
@@ -1338,7 +1347,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 descriptionDone=['got', 'buildid'],
             ))
             self.addStep(SetProperty(
-                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                 'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                 'App', 'SourceStamp'],
                 property='sourcestamp',
@@ -1598,7 +1607,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
 
         if self.productName == 'xulrunner':
             self.addStep(SetProperty(
-                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/platform.ini' % self.mozillaObjdir,
                          'Build', 'BuildID'],
                 property='buildid',
@@ -1607,7 +1616,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             ))
         else:
             self.addStep(SetProperty(
-                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                          'App', 'BuildID'],
                 property='buildid',
@@ -1615,7 +1624,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 name='get_build_id',
             ))
             self.addStep(SetProperty(
-                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaDir,
+                command=['python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                          'App', 'Version'],
                 property='appVersion',
@@ -1964,6 +1973,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='',
                  use_mock=False, mock_target=None,
+                 mozillaDir=None,
+                 mozillaSrcDir=None,
                  mock_packages=None, mock_copyin_files=None, **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -1975,9 +1986,10 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
-        MercurialBuildFactory.__init__(self, mozillaDir='mozilla',
+        MercurialBuildFactory.__init__(self, mozillaDir=mozillaDir,
             mozconfigBranch='default', use_mock=use_mock, mock_target=mock_target,
-            mock_packages=mock_packages, mock_copyin_files=mock_copyin_files, **kwargs)
+            mock_packages=mock_packages, mock_copyin_files=mock_copyin_files, 
+            mozillaSrcDir=mozillaSrcDir, **kwargs)
 
     def addSourceSteps(self):
         # First set our revisions, if no property by the name, use 'default'
@@ -1997,10 +2009,9 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 rev=comm_rev,
                 )
             self.addStep(stepCC)
-            
             stepMC = self.makeHgtoolStep(
                 name="moz_hg_update",
-                wc='build%s' % self.mozillaDir,
+                wc='build%s' % self.mozillaSrcDir,
                 workdir='.',
                 rev=moz_rev,
                 repo_url=self.getRepository(self.mozRepoPath),
@@ -2128,6 +2139,8 @@ def marFilenameToProperty(prop_name=None):
 class NightlyBuildFactory(MercurialBuildFactory):
     def __init__(self, talosMasters=None, unittestMasters=None,
             unittestBranch=None, tinderboxBuildsDir=None, 
+            mozillaDir=None,
+            mozillaSrcDir=None,
             **kwargs):
 
         self.talosMasters = talosMasters or []
@@ -2139,8 +2152,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
             assert self.unittestBranch
 
         self.tinderboxBuildsDir = tinderboxBuildsDir
-
-        MercurialBuildFactory.__init__(self, **kwargs)
+        MercurialBuildFactory.__init__(self, mozillaDir=mozillaDir,
+                                       mozillaSrcDir=mozillaSrcDir, **kwargs)
 
     def makePartialTools(self):
         '''The mar and bsdiff tools are created by default when 
@@ -2601,6 +2614,8 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='',
+                 mozillaDir=None,
+                 mozillaSrcDir=None,
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None, **kwargs):
         self.skipBlankRepos = skipBlankRepos
@@ -2613,7 +2628,9 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
-        NightlyBuildFactory.__init__(self, mozillaDir='mozilla',
+        NightlyBuildFactory.__init__(self,
+            mozillaDir=mozillaDir,
+            mozillaSrcDir=mozillaSrcDir,
             mozconfigBranch='default', use_mock=use_mock, mock_target=mock_target,
             mock_packages=mock_packages, mock_copyin_files=mock_copyin_files, **kwargs)
 
@@ -2958,7 +2975,8 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
                  venkmanRepoPath='', chatzillaRepoPath='', cvsroot='',
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, **kwargs):
+                 mock_copyin_files=None, mozillaDir=None,
+                 mozillaSrcDir=None, **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -2969,7 +2987,8 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
-        ReleaseBuildFactory.__init__(self, mozillaDir='mozilla',
+        ReleaseBuildFactory.__init__(self, mozillaDir=mozillaDir,
+            mozillaSrcDir=mozillaSrcDir,
             mozconfigBranch='default', use_mock=self.use_mock,
             mock_target=self.mock_target, mock_packages=self.mock_packages,
             mock_copyin_files=self.mock_copyin_files, **kwargs)
@@ -3012,7 +3031,8 @@ class BaseRepackFactory(MozillaBuildFactory):
                  compareLocalesRepoPath, compareLocalesTag, stageServer,
                  stageUsername, stageSshKey=None, objdir='', platform='',
                  mozconfig=None,
-                 tree="notset", mozillaDir=None, l10nTag='default',
+                 tree="notset", mozillaDir=None, mozillaSrcDir=None,
+                 l10nTag='default',
                  mergeLocales=True,
                  testPrettyNames=False,
                  tooltool_manifest_src=None,
@@ -3075,7 +3095,11 @@ class BaseRepackFactory(MozillaBuildFactory):
             self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
         else:
             self.mozillaDir = ''
-            self.mozillaSrcDir = self.origSrcDir
+
+            if mozillaSrcDir:
+                self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaSrcDir)
+            else:
+                self.mozillaSrcDir = self.origSrcDir
 
         # self.mozillaObjdir is used in SeaMonkey's and Thunderbird's case
         self.objdir = objdir or self.origSrcDir
@@ -3480,6 +3504,7 @@ class CCBaseRepackFactory(BaseRepackFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='', buildRevision='',
+                 mozillaSrcDir=None,
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -3489,6 +3514,7 @@ class CCBaseRepackFactory(BaseRepackFactory):
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         BaseRepackFactory.__init__(self, mozillaDir='mozilla',
+            mozillaSrcDir=mozillaSrcDir,
             mozconfigBranch='default', **kwargs)
 
     def getSources(self):
@@ -3538,7 +3564,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  ausHost=None, l10nNightlyUpdate=False, l10nDatedDirs=False,
                  createPartial=False, extraConfigureArgs=[], 
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, **kwargs):
+                 mock_copyin_files=None,
+                 mozillaSrcDir=None, **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
@@ -3648,15 +3675,12 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             return self.ausFullUploadDir
 
     def updateSources(self):
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
          name='update_locale_source',
          command=['hg', 'up', '-C', '-r', self.l10nTag],
          description='update workdir',
          workdir=WithProperties('build/l10n/%(locale)s'),
          haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
-         mock_workdir_prefix=None,
         ))
         self.addStep(SetProperty(
                      command=['hg', 'ident', '-i'],
@@ -3886,7 +3910,9 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='', buildRevision='',
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, **kwargs):
+                 mock_copyin_files=None,
+                 mozillaDir=None,
+                 mozillaSrcDir=None, **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -3898,7 +3924,8 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
-        NightlyRepackFactory.__init__(self, mozillaDir='mozilla',
+        NightlyRepackFactory.__init__(self, mozillaDir=mozillaDir,
+                                      mozillaSrcDir=mozillaSrcDir,
                                       use_mock=self.use_mock, mock_target=self.mock_target,
                                       mock_packages=self.mock_packages,
                                       mock_copyin_files=self.mock_copyin_files, **kwargs)
@@ -3986,7 +4013,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                  mozRepoPath='', inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='', enUSBinaryURL='',
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, **kwargs):
+                 mock_copyin_files=None, mozillaDir=None,
+                 mozillaSrcDir=None, **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -4024,7 +4052,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                              '-n %s ' % self.buildNumber + \
                              '--release-to-candidates-dir'
         BaseRepackFactory.__init__(self, env=env, platform=platform,
-                                   mergeLocales=mergeLocales, mozillaDir='mozilla',
+                                   mergeLocales=mergeLocales, mozillaDir=mozillaDir,
+                                   mozillaSrcDir=mozillaSrcDir,
                                    use_mock=self.use_mock, mock_target=self.mock_target,
                                    mock_packages=self.mock_packages,
                                    mock_copyin_files=self.mock_copyin_files, **kwargs)

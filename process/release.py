@@ -552,6 +552,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 category=builderPrefix(''),
                 ))
 
+    mozillaDir = None
+    mozillaSrcDir = None
+    if 'mozilla_dir' in releaseConfig:
+        mozillaDir = releaseConfig['mozilla_dir']
+    if 'mozilla_srcdir' in releaseConfig:
+        mozillaSrcDir = releaseConfig['mozilla_srcdir']
+
     for platform in releaseConfig['enUSPlatforms']:
         # shorthand
         pf = branchConfig['platforms'][platform]
@@ -594,6 +601,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 configRepoPath=branchConfig['config_repo_path'],
                 configSubDir=branchConfig['config_subdir'],
                 profiledBuild=pf['profiled_build'],
+                mozillaDir=mozillaDir,
+                mozillaSrcDir=mozillaSrcDir,
                 mozconfig=mozconfig,
                 srcMozconfig=releaseConfig.get('mozconfigs', {}).get(platform),
                 buildRevision=releaseTag,

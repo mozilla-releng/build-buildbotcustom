@@ -1047,6 +1047,7 @@ def generateBranchObjects(config, name, secrets=None):
                 'baseMirrorUrls': config.get('base_mirror_urls'),
                 'baseBundleUrls': config.get('base_bundle_urls'),
                 'mozillaDir': config.get('mozilla_dir', None),
+                'mozilla_srcdir': config.get('mozilla_srcdir', None),
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
                 'enable_pymake': enable_pymake,
@@ -1336,7 +1337,7 @@ def generateBranchObjects(config, name, secrets=None):
 
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
-                    objdir = ''
+                    objdir = pf['platform_objdir'] 
                     mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
 
                     mozilla2_l10n_nightly_factory = NightlyRepackFactory(
@@ -1378,6 +1379,8 @@ def generateBranchObjects(config, name, secrets=None):
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
+                        mozillaDir=pf.get('mozillaDir'),
+                        mozillaSrcDir=pf.get('mozilla_srcDir'),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -1500,6 +1503,8 @@ def generateBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 extraConfigureArgs=config.get('l10n_extra_configure_args', []),
                 mozconfig=mozconfig,
+                mozillaDir=config.get('mozillaDir_srcdir', None),
+                mozillaSrcDir=config.get('mozilla_SrcDir', None),
                 use_mock=pf.get('use_mock'),
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
@@ -2258,6 +2263,8 @@ def generateCCBranchObjects(config, name, secrets=None):
             factory_kwargs = {
                 'env': pf['env'],
                 'objdir': pf['platform_objdir'],
+                'mozillaDir': config.get('mozilla_dir', None),
+                'mozillaSrcDir': config.get('mozilla_srcdir', None),
                 'platform': platform,
                 'hgHost': config['hghost'],
                 'repoPath': config['repo_path'],
@@ -2309,6 +2316,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
                 'enable_pymake': enable_pymake,
+                'mozillaDir': config.get('mozilla_dir', None),
+                'mozillaSrcDir': config.get('mozilla_srcdir', None),
                 'use_mock': pf.get('use_mock'),
                 'mock_target': pf.get('mock_target'),
                 'mock_packages': pf.get('mock_packages'),
@@ -2566,6 +2575,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                 baseMirrorUrls=config.get('base_mirror_urls'),
                 baseBundleUrls=config.get('base_bundle_urls'),
                 branchName=name,
+                mozillaDir=config.get('mozilla_dir', None),
+                mozillaSrcDir=config.get('mozilla_srcdir', None),
                 tooltool_manifest_src= pf.get('tooltool_manifest_src', None),
                 tooltool_url_list= config.get('tooltool_url_list', []),
                 enable_pymake=enable_pymake,
@@ -2595,7 +2606,7 @@ def generateCCBranchObjects(config, name, secrets=None):
 
             if config['enable_l10n']:
                 if platform in config['l10n_platforms']:
-                    objdir = ''
+                    objdir = pf['platform_objdir'] 
                     mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
 
                     mozilla2_l10n_nightly_factory = CCNightlyRepackFactory(
