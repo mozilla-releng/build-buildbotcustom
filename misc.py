@@ -2756,8 +2756,10 @@ def generateCCBranchObjects(config, name, secrets=None):
         if config['enable_l10n'] and platform in config['l10n_platforms'] and \
            config['enable_l10n_onchange']:
             mozconfig = os.path.join(os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
+            objdir = pf['platform_objdir']
             mozilla2_l10n_dep_factory = CCNightlyRepackFactory(
                 env=platform_env,
+                objdir=objdir,
                 platform=platform,
                 hgHost=config['hghost'],
                 tree=config['l10n_tree'],
