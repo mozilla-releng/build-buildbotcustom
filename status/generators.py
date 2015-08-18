@@ -28,7 +28,7 @@ https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s
             msgdict['body'] += """\
 
 It looks like this submission has talos jobs. You can compare the performance of your push against a baseline revision here:
-https://treeherder.mozilla.org/perf.html?newProject=try&newRevision=%(revision)s
+https://treeherder.mozilla.org/perf.html#/comparechooser?newProject=try&newRevision=%(revision)s
 """ % locals()
 
         msgdict['subject'] += ': %(title)s' % locals()
