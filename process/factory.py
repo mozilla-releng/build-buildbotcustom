@@ -547,7 +547,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
              branch=self.branchName,
              clobber_url=self.clobberURL,
              clobberer_path=WithProperties('%(builddir)s/tools/clobberer/clobberer.py'),
-             clobberTime=self.clobberTime
+             clobberTime=self.clobberTime,
+             env=self.env,
             ))
 
         if self.buildSpace > 0:
@@ -5990,11 +5991,12 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
 class UpdateVerifyFactory(ReleaseFactory):
     def __init__(self, verifyConfig, buildSpace=.3, useOldUpdater=False,
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, **kwargs):
+                 mock_copyin_files=None, env={}, **kwargs):
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
+        self.env = env
 
         ReleaseFactory.__init__(self, repoPath='nothing',
                                 buildSpace=buildSpace, 
@@ -6002,7 +6004,7 @@ class UpdateVerifyFactory(ReleaseFactory):
                                 mock_target=self.mock_target,
                                 mock_packages=self.mock_packages,
                                 mock_copyin_files=self.mock_copyin_files,
-                                **kwargs)
+                                env=self.env, **kwargs)
         command=['bash', 'verify.sh', '-c', verifyConfig]
         if useOldUpdater:
             command.append('--old-updater')
