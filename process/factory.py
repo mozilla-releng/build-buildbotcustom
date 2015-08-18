@@ -3656,6 +3656,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
          haltOnFailure=True,
          mock=self.use_mock,
          target=self.mock_target,
+         mock_workdir_prefix=None,
         ))
         self.addStep(SetProperty(
                      command=['hg', 'ident', '-i'],
@@ -5264,6 +5265,16 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.marDir = '%s/ftp/%s/nightly/%s-candidates/build%s' % \
           (self.updateDir, productName, version, buildNumber)
 
+        self.origSrcDir = self.branchName
+        self.mozillaDir = 'mozilla'
+        self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, self.mozillaDir)
+        self.objdir = 'obj' 
+        self.mozillaObjDir = '%s/%s' % (self.mozillaDir, self.objdir)
+        self.absSrcDir = '%s/%s' % (self.baseWorkDir, self.origSrcDir)
+        self.absObjDir = '%s/%s' % (self.absSrcDir, self.objdir)
+        self.absMozillaSrcDir = '%s/%s' % (self.baseWorkDir, self.mozillaSrcDir)
+        self.absMozillaObjDir = '%s/%s' % (self.baseWorkDir, self.mozillaObjDir)
+     
         if mozRepoPath:
           self.mozRepository = self.getRepository(mozRepoPath)
         else:
@@ -5277,8 +5288,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.setup()
         self.bumpPatcherConfig()
         self.bumpVerifyConfigs()
-        if not self.useChecksums:
-            self.buildTools()
+        #if not self.useChecksums:
+        #    self.buildTools()
+        self.runPatchers()
         self.downloadBuilds()
         self.createPatches()
         if buildNumber >= 2:
@@ -5536,6 +5548,76 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          mock=self.use_mock,
          target=self.mock_target,
         ))
+
+    def downloadMarTools(self):
+        mar = 'mar'
+        mbsdiff = 'mbsdiff'
+
+        baseURL = 'http://%s' % self.stagingServer + \
+                  '/pub/mozilla.org/%s' % self.productName + \
+                  '/nightly/%s-candidates' % self.version + \
+                  '/build%s/mar-tools/%s' % (self.buildNumber, 'linux')
+        marURL = '%s/%s' % (baseURL, mar)
+        mbsdiffURL = '%s/%s' % (baseURL, mbsdiff)
+        mozillaObjdir = '%s/objdir' % self.mozillaDir
+        self.addStep(MockCommand(
+            name='get_mar',
+            description=['get', 'mar'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     (test -e %s && test -s %s) || exit 1;
+                     chmod 755 %s'''.replace("\n", "") % (mar, mar, marURL, mar, mar, mar)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
+        ))
+        self.addStep(MockCommand(
+            name='get_mbsdiff',
+            description=['get', 'mbsdiff'],
+            command=['bash', '-c',
+                     '''if [ ! -f %s ]; then
+                       wget -O  %s --no-check-certificate %s;
+                     fi;
+                     (test -e %s && test -s %s) || exit 1;
+                     chmod 755 %s'''.replace("\n", "") % (mbsdiff, mbsdiff, mbsdiffURL, mbsdiff, mbsdiff, mbsdiff)],
+            workdir='%s/dist/host/bin' % self.absMozillaObjDir,
+            haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
+        ))
+
+    def runPatchers(self):
+        # clone mozilla-beta into build/mozilla
+        self.addStep(MockCommand(
+          name='update_mozilla',
+          command=['hg', 'clone', self.mozRepository, 'mozilla'],
+          description=['update', 'mozilla'],
+          env=self.env,
+          timeout=3600,
+          haltOnFailure=True,
+          workdir='build',
+          mock=self.use_mock,
+          target=self.mock_target,
+        ))
+
+        # update mozilla repo to the version stored in patcherToolsTag
+        self.addStep(MockCommand(
+          name='update_mozilla_to_tag',
+          command=['hg', 'update', self.patcherToolsTag],
+          description=['update', 'mozilla', 'to', 'R17 tag'],
+          env=self.env,
+          timeout=3600,
+          haltOnFailure=True,
+          workdir='build/mozilla',
+          mock=self.use_mock,
+          target=self.mock_target,
+        ))
+
+        # get mar/mbsdiff from candidates dir.
+        self.downloadMarTools()
 
     def downloadBuilds(self):
         command = ['perl', 'patcher2.pl', '--download',
