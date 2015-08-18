@@ -304,6 +304,16 @@ def evaluateReftest(log, superResult):
 
     return worst_status(superResult, SUCCESS)
 
+def pythonWithJson(platform):
+    if platform in ('macosx64'):
+        return "/tools/buildbot/bin/python"
+    elif platform in ('linux'):
+        return "/tools/python27/bin/python"
+    elif platform in ('win32'):
+        return "D:\\mozilla-build\\python27\\python.exe"
+    else:
+        return "python"
+
 
 class MochitestMixin(object):
     warnOnFailure = True
@@ -808,9 +818,7 @@ class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandRepor
             self.name = 'mochitest-%s' % variant
 
         env_os = kwargs.get('env', {})
-        pythonCmd = 'python'
-        if env_os['OS'].fmtstring == "WIN":
-            pythonCmd = 'python2.7'
+        pythonCmd = pythonWithJson(env_os['OS'])
         self.command = [pythonCmd, 'mochitest/runtests.py',
                 WithProperties('--appname=%(exepath)s'), '--utility-path=bin',
                 WithProperties('--extra-profile-file=bin/plugins'),

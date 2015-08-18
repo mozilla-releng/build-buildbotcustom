@@ -475,7 +475,8 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
 
         if self.enable_pymake:
-          self.makeCmd = ['python2.7', WithProperties("%(basedir)s/build/build/pymake/make.py")]
+          pythonCmd = self.pythonWithJson('win32')
+          self.makeCmd = [pythonCmd, WithProperties("%(basedir)s/build/build/pymake/make.py")]
         else:
           self.makeCmd = ['make']
 
@@ -502,6 +503,16 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
              data=WithProperties('Mock : false'),
            ))
         self.addInitialSteps()
+
+    def pythonWithJson(self, platform):
+        if platform in ('macosx64'):
+            return "/tools/buildbot/bin/python"
+        elif platform in ('linux'):
+            return "/tools/python27/bin/python"
+        elif platform in ('win32'):
+            return "D:\\mozilla-build\\python27\\python.exe"
+        else:
+            return "python"
 
     def addInitialSteps(self):
         self.addStep(SetProperty(
@@ -6437,7 +6448,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
             unittestMasters=None, unittestBranch=None, stageUsername=None,
             stageServer=None, stageSshKey=None, exec_xpcshell_suites=True,
             exec_reftest_suites=True, exec_mochi_suites=True,
-            exec_mozmill_suites=False, run_a11y=True, env={}, **kwargs):
+            exec_mozmill_suites=False, run_a11y=True, env={},
+            mozillaDir=None, mozillaSrcDir=None, **kwargs):
         self.env = {}
 
         MozillaBuildFactory.__init__(self, env=env, **kwargs)
@@ -6482,9 +6494,19 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.platform = platform.split('-')[0]
         assert self.platform in getSupportedPlatforms()
 
-        # Mozilla subdir and objdir
-        self.mozillaDir = '/mozilla'
-        self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+        # SeaMonkey/Thunderbird make use of mozillaDir. Firefox does not.
+        if mozillaDir:
+            self.mozillaDir = '/%s' % mozillaDir
+            self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
+            self.mozillaSrcDir = '%s' % self.mozillaDir
+        else:
+            self.mozillaDir = ''
+            self.mozillaObjdir = self.objdir
+
+            if mozillaSrcDir:
+                self.mozillaSrcDir = '/%s' % (mozillaSrcDir)
+            else:
+                self.mozillaSrcDir = ''
 
         self.env = MozillaEnvironments[env_map[self.platform]].copy()
         self.env['MOZ_OBJDIR'] = self.objdir
@@ -7567,10 +7589,7 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                                command=["ls", "-1", "mozbase"],
                                extract_fn=glob2list))
                 tmpEnv['PYTHONPATH'] = WithProperties('%(files)s')
-                if self.platform.startswith('win'):
-                    tmpEnv['OS'] = WithProperties('WIN')
-                else:
-                    tmpEnv['OS'] = WithProperties('NONWIN')
+                tmpEnv['OS'] = self.platform
                 variant = suite.split('-', 1)[1]
                 self.addStep(MockMozillaPackagedMochitests(
                  variant=variant,
@@ -8048,11 +8067,13 @@ class TalosFactory(RequestSortingBuildFactory):
         self.addRunTestStep()
         self.addRebootStep()
 
-    def pythonWithSimpleJson(self, platform):
-        if (platform in ("fedora", "fedora64", "leopard", "snowleopard", "lion")):
+    def pythonWithJson(self, platform):
+        if platform in ('macosx64', 'linux'):
             return "/tools/buildbot/bin/python"
-        elif (platform in ('w764', 'win7', 'xp')):
-            return "C:\\mozilla-build\\python25\\python.exe"
+        elif platform in ('win32'):
+            return "D:\\mozilla-build\\python27\\python.exe"
+        else:
+            return "python"
 
     def _propertyIsSet(self, step, prop):
         return step.build.getProperties().has_key(prop)
@@ -8340,7 +8361,7 @@ class TalosFactory(RequestSortingBuildFactory):
                 ))
                 self.addStep(MockCommand(
                     name='download files specified in talos.json',
-                    command=[self.pythonWithSimpleJson(self.OS), 'talos_from_code.py', \
+                    command=[self.pythonWithJson(self.OS), 'talos_from_code.py', \
                             '--talos-json-url', \
                             WithProperties('%(repo_path)s/raw-file/%(revision)s/testing/talos/talos.json')],
                     workdir=self.workdirBase,
