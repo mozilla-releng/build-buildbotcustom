@@ -3515,7 +3515,7 @@ class CCBaseRepackFactory(BaseRepackFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='', buildRevision='',
-                 mozillaSrcDir=None,
+                 mozillaSrcDir=None, objdir='',
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -3524,8 +3524,9 @@ class CCBaseRepackFactory(BaseRepackFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
+        self.objdir = objdir
         BaseRepackFactory.__init__(self, mozillaDir='mozilla',
-            mozillaSrcDir=mozillaSrcDir,
+            mozillaSrcDir=mozillaSrcDir, objdir=self.objdir,
             mozconfigBranch='default', **kwargs)
 
     def getSources(self):
@@ -3576,6 +3577,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  createPartial=False, extraConfigureArgs=[], 
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None,
+                 mozillaDir=None,
                  mozillaSrcDir=None, **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
@@ -3648,6 +3650,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                    mock_target=self.mock_target,
                                    mock_packages=self.mock_packages,
                                    mock_copyin_files=self.mock_copyin_files,
+                                   mozillaDir=mozillaDir,
+                                   mozillaSrcDir=mozillaSrcDir,
                                    **kwargs)
 
         if l10nNightlyUpdate:
@@ -3827,7 +3831,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(MockCommand(
          name='make_tier_base',
          command=self.makeCmd + ['tier_base'],
-         workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
+         workdir=self.absObjDir,
          description=['make tier_base'],
          env=self.env,
          haltOnFailure=True,
@@ -3837,7 +3841,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.addStep(MockCommand(
          name='make_tier_nspr',
          command=self.makeCmd + ['tier_nspr'],
-         workdir='%s/%s' % (self.baseWorkDir, self.mozillaObjdir),
+         workdir=self.absObjDir,
          description=['make tier_nspr'],
          env=self.env,
          haltOnFailure=True,
@@ -3850,7 +3854,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
              name='make_libmar',
              command=self.makeCmd,
              env=self.env,
-             workdir='%s/%s/modules/libmar' % (self.baseWorkDir, self.mozillaObjdir),
+             workdir='%s/modules/libmar' % (self.absObjDir),
              description=['make', 'modules/libmar'],
              haltOnFailure=True,
              mock=self.use_mock,
@@ -3922,6 +3926,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                  chatzillaRepoPath='', cvsroot='', buildRevision='',
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None,
+                 objdir=None,
                  mozillaDir=None,
                  mozillaSrcDir=None, **kwargs):
         self.skipBlankRepos = skipBlankRepos
@@ -3935,11 +3940,13 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
+        self.objdir = objdir
         NightlyRepackFactory.__init__(self, mozillaDir=mozillaDir,
                                       mozillaSrcDir=mozillaSrcDir,
                                       use_mock=self.use_mock, mock_target=self.mock_target,
                                       mock_packages=self.mock_packages,
-                                      mock_copyin_files=self.mock_copyin_files, **kwargs)
+                                      mock_copyin_files=self.mock_copyin_files,
+                                      objdir=self.objdir, **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way
     # this is basically mirroring what mobile does
@@ -3954,32 +3961,36 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                      descriptionDone='unpacked en-US',
                      haltOnFailure=True,
                      env=self.env,
-                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
+                     workdir='%s/%s/locales' % (self.absObjDir, self.appName),
                      mock=self.use_mock,
                      target=self.mock_target,
         ))
         
-        self.addStep(SetProperty(
+        self.addStep(MockProperty(
                      command=self.makeCmd + ['ident'],
                      haltOnFailure=True,
                      env=self.env,
-                     workdir='%s/%s/%s/locales' % (self.baseWorkDir, self.objdir, self.appName),
-                     extract_fn=identToProperties()
+                     workdir='%s/%s/locales' % (self.absObjDir, self.appName),
+                     extract_fn=identToProperties(),
+                     mock=self.use_mock,
+                     target=self.mock_target,
         ))
         self.addStep(MockCommand(
                      name='update_comm_enUS_revision',
                      command=['hg', 'update', '-C', '-r',
                               WithProperties('%(comm_revision)s')],
+                     env=self.env,
                      haltOnFailure=True,
-                     workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
+                     workdir=self.absSrcDir,
                      mock=self.use_mock,
                      target=self.mock_target,))
         self.addStep(MockCommand(
                      name='update_mozilla_enUS_revision',
                      command=['hg', 'update', '-C', '-r',
                               WithProperties('%(moz_revision)s')],
+                     env=self.env,
                      haltOnFailure=True,
-                     workdir='%s/%s' % (self.baseWorkDir, self.mozillaSrcDir),
+                     workdir=self.absMozillaSrcDir,
                      mock=self.use_mock,
                      target=self.mock_target,))
 
