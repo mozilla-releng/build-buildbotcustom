@@ -3224,17 +3224,21 @@ class BaseRepackFactory(MozillaBuildFactory):
             target=self.mock_target,
         ))
         if self.tooltool_manifest_src:
+          command=[
+              'sh',
+              WithProperties(
+                '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
+                self.tooltool_manifest_src,
+                self.tooltool_url_list[0],
+                self.tooltool_bootstrap,
+          ]
+          if self.tooltool_script:
+              command.extend(self.tooltool_script)
           self.addStep(ShellCommand(
             name='run_tooltool',
-            command=[
-                 WithProperties('%(toolsdir)s/scripts/tooltool/fetch_and_unpack.sh'),
-                 self.tooltool_manifest_src,
-                 self.tooltool_url_list[0],
-                 self.tooltool_script,
-                 self.tooltool_bootstrap
-            ],
+            command=command,
+            env=self.env,
             haltOnFailure=True,
-            workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
           ))
 
 
