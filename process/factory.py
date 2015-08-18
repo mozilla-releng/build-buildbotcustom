@@ -4690,7 +4690,8 @@ class SingleSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, mozconfig,
                  configRepoPath, configSubDir, objdir='',
-                 mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
+                 mozillaDir=None, mozillaSrcDir=None,
+                 autoconfDirs=['.'], buildSpace=1,
                  mozconfigBranch="production", appVersion=None,
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None, **kwargs):
@@ -4714,7 +4715,11 @@ class SingleSourceFactory(ReleaseFactory):
             self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
         else:
             self.mozillaDir = ''
-            self.mozillaSrcDir = self.origSrcDir
+
+            if mozillaSrcDir:
+                self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaSrcDir)
+            else:
+                self.mozillaSrcDir = self.origSrcDir
 
         # self.mozillaObjdir is used in SeaMonkey's and Thunderbird's case
         self.objdir = objdir or self.origSrcDir
