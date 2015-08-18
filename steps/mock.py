@@ -300,3 +300,5 @@ MockAliveTest = addMockCommand(buildbotcustom.steps.test.AliveTest)
 MockCompareLeakLogs = addMockCommand(buildbotcustom.steps.test.CompareLeakLogs)
 MockScratchboxCommand = addMockCommand(buildbotcustom.steps.misc.ScratchboxCommand)
 TinderboxMockCommand = addMockCommand(buildbotcustom.steps.misc.TinderboxShellCommand)
+UpdateMockVerify = addMockCommand(buildbotcustom.steps.release.UpdateVerify)
+

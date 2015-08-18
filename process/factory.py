@@ -73,7 +73,7 @@ from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
 from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, MockInstall, \
   MockMozillaCheck, MockProperty, RetryingMockProperty, RetryingMockCommand, \
   MockAliveTest, MockCompareLeakLogs, MockScratchboxCommand, MockMozillaPackagedMochitests, \
-  MockMozillaPackagedXPCShellTests, MockMozillaPackagedReftests
+  MockMozillaPackagedXPCShellTests, MockMozillaPackagedReftests, TinderboxMockCommand, UpdateMockVerify
 
 import buildbotcustom.steps.unittest as unittest_steps
 
@@ -1433,12 +1433,15 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         )
 
     def addCreateUpdateSteps(self):
-        self.addStep(ShellCommand(
+        self.addStep(MockCommand(
             name='make_complete_mar',
             command=self.makeCmd + ['-C',
                      '%s/tools/update-packaging' % self.mozillaObjdir],
             env=self.env,
             haltOnFailure=True,
+            workdir='build',
+            mock=self.use_mock,
+            target=self.mock_target,
         ))
         self.addFilePropertiesSteps(
             filename='*.complete.mar',
@@ -1480,7 +1483,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
              mock=self.use_mock,
              target=self.mock_target,
             ))
-        self.addStep(ShellCommand(
+        self.addStep(MockCommand(
              name='make update pretty',
              command=self.makeCmd  +['-C',
                       '%s/tools/update-packaging' % self.mozillaObjdir,
@@ -1489,6 +1492,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
              haltOnFailure=False,
              flunkOnFailure=False,
              warnOnFailure=True,
+             workdir='build',
+             mock=self.use_mock,
+             target=self.mock_target,
          ))
         if self.l10nCheckTest:
             self.addStep(MockCommand(
@@ -1732,7 +1738,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(MockCommand(
+        self.addStep(RetryingMockCommand(
          name='make_uploadsymbols',
          command=self.makeCmd + ['uploadsymbols'],
          env=self.env,
@@ -2659,7 +2665,11 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             env['MOZ_PKG_PRETTYNAMES'] = '1'
         if appVersion is None or self.version != appVersion:
             env['MOZ_PKG_VERSION'] = version
-        MercurialBuildFactory.__init__(self, env=env, **kwargs)
+        MercurialBuildFactory.__init__(self, env=env, use_mock=self.use_mock,
+                                       mock_target=self.mock_target,
+                                       mock_packages=self.mock_packages,
+                                       mock_copyin_files=self.mock_copyin_files,
+                                       **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
                                fileType=None, maxDepth=1, haltOnFailure=False):
@@ -2787,12 +2797,15 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         self.UPLOAD_EXTRA_FILES.append(info_txt)
         # Make sure the complete MAR has been generated
         if self.enableUpdatePackaging:
-            self.addStep(ShellCommand(
+            self.addStep(MockCommand(
                 name='make_update_pkg',
                 command=self.makeCmd + ['-C',
                          '%s/tools/update-packaging' % self.mozillaObjdir],
                 env=self.env,
                 haltOnFailure=True,
+                mock=self.use_mock,
+                target=self.mock_target,
+                workdir='build',
             ))
             if self.createPartial:
                 self.addCreatePartialUpdateSteps()
@@ -2842,7 +2855,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
-        self.addStep(RetryingScratchboxProperty(
+        self.addStep(RetryingMockProperty(
          name='make_upload',
          command=self.makeCmd + ['upload'] + upload_vars,
          env=uploadEnv,
@@ -2852,7 +2865,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
          description=['upload'],
          timeout=60*60, # 60 minutes
          log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
-         sb=self.use_scratchbox,
+         mock=self.use_mock,
+         target=self.mock_target,
+         mock_workdir_prefix=None,
         ))
 
         if self.productName == 'fennec' and not uploadMulti:
@@ -2943,8 +2958,7 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
                  venkmanRepoPath='', chatzillaRepoPath='', cvsroot='',
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None,
-                 **kwargs):
+                 mock_copyin_files=None, **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -2956,8 +2970,9 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
         ReleaseBuildFactory.__init__(self, mozillaDir='mozilla',
-            mozconfigBranch='default', use_mock=False, mock_target=None,
-            mock_packages=None, mock_copyin_files=None, **kwargs)
+            mozconfigBranch='default', use_mock=self.use_mock,
+            mock_target=self.mock_target, mock_packages=self.mock_packages,
+            mock_copyin_files=self.mock_copyin_files, **kwargs)
 
     def addFilePropertiesSteps(self, filename=None, directory=None,
                                fileType=None, maxDepth=1, haltOnFailure=False):
@@ -3004,10 +3019,16 @@ class BaseRepackFactory(MozillaBuildFactory):
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=None,
                  tooltool_script='/tools/tooltool.py',
-                 use_mock=None,
+                 use_mock=False,
                  mock_target=None,
+                 mock_packages=None,
+                 mock_copyin_files=None,
                  **kwargs):
-        MozillaBuildFactory.__init__(self, **kwargs)
+        MozillaBuildFactory.__init__(self, use_mock=self.use_mock,
+                                     mock_target=self.mock_target,
+                                     mock_packages=self.mock_packages,
+                                     mock_copyin_files=self.mock_copyin_files,
+                                     **kwargs)
 
         self.platform = platform
         self.project = project
@@ -3030,6 +3051,8 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tooltool_bootstrap = tooltool_bootstrap
         self.use_mock = use_mock
         self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -3172,7 +3195,7 @@ class BaseRepackFactory(MozillaBuildFactory):
             target=self.mock_target,
         ))
         if self.tooltool_manifest_src:
-          self.addStep(MockCommand(
+          self.addStep(ShellCommand(
             name='run_tooltool',
             command=[
                  WithProperties('%(toolsdir)s/scripts/tooltool/fetch_and_unpack.sh'),
@@ -3183,8 +3206,6 @@ class BaseRepackFactory(MozillaBuildFactory):
             ],
             haltOnFailure=True,
             workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
-            mock=self.use_mock,
-            target=self.mock_target,
           ))
 
 
@@ -3248,7 +3269,6 @@ class BaseRepackFactory(MozillaBuildFactory):
          locks=[upload_lock.access('counting')],
          mock=self.use_mock,
          target=self.mock_target,
-         mock_workdir_prefix=None,
         ))
 
     def getSources(self):
@@ -3307,14 +3327,12 @@ class BaseRepackFactory(MozillaBuildFactory):
          workdir=self.baseWorkDir,
          haltOnFailure=True
         ))
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
          name='update_compare_locales',
          command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
          description='update compare-locales',
          workdir='%s/compare-locales' % self.baseWorkDir,
          haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
 
     def compareLocales(self):
@@ -3331,16 +3349,14 @@ class BaseRepackFactory(MozillaBuildFactory):
             flunkOnFailure = True
             haltOnFailure = True
             warnOnFailure = False
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
          name='rm_merged',
          command=['rm', '-rf', 'merged'],
          description=['remove', 'merged'],
          workdir=self.baseWorkDir,
          haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
          name='run_compare_locales',
 #         command=['python',
 #                  'build/compare-locales/scripts/compare-locales'] +
@@ -3362,8 +3378,6 @@ class BaseRepackFactory(MozillaBuildFactory):
          haltOnFailure=haltOnFailure,
          workdir="%s/%s/locales" % (self.absSrcDir,
                                     self.appName),
-         mock=self.use_mock,
-         target=self.mock_target,
 #         workdir=".",
         ))
 
@@ -3505,15 +3519,14 @@ class CCBaseRepackFactory(BaseRepackFactory):
             co_command.append('--venkman-rev=%s' % self.buildRevision)
             co_command.append('--chatzilla-rev=%s' % self.buildRevision)
         # execute the checkout
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
+         name="checkout_client",
          command=co_command,
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=60*60*3, # 3 hours (crazy, but necessary for now)
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
 
 class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
@@ -3523,7 +3536,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  ausBaseUploadDir=None, updatePlatform=None,
                  downloadBaseURL=None, ausUser=None, ausSshKey=None,
                  ausHost=None, l10nNightlyUpdate=False, l10nDatedDirs=False,
-                 createPartial=False, extraConfigureArgs=[], **kwargs):
+                 createPartial=False, extraConfigureArgs=[], 
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
@@ -3535,6 +3550,10 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         self.createPartial = createPartial
         self.geriatricMasters = []
         self.extraConfigureArgs = extraConfigureArgs
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
 
         # This is required because this __init__ doesn't call the
         # NightlyBuildFactory __init__ where self.complete_platform
@@ -3587,7 +3606,11 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             self.extraConfigureArgs += ['--enable-update-packaging']
 
 
-        BaseRepackFactory.__init__(self, env=env, **kwargs)
+        BaseRepackFactory.__init__(self, env=env, use_mock=self.use_mock,
+                                   mock_target=self.mock_target,
+                                   mock_packages=self.mock_packages,
+                                   mock_copyin_files=self.mock_copyin_files,
+                                   **kwargs)
 
         if l10nNightlyUpdate:
             assert ausBaseUploadDir and updatePlatform and downloadBaseURL
@@ -3861,7 +3884,8 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='', buildRevision='',
-                 **kwargs):
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -3869,7 +3893,14 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.chatzillaRepoPath = chatzillaRepoPath
         self.cvsroot = cvsroot
         self.buildRevision = buildRevision
-        NightlyRepackFactory.__init__(self, mozillaDir='mozilla', **kwargs)
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
+        NightlyRepackFactory.__init__(self, mozillaDir='mozilla',
+                                      use_mock=self.use_mock, mock_target=self.mock_target,
+                                      mock_packages=self.mock_packages,
+                                      mock_copyin_files=self.mock_copyin_files, **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way
     # this is basically mirroring what mobile does
@@ -3952,7 +3983,9 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
     def __init__(self, platform, buildRevision, version, buildNumber,
                  env={}, brandName=None, mergeLocales=False,
                  mozRepoPath='', inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='', enUSBinaryURL='', **kwargs):
+                 chatzillaRepoPath='', cvsroot='', enUSBinaryURL='',
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, **kwargs):
         self.skipBlankRepos = True
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -3966,7 +3999,11 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             self.brandName = brandName
         else:
             self.brandName = kwargs['project'].capitalize()
- 
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
+
         env = env.copy()
 
         env.update({'EN_US_BINARY_URL':enUSBinaryURL})
@@ -3987,7 +4024,9 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                              '--release-to-candidates-dir'
         BaseRepackFactory.__init__(self, env=env, platform=platform,
                                    mergeLocales=mergeLocales, mozillaDir='mozilla',
-                                   **kwargs)
+                                   use_mock=self.use_mock, mock_target=self.mock_target,
+                                   mock_packages=self.mock_packages,
+                                   mock_copyin_files=self.mock_copyin_files, **kwargs)
 
     # Repeated here since the Parent classes fail hgtool/checkouts due to
     # relbranch issues, and not actually having the tag after clone
@@ -4051,35 +4090,30 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             co_command.append('--venkman-rev=%s' % self.buildRevision)
             co_command.append('--chatzilla-rev=%s' % self.buildRevision)
         # execute the checkout
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
+         name="client_checkout",
          command=co_command,
          description=['running', 'client.py', 'checkout'],
          descriptionDone=['client.py', 'checkout'],
          haltOnFailure=True,
          workdir='%s/%s' % (self.baseWorkDir, self.origSrcDir),
          timeout=60*60*3, # 3 hours (crazy, but necessary for now)
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
 
     def updateSources(self):
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
          name='update_sources',
          command=['hg', 'up', '-C', '-r', self.buildRevision],
          workdir='build/'+self.origSrcDir,
          description=['update %s' % self.branchName,
                       'to %s' % self.buildRevision],
          haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
          name='update_locale_sources',
          command=['hg', 'up', '-C', '-r', self.buildRevision],
          workdir=WithProperties('build/l10n/%(locale)s'),
          description=['update to', self.buildRevision],
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
         self.addStep(SetProperty(
                      command=['hg', 'ident', '-i'],
@@ -4087,44 +4121,40 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                      property='l10n_revision',
                      workdir=WithProperties('build/l10n/%(locale)s')
         ))
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
+         name="update_mozilla",
          command=['hg', 'up', '-C', '-r', self.buildRevision],
          workdir='build/'+self.mozillaSrcDir,
          description=['update mozilla',
                       'to %s' % self.buildRevision],
          haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
         if self.venkmanRepoPath:
-            self.addStep(MockCommand(
+            self.addStep(ShellCommand(
+             name="update_venkman",
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/venkman',
              description=['update venkman',
                           'to %s' % self.buildRevision],
              haltOnFailure=True,
-             mock=self.use_mock,
-             target=self.mock_target,
             ))
         if self.inspectorRepoPath:
-            self.addStep(MockCommand(
+            self.addStep(ShellCommand(
+             name="update_inspector",
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/inspector',
              description=['update inspector',
                           'to %s' % self.buildRevision],
              haltOnFailure=True,
-             mock=self.use_mock,
-             target=self.mock_target,
             ))
         if self.chatzillaRepoPath:
-            self.addStep(MockCommand(
+            self.addStep(ShellCommand(
+             name="update_chatzilla",
              command=['hg', 'up', '-C', '-r', self.buildRevision],
              workdir='build/'+self.mozillaSrcDir+'/extensions/irc',
              description=['update chatzilla',
                           'to %s' % self.buildRevision],
              haltOnFailure=True,
-             mock=self.use_mock,
-             target=self.mock_target,
             ))
 
     def preClean(self):
@@ -4639,7 +4669,9 @@ class SingleSourceFactory(ReleaseFactory):
                  stageUsername, stageSshKey, buildNumber, mozconfig,
                  configRepoPath, configSubDir, objdir='',
                  mozillaDir=None, autoconfDirs=['.'], buildSpace=1,
-                 mozconfigBranch="production", appVersion=None, **kwargs):
+                 mozconfigBranch="production", appVersion=None,
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
         self.mozconfig = mozconfig
@@ -4649,6 +4681,8 @@ class SingleSourceFactory(ReleaseFactory):
         self.releaseTag = '%s_RELEASE' % (baseTag)
         self.bundleFile = 'source/%s-%s.bundle' % (productName, version)
         self.sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName, version)
+        self.use_mock =use_mock
+        self.mock_target = mock_target
 
         self.origSrcDir = self.branchName
 
@@ -5015,8 +5049,16 @@ class CCSourceFactory(ReleaseFactory):
                  stageUsername, stageSshKey, buildNumber, mozRepoPath,
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', cvsroot='', autoconfDirs=['.'],
-                 buildSpace=1, **kwargs):
-        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
+                 buildSpace=1, use_mock=False, mock_target=None,
+                 mock_copyin_files=None, mock_packages=None, **kwargs):
+
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, use_mock=self.use_mock,
+                                mock_target=self.mock_target, mock_packages=self.mock_packages,
+                                mock_copyin_files=self.mock_copyin_files, **kwargs)
         releaseTag = '%s_RELEASE' % (baseTag)
         sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
                                                          version)
@@ -5030,6 +5072,7 @@ class CCSourceFactory(ReleaseFactory):
                      'POST_UPLOAD_CMD': postUploadCmd}
 
         self.addStep(MockCommand(
+         name="rm src",
          command=['rm', '-rf', 'source'],
          workdir='.',
          haltOnFailure=True,
@@ -5037,6 +5080,7 @@ class CCSourceFactory(ReleaseFactory):
          target=self.mock_target,
         ))
         self.addStep(MockCommand(
+         name="mkdir src",
          command=['mkdir', 'source'],
          workdir='.',
          haltOnFailure=True,
@@ -5073,19 +5117,19 @@ class CCSourceFactory(ReleaseFactory):
         if cvsroot:
             co_command.append('--cvsroot=%s' % cvsroot)
         # execute the checkout
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
+         name="checkout",
          command=co_command,
          workdir=self.branchName,
          description=['update to', releaseTag],
          haltOnFailure=True,
          timeout=60*60, # 1 hour
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
         # the autoconf and actual tarring steps
         # should be replaced by calling the build target
         for dir in autoconfDirs:
             self.addStep(MockCommand(
+             name="autoconf-%s" % dir,
              command=['autoconf-2.13'],
              workdir='%s/%s' % (self.branchName, dir),
              haltOnFailure=True,
@@ -5093,6 +5137,7 @@ class CCSourceFactory(ReleaseFactory):
              target=self.mock_target,
             ))
         self.addStep(MockCommand(
+         name="create tarball",
          command=['tar', '-cj', '--owner=0', '--group=0', '--numeric-owner',
                   '--mode=go-w', '--exclude=.hg*', '--exclude=CVS',
                   '--exclude=.cvs*', '-f', sourceTarball, self.branchName],
@@ -5103,6 +5148,7 @@ class CCSourceFactory(ReleaseFactory):
          target=self.mock_target,
         ))
         self.addStep(MockCommand(
+         name="upload tarball",
          command=['python', '%s/mozilla/build/upload.py' % self.branchName,
                   '--base-path', '.', sourceTarball],
          workdir='.',
@@ -5128,7 +5174,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  releaseNotesUrl=None, binaryName=None, oldBinaryName=None,
                  testOlderPartials=False, fakeMacInfoTxt=False,
                  longVersion=None, oldLongVersion=None, schema=None,
-                 useBetaChannelForRelease=False, useChecksums=False, **kwargs):
+                 useBetaChannelForRelease=False, useChecksums=False, 
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, **kwargs):
         """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
                     Bootstrap/Util.pm, and MozBuild. It is also used when
                     commiting the version-bumped patcher config so it must have
@@ -5156,7 +5204,14 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         """
         if useChecksums:
             buildSpace = 1
-        ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
+
+        ReleaseFactory.__init__(self, buildSpace=buildSpace, use_mock=self.use_mock,
+                                mock_target=self.mock_target, mock_packages=self.mock_packages,
+                                mock_copyin_files=self.mock_copyin_files, **kwargs)
 
         self.cvsroot = cvsroot
         self.patcherToolsTag = patcherToolsTag
@@ -5218,11 +5273,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.brandName = brandName or productName.capitalize()
         self.releaseNotesUrl = releaseNotesUrl
 
-        self.use_mock = kwargs.get('use_mock')
-        self.mock_target = kwargs.get('mock_target')
-        self.mock_packages = kwargs.get('mock_packages')
-        self.mock_copyin_files = kwargs.get('mock_copyin_files')
-
         self.setChannelData()
         self.setup()
         self.bumpPatcherConfig()
@@ -5280,45 +5330,66 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   '-d', 'build', 'mozilla/tools/patcher'],
          description=['checkout', 'patcher'],
          workdir='.',
+         env=self.env,
          haltOnFailure=True,
          mock=self.use_mock,
          target=self.mock_target,
         ))
-        self.addStep(RetryingShellCommand(
+        self.addStep(RetryingMockCommand(
          name='checkout_mozbuild',
          command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
                   '-d', 'MozBuild',
                   'mozilla/tools/release/MozBuild'],
          description=['checkout', 'MozBuild'],
+         env=self.env,
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
-        self.addStep(RetryingShellCommand(
+        self.addStep(RetryingMockCommand(
          name='checkout_bootstrap_util',
          command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
                   '-d' 'Bootstrap',
                   'mozilla/tools/release/Bootstrap/Util.pm'],
          description=['checkout', 'Bootstrap/Util.pm'],
+         env=self.env,
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
-        self.addStep(RetryingShellCommand(
+        self.addStep(RetryingMockCommand(
          name='checkout_patcher_configs',
          command=['cvs', '-d', self.cvsroot, 'co', '-d' 'patcher-configs',
                   'mozilla/tools/patcher-configs'],
          description=['checkout', 'patcher-configs'],
+         env=self.env,
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
         # Bump the patcher config
-        self.addStep(RetryingShellCommand(
+        self.addStep(RetryingMockCommand(
          name='get_shipped_locales',
          command=['wget', '-O', 'shipped-locales', self.shippedLocales],
          description=['get', 'shipped-locales'],
+         env=self.env,
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
-        self.addStep(RetryingShellCommand(
+        self.addStep(RetryingMockCommand(
          name='get_old_shipped_locales',
          command=['wget', '-O', 'old-shipped-locales', self.oldShippedLocales],
          description=['get', 'old-shipped-locales'],
+         env=self.env,
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
 
 
@@ -5342,14 +5413,17 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             bumpCommand.extend(['-n', self.releaseNotesUrl])
         if self.schema:
             bumpCommand.extend(['-s', str(self.schema)])
-        self.addStep(ShellCommand(
+        self.addStep(MockCommand(
          name='bump',
          command=bumpCommand,
          description=['bump patcher config'],
          env={'PERL5LIB': '../tools/lib/perl'},
-         haltOnFailure=True
+         haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
-        self.addStep(TinderboxShellCommand(
+        self.addStep(TinderboxMockCommand(
          name='diff_patcher_config',
          command=['bash', '-c',
                   '(cvs diff -u "%s") && (grep \
@@ -5360,6 +5434,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                                           self.patcherConfigFile)],
          description=['diff patcher config'],
          ignoreCodes=[0,1],
+         workdir='build',
+         env=self.env,
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
         if self.commitPatcherConfig:
             self.addStep(MockCommand(
@@ -5373,6 +5451,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              workdir='build/patcher-configs',
              description=['commit patcher config'],
              haltOnFailure=True,
+             env=self.env,
              mock=self.use_mock,
              target=self.mock_target,
             ))
@@ -5385,10 +5464,14 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
         for platform in sorted(self.verifyConfigs.keys()):
             bumpCommand = self.getUpdateVerifyBumpCommand(platform)
-            self.addStep(ShellCommand(
+            self.addStep(MockCommand(
              name='bump_verify_configs',
              command=bumpCommand,
              description=['bump', self.verifyConfigs[platform]],
+             env=self.env,
+             workdir='build',
+             mock=self.use_mock,
+             target=self.mock_target,
             ))
         self.addStep(MockCommand(
          name='commit_verify_configs',
@@ -5398,6 +5481,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                                           self.buildNumber)
                  ],
          description=['commit verify configs'],
+         env=self.env,
          workdir='tools',
          haltOnFailure=True,
          mock=self.use_mock,
@@ -5415,6 +5499,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              command=['hg', 'tag', '-u', self.hgUsername, '-f',
                       '-r', WithProperties('%(configRevision)s'), t],
              description=['tag verify configs'],
+             env=self.env,
              workdir='tools',
              haltOnFailure=True,
              mock=self.use_mock,
@@ -5426,6 +5511,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   'ssh -l %s %s' % (self.hgUsername, sshKeyOption),
                   '-f', pushRepo],
          description=['push verify configs'],
+         env=self.env,
          workdir='tools',
          haltOnFailure=True,
          mock=self.use_mock,
@@ -5434,7 +5520,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
     def buildTools(self):
         # Generate updates from here
-        self.addStep(ShellCommand(
+        self.addStep(MockCommand(
          name='patcher_build_tools',
          command=['perl', 'patcher2.pl', '--build-tools-hg',
                   '--tools-revision=%s' % self.patcherToolsTag,
@@ -5442,9 +5528,13 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                   '--brand=%s' % self.brandName,
                   WithProperties('--config=%s' % self.patcherConfigFile)],
          description=['patcher:', 'build tools'],
-         env={'HGROOT': self.mozRepository},
+         env={'HGROOT': self.mozRepository,
+              'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin'},
          haltOnFailure=True,
          timeout=3600,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
 
     def downloadBuilds(self):
@@ -5454,11 +5544,14 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                    WithProperties('--config=%s' % self.patcherConfigFile)]
         if self.useChecksums:
             command.append('--use-checksums')
-        self.addStep(ShellCommand(
+        self.addStep(MockCommand(
          name='patcher_download_builds',
          command=command,
          description=['patcher:', 'download builds'],
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
 
     def createPatches(self):
@@ -5469,11 +5562,14 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  WithProperties('--config=%s' % self.patcherConfigFile)]
         if self.useChecksums:
             command.append('--use-checksums')
-        self.addStep(ShellCommand(
+        self.addStep(MockCommand(
          name='patcher_create_patches',
          command=command,
          description=['patcher:', 'create patches'],
          haltOnFailure=True,
+         workdir='build',
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
         # XXX: For Firefox 10 betas we want the appVersion in the snippets to
         #      show a version change with each one, so we change them from the
@@ -5580,6 +5676,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              haltOnFailure=True,
              mock=self.use_mock,
              target=self.mock_target,
+             env=self.env,
             ))
             # We only push test channel snippets from automation.
             if localDir.endswith('test'):
@@ -5592,6 +5689,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  timeout=7200, # 2 hours
                  description=['backupsnip'],
                  haltOnFailure=True,
+                 env=self.env,
                 ))
                 self.addStep(RetryingShellCommand(
                  name='pushsnip',
@@ -5602,6 +5700,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  timeout=7200, # 2 hours
                  description=['pushsnip'],
                  haltOnFailure=True,
+                 env=self.env,
                 ))
 
     def verifySnippets(self):
@@ -5710,7 +5809,7 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
          mock=self.use_mock,
          target=self.mock_target,
         ))
-        self.addStep(TinderboxMockCommand(
+        self.addStep(TinderboxShellCommand(
          name='diff_patcher_config',
          command=['bash', '-c',
                   '(cvs diff -Nu "%s") && (grep \
@@ -5721,8 +5820,6 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                                           self.patcherConfigFile)],
          description=['diff patcher config'],
          ignoreCodes=[1],
-         mock=self.use_mock,
-         target=self.mock_target,
         ))
         if self.commitPatcherConfig:
             self.addStep(MockCommand(
@@ -5771,16 +5868,29 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
 
 class UpdateVerifyFactory(ReleaseFactory):
     def __init__(self, verifyConfig, buildSpace=.3, useOldUpdater=False,
-                 **kwargs):
+                 use_mock=False, mock_target=None, mock_packages=None,
+                 mock_copyin_files=None, **kwargs):
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
+
         ReleaseFactory.__init__(self, repoPath='nothing',
-                                buildSpace=buildSpace, **kwargs)
+                                buildSpace=buildSpace, 
+                                use_mock=self.use_mock,
+                                mock_target=self.mock_target,
+                                mock_packages=self.mock_packages,
+                                mock_copyin_files=self.mock_copyin_files,
+                                **kwargs)
         command=['bash', 'verify.sh', '-c', verifyConfig]
         if useOldUpdater:
             command.append('--old-updater')
-        self.addStep(UpdateVerify(
+        self.addStep(UpdateMockVerify(
          command=command,
          workdir='tools/release/updates',
-         description=['./verify.sh', verifyConfig]
+         description=['./verify.sh', verifyConfig],
+         mock=self.use_mock,
+         target=self.mock_target,
         ))
 
 
@@ -6443,16 +6553,13 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                     product=self.productName,
                     to_tinderbox_dated=True,
                     )
-            self.addStep(RetryingMockProperty(
+            self.addStep(RetryingSetProperty(
              name='make_upload',
              command=self.makeCmd + ['upload'],
              env=uploadEnv,
              workdir='build/%s' % self.objdir,
              extract_fn = parse_make_upload,
              haltOnFailure=True,
-             mock=self.use_mock,
-             target=self.mock_target,
-             mock_workdir_prefix=None,
              description=['upload'],
              timeout=60*60, # 60 minutes
              log_eval_func=lambda c,s: regex_log_evaluator(c, s, upload_errors),
@@ -6823,9 +6930,17 @@ class L10nVerifyFactory(ReleaseFactory):
     def __init__(self, cvsroot, stagingServer, productName, version,
                  buildNumber, oldVersion, oldBuildNumber,
                  platform, verifyDir='verify', linuxExtension='bz2',
-                 buildSpace=4, **kwargs):
+                 buildSpace=4, use_mock=False, mock_target=None,
+                 mock_packages=None, mock_copyin_files=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
+        self.use_mock = use_mock
+        self.mock_target = mock_target
+        self.mock_packages = mock_packages
+        self.mock_copyin_files = mock_copyin_files
         ReleaseFactory.__init__(self, repoPath='nothing', buildSpace=buildSpace,
+                                use_mock=self.use_mock, mock_target=self.mock_target,
+                                mock_packages=self.mock_packages,
+                                mock_copyin_files=self.mock_copyin_files,
                                 **kwargs)
 
         verifyDirVersion = 'tools/release/l10n'
