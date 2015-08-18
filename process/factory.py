@@ -3829,38 +3829,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
     def doRepack(self):
         self.downloadMarTools()
         self.addStep(MockCommand(
-         name='make_tier_base',
-         command=self.makeCmd + ['tier_base'],
-         workdir=self.absObjDir,
-         description=['make tier_base'],
-         env=self.env,
-         haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-        self.addStep(MockCommand(
-         name='make_tier_nspr',
-         command=self.makeCmd + ['tier_nspr'],
-         workdir=self.absObjDir,
-         description=['make tier_nspr'],
-         env=self.env,
-         haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-        if self.l10nNightlyUpdate:
-            # Because we're generating updates we need to build the libmar tools
-            self.addStep(MockCommand(
-             name='make_libmar',
-             command=self.makeCmd,
-             env=self.env,
-             workdir='%s/modules/libmar' % (self.absObjDir),
-             description=['make', 'modules/libmar'],
-             haltOnFailure=True,
-             mock=self.use_mock,
-             target=self.mock_target,
-            ))
-        self.addStep(MockCommand(
          name='repack_installers',
          description=['repack', 'installers'],
          command=self.makeCmd + [WithProperties('installers-%(locale)s'),
@@ -3883,25 +3851,27 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             haltOnFailure=True,
         ))
         self.addStep(SetProperty(
-            command=['python', 'config/printconfigsetting.py',
-                     WithProperties('%(inipath)s'),
+            command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'BuildID'],
             property='buildid',
             name='get_build_id',
-            workdir=self.absMozillaSrcDir,
+            workdir='.',
+            env=self.env,
         ))
         if self.l10nNightlyUpdate:
             # We need the appVersion to create snippets
             self.addStep(SetProperty(
-                command=['python', 'config/printconfigsetting.py',
-                         WithProperties('%(inipath)s'),
+                command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
+                         WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                          'App', 'Version'],
                 property='appVersion',
                 name='get_app_version',
-                workdir=self.absMozillaSrcDir,
+                workdir='.',
+                env=self.env,
             ))
             self.addFilePropertiesSteps(filename='*.complete.mar',
-                                        directory='%s/dist/update' % self.absMozillaSrcDir,
+                                        directory='%s/dist/update' % self.absMozillaObjDir,
                                         fileType='completeMar',
                                         haltOnFailure=True)
 
