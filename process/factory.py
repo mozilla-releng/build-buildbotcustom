@@ -3239,6 +3239,7 @@ class BaseRepackFactory(MozillaBuildFactory):
             command=command,
             env=self.env,
             haltOnFailure=True,
+            workdir="build/" + self.origSrcDir,
           ))
 
 
