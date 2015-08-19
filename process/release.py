@@ -342,6 +342,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     status = []
     updates_upstream_builders = []
     post_signing_builders = []
+    extra_updates_builders = []
     update_verify_builders = defaultdict(list)
     ui_update_tests_builders = defaultdict(list)
     deliverables_builders = []
@@ -1233,7 +1234,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 "update_channel": updateConfig["localTestChannel"],
             }
         })
-        post_signing_builders.append(builderName)
+        if channel == releaseChannel:
+            post_signing_builders.append(builderName)
+        else:
+            extra_updates_builders.append(builderName)
 
         if not releaseConfig.get('enablePartialMarsAtBuildTime', True):
             deliverables_builders.append(builderName)
@@ -1835,11 +1839,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     for channel, updateConfig in updateChannels.iteritems():
         push_to_mirrors_upstreams.append(builderPrefix("%s_%s_updates" % (releaseConfig["productName"], channel)))
         if updateConfig.get('verifyConfigs'):
+            builderNames=update_verify_builders[channel]
+            # run any extra updates jobs once the releaseChannel equivalent has run
+            if channel == releaseChannel:
+                builderNames.extend(extra_updates_builders)
             schedulers.append(AggregatingScheduler(
                 name=builderPrefix('%s_updates_done' % channel),
                 branch=sourceRepoInfo['path'],
                 upstreamBuilders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], channel))],
-                builderNames=update_verify_builders[channel],
+                builderNames=builderNames,
             ))
             # Add Firefox UI update test builders
             schedulers.append(AggregatingScheduler(

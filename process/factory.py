@@ -397,7 +397,7 @@ class TooltoolMixin(object):
 
 
 class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
-    ignore_dirs = ['info', 'rel-*:45d', 'tb-rel-*:45d']
+    ignore_dirs = ['info', 'rel-*:10d', 'tb-rel-*:10d']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberBranch=None, clobberTime=None,
