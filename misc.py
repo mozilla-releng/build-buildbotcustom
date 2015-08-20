@@ -1823,6 +1823,8 @@ def generateBranchObjects(config, name, secrets=None):
                     builderName = "%s l10n nightly-%s" % (pf['base_name'], n)
                     mobile_l10n_builders.append(builderName)
                     extra_args = ['--cfg',
+                                  config['mozharness_configs']['single_locale_environment'],
+                                  '--cfg',
                                   'single_locale/%s_%s.py' % (name, platform),
                                   '--cfg',
                                   config['mozharness_configs']['balrog'],
