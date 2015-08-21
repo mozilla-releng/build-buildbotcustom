@@ -4643,7 +4643,8 @@ class ReleaseTaggingFactory(ReleaseFactory):
                           'CLOSED TREE a=release'],
                  workdir=repoName,
                  description=['commit %s' % repoName],
-                 haltOnFailure=True,
+                 haltOnFailure=False,
+                 flunkOnFailure=False,
                  mock=self.use_mock,
                  target=self.mock_target,
                 ))
