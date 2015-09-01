@@ -293,18 +293,10 @@ class MockMixin(object):
             ))
 
 class BootstrapFactory(BuildFactory):
-    def __init__(self, automation_tag, logdir, bootstrap_config,
-                 cvsroot="pserver:anonymous@cvs-mirror.mozilla.org",
-                 cvsmodule="mozilla"):
+    def __init__(self, automation_tag, logdir, bootstrap_config):
         """
-    @type  cvsroot: string
-    @param cvsroot: The CVSROOT to use for checking out Bootstrap.
-
-    @type  cvsmodule: string
-    @param cvsmodule: The CVS module to use for checking out Bootstrap.
-
     @type  automation_tag: string
-    @param automation_tag: The CVS Tag to use for checking out Bootstrap.
+    @param automation_tag: The Mercurial Tag to use for checking out Bootstrap.
 
     @type  logdir: string
     @param logdir: The log directory for Bootstrap to use.
@@ -326,8 +318,8 @@ class BootstrapFactory(BuildFactory):
          name='checkout',
          description='checkout',
          workdir='.',
-         command=['cvs', '-d', cvsroot, 'co', '-r', automation_tag,
-                  '-d', 'build', cvsmodule],
+         command=['hg', 'clone', '-r', automation_tag,
+                  'mozilla'],
          haltOnFailure=1,
         ))
         self.addStep(ShellCommand(
@@ -1988,7 +1980,7 @@ class TryBuildFactory(MercurialBuildFactory):
 class CCMercurialBuildFactory(MercurialBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='',
+                 chatzillaRepoPath='',
                  use_mock=False, mock_target=None,
                  mozillaDir=None,
                  mozillaSrcDir=None,
@@ -1998,7 +1990,6 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
@@ -2085,8 +2076,6 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             co_command.append('--chatzilla-repo=%s' % self.getRepository(self.chatzillaRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-chatzilla')
-        if self.cvsroot:
-            co_command.append('--cvsroot=%s' % self.cvsroot)
         if self.buildRevision:
             co_command.append('--mozilla-rev=%s' % self.buildRevision)
             co_command.append('--inspector-rev=%s' % self.buildRevision)
@@ -2630,7 +2619,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='',
+                 chatzillaRepoPath='',
                  mozillaDir=None,
                  mozillaSrcDir=None,
                  use_mock=False, mock_target=None, mock_packages=None,
@@ -2640,7 +2629,6 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
@@ -2990,7 +2978,7 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
 
 class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
     def __init__(self, mozRepoPath='', inspectorRepoPath='',
-                 venkmanRepoPath='', chatzillaRepoPath='', cvsroot='',
+                 venkmanRepoPath='', chatzillaRepoPath='',
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None, mozillaDir=None,
                  mozillaSrcDir=None, **kwargs):
@@ -2999,7 +2987,6 @@ class CCReleaseBuildFactory(CCMercurialBuildFactory, ReleaseBuildFactory):
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
@@ -3525,7 +3512,7 @@ class CCBaseRepackFactory(BaseRepackFactory):
 
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='', buildRevision='',
+                 chatzillaRepoPath='', buildRevision='',
                  mozillaSrcDir=None, objdir='',
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
@@ -3533,7 +3520,6 @@ class CCBaseRepackFactory(BaseRepackFactory):
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         self.objdir = objdir
         BaseRepackFactory.__init__(self, mozillaDir='mozilla',
@@ -3559,8 +3545,6 @@ class CCBaseRepackFactory(BaseRepackFactory):
             co_command.append('--chatzilla-repo=%s' % self.getRepository(self.chatzillaRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-chatzilla')
-        if self.cvsroot:
-            co_command.append('--cvsroot=%s' % self.cvsroot)
         if self.buildRevision:
             co_command.append('--comm-rev=%s' % self.buildRevision)
             co_command.append('--mozilla-rev=%s' % self.buildRevision)
@@ -3904,7 +3888,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
 class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
     def __init__(self, skipBlankRepos=False, mozRepoPath='',
                  inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='', buildRevision='',
+                 chatzillaRepoPath='', buildRevision='',
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None,
                  objdir=None,
@@ -3915,7 +3899,6 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         self.use_mock = use_mock
         self.mock_target = mock_target
@@ -4014,7 +3997,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
     def __init__(self, platform, buildRevision, version, buildNumber,
                  env={}, brandName=None, mergeLocales=False,
                  mozRepoPath='', inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='', enUSBinaryURL='',
+                 chatzillaRepoPath='', enUSBinaryURL='',
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None, mozillaDir=None,
                  mozillaSrcDir=None, **kwargs):
@@ -4023,7 +4006,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         self.inspectorRepoPath = inspectorRepoPath
         self.venkmanRepoPath = venkmanRepoPath
         self.chatzillaRepoPath = chatzillaRepoPath
-        self.cvsroot = cvsroot
         self.buildRevision = buildRevision
         self.version = version
         self.buildNumber = buildNumber
@@ -4114,8 +4096,6 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             co_command.append('--chatzilla-repo=%s' % self.getRepository(self.chatzillaRepoPath))
         elif self.skipBlankRepos:
             co_command.append('--skip-chatzilla')
-        if self.cvsroot:
-            co_command.append('--cvsroot=%s' % self.cvsroot)
         if self.buildRevision:
             co_command.append('--comm-rev=%s' % self.buildRevision)
             co_command.append('--mozilla-rev=%s' % self.buildRevision)
@@ -5087,7 +5067,7 @@ class CCSourceFactory(ReleaseFactory):
     def __init__(self, productName, version, baseTag, stagingServer,
                  stageUsername, stageSshKey, buildNumber, mozRepoPath,
                  inspectorRepoPath='', venkmanRepoPath='',
-                 chatzillaRepoPath='', cvsroot='', autoconfDirs=['.'],
+                 chatzillaRepoPath='', autoconfDirs=['.'],
                  buildSpace=1, use_mock=False, mock_target=None,
                  mock_copyin_files=None, mock_packages=None, **kwargs):
 
@@ -5153,8 +5133,6 @@ class CCSourceFactory(ReleaseFactory):
             co_command.append('--chatzilla-rev=%s' % releaseTag)
         else:
             co_command.append('--skip-chatzilla')
-        if cvsroot:
-            co_command.append('--cvsroot=%s' % cvsroot)
         # execute the checkout
         self.addStep(ShellCommand(
          name="checkout",
@@ -5178,8 +5156,8 @@ class CCSourceFactory(ReleaseFactory):
         self.addStep(MockCommand(
          name="create tarball",
          command=['tar', '-cj', '--owner=0', '--group=0', '--numeric-owner',
-                  '--mode=go-w', '--exclude=.hg*', '--exclude=CVS',
-                  '--exclude=.cvs*', '-f', sourceTarball, self.branchName],
+                  '--mode=go-w', '--exclude=.hg*',
+                  '-f', sourceTarball, self.branchName],
          workdir='.',
          description=['create tarball'],
          haltOnFailure=True,
@@ -5201,7 +5179,7 @@ class CCSourceFactory(ReleaseFactory):
 
 class ReleaseUpdatesFactory(ReleaseFactory):
     snippetStagingDir = '/opt/aus2/snippets/staging'
-    def __init__(self, cvsroot, patcherToolsTag, patcherConfig, verifyConfigs,
+    def __init__(self, patcherToolsTag, patcherConfig, verifyConfigs,
                  appName, productName,
                  version, appVersion, baseTag, buildNumber,
                  oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
@@ -5216,12 +5194,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  useBetaChannelForRelease=False, useChecksums=False, 
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None, **kwargs):
-        """cvsroot: The CVSROOT to use when pulling patcher, patcher-configs,
-                    Bootstrap/Util.pm, and MozBuild. It is also used when
-                    commiting the version-bumped patcher config so it must have
-                    write permission to the repository if commitPatcherConfig
-                    is True.
-           patcherToolsTag: A tag that has been applied to all of:
+        """patcherToolsTag: A tag that has been applied to all of:
                               sourceRepo, patcher, MozBuild, Bootstrap.
                             This version of all of the above tools will be
                             used - NOT tip.
@@ -5229,7 +5202,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                           and pass to patcher.
            commitPatcherConfig: This flag simply controls whether or not
                                 the bumped patcher config file will be
-                                commited to the CVS repository.
+                                commited to the Mercurial repository.
            mozRepoPath: The path for the Mozilla repo to hand patcher as the
                         HGROOT (if omitted, the default repoPath is used).
                         Apps not rooted in the Mozilla repo need this.
@@ -5252,7 +5225,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                                 mock_target=self.mock_target, mock_packages=self.mock_packages,
                                 mock_copyin_files=self.mock_copyin_files, **kwargs)
 
-        self.cvsroot = cvsroot
         self.patcherToolsTag = patcherToolsTag
         self.patcherConfig = patcherConfig
         self.verifyConfigs = verifyConfigs
@@ -5374,52 +5346,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
     def setup(self):
         # General setup
-        self.addStep(RetryingMockCommand(
-         name='checkout_patcher',
-         command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
-                  '-d', 'build', 'mozilla/tools/patcher'],
-         description=['checkout', 'patcher'],
-         workdir='.',
-         env=self.env,
-         haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-        self.addStep(RetryingMockCommand(
-         name='checkout_mozbuild',
-         command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
-                  '-d', 'MozBuild',
-                  'mozilla/tools/release/MozBuild'],
-         description=['checkout', 'MozBuild'],
-         env=self.env,
-         haltOnFailure=True,
-         workdir='build',
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-        self.addStep(RetryingMockCommand(
-         name='checkout_bootstrap_util',
-         command=['cvs', '-d', self.cvsroot, 'co', '-r', self.patcherToolsTag,
-                  '-d' 'Bootstrap',
-                  'mozilla/tools/release/Bootstrap/Util.pm'],
-         description=['checkout', 'Bootstrap/Util.pm'],
-         env=self.env,
-         haltOnFailure=True,
-         workdir='build',
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-        self.addStep(RetryingMockCommand(
-         name='checkout_patcher_configs',
-         command=['cvs', '-d', self.cvsroot, 'co', '-d' 'patcher-configs',
-                  'mozilla/tools/patcher-configs'],
-         description=['checkout', 'patcher-configs'],
-         env=self.env,
-         haltOnFailure=True,
-         workdir='build',
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
         # Bump the patcher config
         self.addStep(RetryingMockCommand(
          name='get_shipped_locales',
@@ -5427,7 +5353,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['get', 'shipped-locales'],
          env=self.env,
          haltOnFailure=True,
-         workdir='build',
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
@@ -5437,14 +5363,14 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          description=['get', 'old-shipped-locales'],
          env=self.env,
          haltOnFailure=True,
-         workdir='build',
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
 
 
     def bumpPatcherConfig(self):
-        bumpCommand = ['perl', '../tools/release/patcher-config-bump.pl',
+        bumpCommand = ['perl', '../patcher-config-bump.pl',
                        '-p', self.productName, '-r', self.brandName,
                        '-v', self.version, '-a', self.appVersion,
                        '-o', self.oldVersion, '-b', str(self.buildNumber),
@@ -5467,16 +5393,16 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          name='bump',
          command=bumpCommand,
          description=['bump patcher config'],
-         env={'PERL5LIB': '../tools/lib/perl'},
+         env={'PERL5LIB': '../../lib/perl'},
          haltOnFailure=True,
-         workdir='build',
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
         self.addStep(TinderboxMockCommand(
          name='diff_patcher_config',
          command=['bash', '-c',
-                  '(cvs diff -u "%s") && (grep \
+                  '(hg diff -U8 "%s") && (grep \
                     "build%s/update/.platform./.locale./%s-%s.complete.mar" \
                     "%s" || return 2)' % (self.patcherConfigFile,
                                           self.buildNumber, self.productName,
@@ -5484,7 +5410,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                                           self.patcherConfigFile)],
          description=['diff patcher config'],
          ignoreCodes=[0,1],
-         workdir='build',
+         workdir='tools/release/updates',
          env=self.env,
          mock=self.use_mock,
          target=self.mock_target,
@@ -5492,13 +5418,13 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         if self.commitPatcherConfig:
             self.addStep(MockCommand(
              name='commit_patcher_config',
-             command=['cvs', 'commit', '-m',
+             command=['hg', 'commit', '-m',
                       WithProperties('Automated configuration bump: ' + \
                       '%s, from %s to %s build %s' % \
                         (self.patcherConfig, self.oldVersion,
                          self.version, self.buildNumber))
                      ],
-             workdir='build/patcher-configs',
+             workdir='tools/release/updates/patcher-configs',
              description=['commit patcher config'],
              haltOnFailure=True,
              env=self.env,
@@ -5519,7 +5445,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
              command=bumpCommand,
              description=['bump', self.verifyConfigs[platform]],
              env=self.env,
-             workdir='build',
+             workdir='tools/release/updates',
              mock=self.use_mock,
              target=self.mock_target,
             ))
@@ -5582,7 +5508,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
               'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin'},
          haltOnFailure=True,
          timeout=3600,
-         workdir='build',
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
@@ -5669,7 +5595,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=command,
          description=['patcher:', 'download builds'],
          haltOnFailure=True,
-         workdir='build',
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
@@ -5687,7 +5613,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=command,
          description=['patcher:', 'create patches'],
          haltOnFailure=True,
-         workdir='build',
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
@@ -5845,10 +5771,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         oldCandidatesDir = self.getCandidatesDir(self.productName,
                                                  self.oldVersion,
                                                  self.oldBuildNumber)
-        verifyConfigPath = '../tools/release/updates/%s' % \
+        verifyConfigPath = 'verification/%s' % \
                             self.verifyConfigs[platform]
 
-        bcmd = ['perl', '../tools/release/update-verify-bump.pl',
+        bcmd = ['perl', '../update-verify-bump.pl',
                 '-o', platform, '-p', self.productName,
                 '-r', self.brandName,
                 '--old-version=%s' % self.oldVersion,
@@ -5883,7 +5809,7 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
              command=['bash', '-c', 
                       WithProperties('if [ ! -f ' + self.patcherConfigFile + 
                                      ' ]; then touch ' + self.patcherConfigFile + 
-                                     ' && cvs add ' + self.patcherConfigFile + 
+                                     ' && hg add ' + self.patcherConfigFile + 
                                      '; fi')],
              description=['add patcher config'],
              mock=self.use_mock,
@@ -5900,7 +5826,7 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                 mock=self.use_mock,
                 target=self.mock_target,
             ))
-        bumpCommand = ['perl', '../tools/release/patcher-config-creator.pl',
+        bumpCommand = ['perl', '../patcher-config-creator.pl',
                        '-p', self.productName, '-r', self.brandName,
                        '-v', self.version, '-a', self.appVersion,
                        '-o', self.oldVersion,
@@ -5924,15 +5850,16 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
          name='create_config',
          command=bumpCommand,
          description=['create patcher config'],
-         env={'PERL5LIB': '../tools/lib/perl'},
+         env={'PERL5LIB': '../../lib/perl'},
          haltOnFailure=True,
+         workdir='tools/release/updates',
          mock=self.use_mock,
          target=self.mock_target,
         ))
         self.addStep(TinderboxShellCommand(
          name='diff_patcher_config',
          command=['bash', '-c',
-                  '(cvs diff -Nu "%s") && (grep \
+                  '(hg diff -Nu "%s") && (grep \
                     "build%s/update/.platform./.locale./%s-%s.complete.mar" \
                     "%s" || return 2)' % (self.patcherConfigFile,
                                           self.buildNumber, self.productName,
@@ -5944,13 +5871,13 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
         if self.commitPatcherConfig:
             self.addStep(MockCommand(
              name='commit_patcher_config',
-             command=['cvs', 'commit', '-m',
+             command=['hg', 'commit', '-m',
                       WithProperties('Automated configuration creation: ' + \
                       '%s, from %s to %s build %s' % \
                         (self.patcherConfig, self.oldVersion,
                          self.version, self.buildNumber))
                      ],
-             workdir='build/patcher-configs',
+             workdir='tools/release/updates/patcher-configs',
              description=['commit patcher config'],
              haltOnFailure=True,
              mock=self.use_mock,
@@ -6008,7 +5935,7 @@ class UpdateVerifyFactory(ReleaseFactory):
             command.append('--old-updater')
         self.addStep(UpdateMockVerify(
          command=command,
-         workdir='tools/release/updates',
+         workdir='tools/release/updates/verification',
          description=['./verify.sh', verifyConfig],
          mock=self.use_mock,
          target=self.mock_target,
@@ -7059,7 +6986,7 @@ class CodeCoverageFactory(UnittestBuildFactory):
             ))
 
 class L10nVerifyFactory(ReleaseFactory):
-    def __init__(self, cvsroot, stagingServer, productName, version,
+    def __init__(self, stagingServer, productName, version,
                  buildNumber, oldVersion, oldBuildNumber,
                  platform, verifyDir='verify', linuxExtension='bz2',
                  buildSpace=4, use_mock=False, mock_target=None,
@@ -8741,7 +8668,7 @@ class TryTalosFactory(TalosFactory):
 
         def make_tinderbox_header(build):
             identifier = build.getProperty("filename").rsplit('-', 1)[0]
-            # Grab the submitter out of the dir name. CVS and Mercurial builds
+            # Grab the submitter out of the dir name. Mercurial builds
             # are a little different, so we need to try fairly hard to find
             # the e-mail address.
             dir = os.path.basename(os.path.dirname(build.getProperty("fileURL")))
