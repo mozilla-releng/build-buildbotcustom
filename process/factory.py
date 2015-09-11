@@ -5647,10 +5647,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.downloadMarTools()
 
     def downloadBuilds(self):
-        command = ['perl', 'patcher2.pl', '--download',
+        command = ['perl', '-I', '../tools/release/updates', 
+                   '../tools/release/updates/patcher2.pl', '--download',
                    '--app=%s' % self.productName,
                    '--brand=%s' % self.brandName,
-                   WithProperties('--config=%s' % self.patcherConfigFile)]
+                   WithProperties('--config=../tools/release/updates/%s' % self.patcherConfigFile)]
         if self.useChecksums:
             command.append('--use-checksums')
         self.addStep(MockCommand(
@@ -5658,17 +5659,18 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=command,
          description=['patcher:', 'download builds'],
          haltOnFailure=True,
-         workdir='tools/release/updates',
+         workdir='build',
          mock=self.use_mock,
          target=self.mock_target,
         ))
 
     def createPatches(self):
-        command=['perl', 'patcher2.pl', '--create-patches',
+        command=['perl', '-I', '../tools/release/updates',
+                 '../tools/release/updates/patcher2.pl', '--create-patches',
                  '--partial-patchlist-file=patchlist.cfg',
                  '--app=%s' % self.productName,
                  '--brand=%s' % self.brandName,
-                 WithProperties('--config=%s' % self.patcherConfigFile)]
+                 WithProperties('--config=../tools/release/updates/%s' % self.patcherConfigFile)]
         if self.useChecksums:
             command.append('--use-checksums')
         self.addStep(MockCommand(
@@ -5676,7 +5678,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          command=command,
          description=['patcher:', 'create patches'],
          haltOnFailure=True,
-         workdir='tools/release/updates',
+         workdir='build',
          mock=self.use_mock,
          target=self.mock_target,
         ))
