@@ -4651,7 +4651,8 @@ class ReleaseTaggingFactory(ReleaseFactory):
                           tag],
                  workdir=repoName,
                  description=['tag %s' % repoName],
-                 haltOnFailure=True,
+                 haltOnFailure=False,
+                 flunkOnFailure=False,
                  mock=self.use_mock,
                  target=self.mock_target,
                 ))
