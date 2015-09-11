@@ -5481,7 +5481,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         if self.commitPatcherConfig:
             self.addStep(MockCommand(
              name='commit_patcher_config',
-             command=['hg', 'commit', '-m',
+             command=['hg', 'commit', '-u', self.hgUsername,
+                      '-m',
                       WithProperties('Automated configuration bump: ' + \
                       '%s, from %s to %s build %s' % \
                         (self.patcherConfig, self.oldVersion,
