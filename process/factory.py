@@ -5996,13 +5996,15 @@ class UpdateVerifyFactory(ReleaseFactory):
                                 mock_packages=self.mock_packages,
                                 mock_copyin_files=self.mock_copyin_files,
                                 env=self.env, **kwargs)
-        command=['bash', 'verify.sh', '-c', verifyConfig]
+        modVerifyConfig = 'verification/%s' % verifyConfig
+        modVerifySh = 'verification/verify.sh'
+        command=['bash', modVerifySh, '-c', modVerifyConfig]
         if useOldUpdater:
             command.append('--old-updater')
         self.addStep(UpdateMockVerify(
          command=command,
-         workdir='tools/release/updates/verification',
-         description=['./verify.sh', verifyConfig],
+         workdir='tools/release/updates',
+         description=['./verify.sh', modVerifyConfig],
          mock=self.use_mock,
          target=self.mock_target,
         ))
@@ -6020,7 +6022,9 @@ class ReleaseFinalVerification(ReleaseFactory):
         verifyCommand = ['bash', 'final-verification.sh']
         platforms = platforms or sorted(verifyConfigs.keys())
         for platform in platforms:
-            verifyCommand.append(verifyConfigs[platform])
+            modVerifyConfig = 'verification/%s' % \
+                              verifyConfigs[platform]
+            verifyCommand.append(modVerifyConfig)
         self.addStep(MockCommand(
          name='final_verification',
          command=verifyCommand,
