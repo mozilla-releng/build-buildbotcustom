@@ -5069,7 +5069,9 @@ class CCSourceFactory(ReleaseFactory):
                  inspectorRepoPath='', venkmanRepoPath='',
                  chatzillaRepoPath='', autoconfDirs=['.'],
                  buildSpace=1, use_mock=False, mock_target=None,
-                 mock_copyin_files=None, mock_packages=None, **kwargs):
+                 mock_copyin_files=None, mock_packages=None,
+                 mozconfig='', env={}, mozillaDir=None,
+                 mozillaSrcDir=None, objdir='objdir', **kwargs):
 
         self.use_mock = use_mock
         self.mock_target = mock_target
@@ -5078,17 +5080,46 @@ class CCSourceFactory(ReleaseFactory):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, use_mock=self.use_mock,
                                 mock_target=self.mock_target, mock_packages=self.mock_packages,
                                 mock_copyin_files=self.mock_copyin_files, **kwargs)
+        self.mozconfig = mozconfig
+        self.env = env
+        self.origSrcDir = self.branchName
+
+        if mozillaDir:
+            self.mozillaDir = '/%s' % mozillaDir
+            self.mozillaSrcDir = '%s/%s' % (self.origSrcDir, mozillaDir)
+        else:
+            self.mozillaDir = ''
+
+            if mozillaSrcDir:
+                self.mozillaSrcDir = '%s/%s' % \
+                                     (self.origSrcDir, mozillaSrcDir)
+            else:
+                self.mozillaSrcDir = self.origSrcDir
+        self.objdir = objdir or self.origSrcDir
+        self.env['MOZ_OBJDIR'] = self.objdir
+        self.env['MOZ_PKG_PRETTYNAMES'] = '1'
+        self.env['MOZ_PKG_VERSION'] = version
+        self.env['MOZ_PKG_APPNAME'] = productName
+        self.env['no_tooltool'] = "1"
+
         releaseTag = '%s_RELEASE' % (baseTag)
         sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
                                                          version)
         # '-c' is for "release to candidates dir"
         postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
           (productName, version, buildNumber)
-        uploadEnv = {'UPLOAD_HOST': stagingServer,
-                     'UPLOAD_USER': stageUsername,
-                     'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
-                     'UPLOAD_TO_TEMP': '1',
-                     'POST_UPLOAD_CMD': postUploadCmd}
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'UPLOAD_HOST': stagingServer,
+                          'UPLOAD_USER': stageUsername,
+                          'UPLOAD_SSH_KEY': '~/.ssh/%s' % stageSshKey,
+                          'UPLOAD_TO_TEMP': '1',
+                          'POST_UPLOAD_CMD': postUploadCmd})
+
+        if 'PATH' in uploadEnv.keys():
+            uploadEnvPath = '/tools/python27/bin:%s' % uploadEnv['PATH']
+        else:
+            uploadEnvPath = '/tools/python27/bin:/usr/local/bin:/usr/lib64/ccache:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/home/seabld/bin'
+        uploadEnv.update({'PATH': uploadEnvPath,})
 
         self.addStep(MockCommand(
          name="rm src",
@@ -5112,6 +5143,13 @@ class CCSourceFactory(ReleaseFactory):
          description=['clone %s' % self.branchName],
          haltOnFailure=True,
          timeout=30*60 # 30 minutes
+        ))
+        self.addStep(ShellCommand(
+          name="update to %s" % releaseTag,
+          command=['hg', 'update', '-r', releaseTag],
+          workdir=self.branchName,
+          description=['update to %s' % releaseTag],
+          haltOnFailure=True,
         ))
         # build up the checkout command that will bring us up to the release version
         co_command = ['python', 'client.py', 'checkout',
@@ -5142,37 +5180,61 @@ class CCSourceFactory(ReleaseFactory):
          haltOnFailure=True,
          timeout=60*60, # 1 hour
         ))
-        # the autoconf and actual tarring steps
-        # should be replaced by calling the build target
-        for dir in autoconfDirs:
-            self.addStep(MockCommand(
-             name="autoconf-%s" % dir,
-             command=['autoconf-2.13'],
-             workdir='%s/%s' % (self.branchName, dir),
-             haltOnFailure=True,
-             mock=self.use_mock,
-             target=self.mock_target,
-            ))
+        self.addConfigSteps(workdir=self.branchName)
+        configEnv = self.env.copy()
+        if 'PATH' in configEnv.keys():
+            configEnv.update({'PATH': '/tools/python27/bin:%s' %
+                                       configEnv['PATH']})
         self.addStep(MockCommand(
-         name="create tarball",
-         command=['tar', '-cj', '--owner=0', '--group=0', '--numeric-owner',
-                  '--mode=go-w', '--exclude=.hg*',
-                  '-f', sourceTarball, self.branchName],
-         workdir='.',
-         description=['create tarball'],
-         haltOnFailure=True,
-         mock=self.use_mock,
-         target=self.mock_target,
+          name='configure',
+          command=self.makeCmd + ['-f', 'client.mk', 'configure'],
+          workdir=self.branchName,
+          env=uploadEnv,
+          description=['configure'],
+          mock=self.use_mock,
+          target=self.mock_target,
+          haltOnFailure=True,
         ))
         self.addStep(MockCommand(
-         name="upload tarball",
-         command=['python', '%s/mozilla/build/upload.py' % self.branchName,
-                  '--base-path', '.', sourceTarball],
-         workdir='.',
-         env=uploadEnv,
-         description=['upload files'],
-         mock=self.use_mock,
-         target=self.mock_target,
+          name='create tarball',
+          command=self.makeCmd + ['source-package'],
+          workdir='%s/%s' % (self.branchName, self.objdir),
+          env=self.env,
+          description=['make source-package'],
+          mock=self.use_mock,
+          target=self.mock_target,
+          haltOnFailure=True,
+        ))
+        self.addStep(RetryingMockCommand(
+          name='upload_tarball',
+          command=self.makeCmd + ['source-upload'],
+          env=uploadEnv,
+          description=['upload files'],
+          workdir='%s/%s' % (self.branchName, self.objdir),
+          mock=self.use_mock,
+          target=self.mock_target,
+          haltOnFailure=True,
+        ))
+
+    def addConfigSteps(self, workdir='build'):
+        # get mozconfig
+        self.addStep(MockCommand(
+          name="get mozconfig",
+          command=['cp', self.mozconfig, '.mozconfig'],
+          workdir=workdir,
+          description=['get mozconfig'],
+          mock=self.use_mock,
+          target=self.mock_target,
+        ))
+
+        # cat mozconfig
+        self.addStep(MockCommand(
+          name="cat mozconfig",
+          command=['cat', '.mozconfig'],
+          workdir=workdir,
+          description=['cat mozconfig'],
+          mock=self.use_mock,
+          target=self.mock_target,
         ))
 
 
