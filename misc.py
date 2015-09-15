@@ -3341,7 +3341,7 @@ def generateReleasePromotionObjects(config, name, secrets):
     signing_servers = secrets.get(pf_linux64.get('dep_signing_servers'))
 
     # source builder
-    source_buildername = '%s_source' % name
+    source_buildername = 'release-%s_source' % name
     source_factory = makeMHFactory(config, pf_linux64,
             mh_cfg=pf_linux64['mozharness_desktop_build'],
             extra_args=pf_linux64['mozharness_desktop_build'].get('extra_args', []) + \
