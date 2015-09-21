@@ -834,6 +834,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'chunkTotal': int(l10nChunks),
                     'chunkNum': int(n),
                     'event_group': 'repack',
+                    'script_repo_revision': releaseTag,
                 }
                 if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--cfg', branchConfig['mozharness_configs']['balrog'], '--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
@@ -847,7 +848,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         relengapi_archiver_repo_path=relengapi_archiver_repo_path,
                         relengapi_archiver_release_tag=releaseTag,
                     )
-                    properties['script_repo_revision'] = releaseTag
                 else:
                     extra_args = [platform, branchConfigFile]
                     extra_args.extend([
@@ -1753,7 +1753,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                  branch=sourceRepoInfo['path'],
                  upstreamBuilders=repack_upstream,
                  builderNames=l10nBuilderNames,
-                 properties={'script_repo_revision': releaseTag, },)
+            )
 
             schedulers.append(repack_scheduler)
             repack_complete_scheduler = AggregatingScheduler(
