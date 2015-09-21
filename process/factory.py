@@ -3915,26 +3915,13 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                      workdir='tools',
                      ignoreCodes=[0, 1]
                      ))
-        # Before committing we pull and update in an effort to reduce the
-        # potential of hitting a push race.
-        self.addStep(ShellCommand(
-            name='repull_configs',
-            command=["hg", "pull"],
-            workdir='tools',
-            haltOnFailure=True
-        ))
-        self.addStep(ShellCommand(
-            name='reupdate_configs',
-            command=["hg", "up"],
-            workdir='tools',
-            haltOnFailure=True
-        ))
         self.addStep(MockCommand(
                      name='commit_configs',
                      command=['hg', 'commit', '-u', self.hgUsername, '-m',
                               'Automated configuration bump: update configs ' +
-                              'for %s %s build %s' % (self.brandName, self.version,
-                                                      self.buildNumber)
+                              'for %s %s build %s on %s' % (self.brandName, self.version,
+                                                            self.buildNumber,
+                                                            self.releaseChannel)
                               ],
                      description=['commit configs'],
                      workdir='tools',
