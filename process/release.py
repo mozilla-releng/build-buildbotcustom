@@ -663,7 +663,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageSshKey=branchConfig['stage_ssh_key'],
                 stageBasePath=branchConfig['stage_base_path'],
                 uploadPackages=True,
-                uploadSymbols=True,
+                uploadSymbols=not branchConfig.get('staging', False),
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -834,6 +834,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     'chunkTotal': int(l10nChunks),
                     'chunkNum': int(n),
                     'event_group': 'repack',
+                    'script_repo_revision': releaseTag,
                 }
                 if hasPlatformSubstring(platform, 'android'):
                     extra_args = releaseConfig['single_locale_options'][platform] + ['--cfg', branchConfig['mozharness_configs']['balrog'], '--total-chunks', str(l10nChunks), '--this-chunk', str(n)]
@@ -847,7 +848,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         relengapi_archiver_repo_path=relengapi_archiver_repo_path,
                         relengapi_archiver_release_tag=releaseTag,
                     )
-                    properties['script_repo_revision'] = releaseTag
                 else:
                     extra_args = [platform, branchConfigFile]
                     extra_args.extend([
@@ -975,7 +975,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageSshKey=branchConfig['stage_ssh_xulrunner_key'],
                 stageBasePath=branchConfig['stage_base_path'] + '/xulrunner',
                 uploadPackages=True,
-                uploadSymbols=True,
+                uploadSymbols=not branchConfig.get('staging', False),
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -1753,7 +1753,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                  branch=sourceRepoInfo['path'],
                  upstreamBuilders=repack_upstream,
                  builderNames=l10nBuilderNames,
-                 properties={'script_repo_revision': releaseTag, },)
+            )
 
             schedulers.append(repack_scheduler)
             repack_complete_scheduler = AggregatingScheduler(
@@ -2003,7 +2003,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         sendToInterestedUsers=False,
         extraRecipients=releaseConfig['AllRecipients'],
         extraHeaders={'In-Reply-To': email_message_id,
-                      'References': email_message_id},
+                      'References': email_message_id,
+                      'Reply-To': ",".join(releaseConfig['AllRecipients'])},
         mode='all',
         builders=non_ui_update_verify_builders,
         messageFormatter=createReleaseMessage,
