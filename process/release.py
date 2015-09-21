@@ -663,7 +663,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageSshKey=branchConfig['stage_ssh_key'],
                 stageBasePath=branchConfig['stage_base_path'],
                 uploadPackages=True,
-                uploadSymbols=True,
+                uploadSymbols=not branchConfig.get('staging', False),
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
@@ -975,7 +975,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 stageSshKey=branchConfig['stage_ssh_xulrunner_key'],
                 stageBasePath=branchConfig['stage_base_path'] + '/xulrunner',
                 uploadPackages=True,
-                uploadSymbols=True,
+                uploadSymbols=not branchConfig.get('staging', False),
                 doCleanup=True,
                 # this will clean-up the mac build dirs, but not delete
                 # the entire thing
