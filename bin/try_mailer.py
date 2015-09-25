@@ -65,7 +65,8 @@ def makeTryMessage(build, log_url):
         if users:
             who = users[0]
         else:
-            raise ValueError("I don't know who did this build")
+            print "I don't know who did this build, not sending mail"
+            return None
 
     tree = props['branch']
 
@@ -198,7 +199,10 @@ if __name__ == '__main__':
     build = getBuild(builder_path, build_number)
 
     # check the commit message for syntax regarding email prefs
-    match = re.search("try: ", build.source.changes[-1].comments)
+    if build.source.changes:
+        match = re.search("try: ", build.source.changes[-1].comments)
+    else:
+        match = None
     comment_args = ""
     if match:
         comment_args = build.source.changes[-1].comments.split(
