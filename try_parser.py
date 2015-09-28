@@ -326,6 +326,9 @@ def TryParser(
         chosen_suites = options.test.split(',')
         new_choice = []
         for chosen_suite in chosen_suites:
+            if chosen_suite == 'all':
+                new_choice.append(chosen_suite)
+                continue
             if buildersWithSetsMap.has_key(chosen_suite):
                 if chosen_suite not in new_choice:
                     new_choice.append(buildersWithSetsMap[chosen_suite])
