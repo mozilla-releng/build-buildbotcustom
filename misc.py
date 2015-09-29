@@ -1,4 +1,3 @@
-from urlparse import urljoin
 import urllib2
 import time
 try:
@@ -49,8 +48,7 @@ from buildbotcustom.common import normalizeName
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
     NightlyRepackFactory, UnittestPackagedBuildFactory, \
-    TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func, \
-    PartnerRepackFactory
+    TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
 from buildbotcustom.scheduler import BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
 from buildbotcustom.l10n import TriggerableL10n
@@ -3338,32 +3336,52 @@ def generateReleasePromotionObjects(config, name, secrets):
         'change_source': change_sources,
     }
 
-    pf_linux64 = config['platforms']['linux64']
-    signing_servers = secrets.get(pf_linux64.get('dep_signing_servers'))
+    for platform in config["l10n_release_platforms"]:
+        pf = config["platforms"][platform]
+        l10n_buildername = "release-{branch}_{product}_{platform}_l10n_repack".format(
+            branch=name,
+            product=pf["product_name"],
+            platform=platform,
+        )
 
-    # source builder
-    source_buildername = 'release-%s_source' % name
-    source_factory = makeMHFactory(config, pf_linux64,
-            mh_cfg=pf_linux64['mozharness_desktop_build'],
-            extra_args=pf_linux64['mozharness_desktop_build'].get('extra_args', []) + \
-                       ['--custom-build-variant-cfg', 'source'],
-            signingServers=signing_servers)
+        env_config = "single_locale/production.py"
+        balrog_config = "balrog/production.py"
+        if config.get("staging"):
+            env_config = "single_locale/staging.py"
+            balrog_config = "balrog/staging.py"
 
-    source_builder = {
-        'name': source_buildername,
-        'factory': source_factory,
-        'builddir': source_buildername,
-        'slavebuilddir': normalizeName(source_buildername, config['product_name']),
-        'slavenames': pf_linux64['slaves'],
-        'category': name,
-        'properties': {
-            'branch': name,
-            'platform': 'source',
-            'product': config['product_name'],
-            'repo_path': config['repo_path'],
-            'script_repo_revision': config["mozharness_tag"],
-        },
-    }
-    builders.append(source_builder)
+        mh_cfg = {
+            "script_name": "scripts/desktop_l10n.py",
+            "extra_args": [
+                "--branch-config", "single_locale/%s.py" % name,
+                "--platform-config", "single_locale/%s.py" % platform,
+                "--environment-config", env_config,
+                "--balrog-config", balrog_config,
+            ],
+            "use_credentials_file": True,
+            "script_timeout": 1800,
+            "script_maxtime": 7200,
+        }
+
+        l10n_factory = makeMHFactory(config, pf,
+            mh_cfg=mh_cfg,
+            signingServers=secrets.get(pf.get("dep_signing_servers")),
+        )
+        l10n_builder = {
+            "name": l10n_buildername,
+            "factory": l10n_factory,
+            "builddir": l10n_buildername,
+            "slavebuilddir": normalizeName(l10n_buildername, config["product_name"]),
+            "slavenames": pf["slaves"],
+            "category": name,
+            "properties": {
+                "branch": name,
+                "platform": "l10n",
+                "product": pf["product_name"],
+                "repo_path": config["repo_path"],
+                "script_repo_revision": config["mozharness_tag"],
+            },
+        }
+        builders.append(l10n_builder)
 
     return buildObjects
