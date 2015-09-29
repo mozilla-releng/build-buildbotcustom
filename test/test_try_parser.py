@@ -427,6 +427,20 @@ class TestTryParser(unittest.TestCase):
             t for t in builders if 'crashtest' in t or 'mochitest-other' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
+    def testAllTestsWithSets(self):
+        tm = 'try: -b o -p android-x86 -u all -t none'
+        builders_with_sets = {'xpcshell': 'androidx86-set-4'}
+        selected_builders = TryParser(tm,
+                                      ['Android 4.2 x86 Emulator try opt test androidx86-set-4'],
+                                      {
+                                          'android-x86': 'Android 4.2 x86 Emulator',
+                                      },
+                                      None,
+                                      ['androidx86-set-4'],
+                                      buildersWithSetsMap=builders_with_sets)
+        self.assertEqual(selected_builders,
+                         ['Android 4.2 x86 Emulator try opt test androidx86-set-4'])
+
     def test_NoTests(self):
         tm = 'try: -b od -p linux,win32 -u none'
         # test in getBuilders
