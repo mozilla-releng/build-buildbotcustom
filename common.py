@@ -121,6 +121,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'nexus-5': 'n5',
         'firefox_tag_source': 'fx_tag_src',
         'firefox_tag_l10n': 'fx_tag_l10n',
+        'firefox': 'fx',
         'fennec_tag_source': 'm_tag_src',
         'fennec_tag_l10n': 'm_tag_l10n',
         'thunderbird_tag_source': 't_tag_src',

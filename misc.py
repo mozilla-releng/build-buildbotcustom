@@ -3358,7 +3358,6 @@ def generateReleasePromotionObjects(config, name, secrets):
                 "--environment-config", env_config,
                 "--balrog-config", balrog_config,
             ],
-            "use_credentials_file": True,
             "script_timeout": 1800,
             "script_maxtime": 7200,
         }
@@ -3366,12 +3365,13 @@ def generateReleasePromotionObjects(config, name, secrets):
         l10n_factory = makeMHFactory(config, pf,
             mh_cfg=mh_cfg,
             signingServers=secrets.get(pf.get("dep_signing_servers")),
+            use_credentials_file=True,
         )
         l10n_builder = {
             "name": l10n_buildername,
             "factory": l10n_factory,
             "builddir": l10n_buildername,
-            "slavebuilddir": normalizeName(l10n_buildername, config["product_name"]),
+            "slavebuilddir": normalizeName(l10n_buildername),
             "slavenames": pf["slaves"],
             "category": name,
             "properties": {
