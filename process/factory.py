@@ -130,6 +130,7 @@ def postUploadCmdPrefix(upload_dir=None,
                         as_list=True,
                         signed=False,
                         log=False,
+                        bucket_prefix=None,
                         ):
     """Returns a post_upload.py command line for the given arguments.
 
@@ -183,6 +184,8 @@ def postUploadCmdPrefix(upload_dir=None,
         cmd.append("--nightly-dir=%s" % nightly_dir)
     if signed:
         cmd.append("--signed")
+    if bucket_prefix:
+        cmd.extend(['--bucket-prefix', bucket_prefix])
 
     if as_list:
         return cmd
@@ -2378,13 +2381,14 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
 class ReleaseBuildFactory(MercurialBuildFactory):
     def __init__(
-        self, env, version, buildNumber, partialUpdates, brandName=None,
+        self, env, version, buildNumber, partialUpdates, ftpServer, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
             usePrettyNames=True, enableUpdatePackaging=True, appVersion=None,
-            **kwargs):
+            bucketPrefix=None, **kwargs):
         self.version = version
         self.buildNumber = buildNumber
         self.partialUpdates = partialUpdates
+        self.ftpServer = ftpServer
         self.talosMasters = talosMasters or []
         self.unittestMasters = unittestMasters or []
         self.unittestBranch = unittestBranch
@@ -2396,6 +2400,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             self.brandName = brandName
         else:
             self.brandName = kwargs['productName'].capitalize()
+        self.bucketPrefix = bucketPrefix
         self.UPLOAD_EXTRA_FILES = []
         # Copy the environment to avoid screwing up other consumers of
         # MercurialBuildFactory
@@ -2470,8 +2475,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 (self.productName, oldVersion, self.version)
             oldCandidatesDir = makeCandidatesDir(
                 self.productName, oldVersion, oldBuildNumber,
-                protocol='http', server=self.stageServer)
-            previousMarURL = '%s/update/%s/en-US/%s' % \
+                protocol='http', server=self.ftpServer)
+            previousMarURL = '%supdate/%s/en-US/%s' % \
                 (oldCandidatesDir, getPlatformFtpDir(self.platform),
                  previous_mar_name)
 
@@ -2654,6 +2659,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         else:
             uploadArgs['to_candidates'] = True
 
+        if self.bucketPrefix:
+            uploadArgs['bucket_prefix'] = self.bucketPrefix
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
 
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
@@ -2674,21 +2681,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                      mock=self.use_mock,
                      mock_workdir_prefix=None,
                      ))
-
-        if self.productName == 'fennec' and not uploadMulti:
-            cmd = ['scp']
-            if self.stageSshKey:
-                cmd.append('-oIdentityFile=~/.ssh/%s' % self.stageSshKey)
-            cmd.append(info_txt)
-            candidates_dir = makeCandidatesDir(self.productName, self.version,
-                                               self.buildNumber)
-            cmd.append('%s@%s:%s' % (self.stageUsername, self.stageServer,
-                                     candidates_dir))
-            self.addStep(RetryingShellCommand(
-                name='upload_buildID',
-                command=cmd,
-                workdir='build/%s/dist' % self.mozillaObjdir
-            ))
 
         # Send to the "release" branch on talos, it will do
         # super-duper-extra testing
@@ -3663,6 +3655,7 @@ class SingleSourceFactory(ReleaseFactory):
                  mozillaSrcDir=None,
                  autoconfDirs=['.'],
                  buildSpace=2,
+                 bucketPrefix=None,
                  **kwargs):
         ReleaseFactory.__init__(self, buildSpace=buildSpace, **kwargs)
 
@@ -3698,12 +3691,18 @@ class SingleSourceFactory(ReleaseFactory):
         self.env['MOZ_PKG_APPNAME'] = productName
         self.env['no_tooltool'] = "1"
 
-        # '-c' is for "release to candidates dir"
-        postUploadCmd = 'post_upload.py -p %s -v %s -n %s -c' % \
-            (productName, version, buildNumber)
+        postUploadArgs = dict(
+            product=productName,
+            version=version,
+            buildNumber=str(buildNumber),
+            to_candidates=True,
+            as_list=False,
+            bucket_prefix=bucketPrefix,
+        )
         if productName == 'fennec':
-            postUploadCmd = 'post_upload.py -p mobile --nightly-dir candidates -v %s -n %s -c' % \
-                (version, buildNumber)
+            postUploadArgs['product'] = 'mobile'
+            postUploadArgs['nightly_dir'] = 'candidates'
+        postUploadCmd = postUploadCmdPrefix(**postUploadArgs)
         uploadEnv = self.env.copy()
         uploadEnv.update({'UPLOAD_HOST': stagingServer,
                           'UPLOAD_USER': stageUsername,
@@ -3789,7 +3788,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
     def __init__(self, patcherConfig, verifyConfigs, appName, productName,
                  configRepoPath, version, appVersion, baseTag, buildNumber,
-                 partialUpdates, ftpServer, bouncerServer, stagingServer,
+                 partialUpdates, ftpServer, bouncerServer,
                  hgSshKey, hgUsername, releaseChannel, localTestChannel, brandName=None,
                  buildSpace=2, triggerSchedulers=None, releaseNotesUrl=None,
                  python='python', promptWaitTime=None,
@@ -3808,7 +3807,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.partialUpdates = partialUpdates
         self.ftpServer = ftpServer
         self.bouncerServer = bouncerServer
-        self.stagingServer = stagingServer
         self.hgSshKey = hgSshKey
         self.hgUsername = hgUsername
         self.triggerSchedulers = triggerSchedulers
@@ -3852,7 +3850,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                        '-v', self.version, '-a', self.appVersion,
                        '-o', self.previousVersion, '-b', str(self.buildNumber),
                        '-c', WithProperties(self.patcherConfigFile),
-                       '-t', self.stagingServer, '-f', self.ftpServer,
+                       '-f', self.ftpServer,
                        '-d', self.bouncerServer, '-l', 'shipped-locales']
         for previousVersion in self.partialUpdates:
             bumpCommand.extend(['--partial-version', previousVersion])
