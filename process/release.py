@@ -496,6 +496,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             mock_target=pf.get('mock_target'),
             mock_packages=pf.get('mock_packages'),
             mock_copyin_files=pf.get('mock_copyin_files'),
+            bucketPrefix=branchConfig.get('bucket_prefix'),
         )
 
         builders.append({
@@ -548,6 +549,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                bucketPrefix=branchConfig.get('bucket_prefix'),
             )
 
             builders.append({
@@ -719,6 +721,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 balrog_api_root=balrog_api_root,
                 balrog_username=balrog_username,
                 balrog_credentials_file=balrog_credentials_file,
+                bucketPrefix=branchConfig.get('bucket_prefix'),
+                ftpServer=releaseConfig['ftpServer'],
             )
 
             builders.append({
@@ -764,6 +768,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     '--stage-ssh-key', branchConfig['stage_ssh_key'],
                     '--stage-server', branchConfig['stage_server'],
                     '--stage-username', branchConfig['stage_username'],
+                    '--ftp-server', releaseConfig['ftpServer'],
                     '--hghost', branchConfig['hghost'],
                     '--compare-locales-repo-path',
                     branchConfig['compare_locales_repo_path']
@@ -855,6 +860,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         '--stage-ssh-key', branchConfig['stage_ssh_key'],
                         '--stage-server', branchConfig['stage_server'],
                         '--stage-username', branchConfig['stage_username'],
+                        '--ftp-server', releaseConfig['ftpServer'],
                         '--hghost', branchConfig['hghost'],
                         '--compare-locales-repo-path',
                         branchConfig['compare_locales_repo_path']
@@ -877,6 +883,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                             "--balrog-api-root", balrog_api_root,
                             "--balrog-username", balrog_username,
                             "--credentials-file", "oauth.txt",
+                        ])
+                    if branchConfig.get('bucket_prefix'):
+                        extra_args.extend([
+                            '--bucket-prefix', branchConfig.get('bucket_prefix'),
                         ])
                     repack_factory = SigningScriptFactory(
                         signingServers=getSigningServers(platform),
@@ -997,6 +1007,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 enable_pymake=enable_pymake,
+                ftpServer=None,
             )
             builders.append({
                 'name': builderPrefix('xulrunner_%s_build' % platform),
@@ -1190,7 +1201,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             partialUpdates=updateConfig.get('partialUpdates', {}),
             ftpServer=releaseConfig['ftpServer'],
             bouncerServer=releaseConfig['bouncerServer'],
-            stagingServer=releaseConfig['stagingServer'],
             hgSshKey=releaseConfig['hgSshKey'],
             hgUsername=releaseConfig['hgUsername'],
             releaseChannel=channel,
