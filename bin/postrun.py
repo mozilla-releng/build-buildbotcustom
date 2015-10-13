@@ -68,7 +68,8 @@ class PostRunner(object):
                        self.config['statusdb.master_name']]
         if "nightly" in builder.name:
             upload_args.append("--nightly")
-        if builder.name.startswith("release-"):
+        if builder.name.startswith("release-") and \
+                not info['release_promotion']:
             upload_args.append("--release")
             upload_args.append(
                 "%s/%s" % (info.get('version'), info.get('build_number')))
@@ -78,7 +79,7 @@ class PostRunner(object):
         elif branch == 'shadow-central':
             upload_args.append("--shadow")
 
-        if 'l10n' in builder.name:
+        if 'l10n' in builder.name and not info['release_promotion']:
             upload_args.append("--l10n")
 
         if product:
@@ -193,6 +194,8 @@ class PostRunner(object):
 
         if props.getProperty('build_number') is not None:
             retval['build_number'] = props['build_number']
+
+        retval['release_promotion'] = props.getProperty('release_promotion')
 
         log.debug("Build info: %s", retval)
         return retval
