@@ -460,6 +460,10 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
                 self.signingServers, self.env.get('PYTHON26'))
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
 
+        # Make sure the objdir is specified with an absolute path
+        if 'MOZ_OBJDIR' in self.env and not os.path.isabs(self.env['MOZ_OBJDIR']):
+            self.env['MOZ_OBJDIR'] = WithProperties('%(basedir)s' + '/%s/%s' % (self.baseWorkDir, self.env['MOZ_OBJDIR']))
+
         self.addInitialSteps()
 
     def addInitialSteps(self):
@@ -2889,7 +2893,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
 
         if objdir != '':
             # L10NBASEDIR is relative to MOZ_OBJDIR
-            self.env.update({'MOZ_OBJDIR': objdir,
+            self.env.update({'MOZ_OBJDIR': WithProperties('%(basedir)s/' + self.absObjDir),
                              'L10NBASEDIR': '../../l10n'})
 
         if platform == 'macosx64':
@@ -3681,9 +3685,15 @@ class SingleSourceFactory(ReleaseFactory):
         self.mozillaObjdir = '%s%s' % (self.objdir, self.mozillaDir)
         self.distDir = "%s/dist" % self.mozillaObjdir
 
+        self.absSrcDir = "%s/%s" % (self.baseWorkDir,
+                                    self.origSrcDir)
+        self.absObjDir = '%s/%s' % (self.absSrcDir,
+                                    self.objdir)
+        self.absMozillaObjdir = '%s%s' % (self.absObjDir, self.mozillaDir)
+
         # Make sure MOZ_PKG_PRETTYNAMES is set so that our source package is
         # created in the expected place.
-        self.env['MOZ_OBJDIR'] = self.objdir
+        self.env['MOZ_OBJDIR'] = WithProperties('%(basedir)s/' + self.absObjDir)
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
         if appVersion is None or version != appVersion or \
                 (self.branchName == 'mozilla-1.9.2' and productName == 'xulrunner'):
@@ -3750,7 +3760,7 @@ class SingleSourceFactory(ReleaseFactory):
             name='make_source-package',
             command=self.makeCmd + ['source-package', 'hg-bundle',
                      WithProperties('HG_BUNDLE_REVISION=%(revision)s')],
-            workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
+            workdir=self.absMozillaObjdir,
             env=self.env,
             description=['make source-package'],
             mock=self.use_mock,
@@ -3761,7 +3771,7 @@ class SingleSourceFactory(ReleaseFactory):
         self.addStep(RetryingMockCommand(
             name='upload_files',
             command=self.makeCmd + ['source-upload', 'UPLOAD_HG_BUNDLE=1'],
-            workdir="%s/%s" % (self.mozillaSrcDir, self.mozillaObjdir),
+            workdir=self.absMozillaObjdir,
             env=uploadEnv,
             description=['upload files'],
             mock=self.use_mock,
