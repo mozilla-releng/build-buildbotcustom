@@ -29,7 +29,7 @@ from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import (
     generateTestBuilderNames, generateTestBuilder, changeContainsProduct,
     nomergeBuilders, changeContainsProperties,
-    changeContainsScriptRepoRevision)
+    changeContainsScriptRepoRevision, makeMHFactory)
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import (
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory,
@@ -2053,3 +2053,61 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         "change_source": change_source,
         "schedulers": schedulers,
     }
+
+
+def generateReleasePromotionBuilders(config, name, secrets):
+    builders = []
+
+    if not config.get('enable_release_promotion'):
+        # this is not a release promotion branch
+        return builders
+
+    for platform in config["l10n_release_platforms"]:
+        pf = config["platforms"][platform]
+        l10n_buildername = "release-{branch}_{product}_{platform}_l10n_repack".format(
+            branch=name,
+            product=pf["product_name"],
+            platform=platform,
+        )
+
+        env_config = "single_locale/production.py"
+        balrog_config = "balrog/production.py"
+        if config.get("staging"):
+            env_config = "single_locale/staging.py"
+            balrog_config = "balrog/staging.py"
+
+        mh_cfg = {
+            "script_name": "scripts/desktop_l10n.py",
+            "extra_args": [
+                "--branch-config", "single_locale/%s.py" % name,
+                "--platform-config", "single_locale/%s.py" % platform,
+                "--environment-config", env_config,
+                "--balrog-config", balrog_config,
+                                   ],
+            "script_timeout": 1800,
+            "script_maxtime": 7200,
+        }
+
+        l10n_factory = makeMHFactory(config, pf,
+                                     mh_cfg=mh_cfg,
+                                     signingServers=secrets.get(pf.get("dep_signing_servers")),
+                                     use_credentials_file=True,
+                                     )
+        l10n_builder = {
+            "name": l10n_buildername,
+            "factory": l10n_factory,
+            "builddir": l10n_buildername,
+            "slavebuilddir": normalizeName(l10n_buildername),
+            "slavenames": pf["slaves"],
+            "category": name,
+            "properties": {
+                "branch": name,
+                "platform": "l10n",
+                "product": pf["product_name"],
+                "repo_path": config["repo_path"],
+                "script_repo_revision": config["mozharness_tag"],
+            },
+        }
+        builders.append(l10n_builder)
+
+    return builders
