@@ -1367,7 +1367,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         Looks for self._gotBuildInfo to make sure we only run this set of steps
         once."""
         if not getattr(self, '_gotBuildInfo', False):
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 command=[
                     'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                     'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1376,8 +1376,11 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 workdir='.',
                 description=['getting', 'buildid'],
                 descriptionDone=['got', 'buildid'],
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None
             ))
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 command=[
                     'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                     'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1385,7 +1388,10 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 property='sourcestamp',
                 workdir='.',
                 description=['getting', 'sourcestamp'],
-                descriptionDone=['got', 'sourcestamp']
+                descriptionDone=['got', 'sourcestamp'],
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None
             ))
             self._gotBuildInfo = True
 
@@ -1402,11 +1408,14 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 except:
                     return {'testresults': []}
 
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 name='get_ctors',
                 command=['python', WithProperties('%(toolsdir)s/buildfarm/utils/count_ctors.py'),
                          '%s/dist/bin/libxul.so' % self.mozillaObjdir],
                 extract_fn=get_ctors,
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None,
             ))
 
             if self.graphServer:
@@ -1635,7 +1644,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                                             haltOnFailure=True)
 
         if self.productName == 'xulrunner':
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 command=[
                     'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/platform.ini' % self.mozillaObjdir,
@@ -1643,9 +1652,12 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 property='buildid',
                 workdir='.',
                 name='get_build_id',
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None,
             ))
         else:
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 command=[
                     'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1653,8 +1665,11 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 property='buildid',
                 workdir='.',
                 name='get_build_id',
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None,
             ))
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 command=[
                     'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1662,8 +1677,11 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 property='appVersion',
                 workdir='.',
                 name='get_app_version',
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None,
             ))
-            self.addStep(SetProperty(
+            self.addStep(MockProperty(
                 command=[
                     'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
@@ -1671,6 +1689,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 property='appName',
                 workdir='.',
                 name='get_app_name',
+                target=self.mock_target,
+                mock=self.use_mock,
+                mock_workdir_prefix=None,
             ))
         self.pkg_env = pkg_env
 
@@ -2142,7 +2163,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
         ))
-        self.addStep(SetProperty(
+        self.addStep(MockProperty(
             name='set_previous_buildid',
             description=['set', 'previous', 'buildid'],
             doStepIf=self.previousMarExists,
@@ -2154,6 +2175,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
             property='previous_buildid',
             workdir='.',
             haltOnFailure=True,
+            target=self.mock_target,
+            mock=self.use_mock,
+            mock_workdir_prefix=None,
         ))
         for dir in ['current', 'previous']:
             self.addStep(ShellCommand(
@@ -3571,7 +3595,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
         ))
-        self.addStep(SetProperty(
+        self.addStep(MockProperty(
             command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
                      WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'BuildID'],
@@ -3579,8 +3603,11 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             workdir='.',
             env=self.env,
             property='buildid',
+            target=self.mock_target,
+            mock=self.use_mock,
+            mock_workdir_prefix=None,
         ))
-        self.addStep(SetProperty(
+        self.addStep(MockProperty(
             command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
                      WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'Version'],
@@ -3588,8 +3615,11 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='get_app_version',
             workdir='.',
             env=self.env,
+            target=self.mock_target,
+            mock=self.use_mock,
+            mock_workdir_prefix=None,
         ))
-        self.addStep(SetProperty(
+        self.addStep(MockProperty(
             command=['python', '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
                      WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'Name'],
@@ -3597,6 +3627,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='get_app_name',
             workdir='.',
             env=self.env,
+            target=self.mock_target,
+            mock=self.use_mock,
+            mock_workdir_prefix=None,
         ))
 
         if self.l10nNightlyUpdate:
@@ -4261,12 +4294,15 @@ class MozillaTestFactory(MozillaBuildFactory):
             if m:
                 retval['buildid'] = m.group(1)
             return retval
-        self.addStep(SetProperty(
+        self.addStep(MockProperty(
                      command=['python', WithProperties('%(toolsdir)s/buildfarm/utils/printbuildrev.py'),
                               WithProperties('%(xredir)s')],
                      workdir='build',
                      extract_fn=get_build_info,
                      name='get build info',
+                     target=self.mock_target,
+                     mock=self.use_mock,
+                     mock_workdir_prefix=None,
                      ))
 
     def addSetupSteps(self):
@@ -4860,7 +4896,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                                 'repository_manifest.py')
 
             if script_repo_manifest:
-                self.addStep(SetProperty(
+                self.addStep(MockProperty(
                     name="set_script_repo_url_and_script_repo_revision",
                     extract_fn=extractProperties,
                     command=['bash', '-c',
@@ -4873,6 +4909,9 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                         '--manifest-url %s' % script_repo_manifest)],
                     log_eval_func=rc_eval_func({0: SUCCESS, None: EXCEPTION}),
                     haltOnFailure=True,
+                    target=self.mock_target,
+                    mock=self.use_mock,
+                    mock_workdir_prefix=None,
                 ))
             else:
                 self.addStep(SetBuildProperty(
