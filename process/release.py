@@ -1474,15 +1474,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         post_deliverables_builders.append(builderPrefix('%s_antivirus' % releaseConfig['productName']))
 
     push_to_mirrors_factory = ScriptFactory(
-        scriptRepo=tools_repo,
-        script_timeout=3 * 60 * 60,
-        scriptName='scripts/release/stage-tasks.sh',
-        extra_args=['push',
-                    '--extra-excludes=*.zip',
-                    '--extra-excludes=*.zip.asc',
-                    '--ssh-user', branchConfig['stage_username'],
-                    '--ssh-key', branchConfig['stage_ssh_key'],
-                    ],
+        scriptRepo=mozharness_repo,
+        interpreter="python2.7",
+        scriptName='scripts/release/push-candidate-to-releases.py',
+        extra_args=[
+                "--product", releaseConfig["stage_product"],
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--bucket", releaseConfig["S3Bucket"],
+                "--credentials", releaseConfig["S3Credentials"],
+        ],
+        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+        relengapi_archiver_release_tag=releaseTag,
     )
 
     builders.append({
