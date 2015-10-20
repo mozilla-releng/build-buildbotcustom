@@ -1098,21 +1098,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderPrefix('partner_repack', platform))
 
     if releaseConfig.get('autoGenerateChecksums', True):
-        pf = branchConfig['platforms']['linux']
-        env = builder_env.copy()
-        env.update(pf['env'])
         checksums_factory = SigningScriptFactory(
             signingServers=getSigningServers('linux'),
-            env=env,
-            scriptRepo=tools_repo,
-            interpreter='bash',
-            scriptName='scripts/release/generate-sums.sh',
+            scriptRepo=mozharness_repo,
+            interpreter="python2.7",
+            scriptName='scripts/release/generate-checksums.py',
             extra_args=[
-                branchConfigFile, '--product', releaseConfig['productName'],
-                '--ssh-user', branchConfig['stage_username'],
-                '--ssh-key', branchConfig['stage_ssh_key'],
-                '--create-contrib-dirs',
+                "--stage-product", releaseConfig["stage_product"],
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--bucket-name-prefix", branchConfig["bucket_prefix"],
+                "--upload-host", releaseConfig["stagingServer"],
+                "--upload-user", branchConfig["stage_username"],
+                "--upload-ssh-key", "~/.ssh/%s" % branchConfig["stage_ssh_key"],
+                "--gecko-repo", "%s%s" % (branchConfig["hgurl"], relengapi_archiver_repo_path),
+                "--gecko-revision", releaseTag,
+                "--tools-repo", branchConfig["platforms"]["linux64"]["tools_repo_cache"],
             ],
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+            relengapi_archiver_release_tag=releaseTag,
         )
         builders.append({
             'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
