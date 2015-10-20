@@ -1406,7 +1406,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         post_signing_builders.append(builderPrefix('%s_%s_updates' % (releaseConfig['productName'], releaseChannel)))
 
 
-    if not releaseConfig.get('disablePermissionCheck'):
+    if releaseConfig.get('enablePermissionCheck'):
         check_permissions_factory = ScriptFactory(
             scriptRepo=tools_repo,
             script_timeout=3 * 60 * 60,
