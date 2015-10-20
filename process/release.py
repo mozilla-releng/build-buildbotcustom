@@ -29,7 +29,7 @@ from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import (
     generateTestBuilderNames, generateTestBuilder, changeContainsProduct,
     nomergeBuilders, changeContainsProperties,
-    changeContainsScriptRepoRevision)
+    changeContainsScriptRepoRevision, makeMHFactory)
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import (
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory,
@@ -117,18 +117,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
     mock_slaves = []
+    av_slaves = []
     all_slaves = []
     for p in branchConfig['platforms']:
         if p == 'b2g':
             continue
         platform_slaves = branchConfig['platforms'][p].get('slaves', [])
         all_slaves.extend(platform_slaves)
-        if 'win' not in p:
+        if 'linux64-av' in p:
+            av_slaves.extend(platform_slaves)
+        elif 'win' not in p:
             unix_slaves.extend(platform_slaves)
             if branchConfig['platforms'][p].get('use_mock'):
                 mock_slaves.extend(platform_slaves)
     unix_slaves = [x for x in set(unix_slaves)]
     mock_slaves = [x for x in set(mock_slaves)]
+    av_slaves = [x for x in set(av_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
     if secrets is None:
@@ -1098,21 +1102,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderPrefix('partner_repack', platform))
 
     if releaseConfig.get('autoGenerateChecksums', True):
-        pf = branchConfig['platforms']['linux']
-        env = builder_env.copy()
-        env.update(pf['env'])
         checksums_factory = SigningScriptFactory(
             signingServers=getSigningServers('linux'),
-            env=env,
-            scriptRepo=tools_repo,
-            interpreter='bash',
-            scriptName='scripts/release/generate-sums.sh',
+            scriptRepo=mozharness_repo,
+            interpreter="python2.7",
+            scriptName='scripts/release/generate-checksums.py',
             extra_args=[
-                branchConfigFile, '--product', releaseConfig['productName'],
-                '--ssh-user', branchConfig['stage_username'],
-                '--ssh-key', branchConfig['stage_ssh_key'],
-                '--create-contrib-dirs',
+                "--stage-product", releaseConfig["stage_product"],
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--bucket-name-prefix", branchConfig["bucket_prefix"],
+                "--upload-host", releaseConfig["stagingServer"],
+                "--upload-user", branchConfig["stage_username"],
+                "--upload-ssh-key", "~/.ssh/%s" % branchConfig["stage_ssh_key"],
+                "--gecko-repo", "%s%s" % (branchConfig["hgurl"], relengapi_archiver_repo_path),
+                "--gecko-revision", releaseTag,
+                "--tools-repo", branchConfig["platforms"]["linux64"]["tools_repo_cache"],
             ],
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+            relengapi_archiver_release_tag=releaseTag,
         )
         builders.append({
             'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
@@ -1398,7 +1406,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         post_signing_builders.append(builderPrefix('%s_%s_updates' % (releaseConfig['productName'], releaseChannel)))
 
 
-    if not releaseConfig.get('disablePermissionCheck'):
+    if releaseConfig.get('enablePermissionCheck'):
         check_permissions_factory = ScriptFactory(
             scriptRepo=tools_repo,
             script_timeout=3 * 60 * 60,
@@ -1432,18 +1440,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if not releaseConfig.get('disableVirusCheck'):
         antivirus_factory = ScriptFactory(
-            scriptRepo=tools_repo,
-            script_timeout=3 * 60 * 60,
-            scriptName='scripts/release/stage-tasks.sh',
-            extra_args=['antivirus',
-                        '--ssh-user', branchConfig['stage_username'],
-                        '--ssh-key', branchConfig['stage_ssh_key'],
-                        ],
+            scriptRepo=mozharness_repo,
+            interpreter="python2.7",
+            scriptName='scripts/release/antivirus.py',
+            extra_args=[
+                "--product", releaseConfig["stage_product"],
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--bucket-name", releaseConfig["S3Bucket"],
+                "--tools-revision", releaseTag,
+                "--tools-repo", tools_repo,
+            ],
+            script_timeout=3*60*60,
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+            relengapi_archiver_release_tag=releaseTag,
         )
 
         builders.append({
             'name': builderPrefix('%s_antivirus' % releaseConfig['productName']),
-            'slavenames': unix_slaves,
+            'slavenames': av_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('%s_antivirus' % releaseConfig['productName']),
             'slavebuilddir': normalizeName(builderPrefix('av'), releaseConfig['productName']),
@@ -1459,15 +1474,18 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         post_deliverables_builders.append(builderPrefix('%s_antivirus' % releaseConfig['productName']))
 
     push_to_mirrors_factory = ScriptFactory(
-        scriptRepo=tools_repo,
-        script_timeout=3 * 60 * 60,
-        scriptName='scripts/release/stage-tasks.sh',
-        extra_args=['push',
-                    '--extra-excludes=*.zip',
-                    '--extra-excludes=*.zip.asc',
-                    '--ssh-user', branchConfig['stage_username'],
-                    '--ssh-key', branchConfig['stage_ssh_key'],
-                    ],
+        scriptRepo=mozharness_repo,
+        interpreter="python2.7",
+        scriptName='scripts/release/push-candidate-to-releases.py',
+        extra_args=[
+                "--product", releaseConfig["stage_product"],
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--bucket", releaseConfig["S3Bucket"],
+                "--credentials", releaseConfig["S3Credentials"],
+        ],
+        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+        relengapi_archiver_release_tag=releaseTag,
     )
 
     builders.append({
@@ -2053,3 +2071,61 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         "change_source": change_source,
         "schedulers": schedulers,
     }
+
+
+def generateReleasePromotionBuilders(config, name, secrets):
+    builders = []
+
+    if not config.get('enable_release_promotion'):
+        # this is not a release promotion branch
+        return builders
+
+    for platform in config["l10n_release_platforms"]:
+        pf = config["platforms"][platform]
+        l10n_buildername = "release-{branch}_{product}_{platform}_l10n_repack".format(
+            branch=name,
+            product=pf["product_name"],
+            platform=platform,
+        )
+
+        env_config = "single_locale/production.py"
+        balrog_config = "balrog/production.py"
+        if config.get("staging"):
+            env_config = "single_locale/staging.py"
+            balrog_config = "balrog/staging.py"
+
+        mh_cfg = {
+            "script_name": "scripts/desktop_l10n.py",
+            "extra_args": [
+                "--branch-config", "single_locale/%s.py" % name,
+                "--platform-config", "single_locale/%s.py" % platform,
+                "--environment-config", env_config,
+                "--balrog-config", balrog_config,
+                                   ],
+            "script_timeout": 1800,
+            "script_maxtime": 7200,
+        }
+
+        l10n_factory = makeMHFactory(config, pf,
+                                     mh_cfg=mh_cfg,
+                                     signingServers=secrets.get(pf.get("dep_signing_servers")),
+                                     use_credentials_file=True,
+                                     )
+        l10n_builder = {
+            "name": l10n_buildername,
+            "factory": l10n_factory,
+            "builddir": l10n_buildername,
+            "slavebuilddir": normalizeName(l10n_buildername),
+            "slavenames": pf["slaves"],
+            "category": name,
+            "properties": {
+                "branch": name,
+                "platform": "l10n",
+                "product": pf["product_name"],
+                "repo_path": config["repo_path"],
+                "script_repo_revision": config["mozharness_tag"],
+            },
+        }
+        builders.append(l10n_builder)
+
+    return builders
