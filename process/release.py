@@ -117,18 +117,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     branchConfigFile = getRealpath('localconfig.py')
     unix_slaves = []
     mock_slaves = []
+    av_slaves = []
     all_slaves = []
     for p in branchConfig['platforms']:
         if p == 'b2g':
             continue
         platform_slaves = branchConfig['platforms'][p].get('slaves', [])
         all_slaves.extend(platform_slaves)
-        if 'win' not in p:
+        if 'linux64-av' in p:
+            av_slaves.extend(platform_slaves)
+        elif 'win' not in p:
             unix_slaves.extend(platform_slaves)
             if branchConfig['platforms'][p].get('use_mock'):
                 mock_slaves.extend(platform_slaves)
     unix_slaves = [x for x in set(unix_slaves)]
     mock_slaves = [x for x in set(mock_slaves)]
+    av_slaves = [x for x in set(av_slaves)]
     all_slaves = [x for x in set(all_slaves)]
 
     if secrets is None:
@@ -1436,18 +1440,25 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 
     if not releaseConfig.get('disableVirusCheck'):
         antivirus_factory = ScriptFactory(
-            scriptRepo=tools_repo,
-            script_timeout=3 * 60 * 60,
-            scriptName='scripts/release/stage-tasks.sh',
-            extra_args=['antivirus',
-                        '--ssh-user', branchConfig['stage_username'],
-                        '--ssh-key', branchConfig['stage_ssh_key'],
-                        ],
+            scriptRepo=mozharness_repo,
+            interpreter="python2.7",
+            scriptName='scripts/release/antivirus.py',
+            extra_args=[
+                "--product", releaseConfig["stage_product"],
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--bucket-name", releaseConfig["S3Bucket"],
+                "--tools-revision", releaseTag,
+                "--tools-repo", tools_repo,
+            ],
+            script_timeout=3*60*60,
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+            relengapi_archiver_release_tag=releaseTag,
         )
 
         builders.append({
             'name': builderPrefix('%s_antivirus' % releaseConfig['productName']),
-            'slavenames': unix_slaves,
+            'slavenames': av_slaves,
             'category': builderPrefix(''),
             'builddir': builderPrefix('%s_antivirus' % releaseConfig['productName']),
             'slavebuilddir': normalizeName(builderPrefix('av'), releaseConfig['productName']),
