@@ -292,7 +292,7 @@ if __name__ == "__main__":
                     to_try=True,
                     to_tinderbox_dated=False,
                     who=getAuthor(build),
-                    revision=build.getProperty('revision')[:12],
+                    revision=build.getProperty('revision'),
                     builddir="%s-%s" % (options.branch, platform),
                 ))
             else:
