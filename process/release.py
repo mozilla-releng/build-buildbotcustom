@@ -1886,14 +1886,13 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             ))
 
     if releaseConfig.get('enableAutomaticPushToMirrors'):
-        if not hasPlatformSubstring(releaseConfig["enUSPlatforms"], "android"):
+        push_to_mirrors_upstreams.extend([
+            builderPrefix("%s_checksums" % releaseConfig["productName"]),
+        ])
+        if releaseConfig.get('enablePermissionCheck'):
             push_to_mirrors_upstreams.extend([
-                builderPrefix("%s_checksums" % releaseConfig["productName"]),
+                builderPrefix("check_permissions"),
             ])
-            if releaseConfig.get('enablePermissionCheck'):
-                push_to_mirrors_upstreams.extend([
-                    builderPrefix("check_permissions"),
-                ])
 
         schedulers.append(AggregatingScheduler(
             name=builderPrefix("%s_push_to_mirrors" % releaseConfig["productName"]),
