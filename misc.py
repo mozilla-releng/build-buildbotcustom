@@ -79,25 +79,80 @@ def shouldBuild(change):
 
 
 _product_excludes = {
-    'firefox': [
+    '__all': [
         re.compile('^CLOBBER'),
-        re.compile('^mobile/'),
+        re.compile('/docs/'),
+        re.compile('^tools/mercurial/hgsetup/'),
+    ],
+    'firefox': [
+        re.compile('android'),
+
+        re.compile('gonk'),
+
         re.compile('^b2g/'),
+        re.compile('^build/mobile'),
+        re.compile('^mobile/'),
+        re.compile('^testing/mochitest/runrobocop.py')
     ],
     'mobile': [
-        re.compile('^CLOBBER'),
-        re.compile('^browser/'),
+        re.compile('gonk'),
+
         re.compile('^b2g/'),
-        re.compile('^xulrunner/'),
+
+        re.compile('^accessible/public/ia2'),
+        re.compile('^accessible/public/msaa'),
+        re.compile('^accessible/src/mac'),
+        re.compile('^accessible/src/windows'),
+
+        re.compile('^browser/'),
+
+        re.compile('^build/macosx'),
+        re.compile('^build/package/mac_osx'),
+        re.compile('^build/win32'),
+        re.compile('^build/win64'),
+
+        re.compile('^devtools/client'),
+
+        re.compile('^toolkit/system/osxproxy'),
+        re.compile('^toolkit/system/windowsproxy'),
+        re.compile('^toolkit/themes/osx'),
+
+        re.compile('^webapprt/win'),
+        re.compile('^webapprt/mac'),
+
+        re.compile('^widget/cocoa'),
+        re.compile('^widget/windows'),
+
+        re.compile('^xulrunner/')
     ],
     'b2g': [
-        re.compile('^CLOBBER'),
+        re.compile('^accessible/public/ia2'),
+        re.compile('^accessible/public/msaa'),
+        re.compile('^accessible/src/mac'),
+        re.compile('^accessible/src/windows'),
+
         re.compile('^browser/'),
+
+        re.compile('^build/macosx'),
+        re.compile('^build/mobile'),
+        re.compile('^build/package/mac_osx'),
+        re.compile('^build/win32'),
+        re.compile('^build/win64'),
+
+        re.compile('^devtools/client'),
+
         re.compile('^mobile/'),
-        re.compile('^xulrunner/'),
+
+        re.compile('^webapprt/win'),
+        re.compile('^webapprt/mac'),
+
+        re.compile('^widget/cocoa'),
+        re.compile('^widget/gonk'),
+        re.compile('^widget/windows'),
+
+        re.compile('^xulrunner/')
     ],
     'thunderbird': [
-        re.compile('^CLOBBER'),
         re.compile("^im/"),
         re.compile("^suite/")
     ],
@@ -111,7 +166,7 @@ def isImportantForProduct(change, product):
     # If all files are excluded, then the change is not important
     # As long as hgpoller's 'overflow' marker isn't excluded, it will cause all
     # products to build
-    excludes = _product_excludes.get(product, [])
+    excludes = _product_excludes.get(product, []) + _product_excludes.get('__all', [])
     for f in change.files:
         excluded = any(e.search(f) for e in excludes)
         if not excluded:
