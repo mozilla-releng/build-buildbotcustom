@@ -9,6 +9,8 @@ import gzip
 import subprocess
 from datetime import datetime
 import time
+import re
+import sys
 
 from buildbot import util
 from buildbot.status.builder import Results
@@ -19,6 +21,12 @@ from util.retry import retry
 
 retries = 5
 retry_sleep = 30
+
+try:
+    import statsd
+    STATSD = statsd.StatsClient()
+except ImportError:
+    STATSD = None
 
 
 def do_cmd(cmd):
@@ -108,6 +116,68 @@ def isNightly(build):
         return False
 
 
+def formatSteps(logFile, build):
+    """
+    Writes the steps of build to the logfile
+    """
+    # Steps
+    total_master_lag = 0.0
+    for step in build.getSteps():
+        times = step.getTimes()
+        if not times or not times[0]:
+            elapsed = "not started"
+        elif not times[1]:
+            elapsed = "not finished"
+        else:
+            elapsed = util.formatInterval(times[1] - times[0])
+
+        results = step.getResults()[0]
+        if results == (None, []):
+            results = "not started"
+
+        shortText = ' '.join(step.getText(
+        )) + ' (results: %s, elapsed: %s)' % (results, elapsed)
+        if times and times[0]:
+            logFile.write("========= Started %s (at %s) =========\n" %
+                          (shortText, datetime.fromtimestamp(times[0])))
+        else:
+            logFile.write("========= Skipped %s =========\n" % shortText)
+            continue
+
+        slave_time = None
+        for log in step.getLogs():
+            data = log.getTextWithHeaders()
+            logFile.write(data)
+            if not data.endswith("\n"):
+                logFile.write("\n")
+
+            # Look for if the slave reported its elapsedTime
+            m = re.search("^elapsedTime=([.0-9]+)$", data, re.M)
+            if m:
+                try:
+                    slave_time = float(m.group(1))
+                except ValueError:
+                    pass
+
+        if times and times[0] and times[1] and slave_time:
+            master_lag = times[1] - times[0] - slave_time
+            total_master_lag += master_lag
+            logFile.write("========= master_lag: %.2f =========\n" % master_lag)
+            if STATSD:
+                # statsd expects milliseconds
+                STATSD.timing('master_lag', master_lag * 1000.0)
+
+        if times and times[1]:
+            logFile.write("========= Finished %s (at %s) =========\n\n" %
+                          (shortText, datetime.fromtimestamp(times[1])))
+        else:
+            logFile.write("========= Finished %s =========\n\n" % shortText)
+
+    if STATSD:
+        STATSD.timing('total_master_lag', total_master_lag * 1000.0)
+    logFile.write("========= Total master_lag: %.2f =========\n\n" % total_master_lag)
+
+
 def formatLog(tmpdir, build, master_name, builder_suffix=''):
     """
     Returns a filename with the contents of the build log
@@ -149,40 +219,8 @@ def formatLog(tmpdir, build, master_name, builder_suffix=''):
 
     logFile.write("\n")
 
-    # Steps
-    for step in build.getSteps():
-        times = step.getTimes()
-        if not times or not times[0]:
-            elapsed = "not started"
-        elif not times[1]:
-            elapsed = "not finished"
-        else:
-            elapsed = util.formatInterval(times[1] - times[0])
+    formatSteps(logFile, build)
 
-        results = step.getResults()[0]
-        if results == (None, []):
-            results = "not started"
-
-        shortText = ' '.join(step.getText(
-        )) + ' (results: %s, elapsed: %s)' % (results, elapsed)
-        if times and times[0]:
-            logFile.write("========= Started %s (at %s) =========\n" %
-                          (shortText, datetime.fromtimestamp(times[0])))
-        else:
-            logFile.write("========= Skipped %s =========\n" % shortText)
-            continue
-
-        for log in step.getLogs():
-            data = log.getTextWithHeaders()
-            logFile.write(data)
-            if not data.endswith("\n"):
-                logFile.write("\n")
-
-        if times and times[1]:
-            logFile.write("========= Finished %s (at %s) =========\n\n" %
-                          (shortText, datetime.fromtimestamp(times[1])))
-        else:
-            logFile.write("========= Finished %s =========\n\n" % shortText)
     logFile.close()
     return os.path.join(tmpdir, build_name)
 
@@ -202,6 +240,7 @@ if __name__ == "__main__":
         retries=retries,
         retry_sleep=retry_sleep,
         master_name=None,
+        dry_run=False,
     )
     parser.add_option("-u", "--user", dest="user", help="upload user name")
     parser.add_option("-i", "--identity", dest="identity", help="ssh identity")
@@ -221,6 +260,8 @@ if __name__ == "__main__":
     parser.add_option("--try", dest="trybuild", action="store_true",
                       help="upload to try build directory")
     parser.add_option("--master-name", dest="master_name")
+    parser.add_option("--dry-run", dest="dry_run", action="store_true",
+                      help="dry run; output log to stdout instead of uploading")
 
     options, args = parser.parse_args()
 
@@ -252,6 +293,10 @@ if __name__ == "__main__":
                 local_tmpdir, build, options.master_name, suffix)
         else:
             logfile = formatLog(local_tmpdir, build, options.master_name)
+
+        if options.dry_run:
+            sys.stdout.write(gzip.open(logfile).read())
+            exit()
 
         # Now....upload it!
         remote_tmpdir = ssh(
