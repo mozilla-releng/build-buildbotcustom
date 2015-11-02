@@ -1529,7 +1529,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                          flunkOnFailure=False,
                          warnOnFailure=False,
                          ))
-        pkg_targets = ['package']
+        pkg_targets = ['package', 'package-tests']
         if self.enableInstaller:
             pkg_targets.append('installer')
         for t in pkg_targets:
@@ -1583,12 +1583,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
         if self.platform.startswith('win'):
             objdir = "build/%s" % self.objdir
-        objdir_tests = objdir
-        if self.complete_platform == 'macosx64':
-            # tests for mac must be packaged on the arch they're going to
-            # run on since bug 1201224
-            objdir_tests = WithProperties('%(basedir)s/build/' +
-                                          self.objdir.replace('i386', 'x86_64'))
         workdir = WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir = "build/"
@@ -1618,7 +1612,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                          command=self.makeCmd + [
                              'package-tests'] + pkgTestArgs,
                          env=pkg_env2,
-                         workdir=objdir_tests,
+                         workdir=objdir,
                          mock=self.use_mock,
                          target=self.mock_target,
                          mock_workdir_prefix=None,
