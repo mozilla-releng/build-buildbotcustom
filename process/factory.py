@@ -212,6 +212,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['packageRpmUrl'] = m
         elif m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
+        elif 'mozharness' in m and m.endswith('.zip'):
+            pass
         elif m.endswith("crashreporter-symbols-full.zip"):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
