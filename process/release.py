@@ -34,7 +34,7 @@ from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import (
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory,
     ReleaseUpdatesFactory, ReleaseFinalVerification, PartnerRepackFactory,
-    XulrunnerReleaseBuildFactory, makeDummyBuilder, SigningScriptFactory,
+    makeDummyBuilder, SigningScriptFactory,
     DummyFactory)
 from release.platforms import buildbot2ftp
 from release.paths import makeCandidatesDir
@@ -177,31 +177,22 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         job_status = "failed" if results else "success"
         job_status_repr = Results[results]
         allplatforms = list(releaseConfig['enUSPlatforms'])
-        xrplatforms = list(releaseConfig.get('xulrunnerPlatforms', []))
         stage = name.replace(builderPrefix(""), "")
 
         # Detect platform from builder name by tokenizing by '_', and matching
         # the first token after the prefix
-        if stage.startswith("xulrunner"):
-            platform = ["xulrunner_%s" % p for p in xrplatforms
-                        if stage.replace("xulrunner_", "").split('_')[0] == p]
-        else:
-            platform = [p for p in allplatforms if stage.split('_')[0] == p]
+        platform = [p for p in allplatforms if stage.split('_')[0] == p]
         platform = platform[0] if len(platform) >= 1 else ''
-        bare_platform = platform.replace('xulrunner_', '')
+        bare_platform = platform
         message_tag = getMessageTag()
         buildbot_url = ''
         if master_status.getURLForThing(build):
             buildbot_url = "Full details are available at:\n %s\n" % master_status.getURLForThing(build)
         # Use a generic ftp URL non-specific to any locale
         ftpURL = genericHttpsUrl()
-        if 'xulrunner' in platform:
-            ftpURL = ftpURL.replace(releaseConfig['productName'], 'xulrunner')
         isPlatformUnsigned = False
         if platform:
             platformDir = buildbot2ftp(bare_platform)
-            if 'xulrunner' in platform:
-                platformDir = ''
             ftpURL = '/'.join([
                 ftpURL.strip('/'),
                 platformDir])
@@ -350,7 +341,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     update_verify_builders = defaultdict(list)
     ui_update_tests_builders = defaultdict(list)
     deliverables_builders = []
-    xr_deliverables_builders = []
     post_deliverables_builders = []
     email_message_id = getMessageId()
 
@@ -465,7 +455,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     if not releaseConfig.get('skip_source'):
         pf = branchConfig['platforms']['linux64']
         # Everywhere except Thunderbird we use browser mozconfigs to generate
-        # source tarballs. This includes Android and Xulrunner
+        # source tarballs. This includes Android
         mozconfig = releaseConfig.get(
             'source_mozconfig',
             'browser/config/mozconfigs/linux64/release')
@@ -526,53 +516,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         deliverables_builders.append(
             builderPrefix('%s_source' % releaseConfig['productName']))
 
-        if releaseConfig.get('xulrunnerPlatforms'):
-            mozconfig = releaseConfig.get(
-                'source_mozconfig',
-                'browser/config/mozconfigs/linux64/release')
-            xulrunner_source_factory = SingleSourceFactory(
-                env=pf['env'],
-                objdir=pf['platform_objdir'],
-                hgHost=branchConfig['hghost'],
-                buildToolsRepoPath=tools_repo_path,
-                repoPath=sourceRepoInfo['path'],
-                productName='xulrunner',
-                version=releaseConfig['version'],
-                appVersion=releaseConfig['appVersion'],
-                baseTag=releaseConfig['baseTag'],
-                stagingServer=branchConfig['stage_server'],
-                stageUsername=branchConfig['stage_username_xulrunner'],
-                stageSshKey=branchConfig['stage_ssh_xulrunner_key'],
-                buildNumber=releaseConfig['buildNumber'],
-                autoconfDirs=['.', 'js/src'],
-                clobberURL=clobberer_url,
-                clobberBranch='release-%s' % sourceRepoInfo['name'],
-                mozconfig=mozconfig,
-                signingServers=getSigningServers('linux'),
-                use_mock=use_mock('linux'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                bucketPrefix=branchConfig.get('bucket_prefix'),
-            )
-
-            builders.append({
-                            'name': builderPrefix('xulrunner_source'),
-                            'slavenames': branchConfig['platforms']['linux']['slaves'] +
-                            branchConfig['platforms']['linux64']['slaves'],
-                            'category': builderPrefix(''),
-                            'builddir': builderPrefix('xulrunner_source'),
-                            'slavebuilddir': normalizeName(builderPrefix('xulrunner_source'), releaseConfig['productName']),
-                            'factory': xulrunner_source_factory,
-                            'env': builder_env,
-                            'properties': {
-                                'slavebuilddir': normalizeName(builderPrefix('xulrunner_source'), releaseConfig['productName']),
-                                'platform': None,
-                                'branch': 'release-%s' % sourceRepoInfo['name'],
-                                'product': 'xulrunner',
-                            }
-                            })
-            xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
     else:
         builders.append(makeDummyBuilder(
             name=builderPrefix('%s_source' % releaseConfig['productName']),
@@ -584,18 +527,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             },
             env=dummy_builder_env,
         ))
-        if releaseConfig.get('xulrunnerPlatforms'):
-            builders.append(makeDummyBuilder(
-                name=builderPrefix('xulrunner_source'),
-                slaves=all_slaves,
-                category=builderPrefix(''),
-                properties={
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                },
-                env=dummy_builder_env,
-            ))
-            xr_deliverables_builders.append(builderPrefix('xulrunner_source'))
 
     mozillaDir = None
     mozillaSrcDir = None
@@ -953,97 +884,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     suites_name, suites, mochitestLeakThreshold,
                     crashtestLeakThreshold, category=builderPrefix('')))
 
-    for platform in releaseConfig.get('xulrunnerPlatforms', []):
-        pf = branchConfig['platforms'][platform]
-        xr_env = pf['env'].copy()
-        xr_env['SYMBOL_SERVER_USER'] = branchConfig['stage_username_xulrunner']
-        xr_env['SYMBOL_SERVER_PATH'] = branchConfig[
-            'symbol_server_xulrunner_path']
-        xr_env['SYMBOL_SERVER_SSH_KEY'] = \
-            xr_env['SYMBOL_SERVER_SSH_KEY'].replace(branchConfig['stage_ssh_key'],
-                                                    branchConfig['stage_ssh_xulrunner_key'])
-        # Turn pymake on by default for Windows, and off by default for
-        # other platforms.
-        if 'win' in platform:
-            enable_pymake = pf.get('enable_pymake', True)
-        else:
-            enable_pymake = pf.get('enable_pymake', False)
-
-        if not releaseConfig.get('skip_build'):
-            xulrunner_build_factory = XulrunnerReleaseBuildFactory(
-                env=xr_env,
-                objdir=pf['platform_objdir'],
-                platform=platform,
-                hgHost=branchConfig['hghost'],
-                repoPath=sourceRepoInfo['path'],
-                buildToolsRepoPath=tools_repo_path,
-                configRepoPath=branchConfig['config_repo_path'],
-                profiledBuild=None,
-                mozconfig='%s/%s/xulrunner' % (
-                    platform, sourceRepoInfo['name']),
-                srcMozconfig=releaseConfig.get(
-                    'xulrunner_mozconfigs', {}).get(platform),
-                buildRevision=releaseTag,
-                stageServer=branchConfig['stage_server'],
-                stageUsername=branchConfig['stage_username_xulrunner'],
-                stageGroup=branchConfig['stage_group'],
-                stageSshKey=branchConfig['stage_ssh_xulrunner_key'],
-                stageBasePath=branchConfig['stage_base_path'] + '/xulrunner',
-                uploadPackages=True,
-                uploadSymbols=not branchConfig.get('staging', False),
-                doCleanup=True,
-                # this will clean-up the mac build dirs, but not delete
-                # the entire thing
-                buildSpace=pf.get(
-                    'build_space', branchConfig['default_build_space']),
-                productName='xulrunner',
-                version=releaseConfig['version'],
-                buildNumber=releaseConfig['buildNumber'],
-                clobberURL=clobberer_url,
-                clobberBranch='release-%s' % sourceRepoInfo['name'],
-                packageSDK=True,
-                signingServers=getSigningServers(platform),
-                partialUpdates={},  # no updates for Xulrunner
-                tooltool_manifest_src=pf.get('tooltool_manifest_src'),
-                tooltool_url_list=branchConfig.get('tooltool_url_list', []),
-                tooltool_script=pf.get('tooltool_script'),
-                use_mock=use_mock(platform),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                enable_pymake=enable_pymake,
-                ftpServer=None,
-            )
-            builders.append({
-                'name': builderPrefix('xulrunner_%s_build' % platform),
-                'slavenames': pf['slaves'],
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('xulrunner_%s_build' % platform),
-                'slavebuilddir': normalizeName(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
-                'factory': xulrunner_build_factory,
-                'env': builder_env,
-                'properties': {
-                    'slavebuilddir': normalizeName(builderPrefix('xulrunner_%s_build' % platform), releaseConfig['productName']),
-                    'platform': platform,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                    'product': 'xulrunner',
-                }
-            })
-        else:
-            builders.append(makeDummyBuilder(
-                name=builderPrefix('xulrunner_%s_build' % platform),
-                slaves=all_slaves,
-                category=builderPrefix(''),
-                properties={
-                    'platform': platform,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                    'product': 'xulrunner',
-                },
-                env=dummy_builder_env,
-            ))
-        xr_deliverables_builders.append(
-            builderPrefix('xulrunner_%s_build' % platform))
-
     if releaseConfig['doPartnerRepacks']:
         for platform in releaseConfig.get('partnerRepackPlatforms',
                                           releaseConfig['l10nPlatforms']):
@@ -1146,38 +986,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         })
         post_deliverables_builders.append(
             builderPrefix('%s_checksums' % releaseConfig['productName']))
-        if releaseConfig.get('xulrunnerPlatforms'):
-            xr_checksums_factory = SigningScriptFactory(
-                signingServers=getSigningServers('linux'),
-                env=env,
-                scriptRepo=tools_repo,
-                interpreter='bash',
-                scriptName='scripts/release/generate-sums.sh',
-                extra_args=[
-                    branchConfigFile, '--product', 'xulrunner',
-                    '--ssh-user', branchConfig['stage_username_xulrunner'],
-                    '--ssh-key', branchConfig['stage_ssh_xulrunner_key'],
-                ],
-            )
-            builders.append({
-                'name': builderPrefix('xulrunner_checksums'),
-                'slavenames': branchConfig['platforms']['linux']['slaves'] +
-                branchConfig['platforms']['linux64']['slaves'],
-                'category': builderPrefix(''),
-                'builddir': builderPrefix('xulrunner_checksums'),
-                'slavebuilddir': normalizeName(builderPrefix('xulrunner_checksums')),
-                'factory': xr_checksums_factory,
-                'env': builder_env,
-                'properties': {
-                    'slavebuilddir': normalizeName(
-                        builderPrefix('xulrunner_checksums')),
-                    'script_repo_revision': releaseTag,
-                    'release_config': releaseConfigFile,
-                    'platform': None,
-                    'branch': 'release-%s' % sourceRepoInfo['name'],
-                }
-            })
-
     for channel, updateConfig in updateChannels.iteritems():
         # If updates are fully disabled we should bail completely
         if releaseConfig.get("skip_updates"):
@@ -1515,8 +1323,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     '--ssh-key', branchConfig['stage_ssh_key'],
                     ],
     )
-    if releaseConfig.get('xulrunnerPlatforms'):
-        postrelease_factory_args["triggered_schedulers"] = [builderPrefix('xr_postrelease')]
     postrelease_factory = ScriptFactory(**postrelease_factory_args)
 
     builders.append({
@@ -1536,64 +1342,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             'event_group': 'postrelease',
         },
     })
-
-    if releaseConfig.get('xulrunnerPlatforms'):
-        xr_push_to_mirrors_factory = ScriptFactory(
-            scriptRepo=tools_repo,
-            scriptName='scripts/release/stage-tasks.sh',
-            extra_args=[
-                'push',
-                '--product', 'xulrunner',
-                '--ssh-user', branchConfig['stage_username_xulrunner'],
-                '--ssh-key', branchConfig['stage_ssh_xulrunner_key'],
-                '--overwrite',
-            ],
-            script_timeout=3 * 60 * 60,
-        )
-        builders.append({
-            'name': builderPrefix('xulrunner_push_to_mirrors'),
-            'slavenames': unix_slaves,
-            'category': builderPrefix(''),
-            'builddir': builderPrefix('xulrunner_push_to_mirrors'),
-            'slavebuilddir': normalizeName(builderPrefix('xr_psh_mrrrs')),
-            'factory': xr_push_to_mirrors_factory,
-            'env': builder_env,
-            'properties': {
-                'slavebuilddir': normalizeName(builderPrefix('xr_psh_mrrrs')),
-                'release_config': releaseConfigFile,
-                'script_repo_revision': releaseTag,
-                'platform': None,
-                'branch': 'release-%s' % sourceRepoInfo['name'],
-            },
-        })
-
-        xr_postrelease_factory = ScriptFactory(
-            scriptRepo=tools_repo,
-            scriptName='scripts/release/stage-tasks.sh',
-            extra_args=['postrelease',
-                        '--product', 'xulrunner',
-                        '--ssh-user', branchConfig['stage_username_xulrunner'],
-                        '--ssh-key', branchConfig['stage_ssh_xulrunner_key'],
-                        ],
-        )
-
-        builders.append({
-            'name': builderPrefix('xr_postrelease'),
-            'slavenames': unix_slaves,
-            'category': builderPrefix(''),
-            'builddir': builderPrefix('xr_postrelease'),
-            'slavebuilddir': normalizeName(builderPrefix('xr_postrelease')),
-            'factory': xr_postrelease_factory,
-            'env': builder_env,
-            'properties': {
-                'slavebuilddir': normalizeName(builderPrefix('xr_postrelease')),
-                'release_config': releaseConfigFile,
-                'script_repo_revision': releaseTag,
-                'platform': None,
-                'branch': 'release-%s' % sourceRepoInfo['name'],
-                'event_group': 'postrelease',
-            },
-        })
 
     for channel, updateConfig in updateChannels.iteritems():
         if not releaseConfig.get('disableBouncerEntries'):
@@ -1760,14 +1508,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         tag_source_downstream.append(builderPrefix(
             '%s_bouncer_submitter' % releaseConfig['productName']))
 
-    if releaseConfig.get('xulrunnerPlatforms'):
-        tag_source_downstream.append(builderPrefix('xulrunner_source'))
-        xr_postrelease_scheduler = Triggerable(
-            name=builderPrefix('xr_postrelease'),
-            builderNames=[builderPrefix('xr_postrelease')],
-        )
-        schedulers.append(xr_postrelease_scheduler)
-
     for platform in releaseConfig['enUSPlatforms']:
         tag_source_downstream.append(builderPrefix('%s_build' % platform))
         if platform in releaseConfig['l10nPlatforms']:
@@ -1792,9 +1532,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderNames=[builderPrefix('repack_complete', platform), ]
             )
             schedulers.append(repack_complete_scheduler)
-
-    for platform in releaseConfig.get('xulrunnerPlatforms', []):
-        tag_source_downstream.append(builderPrefix('xulrunner_%s_build' % platform))
 
     DependentID = makePropertiesScheduler(
         Dependent, [buildIDSchedFunc, buildUIDSchedFunc])
@@ -1909,20 +1646,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             branch=sourceRepoInfo['path'],
             upstreamBuilders=deliverables_builders,
             builderNames=post_deliverables_builders,
-        ))
-    if releaseConfig.get('xulrunnerPlatforms'):
-        if xr_deliverables_builders:
-            schedulers.append(AggregatingScheduler(
-                name=builderPrefix('xulrunner_deliverables_ready'),
-                branch=sourceRepoInfo['path'],
-                upstreamBuilders=xr_deliverables_builders,
-                builderNames=[builderPrefix('xulrunner_checksums')],
-            ))
-        schedulers.append(AggregatingScheduler(
-            name=builderPrefix('xulrunner_push_to_mirrors'),
-            branch=sourceRepoInfo['path'],
-            upstreamBuilders=[builderPrefix('xulrunner_checksums')],
-            builderNames=[builderPrefix('xulrunner_push_to_mirrors')],
         ))
     if releaseConfig['doPartnerRepacks'] and \
             not hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):

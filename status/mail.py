@@ -133,7 +133,7 @@ class ChangeNotifier(base.StatusReceiverMultiService):
         # interpolation if necessary
         if self.extraHeaders:
             d = change.asDict()
-            for k, v in self.extraHeaders.items():
+            for k, v in self.extraHeaders.iteritems():
                 k = k % d
                 if k in m:
                     twlog.msg("Warning: Got header " + k + " in self.extraHeaders "
@@ -144,7 +144,7 @@ class ChangeNotifier(base.StatusReceiverMultiService):
 
         if 'headers' in msgdict:
             d = change.asDict()
-            for k, v in msgdict['headers'].items():
+            for k, v in msgdict['headers'].iteritems():
                 k = k % d
                 if k in m:
                     twlog.msg("Warning: Got header " + k + " in self.extraHeaders "

@@ -297,8 +297,7 @@ class TriggerBouncerCheck(Triggerable):
             return defer.succeed(None)
         self.working = True
         log.msg('%s: polling' % self.__class__.__name__)
-        bouncerProductName = self.release_config.get('bouncerProductName') or \
-            self.release_config.get('productName').capitalize()
+        bouncerProductName = self.release_config.get('productName').capitalize()
         version = self.release_config.get('version')
         partialVersions = []
         if self.appendBuildNumber:

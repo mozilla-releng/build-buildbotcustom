@@ -145,13 +145,13 @@ class MockProperty(MockCommand):
                                         ''.join(log.getChunks(
                                                 [STDOUT], onlyText=True)),
                                         ''.join(log.getChunks([STDERR], onlyText=True)))
-            for k, v in new_props.items():
+            for k, v in new_props.iteritems():
                 self.setProperty(k, v, "MockProperty Step")
             self.property_changes = new_props
 
     def createSummary(self, log):
         props_set = ["%s: %r" % (k, v)
-                     for k, v in self.property_changes.items()]
+                     for k, v in self.property_changes.iteritems()]
         self.addCompleteLog('property changes', "\n".join(props_set))
 
     def getText(self, cmd, results):

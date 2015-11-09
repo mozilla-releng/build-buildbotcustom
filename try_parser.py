@@ -361,7 +361,7 @@ def TryParser(
                 [p for n in prettyNames[p] if 'try-nondefault' not in n])
     else:
         defaultPrettyNames = dict([(k, v)
-                                   for k, v in prettyNames.items()
+                                   for k, v in prettyNames.iteritems()
                                    if 'try-nondefault' not in v])
         for p in all_platforms:
             if p in defaultPrettyNames:
