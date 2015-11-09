@@ -109,7 +109,7 @@ class SendChangeStep(ShellCommand):
             files = props.render(self.files)
             user = props.render(self.user)
             sendchange_props = []
-            for key, value in self.sendchange_props.items():
+            for key, value in self.sendchange_props.iteritems():
                 sendchange_props.append((key, props.render(value)))
 
             self.addCompleteLog("sendchange", """\
@@ -248,69 +248,6 @@ class UnpackFile(ShellCommand):
     def evaluateCommand(self, cmd):
         superResult = self.super_class.evaluateCommand(self, cmd)
         if SUCCESS != superResult:
-            return superResult
-        if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
-            return FAILURE
-
-        return SUCCESS
-
-
-class UnpackTest(ShellCommand):
-    description = ["unpack", "tests"]
-
-    def __init__(self, filename, testtype, scripts_dir=".", **kwargs):
-        self.super_class = ShellCommand
-        self.super_class.__init__(self, **kwargs)
-        self.filename = filename
-        self.scripts_dir = scripts_dir
-        self.testtype = testtype
-        self.addFactoryArguments(
-            filename=filename, testtype=testtype, scripts_dir=scripts_dir)
-
-    def start(self):
-        filename = self.build.getProperties().render(self.filename)
-        self.filename = filename
-        if filename.endswith(".zip"):
-            args = ['unzip', '-oq', filename, 'mozbase*', 'bin*', 'certs*', 'modules*', 'extensions*']
-
-            # modify the commands to extract only the files we need - the test
-            # directory and bin/ and certs/
-            if self.testtype == "mochitest":
-                args.append('mochitest*')
-            elif self.testtype == "xpcshell":
-                args.append('xpcshell*')
-            elif self.testtype == "jsreftest":
-                # jsreftest needs both jsreftest/ and reftest/ in addition to
-                # bin/ and certs/
-                args.extend(['jsreftest*', 'reftest*'])
-            elif self.testtype == "reftest":
-                args.append('reftest*')
-            elif self.testtype == "jetpack":
-                args.append('jetpack*')
-            else:
-                # If it all fails, we extract the whole shebang
-                args = ['unzip', '-oq', filename]
-
-            self.setCommand(args)
-        # If we come across a test not packaged as a zip file, try unpacking
-        # the whole thing using tar+gzip/bzip2
-        elif filename.endswith("tar.bz2"):
-            self.setCommand(['tar', '-jxf', filename])
-        elif filename.endswith("tar.gz"):
-            self.setCommand(['tar', '-zxf', filename])
-        else:
-            # TODO: The test package is .zip across all three platforms, so
-            # we're special casing for that
-            raise ValueError("Don't know how to handle %s" % filename)
-        self.super_class.start(self)
-
-    def evaluateCommand(self, cmd):
-        superResult = self.super_class.evaluateCommand(self, cmd)
-
-        # Some directories, like extensions, won't always be available. unzip
-        # will exit with code 11, "no matching files were found" and the
-        # remaining files will be extracted. Ignore this exit code.
-        if superResult != SUCCESS and cmd.rc != 11:
             return superResult
         if None != re.search('^Usage:', cmd.logs['stdio'].getText()):
             return FAILURE

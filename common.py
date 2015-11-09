@@ -62,7 +62,6 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'mobile': 'mb',
         'desktop': '',
         'debug': 'd',
-        'xulrunner': 'xr',
         'build': 'bld',
         'linux': 'lx',
         'win32': 'w32',

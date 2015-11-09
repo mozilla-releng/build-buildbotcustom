@@ -1,4 +1,3 @@
-
 from __future__ import absolute_import
 
 import os.path
@@ -50,11 +49,10 @@ from buildbotcustom.steps.base import ShellCommand, SetProperty, Mercurial, \
 from buildbotcustom.steps.misc import TinderboxShellCommand, SendChangeStep, \
     MozillaClobberer, FindFile, DownloadFile, UnpackFile, \
     SetBuildProperty, DisconnectStep, OutputStep, \
-    RepackPartners, UnpackTest, FunctionalStep, setBuildIDProps
+    RepackPartners, FunctionalStep, setBuildIDProps
 from buildbotcustom.steps.source import MercurialCloneCommand
 from buildbotcustom.steps.test import GraphServerPost
 from buildbotcustom.steps.signing import SigningServerAuthenication
-from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.common import getSupportedPlatforms, getPlatformFtpDir, \
     genBuildID, normalizeName, getPreviousVersion
 from buildbotcustom.steps.mock import MockReset, MockInit, MockCommand, \
@@ -202,15 +200,9 @@ def parse_make_upload(rc, stdout, stderr):
     file urls.'''
     retval = {}
     for m in re.findall(
-        "^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|rpm|mar|tar\.gz))$",
+        "^(https?://.*?\.(?:tar\.bz2|dmg|zip|apk|mar|tar\.gz))$",
             "\n".join([stdout, stderr]).replace('\r\n', '\n'), re.M):
-        if 'devel' in m and m.endswith('.rpm'):
-            retval['develRpmUrl'] = m
-        elif 'tests' in m and m.endswith('.rpm'):
-            retval['testsRpmUrl'] = m
-        elif m.endswith('.rpm'):
-            retval['packageRpmUrl'] = m
-        elif m.endswith("crashreporter-symbols.zip"):
+        if m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
         elif 'mozharness' in m and m.endswith('.zip'):
             pass
@@ -946,8 +938,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         # Examples of what happens:
         #   platform = 'linux' sets self.platform_variation to []
         #   platform = 'linux-opt' sets self.platform_variation to ['opt']
-        # platform = 'linux-opt-rpm' sets self.platform_variation to
-        # ['opt','rpm']
         platform_chunks = self.complete_platform.split('-', 1)
         if len(platform_chunks) > 1:
             self.platform_variation = platform_chunks[1].split('-')
@@ -1586,8 +1576,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         workdir = WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
             workdir = "build/"
-        if 'rpm' in self.platform_variation:
-            pkgArgs.append("MOZ_PKG_FORMAT=RPM")
 
         pkg_env2 = pkg_env.copy()
         if self.complete_platform == 'macosx64':
@@ -1633,14 +1621,14 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         # Get package details
         self.packageFilename = self.getPackageFilename(self.platform,
                                                        self.platform_variation)
-        if self.packageFilename and 'rpm' not in self.platform_variation and self.productName not in ('xulrunner', 'b2g'):
+        if self.packageFilename and self.productName not in ('b2g',):
             self.addFilePropertiesSteps(filename=self.packageFilename,
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
                                         haltOnFailure=True)
         # Windows special cases
         installerFilename = self.getInstallerFilename()
-        if self.enableInstaller and self.productName != 'xulrunner':
+        if self.enableInstaller:
             self.addStep(ShellCommand(
                 name='make_installer',
                 command=self.makeCmd + ['installer'] + pkgArgs,
@@ -1654,48 +1642,37 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                                             fileType='installer',
                                             haltOnFailure=True)
 
-        if self.productName == 'xulrunner':
-            self.addStep(SetProperty(
-                command=[
-                    'python', 'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
-                         'build/%s/dist/bin/platform.ini' % self.mozillaObjdir,
-                         'Build', 'BuildID'],
-                property='buildid',
-                workdir='.',
-                name='get_build_id',
-            ))
+        if self.mozillaSrcDir:
+            useConfigDir = '%s/config' % self.baseWorkDir
         else:
-            if self.mozillaSrcDir:
-                useConfigDir = '%s/config' % self.baseWorkDir
-            else:
-                useConfigDir = 'build%s/config' % self.mozillaSrcDir
-            self.addStep(SetProperty(
-                command=[
-                    'python', '%s/printconfigsetting.py' % useConfigDir,
-                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-                         'App', 'BuildID'],
-                property='buildid',
-                workdir='.',
-                name='get_build_id',
-            ))
-            self.addStep(SetProperty(
-                command=[
-                    'python', '%s/printconfigsetting.py' % useConfigDir,
-                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-                         'App', 'Version'],
-                property='appVersion',
-                workdir='.',
-                name='get_app_version',
-            ))
-            self.addStep(SetProperty(
-                command=[
-                    'python', '%s/printconfigsetting.py' % useConfigDir,
-                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-                         'App', 'Name'],
-                property='appName',
-                workdir='.',
-                name='get_app_name',
-            ))
+            useConfigDir = 'build%s/config' % self.mozillaSrcDir
+        self.addStep(SetProperty(
+            command=[
+                'python', '%s/printconfigsetting.py' % useConfigDir,
+                        'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                        'App', 'BuildID'],
+            property='buildid',
+            workdir='.',
+            name='get_build_id',
+        ))
+        self.addStep(SetProperty(
+            command=[
+                'python', '%s/printconfigsetting.py' % useConfigDir,
+                        'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                        'App', 'Version'],
+            property='appVersion',
+            workdir='.',
+            name='get_app_version',
+        ))
+        self.addStep(SetProperty(
+            command=[
+                'python', '%s/printconfigsetting.py' % useConfigDir,
+                        'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                        'App', 'Name'],
+            property='appName',
+            workdir='.',
+            name='get_app_name',
+        ))
         self.pkg_env = pkg_env
 
     def addUploadSteps(self):
@@ -2257,12 +2234,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             self.addCreatePartialUpdateSteps()
 
     def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
-        # Because of how the RPM packaging works,
-        # we need to tell make upload to look for RPMS
-        if 'rpm' in self.complete_platform:
-            upload_vars = ["MOZ_PKG_FORMAT=RPM"]
-        else:
-            upload_vars = []
+        upload_vars = []
         uploadEnv = self.env.copy()
         uploadEnv.update({'UPLOAD_HOST': self.stageServer,
                           'UPLOAD_USER': self.stageUsername,
@@ -2305,42 +2277,26 @@ class NightlyBuildFactory(MercurialBuildFactory):
             uploadArgs['builddir'] = postUploadBuildDir
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(**uploadArgs)
 
-        if self.productName == 'xulrunner':
-            self.addStep(RetryingMockProperty(
-                         command=self.makeCmd + ['-f', 'client.mk', 'upload'],
-                         env=uploadEnv,
-                         workdir='build',
-                         extract_fn=parse_make_upload,
-                         haltOnFailure=True,
-                         description=["upload"],
-                         timeout=60 * 60,  # 60 minutes
-                         log_eval_func=lambda c, s: regex_log_evaluator(
-                             c, s, upload_errors),
-                         locks=[upload_lock.access('counting')],
-                         mock=self.use_mock,
-                         target=self.mock_target,
-                         ))
-        else:
-            objdir = WithProperties(
-                '%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
-            if self.platform.startswith('win'):
-                objdir = '%s/%s' % (self.baseWorkDir, self.objdir)
-            self.addStep(RetryingMockProperty(
-                name='make_upload',
-                command=self.makeCmd + ['upload'] + upload_vars,
-                env=uploadEnv,
-                workdir=objdir,
-                extract_fn=parse_make_upload,
-                haltOnFailure=True,
-                description=self.makeCmd + ['upload'],
-                mock=self.use_mock,
-                target=self.mock_target,
-                mock_workdir_prefix=None,
-                timeout=40 * 60,  # 40 minutes
-                log_eval_func=lambda c, s: regex_log_evaluator(
-                    c, s, upload_errors),
-                locks=[upload_lock.access('counting')],
-            ))
+        objdir = WithProperties(
+            '%(basedir)s/' + self.baseWorkDir + '/' + self.objdir)
+        if self.platform.startswith('win'):
+            objdir = '%s/%s' % (self.baseWorkDir, self.objdir)
+        self.addStep(RetryingMockProperty(
+            name='make_upload',
+            command=self.makeCmd + ['upload'] + upload_vars,
+            env=uploadEnv,
+            workdir=objdir,
+            extract_fn=parse_make_upload,
+            haltOnFailure=True,
+            description=self.makeCmd + ['upload'],
+            mock=self.use_mock,
+            target=self.mock_target,
+            mock_workdir_prefix=None,
+            timeout=40 * 60,  # 40 minutes
+            log_eval_func=lambda c, s: regex_log_evaluator(
+                c, s, upload_errors),
+            locks=[upload_lock.access('counting')],
+        ))
 
         def getPartialInfo(build):
             return [{
@@ -2756,47 +2712,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                          ))
         if self.balrog_api_root:
             self.submitBalrogUpdates(type_='release')
-
-
-class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
-
-    def doUpload(self, postUploadBuildDir=None, uploadMulti=False):
-        uploadEnv = self.env.copy()
-        uploadEnv.update({'UPLOAD_HOST': self.stageServer,
-                          'UPLOAD_USER': self.stageUsername,
-                          'UPLOAD_TO_TEMP': '1'})
-        if self.stageSshKey:
-            uploadEnv['UPLOAD_SSH_KEY'] = '~/.ssh/%s' % self.stageSshKey
-
-        uploadEnv['POST_UPLOAD_CMD'] = 'post_upload.py ' + \
-                                       '-p %s ' % self.productName + \
-                                       '-v %s ' % self.version + \
-                                       '-n %s ' % self.buildNumber + \
-                                       '--release-to-candidates-dir'
-        if self.signingServers and self.enableSigning:
-            uploadEnv['POST_UPLOAD_CMD'] += ' --signed'
-
-        def get_url(rc, stdout, stderr):
-            for m in re.findall("^(https?://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
-                if m.endswith("crashreporter-symbols.zip"):
-                    continue
-                if m.endswith("tests.tar.bz2"):
-                    continue
-                return {'packageUrl': m}
-            return {'packageUrl': ''}
-
-        self.addStep(RetryingMockProperty(
-                     command=self.makeCmd + ['-f', 'client.mk', 'upload'],
-                     env=uploadEnv,
-                     workdir='build',
-                     extract_fn=get_url,
-                     haltOnFailure=True,
-                     description=['upload'],
-                     log_eval_func=lambda c, s: regex_log_evaluator(
-                         c, s, upload_errors),
-                     mock=self.use_mock,
-                     target=self.mock_target,
-                     ))
 
 
 def identToProperties(default_prop=None):
@@ -3729,8 +3644,7 @@ class SingleSourceFactory(ReleaseFactory):
         # created in the expected place.
         self.env['MOZ_OBJDIR'] = WithProperties('%(basedir)s/' + self.absObjDir)
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
-        if appVersion is None or version != appVersion or \
-                (self.branchName == 'mozilla-1.9.2' and productName == 'xulrunner'):
+        if appVersion is None or version != appVersion:
             self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
         self.env['no_tooltool'] = "1"
@@ -3929,7 +3843,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
             t) for t in release.info.getTags(self.baseTag, self.buildNumber)]
         releaseTag = release.info.getReleaseTag(self.baseTag)
 
-        for platform, cfg in self.verifyConfigs.items():
+        for platform, cfg in self.verifyConfigs.iteritems():
             command = [
                 self.python, 'tools/scripts/updates/create-update-verify-configs.py',
                 '-c', WithProperties(self.patcherConfigFile),
@@ -4337,213 +4251,6 @@ class MozillaTestFactory(MozillaBuildFactory):
                              'sudo hwclock --set --date="$(date +%m/%d/%y\ %H:%M:%S)"'],
                 ))
             self.addPeriodicRebootSteps()
-
-
-def resolution_step():
-    return ShellCommand(
-        name='show_resolution',
-        flunkOnFailure=False,
-        warnOnFailure=False,
-        haltOnFailure=False,
-        workdir='/Users/cltbld',
-        command=['bash', '-c', 'screenresolution get && screenresolution list && system_profiler SPDisplaysDataType']
-    )
-
-
-class UnittestPackagedBuildFactory(MozillaTestFactory):
-    def __init__(self, platform, test_suites, env, productName='firefox',
-                 mochitest_leak_threshold=None,
-                 crashtest_leak_threshold=None, totalChunks=None,
-                 thisChunk=None, chunkByDir=None,
-                 **kwargs):
-        platform = platform.split('-')[0]
-        self.test_suites = test_suites
-        self.totalChunks = totalChunks
-        self.thisChunk = thisChunk
-        self.chunkByDir = chunkByDir
-
-        testEnv = MozillaEnvironments['%s-unittest' % platform].copy()
-        testEnv['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(platform)
-        testEnv['MINIDUMP_SAVE_PATH'] = WithProperties(
-            '%(basedir:-)s/minidumps')
-        testEnv.update(env)
-
-        self.leak_thresholds = {'mochitest-plain': mochitest_leak_threshold,
-                                'crashtest': crashtest_leak_threshold, }
-
-        MozillaTestFactory.__init__(self, platform, productName, env=testEnv,
-                                    downloadTests=True,
-                                    **kwargs)
-
-    def addSetupSteps(self):
-        if 'linux' in self.platform:
-            self.addStep(ShellCommand(
-                name='disable_screensaver',
-                command=['xset', 's', 'off', 's', 'reset'],
-                env=self.env,
-            ))
-        if self.platform.startswith('win32'):
-            self.addStep(ShellCommand(
-                name='run mouse & screen adjustment script',
-                command=['python.exe',
-                         WithProperties('%(toolsdir)s/scripts/support/mouse_and_screen_resolution.py'),
-                         '--configuration-url',
-                         WithProperties("https://%s/%s" % (self.hgHost, self.repoPath) +
-                                        "/raw-file/%(revision)s/testing/machine-configuration.json")],
-                flunkOnFailure=True,
-                haltOnFailure=True,
-                log_eval_func=lambda c, s: regex_log_evaluator(
-                    c, s, global_errors),
-            ))
-
-    def addRunTestSteps(self):
-        if self.platform.startswith('macosx64'):
-            self.addStep(resolution_step())
-        # Run them!
-        if self.downloadSymbolsOnDemand:
-            symbols_path = '%(symbols_url)s'
-        else:
-            symbols_path = 'symbols'
-        for suite in self.test_suites:
-            leak_threshold = self.leak_thresholds.get(suite, None)
-            if suite == 'xpcshell':
-                # Unpack the tests
-                self.addStep(UnpackTest(
-                             filename=WithProperties('%(tests_filename)s'),
-                             testtype='xpcshell',
-                             haltOnFailure=True,
-                             name='unpack xpcshell tests',
-                             ))
-
-                self.addStep(unittest_steps.MozillaPackagedXPCShellTests(
-                             env=self.env,
-                             platform=self.platform,
-                             symbols_path=symbols_path,
-                             maxTime=120 * 60,  # Two Hours
-                             ))
-            elif suite == 'jetpack':
-                # Unpack the tests
-                self.addStep(UnpackTest(
-                             filename=WithProperties('%(tests_filename)s'),
-                             testtype='jetpack',
-                             haltOnFailure=True,
-                             name='unpack jetpack tests',
-                             ))
-
-                self.addStep(unittest_steps.MozillaPackagedJetpackTests(
-                             suite='testpkgs',
-                             env=self.env,
-                             leakThreshold=leak_threshold,
-                             symbols_path=symbols_path,
-                             maxTime=75 * 60,  # 75 Minutes
-                             ))
-
-                self.addStep(unittest_steps.MozillaPackagedJetpackTests(
-                             suite='testaddons',
-                             env=self.env,
-                             leakThreshold=leak_threshold,
-                             symbols_path=symbols_path,
-                             maxTime=30 * 60,  # 30 Minutes
-                             ))
-            elif suite == 'mozmill':
-                MOZMILL_VIRTUALENV_DIR = os.path.join(
-                    '..', 'mozmill-virtualenv')
-                mozmill_env = self.env.copy()
-                mozmill_env['MOZMILL_NO_VNC'] = "1"
-                mozmill_env['NO_EM_RESTART'] = "0"
-                mozmill_env['MOZMILL_RICH_FAILURES'] = "1"
-
-                # Workaround for Mozrunner bug 575863.
-                if 'LD_LIBRARY_PATH' in mozmill_env:
-                    mozmill_env[
-                        'LD_LIBRARY_PATH'] = WithProperties("../%(exedir)s")
-
-                # Find the application app bundle, workaround for mozmill on OS X
-                # XXX
-                self.brandName = "Shredder"
-                if self.platform.startswith('macosx'):
-                    self.addStep(SetProperty(
-                        name='Find executable .app',
-                        command=['bash', '-c', WithProperties(
-                            'echo %(exedir)s | cut -d/ -f1-2')],
-                        property='exepath',
-                        workdir='.',
-                    ))
-                self.addStep(UnpackTest(
-                             filename=WithProperties('%(tests_filename)s'),
-                             testtype='mozmill',
-                             haltOnFailure=True,
-                             name='unpack mozmill tests',
-                             ))
-
-                installscript = " && ".join(["if [ ! -d %(xredir)s/plugins ]; then mkdir %(xredir)s/plugins; fi",
-                                             "if [ ! -d %(xredir)s/extensions ]; then mkdir %(xredir)s/extensions; fi",
-                                             "cp -R bin/plugins/* %(xredir)s/plugins/",
-                                             "if [ -d extensions ]; then cp -R extensions/* %(xredir)s/extensions/; fi"])
-                self.addStep(ShellCommand(
-                             name='install plugins and extensions',
-                             command=['sh', '-c', WithProperties(installscript)],
-                             haltOnFailure=True,
-                             ))
-
-                # Older comm-central branches use a centrally-installed
-                # MozMill. We figure this out by seeing if installmozmill.py is
-                # present.
-                self.addStep(SetProperty(
-                             name='check mozmill virtualenv setup',
-                             property='mozmillVirtualenvSetup',
-                             command=['bash', '-c',
-                                      'test -e installmozmill.py && ls installmozmill.py'],
-                             workdir='build/mozmill/resources',
-                             flunkOnFailure=False,
-                             haltOnFailure=False,
-                             warnOnFailure=False
-                             ))
-
-                def isVirtualenvSetup(step):
-                    return ("mozmillVirtualenvSetup" in step.build.getProperties() and
-                            len(step.build.getProperty("mozmillVirtualenvSetup")) > 0)
-
-                self.addStep(ShellCommand(
-                             name='setup virtualenv',
-                             command=[
-                                 'python', 'resources/installmozmill.py',
-                                 MOZMILL_VIRTUALENV_DIR, '../mozbase'],
-                             doStepIf=isVirtualenvSetup,
-                             flunkOnFailure=True,
-                             haltOnFailure=True,
-                             workdir='build/mozmill'
-                             ))
-                bindir = 'Scripts' if self.platform.startswith(
-                    'win') else 'bin'
-
-                # PYTHONHOME overrides virtualenv install directories, so get
-                # rid of it
-                mozmill_virtualenv_env = mozmill_env.copy()
-                mozmill_virtualenv_env['PYTHONHOME'] = None
-
-                mozmillpython = os.path.join(
-                    MOZMILL_VIRTUALENV_DIR, bindir, 'python')
-                self.addStep(unittest_steps.MozillaCheck,
-                             test_name="mozmill virtualenv",
-                             warnOnWarnings=True,
-                             command=['bash', '-c', WithProperties(mozmillpython + ' runtestlist.py --binary=../%(exepath)s --symbols-path=' + symbols_path + ' --list=mozmilltests.list')],
-                             doStepIf=isVirtualenvSetup,
-                             env=mozmill_virtualenv_env,
-                             workdir='build/mozmill',
-                             )
-                # ... and add another step for older branches, run if the above isn't
-                self.addStep(unittest_steps.MozillaCheck,
-                             test_name="mozmill legacy",
-                             warnOnWarnings=True,
-                             command=['python', 'runtestlist.py', WithProperties('--binary=../%(exepath)s'), '--symbols-path=' + symbols_path, '--list=mozmilltests.list'],
-                             doStepIf=lambda step: not isVirtualenvSetup(step),
-                             env=mozmill_env,
-                             workdir='build/mozmill',
-                             )
-
-        if self.platform.startswith('macosx64'):
-            self.addStep(resolution_step())
 
 
 class PartnerRepackFactory(ReleaseFactory):

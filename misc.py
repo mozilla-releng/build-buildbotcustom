@@ -47,7 +47,7 @@ reload(mozilla_buildtools.queuedir)
 from buildbotcustom.common import normalizeName
 from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
-    NightlyRepackFactory, UnittestPackagedBuildFactory, \
+    NightlyRepackFactory, \
     TryBuildFactory, ScriptFactory, SigningScriptFactory, rc_eval_func
 from buildbotcustom.scheduler import BuilderChooserScheduler, \
     PersistentScheduler, makePropertiesScheduler, SpecificNightly, EveryNthScheduler
@@ -785,119 +785,84 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                         mozharness_repo=None, mozharness_tag='production',
                         script_repo_manifest=None, relengapi_archiver_repo_path=None,
                         relengapi_archiver_rev=None, is_debug=None):
+    # We only support mozharness stuff now!
+    assert mozharness
     builders = []
-    pf = config['platforms'].get(platform, {})
     if slaves is None:
         slavenames = config['platforms'][platform]['slaves']
     else:
         slavenames = slaves
     if not category:
         category = branch_name
-    productName = pf['product_name']
     branchProperty = branch_name
-    posixBinarySuffix = '' if 'mobile' in name_prefix else '-bin'
     properties = {'branch': branchProperty, 'platform': platform,
                   'slavebuilddir': 'test', 'stage_platform': stagePlatform,
                   'product': stageProduct, 'repo_path': config['repo_path'],
                   'moz_repo_path': config.get('moz_repo_path', '')}
-    if mozharness:
-        # suites is a dict!
-        if mozharness_suite_config is None:
-            mozharness_suite_config = {}
-        extra_args = []
-        if mozharness_suite_config.get('config_files'):
-            extra_args.extend(['--cfg', ','.join(mozharness_suite_config['config_files'])])
-        extra_args.extend(mozharness_suite_config.get('extra_args', suites.get('extra_args', [])))
-        if is_debug is True:
-            extra_args.extend(
-                mozharness_suite_config.get(
-                    'debug_extra_args',
-                    suites.get('debug_extra_args', [])
-                )
+    # suites is a dict!
+    if mozharness_suite_config is None:
+        mozharness_suite_config = {}
+    extra_args = []
+    if mozharness_suite_config.get('config_files'):
+        extra_args.extend(['--cfg', ','.join(mozharness_suite_config['config_files'])])
+    extra_args.extend(mozharness_suite_config.get('extra_args', suites.get('extra_args', [])))
+    if is_debug is True:
+        extra_args.extend(
+            mozharness_suite_config.get(
+                'debug_extra_args',
+                suites.get('debug_extra_args', [])
             )
-        elif is_debug is False:
-            extra_args.extend(
-                mozharness_suite_config.get(
-                    'opt_extra_args',
-                    suites.get('opt_extra_args', [])
-                )
+        )
+    elif is_debug is False:
+        extra_args.extend(
+            mozharness_suite_config.get(
+                'opt_extra_args',
+                suites.get('opt_extra_args', [])
             )
-        if mozharness_suite_config.get('blob_upload'):
-            extra_args.extend(['--blob-upload-branch', branch_name])
-        if mozharness_suite_config.get('download_symbols'):
-            extra_args.extend(['--download-symbols', mozharness_suite_config['download_symbols']])
-        reboot_command = mozharness_suite_config.get(
-            'reboot_command', suites.get('reboot_command', None))
-        hg_bin = mozharness_suite_config.get(
-            'hg_bin', suites.get('hg_bin', 'hg'))
-        properties['script_repo_revision'] = mozharness_tag
-        factory = ScriptFactory(
-            interpreter=mozharness_python,
-            scriptRepo=mozharness_repo,
-            scriptName=suites['script_path'],
-            hg_bin=hg_bin,
-            extra_args=extra_args,
-            use_credentials_file=True,
-            script_maxtime=suites.get('script_maxtime', 7200),
-            script_timeout=suites.get('timeout', 1800),
-            script_repo_manifest=script_repo_manifest,
-            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
-            relengapi_archiver_rev=relengapi_archiver_rev,
-            reboot_command=reboot_command,
-            platform=platform,
-            env=mozharness_suite_config.get('env', {}),
-            log_eval_func=rc_eval_func({
-                0: SUCCESS,
-                1: WARNINGS,
-                2: FAILURE,
-                3: EXCEPTION,
-                4: RETRY,
-            }),
         )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': properties,
-            'nextSlave': _nextAWSSlave_nowait,
-        }
-        builders.append(builder)
-    else:
-        factory = UnittestPackagedBuildFactory(
-            platform=platform,
-            test_suites=suites,
-            mochitest_leak_threshold=mochitestLeakThreshold,
-            crashtest_leak_threshold=crashtestLeakThreshold,
-            hgHost=config['hghost'],
-            repoPath=config['repo_path'],
-            productName=productName,
-            posixBinarySuffix=posixBinarySuffix,
-            macResSubdir=pf.get('mac_res_subdir', 'Resources'),
-            buildToolsRepoPath=config['build_tools_repo_path'],
-            buildSpace=1.0,
-            buildsBeforeReboot=config['platforms'][
-                platform]['builds_before_reboot'],
-            downloadSymbols=pf.get('download_symbols', False),
-            downloadSymbolsOnDemand=pf.get(
-                'download_symbols_ondemand', True),
-            env=pf.get('unittest-env', {}),
-            resetHwClock=resetHwClock,
-        )
-        builder = {
-            'name': '%s %s' % (name_prefix, suites_name),
-            'slavenames': slavenames,
-            'builddir': '%s-%s' % (build_dir_prefix, suites_name),
-            'slavebuilddir': 'test',
-            'factory': factory,
-            'category': category,
-            'properties': properties,
-            'env': MozillaEnvironments.get(config['platforms'][platform].get('env_name'), {}),
-            'nextSlave': _nextAWSSlave_nowait,
-        }
-        builders.append(builder)
+    if mozharness_suite_config.get('blob_upload'):
+        extra_args.extend(['--blob-upload-branch', branch_name])
+    if mozharness_suite_config.get('download_symbols'):
+        extra_args.extend(['--download-symbols', mozharness_suite_config['download_symbols']])
+    reboot_command = mozharness_suite_config.get(
+        'reboot_command', suites.get('reboot_command', None))
+    hg_bin = mozharness_suite_config.get(
+        'hg_bin', suites.get('hg_bin', 'hg'))
+    properties['script_repo_revision'] = mozharness_tag
+    factory = ScriptFactory(
+        interpreter=mozharness_python,
+        scriptRepo=mozharness_repo,
+        scriptName=suites['script_path'],
+        hg_bin=hg_bin,
+        extra_args=extra_args,
+        use_credentials_file=True,
+        script_maxtime=suites.get('script_maxtime', 7200),
+        script_timeout=suites.get('timeout', 1800),
+        script_repo_manifest=script_repo_manifest,
+        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+        relengapi_archiver_rev=relengapi_archiver_rev,
+        reboot_command=reboot_command,
+        platform=platform,
+        env=mozharness_suite_config.get('env', {}),
+        log_eval_func=rc_eval_func({
+            0: SUCCESS,
+            1: WARNINGS,
+            2: FAILURE,
+            3: EXCEPTION,
+            4: RETRY,
+        }),
+    )
+    builder = {
+        'name': '%s %s' % (name_prefix, suites_name),
+        'slavenames': slavenames,
+        'builddir': '%s-%s' % (build_dir_prefix, suites_name),
+        'slavebuilddir': 'test',
+        'factory': factory,
+        'category': category,
+        'properties': properties,
+        'nextSlave': _nextAWSSlave_nowait,
+    }
+    builders.append(builder)
     return builders
 
 
@@ -935,13 +900,8 @@ def generateMozharnessTalosBuilder(platform, mozharness_repo, script_path,
     )
 
 
-def generateUnittestBuilders(
-    platform_name,
-    branch,
-    test_type,
-    create_pgo_builders,
-    **test_builder_kwargs
-):
+def generateUnittestBuilders(platform_name, branch, test_type,
+                             create_pgo_builders, **test_builder_kwargs):
     builders = []
     builders.extend(generateTestBuilder(**test_builder_kwargs))
     if create_pgo_builders and test_type == 'opt':
@@ -1126,7 +1086,7 @@ def generateBranchObjects(config, name, secrets=None):
        'mozilla-1.9.1'.
        config is a dictionary containing all of the necessary configuration
        information for a branch. The required keys depends greatly on what's
-       enabled for a branch (unittests, xulrunner, l10n, etc). The best way
+       enabled for a branch (unittests, l10n, etc). The best way
        to figure out what you need to pass is by looking at existing configs
        and using 'buildbot checkconfig' to verify.
     """
@@ -1146,7 +1106,6 @@ def generateBranchObjects(config, name, secrets=None):
     buildersForNightly = []
     buildersByProduct = {}
     nightlyBuilders = []
-    xulrunnerNightlyBuilders = []
     periodicBuilders = []
     weeklyBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
@@ -1291,8 +1250,6 @@ def generateBranchObjects(config, name, secrets=None):
                config.get('enable_hsts_update', False) or \
                config.get('enable_hpkp_update', False):
                 weeklyBuilders.append('%s periodic file update' % base_name)
-        if pf.get('enable_xulrunner', False) and config.get('enable_xulrunner', False):
-            xulrunnerNightlyBuilders.append('%s xulrunner nightly' % base_name)
 
     if config['enable_weekly_bundle']:
         bundle_builder = makeBundleBuilder(config, name)
@@ -1377,7 +1334,7 @@ def generateBranchObjects(config, name, secrets=None):
         scheduler_name_prefix = name
 
     if config.get("enable_onchange_scheduler", True):
-        for product, product_builders in buildersByProduct.items():
+        for product, product_builders in buildersByProduct.iteritems():
             if config.get('enable_try'):
                 fileIsImportant = lambda c: isHgPollerTriggered(c, config['hgurl'])
             else:
@@ -1417,7 +1374,7 @@ def generateBranchObjects(config, name, secrets=None):
 
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
-    if (nightlyBuilders or xulrunnerNightlyBuilders) and config.get("enable_nightly_scheduler", True):
+    if nightlyBuilders and config.get("enable_nightly_scheduler", True):
         if config.get('enable_nightly_lastgood', False):
             goodFunc = lastGoodFunc(
                 branch=config['repo_path'],
@@ -1441,7 +1398,7 @@ def generateBranchObjects(config, name, secrets=None):
                 # bug 482123 - keep the minute to avoid problems with DST
                 # changes
                 hour=config['start_hour'], minute=config['start_minute'],
-                builderNames=nightlyBuilders + xulrunnerNightlyBuilders,
+                builderNames=nightlyBuilders,
             )
         branchObjects['schedulers'].append(nightly_scheduler)
 
@@ -1462,7 +1419,7 @@ def generateBranchObjects(config, name, secrets=None):
             )
         branchObjects['schedulers'].append(periodic_scheduler)
 
-    for builder in nightlyBuilders + xulrunnerNightlyBuilders:
+    for builder in nightlyBuilders:
         # looping through l10n builders
 
         if builder in l10nNightlyBuilders and \
@@ -1515,7 +1472,7 @@ def generateBranchObjects(config, name, secrets=None):
         # shorthand
         pf = config['platforms'][platform]
 
-        # TODO still need to impl mozharness desktop: try, valgrind, xulrunnner,
+        # TODO still need to impl mozharness desktop: try, valgrind
         # etc builders
         # For now, let's just record when we create desktop builds like
         # generic, pgo, and nightly via mozharness and fall back to buildbot
@@ -1714,7 +1671,7 @@ def generateBranchObjects(config, name, secrets=None):
         if config.get('use_mozharness_repo_cache'):  # branch supports it
             mozharness_repo_cache = pf.get('mozharness_repo_cache')
 
-        # Some platforms shouldn't do dep builds (i.e. RPM)
+        # Some platforms shouldn't do dep builds
         if pf.get('enable_dep', True) or pf.get('enable_periodic', False):
             # This condition just checks to see if we used
             # mozharness to create this builder already. Once we port all
@@ -2277,69 +2234,55 @@ def generateBranchObjects(config, name, secrets=None):
                     config, name, platform, pf['base_name'], pf['slaves'])
                 branchObjects['builders'].append(periodicFileUpdateBuilder)
 
-        if pf.get('enable_xulrunner', False) and config.get('enable_xulrunner', False):
-            xr_env = pf['env'].copy()
-            xr_env['SYMBOL_SERVER_USER'] = config['stage_username_xulrunner']
-            xr_env['SYMBOL_SERVER_PATH'] = config[
-                'symbol_server_xulrunner_path']
-            xr_env['SYMBOL_SERVER_SSH_KEY'] = \
-                xr_env['SYMBOL_SERVER_SSH_KEY'].replace(config['stage_ssh_key'], config['stage_ssh_xulrunner_key'])
-            if 'xr_mozconfig' in pf:
-                mozconfig = pf['xr_mozconfig']
-            else:
-                mozconfig = '%s/%s/xulrunner' % (platform, name)
-            xulrunnerStageBasePath = '%s/xulrunner' % config['stage_base_path']
-            mozilla2_xulrunner_factory = NightlyBuildFactory(
-                env=xr_env,
-                objdir=pf['platform_objdir'],
-                platform=platform,
-                hgHost=config['hghost'],
-                repoPath=config['repo_path'],
-                buildToolsRepoPath=config['build_tools_repo_path'],
-                configRepoPath=config['config_repo_path'],
-                profiledBuild=False,
-                productName='xulrunner',
-                mozconfig=mozconfig,
-                srcMozconfig=pf.get('src_xulrunner_mozconfig'),
-                stageServer=config['stage_server'],
-                stageUsername=config['stage_username_xulrunner'],
-                stageGroup=config['stage_group'],
-                stageSshKey=config['stage_ssh_xulrunner_key'],
-                stageBasePath=xulrunnerStageBasePath,
-                uploadPackages=uploadPackages,
-                uploadSymbols=True,
-                nightly=True,
-                buildSpace=buildSpace,
-                clobberURL=config['base_clobber_url'],
-                clobberTime=clobberTime,
-                buildsBeforeReboot=pf['builds_before_reboot'],
-                packageSDK=True,
-                signingServers=secrets.get(pf.get('nightly_signing_servers')),
-                tooltool_manifest_src=pf.get('tooltool_manifest_src'),
-                tooltool_script=pf.get('tooltool_script'),
-                tooltool_url_list=config.get('tooltool_url_list', []),
-                use_mock=pf.get('use_mock'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                enable_pymake=enable_pymake,
-            )
-            mozilla2_xulrunner_builder = {
-                'name': '%s xulrunner nightly' % pf['base_name'],
-                'slavenames': pf['slaves'],
-                'builddir': '%s-%s-xulrunner-nightly' % (name, platform),
-                'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform), pf['stage_product']),
-                'factory': mozilla2_xulrunner_factory,
-                'category': name,
-                'nextSlave': _nextAWSSlave_sort,
-                'properties': {'branch': name, 'platform': platform, 'slavebuilddir': normalizeName('%s-%s-xulrunner-nightly' % (name, platform)), 'product': 'xulrunner'},
-            }
-            branchObjects['builders'].append(mozilla2_xulrunner_builder)
-
         # -- end of per-platform loop --
 
     return branchObjects
 
+
+def _makeGenerateMozharnessTalosBuilderArgs(suite, talos_branch, platform,
+                                            factory_kwargs, branch_config, platform_config):
+    mh_conf = platform_config['mozharness_config']
+
+    extra_args = []
+    if 'android' not in platform:
+        extra_args = ['--suite', suite,
+                      '--add-option',
+                      ','.join(['--webServer', 'localhost']),
+                      '--branch-name', talos_branch,
+                      '--system-bits', mh_conf['system_bits'],
+                      '--cfg', mh_conf['config_file']]
+        if factory_kwargs['fetchSymbols']:
+            extra_args += ['--download-symbols', 'ondemand']
+        if factory_kwargs["talos_from_source_code"]:
+            extra_args.append('--use-talos-json')
+        scriptpath = "scripts/talos_script.py"
+    else:
+        extra_args.extend(['--talos-suite', suite,
+                           '--cfg', 'android/android_panda_talos_releng.py',
+                           '--branch-name', talos_branch])
+        scriptpath = "scripts/android_panda_talos.py"
+    # add branch config specification if blobber is enabled
+    if branch_config.get('blob_upload'):
+        extra_args.extend(['--blob-upload-branch', talos_branch])
+    args = {
+        'platform': platform,
+        'mozharness_repo': branch_config['mozharness_repo'],
+        'script_path': scriptpath,
+        'hg_bin': platform_config[
+            'mozharness_config']['hg_bin'],
+        'mozharness_python': platform_config[
+            'mozharness_config']['mozharness_python'],
+        'extra_args': extra_args,
+        'script_timeout': platform_config['mozharness_config'].get('script_timeout', 3600),
+        'script_maxtime': (platform_config['mozharness_config'].get('talos_script_maxtime', platform_config['mozharness_config'].get('script_maxtime', 7200))),
+        'reboot_command': platform_config[
+            'mozharness_config'].get('reboot_command'),
+        'script_repo_manifest': branch_config.get(
+                'script_repo_manifest'),
+        'relengapi_archiver_repo_path': branch_config.get('mozharness_archiver_repo_path'),
+        'relengapi_archiver_rev': branch_config.get('mozharness_archiver_rev'),
+    }
+    return args
 
 def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                                ACTIVE_UNITTEST_PLATFORMS):
@@ -2355,10 +2298,15 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
     buildBranch = branch_config['build_branch']
 
-    for platform, platform_config in PLATFORMS.items():
+    for platform, platform_config in PLATFORMS.iteritems():
         if 'platforms' in branch_config and \
            platform in branch_config['platforms'] and \
            not branch_config['platforms'][platform].get('enable_talos', True):
+            continue
+
+        # if platform is in the branch config check for overriding slave_platforms at the branch level
+        # before creating the builders & schedulers
+        if not branch_config['platforms'].get(platform):
             continue
 
         if platform_config.get('is_mobile', False):
@@ -2380,456 +2328,397 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         else:
             create_pgo_builders = False
 
-        # if platform is in the branch config check for overriding slave_platforms at the branch level
-        # before creating the builders & schedulers
-        if branch_config['platforms'].get(platform):
-            slave_platforms = branch_config['platforms'][platform].get(
-                'slave_platforms', platform_config.get('slave_platforms', []))
-            talos_slave_platforms = branch_config['platforms'][platform].get(
-                'talos_slave_platforms', platform_config.get('talos_slave_platforms', []))
+        slave_platforms = branch_config['platforms'][platform].get(
+            'slave_platforms', platform_config.get('slave_platforms', []))
+        talos_slave_platforms = branch_config['platforms'][platform].get(
+            'talos_slave_platforms', platform_config.get('talos_slave_platforms', []))
 
-            # Map of # of test runs to builder names
-            talos_builders = {}
-            talos_pgo_builders = {}
+        # Map of # of test runs to builder names
+        talos_builders = {}
+        talos_pgo_builders = {}
 
-            try_default = True
-            if not branch_config['platforms'][platform].get('try_by_default', True):
-                try_default = False
-            elif not platform_config.get('try_by_default', True):
-                try_default = False
+        try_default = True
+        if not branch_config['platforms'][platform].get('try_by_default', True):
+            try_default = False
+        elif not platform_config.get('try_by_default', True):
+            try_default = False
 
-            for slave_platform in set(slave_platforms + talos_slave_platforms):
-                platform_name = platform_config[slave_platform]['name']
-                # this is to handle how a platform has more than one slave
-                # platform
-                slave_platform_try_default = try_default
-                if not platform_config[slave_platform].get('try_by_default', True):
-                    slave_platform_try_default = False
-                platformPrettyName = platform_name
-                if not slave_platform_try_default:
-                    platformPrettyName += ' try-nondefault'
-                prettyNames.setdefault(platform, []).append(platformPrettyName)
-                for suite, talosConfig in SUITES.items():
-                    tests, merge, extra, platforms = branch_config[
-                        '%s_tests' % suite]
-                    if tests == 0 or slave_platform not in platforms:
-                        continue
+        for slave_platform in set(slave_platforms + talos_slave_platforms):
+            platform_name = platform_config[slave_platform]['name']
+            # this is to handle how a platform has more than one slave
+            # platform
+            slave_platform_try_default = try_default
+            if not platform_config[slave_platform].get('try_by_default', True):
+                slave_platform_try_default = False
+            platformPrettyName = platform_name
+            if not slave_platform_try_default:
+                platformPrettyName += ' try-nondefault'
+            prettyNames.setdefault(platform, []).append(platformPrettyName)
+            for suite, talosConfig in SUITES.iteritems():
+                tests, merge, extra, platforms = branch_config[
+                    '%s_tests' % suite]
+                if tests == 0 or slave_platform not in platforms:
+                    continue
 
-                    # We only want to append '-Non-PGO' to platforms that
-                    # also have PGO builds.
-                    if create_pgo_builders:
-                        opt_branch_name = branchName + '-Non-PGO'
-                        opt_talos_branch = talosBranch + '-Non-PGO'
-                    else:
-                        opt_branch_name = branchName
-                        opt_talos_branch = talosBranch
+                # We only want to append '-Non-PGO' to platforms that
+                # also have PGO builds.
+                if create_pgo_builders:
+                    opt_branch_name = branchName + '-Non-PGO'
+                    opt_talos_branch = talosBranch + '-Non-PGO'
+                else:
+                    opt_branch_name = branchName
+                    opt_talos_branch = talosBranch
 
-                    factory_kwargs = {
-                        "OS": slave_platform,
-                        "supportUrlBase": branch_config['support_url_base'],
-                        "envName": platform_config['env_name'],
-                        "workdirBase": "../talos-data",
-                        "buildBranch": buildBranch,
-                        "branchName": opt_branch_name,
-                        "branch": branch,
-                        "talosBranch": opt_talos_branch,
-                        "configOptions": talosConfig,
-                        "talosCmd": branch_config['talos_command'],
-                        "fetchSymbols": branch_config['fetch_symbols'] and
-                        platform_config[
-                            slave_platform].get('download_symbols', True),
-                        "talos_from_source_code": branch_config.get('talos_from_source_code', False),
-                        "credentialsFile": os.path.join(os.getcwd(), "BuildSlaves.py"),
-                        "datazillaUrl": branch_config.get('datazilla_url')
-                    }
-                    factory_kwargs.update(extra)
+                factory_kwargs = {
+                    "OS": slave_platform,
+                    "supportUrlBase": branch_config['support_url_base'],
+                    "envName": platform_config['env_name'],
+                    "workdirBase": "../talos-data",
+                    "buildBranch": buildBranch,
+                    "branchName": opt_branch_name,
+                    "branch": branch,
+                    "talosBranch": opt_talos_branch,
+                    "configOptions": talosConfig,
+                    "talosCmd": branch_config['talos_command'],
+                    "fetchSymbols": branch_config['fetch_symbols'] and
+                    platform_config[
+                        slave_platform].get('download_symbols', True),
+                    "talos_from_source_code": branch_config.get('talos_from_source_code', False),
+                    "credentialsFile": os.path.join(os.getcwd(), "BuildSlaves.py"),
+                    "datazillaUrl": branch_config.get('datazilla_url')
+                }
+                factory_kwargs.update(extra)
 
-                    builddir = "%s_%s_test-%s" % (
-                        branch, slave_platform, suite)
-                    slavebuilddir = 'test'
+                builddir = "%s_%s_test-%s" % (
+                    branch, slave_platform, suite)
+                slavebuilddir = 'test'
+                properties = {
+                    'branch': branchProperty,
+                    'platform': slave_platform,
+                    'stage_platform': stage_platform,
+                    'product': stage_product,
+                    'builddir': builddir,
+                    'slavebuilddir': slavebuilddir,
+                }
+
+                assert branch_config.get('mozharness_talos', True) and platform_config[slave_platform].get('mozharness_talos', True)
+                args = _makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
+                                                               factory_kwargs, branch_config, platform_config)
+                factory = generateMozharnessTalosBuilder(**args)
+                properties['script_repo_revision'] = branch_config['mozharness_tag']
+                properties['repo_path'] = branch_config['repo_path']
+
+                builder = {
+                    'name': "%s %s talos %s" % (platform_name, branch, suite),
+                    'slavenames': platform_config[slave_platform]['slaves'],
+                    'builddir': builddir,
+                    'slavebuilddir': slavebuilddir,
+                    'factory': factory,
+                    'category': branch,
+                    'properties': properties,
+                    'env': MozillaEnvironments[platform_config['env_name']],
+                }
+
+                if not merge:
+                    nomergeBuilders.add(builder['name'])
+
+                pgo_only_suites = set(branch_config.get('pgo_only_suites', []))
+
+                if suite not in pgo_only_suites:
+                    talos_builders.setdefault(
+                        tests, []).append(builder['name'])
+                    branchObjects['builders'].append(builder)
+
+                if create_pgo_builders:
                     properties = {
                         'branch': branchProperty,
                         'platform': slave_platform,
-                        'stage_platform': stage_platform,
+                        'stage_platform': stage_platform + '-pgo',
                         'product': stage_product,
                         'builddir': builddir,
                         'slavebuilddir': slavebuilddir,
                     }
+                    assert branch_config.get('mozharness_talos') and not platform_config.get('is_mobile')
+                    args = _makeGenerateMozharnessTalosBuilderArgs(suite, talosBranch, platform,
+                                                                   factory_kwargs, branch_config, platform_config)
+                    pgo_factory = generateMozharnessTalosBuilder(**args)
+                    properties['script_repo_revision'] = branch_config['mozharness_tag']
+                    properties['repo_path'] = branch_config['repo_path']
 
-                    def _makeGenerateMozharnessTalosBuilderArgs(suite, talos_branch, platform,
-                                                                factory_kwargs, branch_config, platform_config):
-                        mh_conf = platform_config['mozharness_config']
-
-                        extra_args = []
-                        if 'android' not in platform:
-                            extra_args = ['--suite', suite,
-                                          '--add-option',
-                                          ','.join(['--webServer', 'localhost']),
-                                          '--branch-name', talos_branch,
-                                          '--system-bits', mh_conf['system_bits'],
-                                          '--cfg', mh_conf['config_file']]
-                            if factory_kwargs['fetchSymbols']:
-                                extra_args += ['--download-symbols', 'ondemand']
-                            if factory_kwargs["talos_from_source_code"]:
-                                extra_args.append('--use-talos-json')
-                            scriptpath = "scripts/talos_script.py"
-                        else:
-                            extra_args.extend(['--talos-suite', suite,
-                                               '--cfg', 'android/android_panda_talos_releng.py',
-                                               '--branch-name', talos_branch])
-                            scriptpath = "scripts/android_panda_talos.py"
-                        # add branch config specification if blobber is enabled
-                        if branch_config.get('blob_upload'):
-                            extra_args.extend(['--blob-upload-branch', talos_branch])
-                        args = {
-                            'platform': platform,
-                            'mozharness_repo': branch_config['mozharness_repo'],
-                            'script_path': scriptpath,
-                            'hg_bin': platform_config[
-                                'mozharness_config']['hg_bin'],
-                            'mozharness_python': platform_config[
-                                'mozharness_config']['mozharness_python'],
-                            'extra_args': extra_args,
-                            'script_timeout': platform_config['mozharness_config'].get('script_timeout', 3600),
-                            'script_maxtime': (platform_config['mozharness_config'].get('talos_script_maxtime', platform_config['mozharness_config'].get('script_maxtime', 7200))),
-                            'reboot_command': platform_config[
-                                'mozharness_config'].get('reboot_command'),
-                            'script_repo_manifest': branch_config.get(
-                                 'script_repo_manifest'),
-                            'relengapi_archiver_repo_path': branch_config.get('mozharness_archiver_repo_path'),
-                            'relengapi_archiver_rev': branch_config.get('mozharness_archiver_rev'),
-                        }
-                        return args
-                        # end of _makeGenerateMozharnessTalosBuilderArgs
-
-                    if branch_config.get('mozharness_talos', True) and platform_config[slave_platform].get('mozharness_talos', True):
-                        args = _makeGenerateMozharnessTalosBuilderArgs(suite, opt_talos_branch, platform,
-                                                                       factory_kwargs, branch_config, platform_config)
-                        factory = generateMozharnessTalosBuilder(**args)
-                        properties['script_repo_revision'] = branch_config['mozharness_tag']
-                        properties['repo_path'] = branch_config['repo_path']
-                    else:
-                        assert False
-
-                    builder = {
-                        'name': "%s %s talos %s" % (platform_name, branch, suite),
+                    pgo_builder = {
+                        'name': "%s %s pgo talos %s" % (platform_name, branch, suite),
                         'slavenames': platform_config[slave_platform]['slaves'],
-                        'builddir': builddir,
-                        'slavebuilddir': slavebuilddir,
-                        'factory': factory,
+                        'builddir': builddir + '-pgo',
+                        'slavebuilddir': slavebuilddir + '-pgo',
+                        'factory': pgo_factory,
                         'category': branch,
                         'properties': properties,
                         'env': MozillaEnvironments[platform_config['env_name']],
                     }
 
                     if not merge:
-                        nomergeBuilders.add(builder['name'])
+                        nomergeBuilders.add(pgo_builder['name'])
+                    branchObjects['builders'].append(pgo_builder)
+                    talos_pgo_builders.setdefault(
+                        tests, []).append(pgo_builder['name'])
 
-                    pgo_only_suites = set(branch_config.get('pgo_only_suites', []))
+            # Skip talos only platforms, not active platforms, branches
+            # with disabled unittests
+            if slave_platform not in slave_platforms:
+                continue
+            if platform not in ACTIVE_UNITTEST_PLATFORMS:
+                continue
+            if not branch_config.get('enable_unittests', True):
+                continue
+            if slave_platform not in branch_config['platforms'][platform]:
+                continue
 
-                    if suite not in pgo_only_suites:
-                        talos_builders.setdefault(
-                            tests, []).append(builder['name'])
-                        branchObjects['builders'].append(builder)
+            testTypes = []
+            # unittestSuites are gathered up for each platform from
+            # config.py
+            unittestSuites = []
+            if branch_config['platforms'][platform].get('enable_opt_unittests'):
+                testTypes.append('opt')
+            if branch_config['platforms'][platform].get('enable_debug_unittests'):
+                testTypes.append('debug')
 
-                    if create_pgo_builders:
-                        properties = {
-                            'branch': branchProperty,
-                            'platform': slave_platform,
-                            'stage_platform': stage_platform + '-pgo',
-                            'product': stage_product,
-                            'builddir': builddir,
-                            'slavebuilddir': slavebuilddir,
-                        }
-                        if branch_config.get('mozharness_talos') and not platform_config.get('is_mobile'):
-                            args = _makeGenerateMozharnessTalosBuilderArgs(suite, talosBranch, platform,
-                                                                           factory_kwargs, branch_config, platform_config)
-                            pgo_factory = generateMozharnessTalosBuilder(**args)
-                            properties['script_repo_revision'] = branch_config['mozharness_tag']
-                            properties['repo_path'] = branch_config['repo_path']
+            merge_tests = branch_config.get('enable_merging', True)
+
+            for test_type in testTypes:
+                test_builders = []
+                pgo_builders = []
+                triggeredUnittestBuilders = []
+                pgoUnittestBuilders = []
+                unittest_suites = "%s_unittest_suites" % test_type
+                build_dir_prefix = platform_config[slave_platform].get(
+                    'build_dir_prefix', slave_platform)
+                if test_type == "debug":
+                    # Debug tests always need to download symbols for
+                    # runtime assertions
+                    pf = branch_config['platforms'][platform]
+                    if pf.get('download_symbols', False) or pf.get('download_symbols_ondemand', True):
+                        # Copy the platform config so we can modify it here
+                        # safely
+                        branch_config['platforms'][platform] = deepcopy(branch_config['platforms'][platform])
+                        # Get a new reference
+                        pf = branch_config['platforms'][platform]
+                        pf['download_symbols'] = True
+                        pf['download_symbols_ondemand'] = False
+                    slave_platform_name = "%s-debug" % build_dir_prefix
+                elif test_type == "mobile":
+                    slave_platform_name = "%s-mobile" % build_dir_prefix
+                else:
+                    slave_platform_name = build_dir_prefix
+
+                # in case this builder is a set of suites
+                builders_with_sets_mapping = {}
+                # create builder names for schedulers
+                for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
+                    test_builders.extend(generateTestBuilderNames(
+                        '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
+                    if create_pgo_builders and test_type == 'opt':
+                        pgo_builders.extend(generateTestBuilderNames(
+                                            '%s %s pgo test' % (platform_name, branch), suites_name, suites))
+                    if isinstance(suites, dict) and 'trychooser_suites' in suites:
+                        for s in suites['trychooser_suites']:
+                            builders_with_sets_mapping[s] = suites_name
+
+                scheduler_slave_platform_identifier = platform_config[slave_platform].get(
+                    'scheduler_slave_platform_identifier', slave_platform)
+                triggeredUnittestBuilders.append(
+                    (
+                        'tests-%s-%s-%s-unittest' % (
+                            branch, scheduler_slave_platform_identifier, test_type),
+                        test_builders, merge_tests))
+                if create_pgo_builders and test_type == 'opt':
+                    pgoUnittestBuilders.append(
+                        (
+                            'tests-%s-%s-pgo-unittest' % (
+                                branch, scheduler_slave_platform_identifier),
+                            pgo_builders, merge_tests))
+
+                for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
+                    # create the builders
+                    test_builder_kwargs = {
+                        "config": branch_config,
+                        "branch_name": branch,
+                        "platform": platform,
+                        "name_prefix": "%s %s %s test" % (platform_name, branch, test_type),
+                        "build_dir_prefix": "%s_%s_test" % (branch, slave_platform_name),
+                        "suites_name": suites_name,
+                        "suites": suites,
+                        "mochitestLeakThreshold": branch_config.get('mochitest_leak_threshold', None),
+                        "crashtestLeakThreshold": branch_config.get('crashtest_leak_threshold', None),
+                        "slaves": platform_config[slave_platform]['slaves'],
+                        "resetHwClock": branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
+                        "stagePlatform": stage_platform,
+                        "stageProduct": stage_product
+                    }
+                    test_builder_chunks = None
+                    assert suites['use_mozharness']
+                    test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
+                    test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
+                    test_builder_kwargs['mozharness'] = True
+                    test_builder_kwargs['script_repo_manifest'] = branch_config.get('script_repo_manifest')
+                    test_builder_kwargs['relengapi_archiver_repo_path'] = branch_config.get('mozharness_archiver_repo_path')
+                    test_builder_kwargs['relengapi_archiver_rev'] = branch_config.get('mozharness_archiver_rev')
+                    # allow mozharness_python to be overridden per test slave platform in case Python
+                    # not installed to a consistent location.
+                    if 'mozharness_config' in platform_config[slave_platform] and \
+                            'mozharness_python' in platform_config[slave_platform]['mozharness_config']:
+                        test_builder_kwargs['mozharness_python'] = \
+                            platform_config[slave_platform]['mozharness_config']['mozharness_python']
+                    else:
+                        test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
+                    if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
+                        test_builder_kwargs['mozharness_suite_config'] = deepcopy(branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name])
+                    else:
+                        test_builder_kwargs[
+                            'mozharness_suite_config'] = {}
+                    test_builder_kwargs['mozharness_suite_config']['hg_bin'] = platform_config['mozharness_config']['hg_bin']
+                    test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
+                    test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
+                    test_builder_kwargs['mozharness_suite_config']['env'].update(branch_config['platforms'][platform].get('unittest-env', {}))
+                    if branch_config.get('blob_upload') and suites.get('blob_upload'):
+                        test_builder_kwargs['mozharness_suite_config']['blob_upload'] = True
+                    if suites.get('download_symbols', True) and branch_config['fetch_symbols'] and \
+                            branch_config['platforms'][platform][slave_platform].get('download_symbols', True):
+                        if test_type == 'opt':
+                            test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'ondemand'
                         else:
-                            assert False
+                            test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'true'
+                    if test_type == 'opt':
+                        test_builder_kwargs['is_debug'] = False
+                    else:
+                        test_builder_kwargs['is_debug'] = True
+                    if suites.get('totalChunks'):
+                        test_builder_chunks = suites['totalChunks']
 
-                        pgo_builder = {
-                            'name': "%s %s pgo talos %s" % (platform_name, branch, suite),
-                            'slavenames': platform_config[slave_platform]['slaves'],
-                            'builddir': builddir + '-pgo',
-                            'slavebuilddir': slavebuilddir + '-pgo',
-                            'factory': pgo_factory,
-                            'category': branch,
-                            'properties': properties,
-                            'env': MozillaEnvironments[platform_config['env_name']],
-                        }
+                    branchObjects['builders'].extend(
+                        generateChunkedUnittestBuilders(
+                            test_builder_chunks,
+                            platform_name,
+                            branch,
+                            test_type,
+                            create_pgo_builders,
+                            **test_builder_kwargs
+                        )
+                    )
 
-                        if not merge:
-                            nomergeBuilders.add(pgo_builder['name'])
-                        branchObjects['builders'].append(pgo_builder)
-                        talos_pgo_builders.setdefault(
-                            tests, []).append(pgo_builder['name'])
-
-                # Skip talos only platforms, not active platforms, branches
-                # with disabled unittests
-                if slave_platform in slave_platforms and platform in ACTIVE_UNITTEST_PLATFORMS.keys() \
-                        and branch_config.get('enable_unittests', True) and slave_platform in branch_config['platforms'][platform]:
-                    testTypes = []
-                    # unittestSuites are gathered up for each platform from
-                    # config.py
-                    unittestSuites = []
-                    if branch_config['platforms'][platform].get('enable_opt_unittests'):
-                        testTypes.append('opt')
-                    if branch_config['platforms'][platform].get('enable_debug_unittests'):
-                        testTypes.append('debug')
-
-                    merge_tests = branch_config.get('enable_merging', True)
-
-                    for test_type in testTypes:
-                        test_builders = []
-                        pgo_builders = []
-                        triggeredUnittestBuilders = []
-                        pgoUnittestBuilders = []
-                        unittest_suites = "%s_unittest_suites" % test_type
-                        build_dir_prefix = platform_config[slave_platform].get(
-                            'build_dir_prefix', slave_platform)
-                        if test_type == "debug":
-                            # Debug tests always need to download symbols for
-                            # runtime assertions
-                            pf = branch_config['platforms'][platform]
-                            if pf.get('download_symbols', False) or pf.get('download_symbols_ondemand', True):
-                                # Copy the platform config so we can modify it here
-                                # safely
-                                branch_config['platforms'][platform] = deepcopy(branch_config['platforms'][platform])
-                                # Get a new reference
-                                pf = branch_config['platforms'][platform]
-                                pf['download_symbols'] = True
-                                pf['download_symbols_ondemand'] = False
-                            slave_platform_name = "%s-debug" % build_dir_prefix
-                        elif test_type == "mobile":
-                            slave_platform_name = "%s-mobile" % build_dir_prefix
-                        else:
-                            slave_platform_name = build_dir_prefix
-
-                        # in case this builder is a set of suites
-                        builders_with_sets_mapping = {}
-                        # create builder names for TinderboxMailNotifier
-                        for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
-                            test_builders.extend(generateTestBuilderNames(
-                                '%s %s %s test' % (platform_name, branch, test_type), suites_name, suites))
-                            if create_pgo_builders and test_type == 'opt':
-                                pgo_builders.extend(generateTestBuilderNames(
-                                                    '%s %s pgo test' % (platform_name, branch), suites_name, suites))
-                            if type(suites) is dict and suites.has_key('trychooser_suites'):
-                                for s in suites['trychooser_suites']:
-                                    builders_with_sets_mapping[s] = suites_name
-
-                        scheduler_slave_platform_identifier = platform_config[slave_platform].get(
-                            'scheduler_slave_platform_identifier', slave_platform)
-                        triggeredUnittestBuilders.append(
-                            (
-                                'tests-%s-%s-%s-unittest' % (
-                                    branch, scheduler_slave_platform_identifier, test_type),
-                                test_builders, merge_tests))
-                        if create_pgo_builders and test_type == 'opt':
-                            pgoUnittestBuilders.append(
-                                (
-                                    'tests-%s-%s-pgo-unittest' % (
-                                        branch, scheduler_slave_platform_identifier),
-                                    pgo_builders, merge_tests))
-
-                        for suites_name, suites in branch_config['platforms'][platform][slave_platform][unittest_suites]:
-                            # create the builders
-                            test_builder_kwargs = {
-                                "config": branch_config,
-                                "branch_name": branch,
-                                "platform": platform,
-                                "name_prefix": "%s %s %s test" % (platform_name, branch, test_type),
-                                "build_dir_prefix": "%s_%s_test" % (branch, slave_platform_name),
-                                "suites_name": suites_name,
-                                "suites": suites,
-                                "mochitestLeakThreshold": branch_config.get('mochitest_leak_threshold', None),
-                                "crashtestLeakThreshold": branch_config.get('crashtest_leak_threshold', None),
-                                "slaves": platform_config[slave_platform]['slaves'],
-                                "resetHwClock": branch_config['platforms'][platform][slave_platform].get('reset_hw_clock', False),
-                                "stagePlatform": stage_platform,
-                                "stageProduct": stage_product
-                            }
-                            test_builder_chunks = None
-                            if isinstance(suites, dict) and "use_mozharness" in suites:
-                                test_builder_kwargs['mozharness_repo'] = branch_config['mozharness_repo']
-                                test_builder_kwargs['mozharness_tag'] = branch_config['mozharness_tag']
-                                test_builder_kwargs['mozharness'] = True
-                                test_builder_kwargs['script_repo_manifest'] = branch_config.get('script_repo_manifest')
-                                test_builder_kwargs['relengapi_archiver_repo_path'] = branch_config.get('mozharness_archiver_repo_path')
-                                test_builder_kwargs['relengapi_archiver_rev'] = branch_config.get('mozharness_archiver_rev')
-                                # allow mozharness_python to be overridden per test slave platform in case Python
-                                # not installed to a consistent location.
-                                if 'mozharness_config' in platform_config[slave_platform] and \
-                                        'mozharness_python' in platform_config[slave_platform]['mozharness_config']:
-                                    test_builder_kwargs['mozharness_python'] = \
-                                        platform_config[slave_platform]['mozharness_config']['mozharness_python']
-                                else:
-                                    test_builder_kwargs['mozharness_python'] = platform_config['mozharness_config']['mozharness_python']
-                                if suites_name in branch_config['platforms'][platform][slave_platform].get('suite_config', {}):
-                                    test_builder_kwargs['mozharness_suite_config'] = deepcopy(branch_config['platforms'][platform][slave_platform]['suite_config'][suites_name])
-                                else:
-                                    test_builder_kwargs[
-                                        'mozharness_suite_config'] = {}
-                                test_builder_kwargs['mozharness_suite_config']['hg_bin'] = platform_config['mozharness_config']['hg_bin']
-                                test_builder_kwargs['mozharness_suite_config']['reboot_command'] = platform_config['mozharness_config']['reboot_command']
-                                test_builder_kwargs['mozharness_suite_config']['env'] = MozillaEnvironments.get('%s-unittest' % platform, {}).copy()
-                                test_builder_kwargs['mozharness_suite_config']['env'].update(branch_config['platforms'][platform].get('unittest-env', {}))
-                                if branch_config.get('blob_upload') and suites.get('blob_upload'):
-                                    test_builder_kwargs['mozharness_suite_config']['blob_upload'] = True
-                                if suites.get('download_symbols', True) and branch_config['fetch_symbols'] and \
-                                        branch_config['platforms'][platform][slave_platform].get('download_symbols', True):
-                                    if test_type == 'opt':
-                                        test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'ondemand'
-                                    else:
-                                        test_builder_kwargs['mozharness_suite_config']['download_symbols'] = 'true'
-                                if test_type == 'opt':
-                                    test_builder_kwargs['is_debug'] = False
-                                else:
-                                    test_builder_kwargs['is_debug'] = True
-                                if suites.get('totalChunks'):
-                                    test_builder_chunks = suites['totalChunks']
-
-                            branchObjects['builders'].extend(
-                                generateChunkedUnittestBuilders(
-                                    test_builder_chunks,
-                                    platform_name,
-                                    branch,
-                                    test_type,
-                                    create_pgo_builders,
-                                    **test_builder_kwargs
-                                )
-                            )
-
-                        if branch_config.get("enable_test_schedulers", True):
-                            for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
-                                for test in test_builders:
-                                    unittestSuites.append(test.split(' ')[-1])
-                                scheduler_branch = ('%s-%s-%s-unittest' %
-                                                    (branch, platform, test_type))
-                                if not merge:
-                                    nomergeBuilders.update(test_builders)
-                                extra_args = {}
-                                if branch_config.get('enable_try'):
-                                    scheduler_class = BuilderChooserScheduler
-                                    extra_args['chooserFunc'] = tryChooser
-                                    extra_args['prettyNames'] = prettyNames
-                                    extra_args['unittestSuites'] = unittestSuites
-                                    extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
-                                    extra_args['buildbotBranch'] = branch
-                                    branchObjects['schedulers'].append(scheduler_class(
-                                            name=scheduler_name,
-                                            branch=scheduler_branch,
-                                            builderNames=test_builders,
-                                            treeStableTimer=None,
-                                            **extra_args
-                                    ))
-                                else:
-                                    scheduler_class = Scheduler
-                                    suites_by_skipconfig = collections.defaultdict(list)
-                                    skipcount = 0
-                                    skiptimeout = 0
-                                    for test in test_builders:
-                                        skipcount = 0
-                                        skiptimeout = 0
-                                        if branch_config['platforms'][platform][slave_platform].get('skipconfig'):
-                                            #extract last word in the test string as it should correspond to the name of the test
-                                            test_name = test.split()[-1]
-                                            if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
-                                                skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
-                                                builderMergeLimits[test] = skipcount
-                                        suites_by_skipconfig[skipcount, skiptimeout].append(test)
-
-                                    # Create a new Scheduler for every skip config
-                                    for (skipcount, skiptimeout), test_builders in suites_by_skipconfig.items():
-                                        scheduler_class = Scheduler
-                                        s_name = scheduler_name
-                                        extra_args = {}
-
-                                        if skipcount > 0:
-                                            scheduler_class = EveryNthScheduler
-                                            extra_args['n'] = skipcount
-                                            extra_args['idleTimeout'] = skiptimeout
-                                            s_name = scheduler_name + "-" + str(skipcount) + "-"  + str(skiptimeout)
-
-                                        branchObjects['schedulers'].append(scheduler_class(
-                                            name=s_name,
-                                            branch=scheduler_branch,
-                                            builderNames=test_builders,
-                                            treeStableTimer=None,
-                                            **extra_args
-                                        ))
-                            for scheduler_name, test_builders, merge in pgoUnittestBuilders:
-                                for test in test_builders:
-                                    unittestSuites.append(test.split(' ')[-1])
-                                scheduler_branch = '%s-%s-pgo-unittest' % (
-                                    branch, platform)
-                                if not merge:
-                                    nomergeBuilders.update(pgo_builders)
-                                extra_args = {}
-                                if branch_config.get('enable_try'):
-                                    scheduler_class = BuilderChooserScheduler
-                                    extra_args['chooserFunc'] = tryChooser
-                                    extra_args['prettyNames'] = prettyNames
-                                    extra_args['unittestSuites'] = unittestSuites
-                                    extra_args['buildbotBranch'] = branch
-                                else:
-                                    scheduler_class = Scheduler
-                                branchObjects['schedulers'].append(scheduler_class(
-                                    name=scheduler_name,
-                                    branch=scheduler_branch,
-                                    builderNames=pgo_builders,
-                                    treeStableTimer=None,
-                                    **extra_args
-                                ))
-
-            if branch_config.get("enable_test_schedulers", True):
-                # Create one scheduler per # of tests to run
-                for tests, builder_names in talos_builders.items():
+                for scheduler_name, test_builders, merge in triggeredUnittestBuilders:
+                    for test in test_builders:
+                        unittestSuites.append(test.split(' ')[-1])
+                    scheduler_branch = ('%s-%s-%s-unittest' %
+                                        (branch, platform, test_type))
+                    if not merge:
+                        nomergeBuilders.update(test_builders)
                     extra_args = {}
-                    assert tests == 1
-                    scheduler_class = Scheduler
-                    name = 'tests-%s-%s-talos' % (branch, platform)
-
                     if branch_config.get('enable_try'):
                         scheduler_class = BuilderChooserScheduler
                         extra_args['chooserFunc'] = tryChooser
                         extra_args['prettyNames'] = prettyNames
-                        extra_args['talosSuites'] = SUITES.keys()
+                        extra_args['unittestSuites'] = unittestSuites
+                        extra_args['buildersWithSetsMap'] = builders_with_sets_mapping
                         extra_args['buildbotBranch'] = branch
+                        branchObjects['schedulers'].append(scheduler_class(
+                                name=scheduler_name,
+                                branch=scheduler_branch,
+                                builderNames=test_builders,
+                                treeStableTimer=None,
+                                **extra_args
+                        ))
+                    else:
+                        scheduler_class = Scheduler
+                        suites_by_skipconfig = collections.defaultdict(list)
+                        skipcount = 0
+                        skiptimeout = 0
+                        for test in test_builders:
+                            skipcount = 0
+                            skiptimeout = 0
+                            if branch_config['platforms'][platform][slave_platform].get('skipconfig'):
+                                #extract last word in the test string as it should correspond to the name of the test
+                                test_name = test.split()[-1]
+                                if (test_type, test_name) in branch_config['platforms'][platform][slave_platform]['skipconfig']:
+                                    skipcount, skiptimeout = branch_config['platforms'][platform][slave_platform]['skipconfig'][test_type, test_name]
+                                    builderMergeLimits[test] = skipcount
+                            suites_by_skipconfig[skipcount, skiptimeout].append(test)
 
-                    s = scheduler_class(
-                        name=name,
-                        branch='%s-%s-talos' % (branch, platform),
-                        treeStableTimer=None,
-                        builderNames=builder_names,
-                        **extra_args
-                    )
-                    branchObjects['schedulers'].append(s)
-                # PGO Schedulers
-                for tests, builder_names in talos_pgo_builders.items():
+                        # Create a new Scheduler for every skip config
+                        for (skipcount, skiptimeout), test_builders in suites_by_skipconfig.iteritems():
+                            scheduler_class = Scheduler
+                            s_name = scheduler_name
+                            extra_args = {}
+
+                            if skipcount > 0:
+                                scheduler_class = EveryNthScheduler
+                                extra_args['n'] = skipcount
+                                extra_args['idleTimeout'] = skiptimeout
+                                s_name = scheduler_name + "-" + str(skipcount) + "-"  + str(skiptimeout)
+
+                            branchObjects['schedulers'].append(scheduler_class(
+                                name=s_name,
+                                branch=scheduler_branch,
+                                builderNames=test_builders,
+                                treeStableTimer=None,
+                                **extra_args
+                            ))
+                for scheduler_name, test_builders, merge in pgoUnittestBuilders:
+                    for test in test_builders:
+                        unittestSuites.append(test.split(' ')[-1])
+                    scheduler_branch = '%s-%s-pgo-unittest' % (
+                        branch, platform)
+                    if not merge:
+                        nomergeBuilders.update(pgo_builders)
                     extra_args = {}
-                    assert tests == 1
-                    scheduler_class = Scheduler
+                    if branch_config.get('enable_try'):
+                        scheduler_class = BuilderChooserScheduler
+                        extra_args['chooserFunc'] = tryChooser
+                        extra_args['prettyNames'] = prettyNames
+                        extra_args['unittestSuites'] = unittestSuites
+                        extra_args['buildbotBranch'] = branch
+                    else:
+                        scheduler_class = Scheduler
+                    branchObjects['schedulers'].append(scheduler_class(
+                        name=scheduler_name,
+                        branch=scheduler_branch,
+                        builderNames=pgo_builders,
+                        treeStableTimer=None,
+                        **extra_args
+                    ))
+
+        def makeTalosScheduler(builders, pgo=False):
+            schedulers = []
+            for tests, builder_names in builders.iteritems():
+                extra_args = {}
+                assert tests == 1
+                scheduler_class = Scheduler
+                if pgo:
                     name = 'tests-%s-%s-pgo-talos' % (branch, platform)
+                    scheduler_branch = '%s-%s-pgo-talos' % (branch, platform)
+                else:
+                    name = 'tests-%s-%s-talos' % (branch, platform)
+                    scheduler_branch = '%s-%s-talos' % (branch, platform)
 
-                    if branch_config.get('enable_try'):
-                        scheduler_class = BuilderChooserScheduler
-                        extra_args['chooserFunc'] = tryChooser
-                        extra_args['prettyNames'] = prettyNames
-                        extra_args['talosSuites'] = SUITES.keys()
-                        extra_args['buildbotBranch'] = branch
+                if branch_config.get('enable_try'):
+                    scheduler_class = BuilderChooserScheduler
+                    extra_args['chooserFunc'] = tryChooser
+                    extra_args['prettyNames'] = prettyNames
+                    extra_args['talosSuites'] = SUITES.keys()
+                    extra_args['buildbotBranch'] = branch
 
-                    s = scheduler_class(
-                        name=name,
-                        branch='%s-%s-pgo-talos' % (branch, platform),
-                        treeStableTimer=None,
-                        builderNames=builder_names,
-                        **extra_args
-                    )
-                    branchObjects['schedulers'].append(s)
+                s = scheduler_class(
+                    name=name,
+                    branch=scheduler_branch,
+                    treeStableTimer=None,
+                    builderNames=builder_names,
+                    **extra_args
+                )
+                schedulers.append(s)
+            return schedulers
+
+        # Create talos schedulers
+        branchObjects['schedulers'].extend(makeTalosScheduler(talos_builders, False))
+        branchObjects['schedulers'].extend(makeTalosScheduler(talos_pgo_builders, True))
 
     return branchObjects
 
@@ -2959,7 +2848,7 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
 
     prettyNames = {}   # Map(variant => Map(platform => prettyName))
     builderNames = {}  # Map(variant => builder names)
-    for platform, variants in config['variants'].items():
+    for platform, variants in config['variants'].iteritems():
         if platform not in bconfig['platforms']:
             continue
 
