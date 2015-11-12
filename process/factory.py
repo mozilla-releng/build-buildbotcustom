@@ -1338,7 +1338,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
 
         if self.profiledBuild:
             command.append('MOZ_PGO=1')
-        compile_Env = copy.deepcopy(self.env)
+        compile_Env = self.env.copy()
         compile_Env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         self.addStep(MockCommand(
                      name='compile',
