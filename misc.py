@@ -2807,6 +2807,7 @@ def generateFuzzingObjects(config, SLAVES):
         env['GIT_LITHIUM_REPO'] = config['lithium_repo']
         env['GIT_FUNFUZZ_REPO'] = config['funfuzz_repo']
         env['GIT_FUNFUZZ_PRIVATE_REPO'] = config['funfuzz_private_repo']
+        env['GIT_FUZZMANAGER_REPO'] = config['fuzzmanager_repo']
         env['FUZZ_REMOTE_HOST'] = config['fuzzing_remote_host']
         env['FUZZ_BASE_DIR'] = config['fuzzing_base_dir']
         if 'win' in platform:
