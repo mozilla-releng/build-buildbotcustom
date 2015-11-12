@@ -1524,6 +1524,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         pkg_targets = ['package', 'package-tests']
         if self.enableInstaller:
             pkg_targets.append('installer')
+        makeEnv = env.copy()
+        makeEnv.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         for t in pkg_targets:
             self.addStep(MockCommand(
                          name='make %s pretty' % t,
@@ -1541,7 +1543,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                      command=self.makeCmd + ['-C',
                                              '%s/tools/update-packaging' % self.mozillaObjdir,
                                              'MOZ_PKG_PRETTYNAMES=1'],
-                     env=env,
+                     env=makeEnv,
                      haltOnFailure=False,
                      flunkOnFailure=False,
                      warnOnFailure=True,
