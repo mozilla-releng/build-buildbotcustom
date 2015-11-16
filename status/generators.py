@@ -2,12 +2,13 @@ import re
 
 
 def buildTryChangeMessage(change, packageDir):
-    got_revision = revision = change.revision[:12]
+    got_revision = revision = change.revision
+    short_revision = revision[:12]
     who = change.who
     tree = change.branch
     packageDir = packageDir % locals()
     msgdict = {"type": "plain"}
-    msgdict['subject'] = "%(tree)s submission %(revision)s" % locals()
+    msgdict['subject'] = "%(tree)s submission %(short_revision)s" % locals()
     msgdict['headers'] = {"In-Reply-To": "<%(tree)s-%(revision)s>" % locals(),
                           "References": "<%(tree)s-%(revision)s>" % locals(),
                           }
@@ -15,7 +16,7 @@ def buildTryChangeMessage(change, packageDir):
 Thank you for your try submission. It's the best!
 
 Results will be displayed on Treeherder as they come in:
-https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s
+https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(short_revision)s
 """ % locals()
 
     commitTitles = change.properties.getProperty('commit_titles')
@@ -28,7 +29,7 @@ https://treeherder.mozilla.org/#/jobs?repo=%(tree)s&revision=%(revision)s
             msgdict['body'] += """\
 
 It looks like this submission has talos jobs. You can compare the performance of your push against a baseline revision here:
-https://treeherder.mozilla.org/perf.html#/comparechooser?newProject=try&newRevision=%(revision)s
+https://treeherder.mozilla.org/perf.html#/comparechooser?newProject=try&newRevision=%(short_revision)s
 """ % locals()
 
         msgdict['subject'] += ': %(title)s' % locals()
