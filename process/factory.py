@@ -1912,7 +1912,7 @@ class TryBuildFactory(MercurialBuildFactory):
         uploadEnv['POST_UPLOAD_CMD'] = postUploadCmdPrefix(
             upload_dir=tinderboxBuildsDir,
             product=self.productName,
-            revision=WithProperties('%(got_revision)s'),
+            revision=WithProperties('%(revision)s'),
             who=WithProperties('%(who)s'),
             builddir=WithProperties('%(branch)s-%(stage_platform)s'),
             buildid=WithProperties('%(buildid)s'),
