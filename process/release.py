@@ -943,6 +943,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderPrefix('partner_repack', platform))
 
     if releaseConfig.get('autoGenerateChecksums', True):
+        extra_extra_args = []
+        if releaseConfig['productName'] == 'fennec':
+            extra_extra_args = ['--add-action=copy-info-files']
         checksums_factory = SigningScriptFactory(
             signingServers=getSigningServers('linux'),
             scriptRepo=mozharness_repo,
@@ -953,13 +956,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 "--version", releaseConfig["version"],
                 "--build-number", releaseConfig["buildNumber"],
                 "--bucket-name-prefix", branchConfig["bucket_prefix"],
-                "--upload-host", releaseConfig["stagingServer"],
-                "--upload-user", branchConfig["stage_username"],
-                "--upload-ssh-key", "~/.ssh/%s" % branchConfig["stage_ssh_key"],
-                "--gecko-repo", "%s%s" % (branchConfig["hgurl"], relengapi_archiver_repo_path),
-                "--gecko-revision", releaseTag,
+                "--credentials", releaseConfig["S3Credentials"],
                 "--tools-repo", branchConfig["platforms"]["linux64"]["tools_repo_cache"],
-            ],
+            ] + extra_extra_args,
             relengapi_archiver_repo_path=relengapi_archiver_repo_path,
             relengapi_archiver_release_tag=releaseTag,
         )
