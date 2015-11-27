@@ -1853,4 +1853,38 @@ def generateReleasePromotionBuilders(config, name, secrets):
         }
         builders.append(l10n_builder)
 
+    bouncer_mh_cfg = {
+        "script_name": "scripts/bouncer_submitter.py",
+        "extra_args": [
+             "-c",  config['bouncer_submitter_config'],
+             "--credentials-file", "oauth.txt",
+             "--bouncer-api-prefix", config['tuxedoServerUrl'],
+        ]
+    }
+
+    bouncer_buildername = "release-{branch}_{product}_bncr_sub".format(
+                           branch=name,
+                           product=pf["product_name"],
+                         )
+
+    bouncer_submitter_factory = makeMHFactory(config, pf,
+                                              mh_cfg=bouncer_mh_cfg,
+                                              use_credentials_file=True,
+                                             )
+
+    bouncer_builder = {
+                      "name": bouncer_buildername, 
+                      "slavenames": config["platforms"]["linux"]["slaves"] + config["platforms"]["linux64"]["slaves"],
+                      "builddir": bouncer_buildername,
+                      "slavebuilddir": normalizeName(bouncer_buildername),
+                      "factory": bouncer_submitter_factory,
+                      "category": "release-%s-%s" % (config["bouncer_branch"], ''),
+                      "properties": {
+                          "platform": None,
+                          "product": pf["product_name"],
+                          "branch": config["bouncer_branch"]
+                      }
+    }
+    builders.append(bouncer_builder)
+
     return builders
