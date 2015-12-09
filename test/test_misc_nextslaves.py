@@ -11,7 +11,7 @@ from buildbot.db.schema.manager import DBSchemaManager
 
 import buildbotcustom.misc
 from buildbotcustom.misc import _nextIdleSlave, _nextAWSSlave, \
-    _classifyAWSSlaves, _get_pending, J
+    _classifyAWSSlaves, _get_pending
 
 
 class TestNextSlaveFuncs(unittest.TestCase):
@@ -25,9 +25,6 @@ class TestNextSlaveFuncs(unittest.TestCase):
         self.builder = builder = mock.Mock()
         builder.builder_status.buildCache.keys.return_value = []
         builder.slaves = self.slaves
-
-        # Don't check jacuzzi allocations for tests
-        J.get_slaves = lambda builder, slaves: slaves
 
     def test_nextIdleSlave_avail(self):
         """Test that _nextIdleSlave returns a slow slave if enough slow
