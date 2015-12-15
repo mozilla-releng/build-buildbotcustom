@@ -1360,28 +1360,29 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         Looks for self._gotBuildInfo to make sure we only run this set of steps
         once."""
         if not getattr(self, '_gotBuildInfo', False):
-            printconfig_env = self.env.copy()
-            del printconfig_env['MOZ_OBJDIR']
-            printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
-            printconfig_base_command = [
-                'python2.7', WithProperties('%(basedir)s/build/mach'), 'python',
-                'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
-                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-            ]
-
+            if self.mozillaSrcDir:
+                # Thunderbird uses the c-c's config/printconfigsetting.py due to
+                # the removal of configobj.py (bug 957911)
+                useConfigDir = '%s/config' % self.baseWorkDir
+            else:
+                useConfigDir = 'build%s/config' % self.mozillaSrcDir
             self.addStep(SetProperty(
-                command=printconfig_base_command + ['App', 'BuildID'],
+                command=[
+                    'python', '%s/printconfigsetting.py' % useConfigDir,
+                    'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                    'App', 'BuildID'],
                 property='buildid',
-                workdir=printconfig_workdir,
-                env=printconfig_env,
+                workdir='.',
                 description=['getting', 'buildid'],
                 descriptionDone=['got', 'buildid'],
             ))
             self.addStep(SetProperty(
-                command=printconfig_base_command + ['App', 'SourceStamp'],
+                command=[
+                    'python', '%s/printconfigsetting.py' % useConfigDir,
+                    'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                    'App', 'SourceStamp'],
                 property='sourcestamp',
-                workdir=printconfig_workdir,
-                env=printconfig_env,
+                workdir='.',
                 description=['getting', 'sourcestamp'],
                 descriptionDone=['got', 'sourcestamp']
             ))
@@ -1646,33 +1647,35 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                                             fileType='installer',
                                             haltOnFailure=True)
 
-        printconfig_env = self.env.copy()
-        del printconfig_env['MOZ_OBJDIR']
-        printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
-        printconfig_base_command = [
-            'python2.7', WithProperties('%(basedir)s/build/mach'), 'python',
-            'build%s/config/printconfigsetting.py' % self.mozillaSrcDir,
-            'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-        ]
+        if self.mozillaSrcDir:
+            useConfigDir = '%s/config' % self.baseWorkDir
+        else:
+            useConfigDir = 'build%s/config' % self.mozillaSrcDir
         self.addStep(SetProperty(
-            command=printconfig_base_command + ['App', 'BuildID'],
+            command=[
+                'python', '%s/printconfigsetting.py' % useConfigDir,
+                        'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                        'App', 'BuildID'],
             property='buildid',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
             name='get_build_id',
         ))
         self.addStep(SetProperty(
-            command=printconfig_base_command + ['App', 'Version'],
+            command=[
+                'python', '%s/printconfigsetting.py' % useConfigDir,
+                        'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                        'App', 'Version'],
             property='appVersion',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
             name='get_app_version',
         ))
         self.addStep(SetProperty(
-            command=printconfig_base_command + ['App', 'Name'],
+            command=[
+                'python', '%s/printconfigsetting.py' % useConfigDir,
+                        'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                        'App', 'Name'],
             property='appName',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
             name='get_app_name',
         ))
         self.pkg_env = pkg_env
@@ -2145,22 +2148,23 @@ class NightlyBuildFactory(MercurialBuildFactory):
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
         ))
-        printconfig_env = self.env.copy()
-        del printconfig_env['MOZ_OBJDIR']
-        printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
-        printconfig_base_command = [
-            'python2.7', WithProperties('%(basedir)s/build/mach'), 'python',
-            '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
-            WithProperties(self.absMozillaObjDir + '/%(previous_inipath)s')
-        ]
+        if self.mozillaSrcDir:
+            # Thunderbird uses mozilla/ but uses
+            # comm-*'s /config/printconfigsettings.py
+            useConfigDir = '%s/config' % self.baseWorkDir
+        else:
+            useConfigDir = '%s/config' % self.absMozillaSrcDir
         self.addStep(SetProperty(
             name='set_previous_buildid',
             description=['set', 'previous', 'buildid'],
             doStepIf=self.previousMarExists,
-            command=printconfig_base_command + ['App', 'BuildID'],
+            command=['python',
+                     '%s/printconfigsetting.py' % useConfigDir,
+                     WithProperties(
+                         self.absMozillaObjDir + '/%(previous_inipath)s'),
+                     'App', 'BuildID'],
             property='previous_buildid',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
             haltOnFailure=True,
         ))
         for dir in ['current', 'previous']:
@@ -3517,34 +3521,36 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             workdir=self.absMozillaObjDir,
             haltOnFailure=True,
         ))
-        printconfig_env = self.env.copy()
-        del printconfig_env['MOZ_OBJDIR']
-        printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
-        printconfig_base_command = [
-            'python2.7', WithProperties('%(basedir)s/build/mach'), 'python',
-            '%s/config/printconfigsetting.py' % self.absMozillaSrcDir,
-            WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
-        ]
+        if self.mozillaSrcDir:
+            useConfigDir = '%s/config' % self.baseWorkDir
+        else:
+            useConfigDir = '%s/config' % self.absMozillaSrcDir
         self.addStep(SetProperty(
-            command=printconfig_base_command + ['App', 'BuildID'],
+            command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'BuildID'],
             name='get_build_id',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
+            env=self.env,
             property='buildid',
         ))
         self.addStep(SetProperty(
-            command=printconfig_base_command + ['App', 'Version'],
+            command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'Version'],
             property='appVersion',
             name='get_app_version',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
+            env=self.env,
         ))
         self.addStep(SetProperty(
-            command=printconfig_base_command + ['App', 'Name'],
+            command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                     WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
+                     'App', 'Name'],
             property='appName',
             name='get_app_name',
-            workdir=printconfig_workdir,
-            env=printconfig_env,
+            workdir='.',
+            env=self.env,
         ))
 
         if self.l10nNightlyUpdate:
