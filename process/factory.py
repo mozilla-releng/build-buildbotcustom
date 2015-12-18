@@ -3256,6 +3256,13 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         prettyEnv = self.env.copy()
         prettyEnv['MOZ_PKG_PRETTYNAMES'] = '1'
         prettyEnv['ZIP_IN'] = WithProperties('%(zip_in)s')
+
+        if self.productName == 'thunderbird' and self.platform.startswith('macosx'):
+            # This is a hack to get Thunderbird mac repacks working again and
+            # it should likely be checked if this code also works with all
+            # products. See bug 1231174 for more details.
+            prettyEnv.update({'MOZ_CURRENT_PROJECT': os.path.basename(self.objdir)})
+
         if self.platform.startswith('win'):
             self.addStep(MockProperty(
                          command=self.makeCmd + ['--no-print-directory',
@@ -3514,13 +3521,21 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
 
     def doRepack(self):
         self.downloadMarTools()
+
+        installersEnv = self.env.copy()
+        if self.productName == 'thunderbird' and self.platform.startswith('macosx'):
+            # This is a hack to get Thunderbird mac repacks working again and
+            # it should likely be checked if this code also works with all
+            # products. See bug 1231174 for details.
+            installersEnv.update({'MOZ_CURRENT_PROJECT': os.path.basename(self.objdir)})
+
         self.addStep(MockCommand(
                      name='repack_installers',
                      description=['repack', 'installers'],
                      command=self.makeCmd + [WithProperties('installers-%(locale)s'),
                                              WithProperties('LOCALE_MERGEDIR=%(basedir)s/' +
                                                             "%s/merged" % self.baseWorkDir)],
-                     env=self.env,
+                     env=installersEnv,
                      haltOnFailure=True,
                      workdir='%s/%s/locales' % (self.absObjDir, self.appName),
                      mock=self.use_mock,
