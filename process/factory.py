@@ -1368,9 +1368,13 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 python = ['c:/mozilla-build/python27/python', '-u']
             else:
                 python = ['/tools/buildbot/bin/python']
+            if self.mozillaSrcDir:
+                machPath = '%(basedir)s/build/mozilla/mach'
+            else:
+                machPath = '%(basedir)s/build/mach'
             # we need abs paths because we are in a non relative workdir
             printconfig_base_command = python + [
-                WithProperties('%(basedir)s/build/mach'), 'python',
+                WithProperties(machPath), 'python',
                 WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
                 WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
             ]
@@ -1660,9 +1664,13 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             python = ['c:/mozilla-build/python27/python', '-u']
         else:
             python = ['/tools/buildbot/bin/python']
+        if self.mozillaSrcDir:
+            machPath = '%(basedir)s/build/mozilla/mach'
+        else:
+            machPath = '%(basedir)s/build/mach'
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
-            WithProperties('%(basedir)s/build/mach'), 'python',
+            WithProperties(machPath), 'python',
             WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
             WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
         ]
@@ -2165,9 +2173,13 @@ class NightlyBuildFactory(MercurialBuildFactory):
             python = ['c:/mozilla-build/python27/python', '-u']
         else:
             python = ['/tools/buildbot/bin/python']
+        if self.mozillaSrcDir:
+            machPath = '%(basedir)s/build/mozilla/mach'
+        else:
+            machPath = '%(basedir)s/build/mach'
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
-            WithProperties('%(basedir)s/build/mach'), 'python',
+            WithProperties(machPath), 'python',
             # abs*Dir attrs lie. they are not absolute paths
             WithProperties('%(basedir)s/' + '%s/config/printconfigsetting.py' % self.absMozillaSrcDir),
             WithProperties('%(basedir)s/' + self.absMozillaObjDir + '/%(previous_inipath)s')
@@ -3559,9 +3571,13 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             python = ['c:/mozilla-build/python27/python', '-u']
         else:
             python = ['/tools/buildbot/bin/python']
+        if self.mozillaSrcDir:
+            machPath = '%(basedir)s/build/mozilla/mach'
+        else:
+            machPath = '%(basedir)s/build/mach'
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
-            WithProperties('%(basedir)s/build/mach'), 'python',
+            WithProperties(machPath), 'python',
             # abs*Dir attrs lie. they are not absolute paths
             WithProperties('%(basedir)s/' + '%s/config/printconfigsetting.py' % self.absMozillaSrcDir),
             WithProperties('%(basedir)s/' + self.absMozillaObjDir + '%(inipath)s')
