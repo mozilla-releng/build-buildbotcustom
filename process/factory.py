@@ -1374,7 +1374,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 machPath = '%(basedir)s/build/mach'
             # we need abs paths because we are in a non relative workdir
             printconfig_base_command = python + [
-                WithProperties(machPath, 'python',
+                WithProperties(machPath), 'python',
                 WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
                 WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
             ]
