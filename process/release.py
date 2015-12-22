@@ -1882,7 +1882,8 @@ def generateReleasePromotionBuilders(config, name, secrets):
                       "properties": {
                           "platform": None,
                           "product": pf["product_name"],
-                          "branch": config["bouncer_branch"]
+                          "branch": config["bouncer_branch"],
+                          "bouncer_enabled": config["bouncer_enabled"]
                       }
     }
     builders.append(bouncer_builder)
