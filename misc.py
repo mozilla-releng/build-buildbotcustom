@@ -2056,7 +2056,6 @@ def _makeGenerateMozharnessTalosBuilderArgs(suite, talos_branch, platform,
                       '--add-option',
                       ','.join(['--webServer', 'localhost']),
                       '--branch-name', talos_branch,
-                      '--system-bits', mh_conf['system_bits'],
                       '--cfg', mh_conf['config_file']]
         if factory_kwargs['fetchSymbols']:
             extra_args += ['--download-symbols', 'ondemand']
