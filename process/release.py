@@ -1880,9 +1880,11 @@ def generateReleasePromotionBuilders(config, name, secrets):
                       "factory": bouncer_submitter_factory,
                       "category": "release-%s-%s" % (config["bouncer_branch"], ''),
                       "properties": {
+                          "branch": config["bouncer_branch"],
                           "platform": None,
                           "product": pf["product_name"],
-                          "branch": config["bouncer_branch"],
+                          "repo_path": config["repo_path"],
+                          "script_repo_revision": config["mozharness_tag"],
                           "bouncer_enabled": config["bouncer_enabled"]
                       }
     }
