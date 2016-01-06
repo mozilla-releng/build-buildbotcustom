@@ -1859,9 +1859,6 @@ def generateReleasePromotionBuilders(config, name, secrets):
              "-c",  config['bouncer_submitter_config'],
              "--credentials-file", "oauth.txt",
              "--bouncer-api-prefix", config['tuxedoServerUrl'],
-             "--version", config['version'],
-             "--repo", config['repo_path'],
-             "--revision", config['revision'],
         ]
     }
 
