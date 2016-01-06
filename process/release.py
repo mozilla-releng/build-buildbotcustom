@@ -1861,7 +1861,7 @@ def generateReleasePromotionBuilders(config, name, secrets):
              "--bouncer-api-prefix", config['tuxedoServerUrl'],
              "--version", config['version'],
              "--repo", config['repo_path'],
-             "--revision", config['revision']             
+             "--revision", config['revision'],
         ]
     }
 
