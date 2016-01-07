@@ -1376,7 +1376,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             # we need abs paths because we are in a non relative workdir
             printconfig_base_command = python + [
                 WithProperties(machPath), 'python',
-                WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
+                # Thunderbird uses c-c's config/printconfigsetting.py due to
+                # the removal of configobj.py (bug 957911)
+                WithProperties('%(basedir)s/build/config/printconfigsetting.py'),
                 WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
             ]
 
@@ -1673,7 +1675,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
             WithProperties(machPath), 'python',
-            WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
+            # Thunderbird uses c-c's config/printconfigsetting.py due to
+            # the removal of configobj.py (bug 957911)
+            WithProperties('%(basedir)s/build/config/printconfigsetting.py'),
             WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
         ]
         self.addStep(SetProperty(
@@ -2183,8 +2187,10 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
             WithProperties(machPath), 'python',
+            # Thunderbird uses c-c's config/printconfigsetting.py due to
+            # the removal of configobj.py (bug 957911)
+            WithProperties('%(basedir)s/build/config/printconfigsetting.py'),
             # abs*Dir attrs lie. they are not absolute paths
-            WithProperties('%(basedir)s/' + '%s/config/printconfigsetting.py' % self.absMozillaSrcDir),
             WithProperties('%(basedir)s/' + self.absMozillaObjDir + '/%(previous_inipath)s')
         ]
         self.addStep(SetProperty(
@@ -3582,8 +3588,10 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
             WithProperties(machPath), 'python',
+            # Thunderbird uses c-c's config/printconfigsetting.py due to
+            # the removal of configobj.py (bug 957911)
+            WithProperties('%(basedir)s/build/config/printconfigsetting.py'),
             # abs*Dir attrs lie. they are not absolute paths
-            WithProperties('%(basedir)s/' + '%s/config/printconfigsetting.py' % self.absMozillaSrcDir),
             WithProperties('%(basedir)s/' + self.absMozillaObjDir + '%(inipath)s')
         ]
         self.addStep(SetProperty(
