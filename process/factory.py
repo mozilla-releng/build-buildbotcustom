@@ -1361,6 +1361,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         once."""
         if not getattr(self, '_gotBuildInfo', False):
             printconfig_env = self.env.copy()
+            printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
             del printconfig_env['MOZ_OBJDIR']
             printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
             # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
@@ -1657,6 +1658,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                                             haltOnFailure=True)
 
         printconfig_env = self.env.copy()
+        printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
@@ -2166,6 +2168,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             haltOnFailure=True,
         ))
         printconfig_env = self.env.copy()
+        printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
@@ -3564,6 +3567,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             haltOnFailure=True,
         ))
         printconfig_env = self.env.copy()
+        printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
