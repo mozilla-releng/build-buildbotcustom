@@ -1,6 +1,6 @@
 import re
 
-from buildbot.status.builder import FAILURE, RETRY, WARNINGS
+from buildbot.status.builder import FAILURE, RETRY
 
 
 def re_compile(s):
@@ -24,10 +24,6 @@ hg_errors = ((re_compile("abort: HTTP Error 5\d{2}"), RETRY),
 purge_error = ((re_compile("Error: unable to free"), RETRY),)
 
 update_verify_error = ((re_compile("FAIL"), FAILURE),)
-
-permission_check_error = (
-    (re_compile("WARN: target directory .* exists"), WARNINGS),
-)
 
 upload_errors = ((re_compile("Connection timed out"), RETRY),
                  (re_compile("Connection refused"), RETRY),
