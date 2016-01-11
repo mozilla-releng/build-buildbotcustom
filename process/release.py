@@ -9,7 +9,7 @@ import hashlib
 from distutils.version import LooseVersion
 
 from buildbot.process.buildstep import regex_log_evaluator
-from buildbot.scheduler import Scheduler, Dependent, Triggerable
+from buildbot.scheduler import Scheduler, Dependent
 from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
 from buildbot.status.builder import Results
@@ -41,8 +41,7 @@ from release.paths import makeCandidatesDir
 from buildbotcustom.scheduler import TriggerBouncerCheck, \
     makePropertiesScheduler, AggregatingScheduler
 from buildbotcustom.misc_scheduler import buildIDSchedFunc, buildUIDSchedFunc
-from buildbotcustom.status.errors import update_verify_error, \
-    permission_check_error
+from buildbotcustom.status.errors import update_verify_error
 from build.paths import getRealpath
 from release.info import getRuntimeTag, getReleaseTag
 import BuildSlaves
@@ -1214,38 +1213,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         post_signing_builders.append(builderPrefix('%s_%s_updates' % (releaseConfig['productName'], releaseChannel)))
 
 
-    if releaseConfig.get('enablePermissionCheck'):
-        check_permissions_factory = ScriptFactory(
-            scriptRepo=tools_repo,
-            script_timeout=3 * 60 * 60,
-            scriptName='scripts/release/stage-tasks.sh',
-            extra_args=['permissions',
-                        '--extra-excludes=*.zip',
-                        '--extra-excludes=*.zip.asc',
-                        '--ssh-user', branchConfig['stage_username'],
-                        '--ssh-key', branchConfig['stage_ssh_key'],
-                        ],
-            log_eval_func=lambda c, s: regex_log_evaluator(
-                c, s, permission_check_error),
-        )
-
-        builders.append({
-            'name': builderPrefix('check_permissions'),
-            'slavenames': unix_slaves,
-            'category': builderPrefix(''),
-            'builddir': builderPrefix('check_permissions'),
-            'slavebuilddir': normalizeName(builderPrefix('chk_prms'), releaseConfig['productName']),
-            'factory': check_permissions_factory,
-            'env': builder_env,
-            'properties': {'slavebuilddir': normalizeName(builderPrefix('chk_prms'), releaseConfig['productName']),
-                           'script_repo_revision': releaseTag,
-                           'release_config': releaseConfigFile,
-                           'platform': None,
-                           'branch': 'release-%s' % sourceRepoInfo['name'],
-                           },
-        })
-        post_deliverables_builders.append(builderPrefix('check_permissions'))
-
     if not releaseConfig.get('disableVirusCheck'):
         antivirus_factory = ScriptFactory(
             scriptRepo=mozharness_repo,
@@ -1316,11 +1283,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     postrelease_factory_args = dict(
         scriptRepo=tools_repo,
         use_credentials_file=True,
-        scriptName='scripts/release/stage-tasks.sh',
-        extra_args=['postrelease',
-                    '--ssh-user', branchConfig['stage_username'],
-                    '--ssh-key', branchConfig['stage_ssh_key'],
-                    ],
+        scriptName='scripts/release/post-release.sh',
     )
     postrelease_factory = ScriptFactory(**postrelease_factory_args)
 
@@ -1626,11 +1589,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         push_to_mirrors_upstreams.extend([
             builderPrefix("%s_checksums" % releaseConfig["productName"]),
         ])
-        if releaseConfig.get('enablePermissionCheck'):
-            push_to_mirrors_upstreams.extend([
-                builderPrefix("check_permissions"),
-            ])
-
         schedulers.append(AggregatingScheduler(
             name=builderPrefix("%s_push_to_mirrors" % releaseConfig["productName"]),
             branch=sourceRepoInfo["path"],
@@ -1874,7 +1832,7 @@ def generateReleasePromotionBuilders(config, name, secrets):
                                              )
 
     bouncer_builder = {
-                      "name": bouncer_buildername, 
+                      "name": bouncer_buildername,
                       "slavenames": config["platforms"]["linux"]["slaves"] + config["platforms"]["linux64"]["slaves"],
                       "builddir": bouncer_buildername,
                       "slavebuilddir": normalizeName(bouncer_buildername),
