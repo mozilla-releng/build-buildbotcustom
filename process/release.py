@@ -33,7 +33,7 @@ from buildbotcustom.misc import (
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import (
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory,
-    ReleaseUpdatesFactory, ReleaseFinalVerification, PartnerRepackFactory,
+    ReleaseUpdatesFactory, ReleaseFinalVerification,
     makeDummyBuilder, SigningScriptFactory,
     DummyFactory)
 from release.platforms import buildbot2ftp
@@ -888,12 +888,10 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                                           releaseConfig['l10nPlatforms']):
             slaves = None
             partner_repack_factory = None
-            if releaseConfig.get('partnerRepackConfig', {}).get('use_mozharness'):
+            if releaseConfig['productName'] == 'fennec':
+                mh_cfg = releaseConfig['partnerRepackConfig']['platforms'][platform]
+                extra_args = mh_cfg.get('extra_args', ['--cfg', mh_cfg['config_file']])
                 slaves = branchConfig['platforms']['linux']['slaves']
-                mh_cfg = releaseConfig[
-                    'partnerRepackConfig']['platforms'][platform]
-                extra_args = mh_cfg.get(
-                    'extra_args', ['--cfg', mh_cfg['config_file']])
                 partner_repack_factory = ScriptFactory(
                     scriptRepo=mozharness_repo,
                     scriptName=mh_cfg['script'],
@@ -903,25 +901,24 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     relengapi_archiver_release_tag=releaseTag,
                 )
             else:
-                pr_pf = branchConfig['platforms']['macosx64']
-                slaves = pr_pf['slaves']
-                repack_params = dict(
-                    hgHost=branchConfig['hghost'],
-                    repoPath=sourceRepoInfo['path'],
-                    buildToolsRepoPath=tools_repo_path,
-                    productName=releaseConfig['productName'],
-                    version=releaseConfig['version'],
-                    buildNumber=releaseConfig['buildNumber'],
-                    partnersRepoPath=releaseConfig['partnersRepoPath'],
-                    partnersRepoRevision=releaseTag,
-                    platformList=[platform],
-                    stagingServer=releaseConfig['stagingServer'],
-                    stageUsername=branchConfig['stage_username'],
-                    stageSshKey=branchConfig['stage_ssh_key'],
+                mh_cfg = releaseConfig['partnerRepackConfig']
+                extra_args = mh_cfg.get('extra_args', ['--cfg', mh_cfg['config_file']])
+                extra_args.extend([
+                        "--version", releaseConfig["version"],
+                        "--build-number", releaseConfig["buildNumber"],
+                        "--platform", platform,
+                        "--s3cfg", mh_cfg['s3cfg']
+                        ])
+                slaves = branchConfig['platforms']['macosx64']['slaves']
+                partner_repack_factory = SigningScriptFactory(
                     signingServers=getSigningServers(platform),
-                    env=pr_pf['env'],
+                    scriptRepo=mozharness_repo,
+                    interpreter="python2.7",
+                    scriptName=mh_cfg['script'],
+                    extra_args=extra_args,
+                    relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+                    relengapi_archiver_release_tag=releaseTag,
                 )
-                partner_repack_factory = PartnerRepackFactory(**repack_params)
 
             builders.append({
                 'name': builderPrefix('partner_repack', platform),
