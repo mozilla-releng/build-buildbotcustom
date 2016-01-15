@@ -4441,8 +4441,10 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
         if relengapi_archiver_repo_path:
             if relengapi_archiver_release_tag:
                 archiver_revision = "--tag %s " % relengapi_archiver_release_tag
+                script_repo_revision = relengapi_archiver_release_tag
             else:
                 archiver_revision = "--rev %s " % (relengapi_archiver_rev or '%(revision)s',)
+                script_repo_revision = "%s" % (relengapi_archiver_rev or '%(revision)s',)
             if self.script_repo_cache:
                 assert self.tools_repo_cache
                 archiver_client_path = \
@@ -4486,6 +4488,13 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 script_path = scriptName
             else:
                 script_path = 'scripts/%s' % scriptName
+            self.addStep(SetProperty(
+                name='get_script_repo_revision',
+                property='script_repo_revision',
+                command=['echo', script_repo_revision],
+                workdir=".",
+                haltOnFailure=False,
+            ))
         elif self.script_repo_cache:
             # all slaves bar win tests have a copy of hgtool on their path.
             # However, let's use runner's checkout version like we do for
