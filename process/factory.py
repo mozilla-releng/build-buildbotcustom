@@ -4790,12 +4790,20 @@ class SigningScriptFactory(ScriptFactory):
                 name='download_token',
             ))
             # toolsdir, basedir
-            self.addStep(SetProperty(
-                name='set_toolsdir',
-                command=self.get_basedir_cmd,
-                property='toolsdir',
-                workdir='scripts',
-            ))
+            if self.tools_repo_cache:
+                self.addStep(SetProperty(
+                    name='set_toolsdir',
+                    command=['bash', '-c', 'pwd'],
+                    property='toolsdir',
+                    workdir=self.tools_repo_cache
+                ))
+            else:
+                self.addStep(SetProperty(
+                    name='set_toolsdir',
+                    command=self.get_basedir_cmd,
+                    property='toolsdir',
+                    workdir='scripts',
+                ))
             self.addStep(SetProperty(
                 name='set_basedir',
                 command=self.get_basedir_cmd,
