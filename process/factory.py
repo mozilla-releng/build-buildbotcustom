@@ -4487,7 +4487,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             self.addStep(SetProperty(
                 name='get_script_repo_revision',
                 property='script_repo_revision',
-                command=['echo', script_repo_revision],
+                command=['echo', WithProperties(script_repo_revision)],
                 workdir=".",
                 haltOnFailure=False,
             ))
