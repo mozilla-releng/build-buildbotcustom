@@ -4487,7 +4487,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
             self.addStep(SetProperty(
                 name='get_script_repo_revision',
                 property='script_repo_revision',
-                command=['echo', script_repo_revision],
+                command=['echo', WithProperties(script_repo_revision)],
                 workdir=".",
                 haltOnFailure=False,
             ))
@@ -4790,12 +4790,20 @@ class SigningScriptFactory(ScriptFactory):
                 name='download_token',
             ))
             # toolsdir, basedir
-            self.addStep(SetProperty(
-                name='set_toolsdir',
-                command=self.get_basedir_cmd,
-                property='toolsdir',
-                workdir='scripts',
-            ))
+            if self.tools_repo_cache:
+                self.addStep(SetProperty(
+                    name='set_toolsdir',
+                    command=['bash', '-c', 'pwd'],
+                    property='toolsdir',
+                    workdir=self.tools_repo_cache
+                ))
+            else:
+                self.addStep(SetProperty(
+                    name='set_toolsdir',
+                    command=self.get_basedir_cmd,
+                    property='toolsdir',
+                    workdir='scripts',
+                ))
             self.addStep(SetProperty(
                 name='set_basedir',
                 command=self.get_basedir_cmd,
