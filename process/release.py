@@ -919,6 +919,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     extra_args=extra_args,
                     relengapi_archiver_repo_path=relengapi_archiver_repo_path,
                     relengapi_archiver_release_tag=releaseTag,
+                    tools_repo_cache=branchConfig["platforms"]["macosx64"]["tools_repo_cache"],
                 )
 
             builders.append({
