@@ -612,6 +612,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 partialUpdates=partialUpdates_hacked,  # FIXME: hack
                 talosMasters=talosMasters,
                 packageTests=packageTests,
+                packageSDK=releaseConfig.get('packageSDK', False),
                 unittestMasters=unittestMasters,
                 unittestBranch=unittestBranch,
                 clobberURL=clobberer_url,
