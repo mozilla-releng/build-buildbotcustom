@@ -4640,11 +4640,6 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 workdir='.',
                 flunkOnFailure=False,
             ))
-        self.addStep(OutputStep(
-            name='tinderboxprint_script_revlink',
-            data=WithProperties(
-                'TinderboxPrint: script_revlink: %(script_repo_url)s/rev/%(script_repo_revision)s'
-        )))
         if self.tooltool_manifest_src:
             self.addStep(SetProperty(
                 name='set_toolsdir',
