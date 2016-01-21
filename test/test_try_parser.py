@@ -44,6 +44,8 @@ UNITTEST_SUITES = ['reftest',
                    'mochitest-1',
                    'mochitest-3',
                    'mochitest-browser-chrome',
+                   'mochitest-devtools-chrome',
+                   'mochitest-e10s-devtools-chrome-1',
                    'mochitest-other',
                    'gaia-js-integration-1',
                    'gaia-js-integration-2',
@@ -55,6 +57,7 @@ MOBILE_UNITTEST_SUITES = ['reftest-1', 'reftest-3'] + UNITTEST_SUITES[1:]
 VALID_UPN = ['WINNT 5.2 try debug test mochitest-1',
              'WINNT 5.2 try debug test mochitest-3',
              'WINNT 5.2 try debug test mochitest-browser-chrome',
+             'WINNT 5.2 try debug test mochitest-e10s-devtools-chrome-1',
              'WINNT 5.2 try debug test mochitest-other',
              'WINNT 5.2 try debug test reftest',
              'WINNT 5.2 try debug test crashtest']
@@ -388,6 +391,16 @@ class TestTryParser(unittest.TestCase):
         tm = 'try: -b d -p win32 -u reftest'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
+
+    def test_DevtoolsE10sAliases(self):
+        tm = 'try: -b d -p win32 -u mochitest-e10s-devtools-chrome'
+        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = self.filterBuilders(['win32-debug'],
+                                       valid=VALID_BUILDER_NAMES + VALID_UPN,
+                                       pretties=UNITTEST_PRETTY_NAMES)
+        builders = [t for t in builders if 'mochitest-e10s-devtools-chrome' in t]
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
+        self.assertEquals(len(self.customBuilders), 1)
 
     def test_ReftestMobileAliases(self):
         tm = 'try: -b d -p win32 -u reftests'

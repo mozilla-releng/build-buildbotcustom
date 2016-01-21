@@ -27,6 +27,8 @@ def testSuiteMatches(v, u):
         return v.startswith(u)
     elif u == 'mochitest-dt':
         return v.startswith('mochitest-devtools-chrome')
+    elif u == 'mochitest-e10s-devtools-chrome' or u == 'mochitest-e10s-dt':
+        return v.startswith('mochitest-e10s-devtools-chrome')
     elif u == 'mochitest-gl':
         return v.startswith('mochitest-gl')
     elif u.startswith('mochitest-dt'):
