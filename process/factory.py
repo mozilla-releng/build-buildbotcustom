@@ -220,6 +220,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['completeMarUrl'] = m
         elif m.endswith('.mar') and '.partial.' in m:
             retval['partialMarUrl'] = m
+        elif '.sdk.' in m:
+            retval['sdkUrl'] = m
         elif m.find('geckoview') >= 0:
             pass
         elif m.find('cppunit') >= 0:
@@ -379,11 +381,15 @@ class TooltoolMixin(object):
         ]
         if self.tooltool_script:
             command.extend(self.tooltool_script)
-        self.addStep(ShellCommand(
+        if 'workdir' not in kwargs:
+            kwargs['workdir'] = None
+        self.addStep(MockCommand(
             name='run_tooltool',
             command=command,
             env=self.env,
             haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
             **kwargs
         ))
 
@@ -1323,7 +1329,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                      command=['cat', '.mozconfig'],
                      ))
         if self.tooltool_manifest_src:
-            self.addTooltoolStep()
+            self.addTooltoolStep(mock_workdir='build')
 
     def addDoBuildSteps(self):
         workdir = WithProperties('%(basedir)s/build')
@@ -1363,8 +1369,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
             if self.platform.startswith('win'):
                 python = ['c:/mozilla-build/python27/python', '-u']
-            elif self.use_mock:
-                python = []
             else:
                 python = ['/tools/buildbot/bin/python']
             if self.mozillaSrcDir:
@@ -1378,27 +1382,21 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
             ]
 
-            self.addStep(MockProperty(
+            self.addStep(SetProperty(
                 command=printconfig_base_command + ['App', 'BuildID'],
                 property='buildid',
                 workdir=printconfig_workdir,
                 env=printconfig_env,
                 description=['getting', 'buildid'],
                 descriptionDone=['got', 'buildid'],
-                mock=self.use_mock,
-                target=self.mock_target,
-                mock_workdir_prefix=None,
             ))
-            self.addStep(MockProperty(
+            self.addStep(SetProperty(
                 command=printconfig_base_command + ['App', 'SourceStamp'],
                 property='sourcestamp',
                 workdir=printconfig_workdir,
                 env=printconfig_env,
                 description=['getting', 'sourcestamp'],
-                descriptionDone=['got', 'sourcestamp'],
-                mock=self.use_mock,
-                target=self.mock_target,
-                mock_workdir_prefix=None,
+                descriptionDone=['got', 'sourcestamp']
             ))
             self._gotBuildInfo = True
 
@@ -1668,8 +1666,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
-        elif self.use_mock:
-            python = []
         else:
             python = ['/tools/buildbot/bin/python']
         if self.mozillaSrcDir:
@@ -1682,35 +1678,26 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
             WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
         ]
-        self.addStep(MockProperty(
+        self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'BuildID'],
             property='buildid',
             workdir=printconfig_workdir,
             env=printconfig_env,
             name='get_build_id',
-            mock=self.use_mock,
-            target=self.mock_target,
-            mock_workdir_prefix=None,
         ))
-        self.addStep(MockProperty(
+        self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'Version'],
             property='appVersion',
             workdir=printconfig_workdir,
             env=printconfig_env,
             name='get_app_version',
-            mock=self.use_mock,
-            target=self.mock_target,
-            mock_workdir_prefix=None,
         ))
-        self.addStep(MockProperty(
+        self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'Name'],
             property='appName',
             workdir=printconfig_workdir,
             env=printconfig_env,
             name='get_app_name',
-            mock=self.use_mock,
-            target=self.mock_target,
-            mock_workdir_prefix=None,
         ))
         self.pkg_env = pkg_env
 
@@ -4666,7 +4653,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 property='toolsdir',
                 workdir='scripts',
             ))
-            self.addTooltoolStep()
+            self.addTooltoolStep(mock_workdir='build')
         self.runScript()
         self.addCleanupSteps()
         self.reboot()
