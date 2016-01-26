@@ -1755,31 +1755,28 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     }
 
 
-def generateReleasePromotionBuilders(config, name, secrets):
+def generateReleasePromotionBuilders(branch_config, branch_name, product,
+                                     secrets):
     builders = []
 
-    if not config.get('enable_release_promotion'):
-        # this is not a release promotion branch
-        return builders
-
-    for platform in config["l10n_release_platforms"]:
-        pf = config["platforms"][platform]
+    for platform in branch_config["l10n_release_platforms"]:
+        pf = branch_config["platforms"][platform]
         l10n_buildername = "release-{branch}_{product}_{platform}_l10n_repack".format(
-            branch=name,
-            product=pf["product_name"],
+            branch=branch_name,
+            product=product,
             platform=platform,
         )
 
         env_config = "single_locale/production.py"
         balrog_config = "balrog/production.py"
-        if config.get("staging"):
+        if branch_config.get("staging"):
             env_config = "single_locale/staging.py"
             balrog_config = "balrog/staging.py"
 
         mh_cfg = {
             "script_name": "scripts/desktop_l10n.py",
             "extra_args": [
-                "--branch-config", "single_locale/%s.py" % name,
+                "--branch-config", "single_locale/%s.py" % branch_name,
                 "--platform-config", "single_locale/%s.py" % platform,
                 "--environment-config", env_config,
                 "--balrog-config", balrog_config,
@@ -1788,7 +1785,7 @@ def generateReleasePromotionBuilders(config, name, secrets):
             "script_maxtime": 7200,
         }
 
-        l10n_factory = makeMHFactory(config, pf,
+        l10n_factory = makeMHFactory(branch_config, pf,
                                      mh_cfg=mh_cfg,
                                      signingServers=secrets.get(pf.get("dep_signing_servers")),
                                      use_credentials_file=True,
@@ -1799,13 +1796,11 @@ def generateReleasePromotionBuilders(config, name, secrets):
             "builddir": l10n_buildername,
             "slavebuilddir": normalizeName(l10n_buildername),
             "slavenames": pf["slaves"],
-            "category": name,
+            "category": branch_name,
             "properties": {
-                "branch": name,
+                "branch": branch_name,
                 "platform": "l10n",
-                "product": pf["product_name"],
-                "repo_path": config["repo_path"],
-                "script_repo_revision": config["mozharness_tag"],
+                "product": product,
             },
         }
         builders.append(l10n_builder)
@@ -1813,39 +1808,63 @@ def generateReleasePromotionBuilders(config, name, secrets):
     bouncer_mh_cfg = {
         "script_name": "scripts/bouncer_submitter.py",
         "extra_args": [
-             "-c",  config['bouncer_submitter_config'],
+             "-c",  branch_config['bouncer_submitter_config'],
              "--credentials-file", "oauth.txt",
-             "--bouncer-api-prefix", config['tuxedoServerUrl'],
-             "--repo", config['repo_path'],
+             "--bouncer-api-prefix", branch_config['tuxedoServerUrl'],
+             "--repo", branch_config['repo_path'],
         ]
     }
 
     bouncer_buildername = "release-{branch}_{product}_bncr_sub".format(
-                           branch=name,
-                           product=pf["product_name"],
-                         )
-
-    bouncer_submitter_factory = makeMHFactory(config, pf,
-                                              mh_cfg=bouncer_mh_cfg,
-                                              use_credentials_file=True,
-                                             )
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    bouncer_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=bouncer_mh_cfg, use_credentials_file=True)
 
     bouncer_builder = {
-                      "name": bouncer_buildername,
-                      "slavenames": config["platforms"]["linux"]["slaves"] + config["platforms"]["linux64"]["slaves"],
-                      "builddir": bouncer_buildername,
-                      "slavebuilddir": normalizeName(bouncer_buildername),
-                      "factory": bouncer_submitter_factory,
-                      "category": "release-%s-%s" % (config["bouncer_branch"], ''),
-                      "properties": {
-                          "branch": config["bouncer_branch"],
-                          "platform": None,
-                          "product": pf["product_name"],
-                          "repo_path": config["repo_path"],
-                          "script_repo_revision": config["mozharness_tag"],
-                          "bouncer_enabled": config["bouncer_enabled"]
-                      }
+        "name": bouncer_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": bouncer_buildername,
+        "slavebuilddir": normalizeName(bouncer_buildername),
+        "factory": bouncer_submitter_factory,
+        "category": "release-%s-%s" % (branch_config["bouncer_branch"], ''),
+        "properties": {
+            "branch": branch_config["bouncer_branch"],
+            "platform": None,
+            "product": product,
+            # TODO: bouncer_enabled should be passed to BBB instead of
+            # hardcoding it here
+            "bouncer_enabled": branch_config["bouncer_enabled"]
+        }
     }
     builders.append(bouncer_builder)
+
+    version_bump_mh_cfg = {
+        "script_name": "scripts/release/postrelease_version_bump.py",
+        "extra_args": [
+             "-c",  branch_config['postrelease_version_bump_config'],
+        ]
+    }
+    version_bump_buildername = "release-{branch}_version_bump".format(
+        branch=branch_name)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    version_bump_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=version_bump_mh_cfg, use_credentials_file=True)
+
+    version_bump_builder = {
+        "name": version_bump_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": version_bump_buildername,
+        "slavebuilddir": normalizeName(version_bump_buildername),
+        "factory": version_bump_submitter_factory,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(version_bump_builder)
 
     return builders
