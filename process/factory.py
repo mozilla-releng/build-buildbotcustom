@@ -1378,25 +1378,21 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
             ]
 
-            self.addStep(MockProperty(
+            self.addStep(SetProperty(
                 command=printconfig_base_command + ['App', 'BuildID'],
                 property='buildid',
                 workdir=printconfig_workdir,
                 env=printconfig_env,
                 description=['getting', 'buildid'],
                 descriptionDone=['got', 'buildid'],
-                mock=self.use_mock,
-                target=self.mock_target,
             ))
-            self.addStep(MockProperty(
+            self.addStep(SetProperty(
                 command=printconfig_base_command + ['App', 'SourceStamp'],
                 property='sourcestamp',
                 workdir=printconfig_workdir,
                 env=printconfig_env,
                 description=['getting', 'sourcestamp'],
-                descriptionDone=['got', 'sourcestamp'],
-                mock=self.use_mock,
-                target=self.mock_target,
+                descriptionDone=['got', 'sourcestamp']
             ))
             self._gotBuildInfo = True
 
@@ -1678,32 +1674,26 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             WithProperties('%(basedir)s/build' + '%s/config/printconfigsetting.py' % self.mozillaSrcDir),
             WithProperties('%(basedir)s/build' + '/%s/dist/bin/application.ini' % self.mozillaObjdir),
         ]
-        self.addStep(MockProperty(
+        self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'BuildID'],
             property='buildid',
             workdir=printconfig_workdir,
             env=printconfig_env,
             name='get_build_id',
-            mock=self.use_mock,
-            target=self.mock_target,
         ))
-        self.addStep(MockProperty(
+        self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'Version'],
             property='appVersion',
             workdir=printconfig_workdir,
             env=printconfig_env,
             name='get_app_version',
-            mock=self.use_mock,
-            target=self.mock_target,
         ))
-        self.addStep(MockProperty(
+        self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'Name'],
             property='appName',
             workdir=printconfig_workdir,
             env=printconfig_env,
             name='get_app_name',
-            mock=self.use_mock,
-            target=self.mock_target,
         ))
         self.pkg_env = pkg_env
 
