@@ -1365,8 +1365,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
             if self.platform.startswith('win'):
                 python = ['c:/mozilla-build/python27/python', '-u']
-            elif self.use_mock:
-                python = []
             else:
                 python = ['/tools/buildbot/bin/python']
             if self.mozillaSrcDir:
@@ -1389,7 +1387,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 descriptionDone=['got', 'buildid'],
                 mock=self.use_mock,
                 target=self.mock_target,
-                mock_workdir_prefix=None,
             ))
             self.addStep(MockProperty(
                 command=printconfig_base_command + ['App', 'SourceStamp'],
@@ -1400,7 +1397,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 descriptionDone=['got', 'sourcestamp'],
                 mock=self.use_mock,
                 target=self.mock_target,
-                mock_workdir_prefix=None,
             ))
             self._gotBuildInfo = True
 
@@ -1670,8 +1666,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
-        elif self.use_mock:
-            python = []
         else:
             python = ['/tools/buildbot/bin/python']
         if self.mozillaSrcDir:
@@ -1692,7 +1686,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             name='get_build_id',
             mock=self.use_mock,
             target=self.mock_target,
-            mock_workdir_prefix=None,
         ))
         self.addStep(MockProperty(
             command=printconfig_base_command + ['App', 'Version'],
@@ -1702,7 +1695,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             name='get_app_version',
             mock=self.use_mock,
             target=self.mock_target,
-            mock_workdir_prefix=None,
         ))
         self.addStep(MockProperty(
             command=printconfig_base_command + ['App', 'Name'],
@@ -1712,7 +1704,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             name='get_app_name',
             mock=self.use_mock,
             target=self.mock_target,
-            mock_workdir_prefix=None,
         ))
         self.pkg_env = pkg_env
 
