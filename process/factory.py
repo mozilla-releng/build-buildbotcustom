@@ -381,11 +381,15 @@ class TooltoolMixin(object):
         ]
         if self.tooltool_script:
             command.extend(self.tooltool_script)
-        self.addStep(ShellCommand(
+        if 'workdir' not in kwargs:
+            kwargs['workdir'] = None
+        self.addStep(MockCommand(
             name='run_tooltool',
             command=command,
             env=self.env,
             haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
             **kwargs
         ))
 
@@ -1325,7 +1329,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                      command=['cat', '.mozconfig'],
                      ))
         if self.tooltool_manifest_src:
-            self.addTooltoolStep()
+            self.addTooltoolStep(mock_workdir='build')
 
     def addDoBuildSteps(self):
         workdir = WithProperties('%(basedir)s/build')
@@ -4649,7 +4653,7 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 property='toolsdir',
                 workdir='scripts',
             ))
-            self.addTooltoolStep()
+            self.addTooltoolStep(mock_workdir='build')
         self.runScript()
         self.addCleanupSteps()
         self.reboot()
