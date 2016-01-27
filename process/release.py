@@ -908,7 +908,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         "--version", releaseConfig["version"],
                         "--build-number", releaseConfig["buildNumber"],
                         "--platform", platform,
-                        "--s3cfg", mh_cfg['s3cfg']
+                        "--s3cfg", mh_cfg['s3cfg'],
+                        "--hgrepo", releaseConfig['sourceRepositories']['mozilla']['path'],
                         ])
                 slaves = branchConfig['platforms']['macosx64']['slaves']
                 partner_repack_factory = SigningScriptFactory(
