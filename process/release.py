@@ -1758,6 +1758,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 def generateReleasePromotionBuilders(branch_config, branch_name, product,
                                      secrets):
     builders = []
+    category_name = "release-%s" % branch_name
 
     for platform in branch_config["l10n_release_platforms"]:
         pf = branch_config["platforms"][platform]
@@ -1796,7 +1797,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
             "builddir": l10n_buildername,
             "slavebuilddir": normalizeName(l10n_buildername),
             "slavenames": pf["slaves"],
-            "category": branch_name,
+            "category": category_name,
             "properties": {
                 "branch": branch_name,
                 "platform": "l10n",
@@ -1828,7 +1829,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "builddir": bouncer_buildername,
         "slavebuilddir": normalizeName(bouncer_buildername),
         "factory": bouncer_submitter_factory,
-        "category": "release-%s-%s" % (branch_config["bouncer_branch"], ''),
+        "category": category_name,
         "properties": {
             "branch": branch_config["bouncer_branch"],
             "platform": None,
@@ -1859,7 +1860,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "builddir": version_bump_buildername,
         "slavebuilddir": normalizeName(version_bump_buildername),
         "factory": version_bump_submitter_factory,
-        "category": branch_name,
+        "category": category_name,
         "properties": {
             "branch": branch_name,
             "platform": None,
