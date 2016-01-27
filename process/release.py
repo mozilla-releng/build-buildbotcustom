@@ -1859,6 +1859,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "builddir": version_bump_buildername,
         "slavebuilddir": normalizeName(version_bump_buildername),
         "factory": version_bump_submitter_factory,
+        "category": branch_name,
         "properties": {
             "branch": branch_name,
             "platform": None,
