@@ -4644,14 +4644,6 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 workdir='.',
                 flunkOnFailure=False,
             ))
-        if self.tooltool_manifest_src:
-            self.addStep(SetProperty(
-                name='set_toolsdir',
-                command=['bash', '-c', 'pwd'],
-                property='toolsdir',
-                workdir='scripts',
-            ))
-            self.addTooltoolStep(workdir='build')
         self.runScript()
         self.addCleanupSteps()
         self.reboot()
@@ -4697,6 +4689,15 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
                 packages=self.mock_packages,
                 timeout=2700,
             ))
+
+        if self.tooltool_manifest_src:
+            self.addStep(SetProperty(
+                name='set_toolsdir',
+                command=['bash', '-c', 'pwd'],
+                property='toolsdir',
+                workdir='scripts',
+            ))
+            self.addTooltoolStep(workdir='build')
 
     def runScript(self, env=None):
         if not env:
