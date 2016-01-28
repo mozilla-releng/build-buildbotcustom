@@ -908,7 +908,8 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         "--version", releaseConfig["version"],
                         "--build-number", releaseConfig["buildNumber"],
                         "--platform", platform,
-                        "--s3cfg", mh_cfg['s3cfg']
+                        "--s3cfg", mh_cfg['s3cfg'],
+                        "--hgrepo", releaseConfig['sourceRepositories']['mozilla']['path'],
                         ])
                 slaves = branchConfig['platforms']['macosx64']['slaves']
                 partner_repack_factory = SigningScriptFactory(
@@ -1758,6 +1759,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
 def generateReleasePromotionBuilders(branch_config, branch_name, product,
                                      secrets):
     builders = []
+    category_name = "release-%s" % branch_name
 
     for platform in branch_config["l10n_release_platforms"]:
         pf = branch_config["platforms"][platform]
@@ -1796,7 +1798,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
             "builddir": l10n_buildername,
             "slavebuilddir": normalizeName(l10n_buildername),
             "slavenames": pf["slaves"],
-            "category": branch_name,
+            "category": category_name,
             "properties": {
                 "branch": branch_name,
                 "platform": "l10n",
@@ -1828,7 +1830,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "builddir": bouncer_buildername,
         "slavebuilddir": normalizeName(bouncer_buildername),
         "factory": bouncer_submitter_factory,
-        "category": "release-%s-%s" % (branch_config["bouncer_branch"], ''),
+        "category": category_name,
         "properties": {
             "branch": branch_config["bouncer_branch"],
             "platform": None,
@@ -1846,8 +1848,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
              "-c",  branch_config['postrelease_version_bump_config'],
         ]
     }
-    version_bump_buildername = "release-{branch}_version_bump".format(
-        branch=branch_name)
+    version_bump_buildername = "release-{branch}-{product}_version_bump".format(
+        branch=branch_name, product=product)
     # Explicitly define pf using the slave platform (linux64 in this case)
     version_bump_submitter_factory = makeMHFactory(
         config=branch_config, pf=branch_config["platforms"]['linux64'],
@@ -1859,7 +1861,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "builddir": version_bump_buildername,
         "slavebuilddir": normalizeName(version_bump_buildername),
         "factory": version_bump_submitter_factory,
-        "category": branch_name,
+        "category": category_name,
         "properties": {
             "branch": branch_name,
             "platform": None,
