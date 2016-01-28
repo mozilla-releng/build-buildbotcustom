@@ -1848,8 +1848,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
              "-c",  branch_config['postrelease_version_bump_config'],
         ]
     }
-    version_bump_buildername = "release-{branch}_version_bump".format(
-        branch=branch_name)
+    version_bump_buildername = "release-{branch}-{product}_version_bump".format(
+        branch=branch_name, product=product)
     # Explicitly define pf using the slave platform (linux64 in this case)
     version_bump_submitter_factory = makeMHFactory(
         config=branch_config, pf=branch_config["platforms"]['linux64'],
