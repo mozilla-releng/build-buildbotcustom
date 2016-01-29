@@ -1835,9 +1835,6 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
             "branch": branch_config["bouncer_branch"],
             "platform": None,
             "product": product,
-            # TODO: bouncer_enabled should be passed to BBB instead of
-            # hardcoding it here
-            "bouncer_enabled": branch_config["bouncer_enabled"]
         }
     }
     builders.append(bouncer_builder)
