@@ -590,8 +590,8 @@ class EveryNthScheduler(Scheduler):
                         (self.name, nImportant, self.n))
                 return
 
-            most_recent = max([c.when for c in important])
-            elapsed = int(now() - most_recent)
+            oldest = min([c.when for c in important])
+            elapsed = int(now() - oldest)
 
             if self.idleTimeout and elapsed < self.idleTimeout:
                 # Haven't hit the timeout yet, so let's wait more

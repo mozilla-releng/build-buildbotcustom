@@ -127,7 +127,7 @@ class TestEveryNthScheduler(unittest.TestCase):
         # Test of the idle timeout functionality. If we get n-1 changes, and
         # the timer fires, we should get builds.
         # when we have enough changes?
-        s = EveryNthScheduler(name='s1', branch='b1', builderNames=['d1'], n=2, idleTimeout=30)
+        s = EveryNthScheduler(name='s1', branch='b1', builderNames=['d1'], n=3, idleTimeout=30)
         s.parent = mock.Mock()
         s.parent.db = self.dbc
         s.parent.change_svc = self.cm
@@ -144,13 +144,22 @@ class TestEveryNthScheduler(unittest.TestCase):
         d.addCallback(check)
 
         # Add the first change
-        def addChange1(_):
+        def addChange(_):
             c = Change(who='me!', branch='b1', revision='1', files=[],
                        comments='really important', revlink='from poller', when=self._time())
             self.dbc.addChangeToDatabase(c)
             # Now run the scheduler
             return s.run()
-        d.addCallback(addChange1)
+        d.addCallback(addChange)
+
+        # Advance time by 20s
+        def addTime(_):
+            self._time.return_value += 20
+            return s.run()
+        d.addCallback(addTime)
+
+        # Add the second change
+        d.addCallback(addChange)
 
         # Verify we have 0 buildrequests created
         def checkRequests1(_):
@@ -162,27 +171,20 @@ class TestEveryNthScheduler(unittest.TestCase):
             state = json.loads(schedulers[0][1])
             # Check that we did actually look at the change, but decided
             # against doing anything with it
-            self.assertEquals(state, {"last_processed": 1})
+            self.assertEquals(state, {"last_processed": 2})
         d.addCallback(checkRequests1)
 
-        # Advance time by 20s
-        def addTime(_):
-            self._time.return_value += 20
-            return s.run()
-        d.addCallback(addTime)
-        # Verify again we have no requests
-        d.addCallback(checkRequests1)
-        # Advance time again, now we should have 1 request
+        # Advance time again, now we should have 2 requests
         d.addCallback(addTime)
 
         def checkRequests2(_):
             requests = self.dbc.runQueryNow("SELECT buildername FROM buildrequests WHERE complete=0")
-            self.assertEquals(len(requests), 1)
-            self.assertEquals(sorted([r[0] for r in requests]), ['d1'])
+            self.assertEquals(len(requests), 2)
+            self.assertEquals(sorted([r[0] for r in requests]), ['d1', 'd1'])
             schedulers = self.dbc.runQueryNow("SELECT name, state FROM schedulers")
             self.assertEquals(len(schedulers), 1)
             state = json.loads(schedulers[0][1])
-            self.assertEquals(state, {"last_processed": 1})
+            self.assertEquals(state, {"last_processed": 2})
         d.addCallback(checkRequests2)
 
         return d
