@@ -45,6 +45,8 @@ def testSuiteMatches(v, u):
     elif u.startswith('mochitest-e10s-bc'):
         # mochitest-e10s-bc1 and mochitest-e10s-bc-1 should run mochitest-e10s-browser-chrome-1
         return v == re.sub(r"bc-?", "browser-chrome-", u)
+    elif u in ('crashtests', 'crashtest'):
+        return v.startswith('crashtest')
     elif u in ('reftests', 'reftest'):
         return v.startswith('reftest') or v.startswith('plain-reftest')
     elif u in ('web-platform-tests', 'web-platform-test'):
