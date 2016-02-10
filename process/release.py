@@ -1839,6 +1839,34 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(bouncer_builder)
 
+    updates_mh_cfg = {
+        "script_name": "scripts/release/updates.py",
+        "extra_args": [
+             "-c",  branch_config['updates_config'],
+        ]
+    }
+    updates_buildername = "release-{branch}-{product}_updates".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    updates_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=updates_mh_cfg, use_credentials_file=True)
+
+    updates_builder = {
+        "name": updates_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": updates_buildername,
+        "slavebuilddir": normalizeName(updates_buildername),
+        "factory": updates_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(updates_builder)
+
     version_bump_mh_cfg = {
         "script_name": "scripts/release/postrelease_version_bump.py",
         "extra_args": [
