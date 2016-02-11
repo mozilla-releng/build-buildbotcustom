@@ -77,7 +77,7 @@ def processMessage(message):
             line = line.strip().split('try: ', 1)
             # Allow spaces inside of [filter expressions]
             return re.findall(r'(?:\[.*?\]|\S)+', line[1])
-    return [""]
+    return None
 
 
 def expandPlatforms(user_platforms, buildTypes):
@@ -314,7 +314,12 @@ def TryParser(
                         dest='talos',
                         help='provide a list of talos tests, or specify all (default is None)')
 
-    (options, unknown_args) = parser.parse_known_args(processMessage(message))
+    message = processMessage(message)
+    if message is None:
+        # no try syntax found, don't schedule anything
+        return []
+
+    (options, unknown_args) = parser.parse_known_args(message)
 
     # Build options include a possible override of 'all' to get a buildset
     # that matches m-c
