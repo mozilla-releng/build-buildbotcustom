@@ -941,6 +941,43 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             deliverables_builders.append(
                 builderPrefix('partner_repack', platform))
 
+        mh_cfg = releaseConfig['partnerRepackConfig']
+        platform = "macosx64"
+        extra_args = mh_cfg.get('extra_args', ['--cfg', mh_cfg['config_file']])
+        extra_args.extend([
+                "--version", releaseConfig["version"],
+                "--build-number", releaseConfig["buildNumber"],
+                "--s3cfg", mh_cfg['s3cfg'],
+                "--require-buildprops",
+                ])
+        slaves = branchConfig['platforms'][platform]['slaves']
+        standalone_partner_repack_factory = SigningScriptFactory(
+            signingServers=getSigningServers(platform),
+            scriptRepo=mozharness_repo,
+            interpreter="python2.7",
+            scriptName=mh_cfg['script'],
+            extra_args=extra_args,
+            relengapi_archiver_repo_path=relengapi_archiver_repo_path,
+            relengapi_archiver_release_tag=releaseTag,
+            tools_repo_cache=branchConfig["platforms"][platform]["tools_repo_cache"],
+        )
+
+        builders.append({
+            'name': builderPrefix('standalone_partner_repack'),
+            'slavenames': slaves,
+            'category': builderPrefix(''),
+            'builddir': builderPrefix('standalone_partner_repack'),
+            'slavebuilddir': normalizeName(builderPrefix(
+                'partner_repack', platform), releaseConfig['productName']),
+            'factory': standalone_partner_repack_factory,
+            'env': builder_env,
+            'properties': {
+                'slavebuilddir': normalizeName(builderPrefix('standalone_partner_repack'), releaseConfig['productName']),
+                'platform': platform,
+                'branch': 'release-%s' % sourceRepoInfo['name'],
+            }
+        })
+
     if releaseConfig.get('autoGenerateChecksums', True):
         extra_extra_args = []
         if releaseConfig['productName'] == 'fennec':
