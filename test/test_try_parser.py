@@ -149,13 +149,11 @@ class TestTryParser(unittest.TestCase):
         return list(chosen)
 
     def test_BlankMessage(self):
-        # Should get default set with blank input
+        # Should get empty set with blank input
         tm = ""
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = self.removeNondefaults(
-            VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+        self.assertEqual(sorted(self.customBuilders), [])
 
     def test_JunkMessageBuilders(self):
         # Should get default set with junk input
