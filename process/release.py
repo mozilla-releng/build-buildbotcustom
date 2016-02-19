@@ -1761,6 +1761,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
                                      secrets):
     builders = []
     category_name = "release-%s" % branch_name
+    tools_repo_path = branch_config.get('build_tools_repo_path')
+    tools_repo = '%s%s' % (branch_config['hgurl'], tools_repo_path)
 
     for platform in branch_config["l10n_release_platforms"]:
         pf = branch_config["platforms"][platform]
@@ -1855,7 +1857,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
                     product=branch_config.get("product_name"),
                     )
                 uv_factory = ScriptFactory(
-                    scriptRepo=WithProperties("%(script_repo_path)s"),
+                    scriptRepo=tools_repo,
                     interpreter='bash',
                     scriptName='scripts/release/updates/chunked-verify.sh',
                     extra_args=["UNUSED", "UNUSED", str(t_chunks), str(n)],
