@@ -1936,4 +1936,40 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(version_bump_builder)
 
+    # checksums
+    checksums_buildername = "release-{branch}-{product}_chcksms".format(
+        branch=branch_name, product=product)
+    extra_extra_args = []
+    if product == 'fennec':
+        extra_extra_args = ['--add-action=copy-info-files']
+    checksums_mh_cfg = {
+        'script_name': 'scripts/release/generate-checksums.py',
+        'extra_args': [
+            "--stage-product", branch_config["stage_product"][product],
+            "--bucket-name-prefix", branch_config["beetmover_candidates_bucket"],
+            "--credentials", branch_config["beetmover_credentials"],
+            "--tools-repo", branch_config["platforms"]["linux64"]["tools_repo_cache"],
+        ] + extra_extra_args
+    }
+    checksums_factory = makeMHFactory(
+        config=branch_config, pf=branch_config['platforms']['linux64'],
+        mh_cfg=checksums_mh_cfg,
+        signingServers=secrets.get("release-signing"),
+    )
+    checksums_builder = {
+        'name': checksums_buildername,
+        'slavenames': branch_config['platforms']['linux']['slaves'] +
+                      branch_config['platforms']['linux64']['slaves'],
+        'category': category_name,
+        'builddir': checksums_buildername,
+        'slavebuilddir': normalizeName(checksums_buildername),
+        'factory': checksums_factory,
+        'properties': {
+            'branch': branch_name,
+            'platform': None,
+            'product': product,
+        }
+    }
+    builders.append(checksums_builder)
+
     return builders
