@@ -1842,7 +1842,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(bouncer_builder)
 
-    uv_fmt_template = "release-{branch}_{platform}_update_verify_{channel}_{chunk}/{chunks}"
+    uv_fmt_template = "release-{branch}_{platform}_update_verify_{channel}_{chunk}"
     for platform in branch_config.get("release_platforms"):
         pf = branch_config["platforms"][platform]
         t_chunks = branch_config.get("update_verify_chunks", 6)
