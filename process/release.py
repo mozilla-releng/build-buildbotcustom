@@ -1972,4 +1972,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(checksums_builder)
 
+    # Don't merge release builder requests
+    nomergeBuilders.update([b['name'] for b in builders])
+
     return builders
