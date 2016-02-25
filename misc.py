@@ -2639,8 +2639,8 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             extra_args += ['--platform', platform]  # distinguish win64
             extra_args += mirrorAndBundleArgs(bconfig)
             extra_args += [variant]
-            for server in bconfig.get('tooltool_url_list', []):
-                extra_args += ['--ttserver', server]
+            extra_args += ['--ttserver',
+                           'https://api.pub.build.mozilla.org/tooltool/']
 
             f = ScriptFactory(
                 config['scripts_repo'],
