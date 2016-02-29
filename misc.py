@@ -2736,75 +2736,6 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
         'schedulers': schedulers,
     }
 
-
-def generateJetpackObjects(config, SLAVES):
-    builders = []
-    project_branch = os.path.basename(config['repo_path'])
-    for branch in config['branches']:
-        for platform in config['platforms'].keys():
-            slaves = SLAVES[platform]
-            jetpack_tarball = WithProperties(
-                "%s/%s/archive/%%(%s:~tip)s.tar.bz2" % (config['hgurl'],
-                                                        config['repo_path'],
-                                                        'revision')
-            )
-            ftp_url = config['ftp_url']
-            types = ['opt']
-            if config['platforms'][platform].get('debug'):
-                types.append('debug')
-            for type_ in types:
-                if type_ == 'debug':
-                    ftp_url = ftp_url + "-debug"
-                f = ScriptFactory(
-                    config['scripts_repo'],
-                    'buildfarm/utils/run_jetpack.py',
-                    extra_args=(
-                        "-p", platform, "-t", jetpack_tarball, "-b", branch,
-                        "-f", ftp_url, "-e", config['platforms'][platform]['ext'],),
-                    interpreter='python',
-                    log_eval_func=rc_eval_func({1: WARNINGS, 2: FAILURE,
-                                                4: EXCEPTION, 5: RETRY}),
-                    reboot_command=['python',
-                                    'scripts/buildfarm/maintenance/count_and_reboot.py',
-                                    '-f', './reboot_count.txt',
-                                    '-n', '0',
-                                    '-z'],
-                )
-
-                builder = {'name': 'jetpack-%s-%s-%s' % (branch, platform, type_),
-                           'builddir': 'jetpack-%s-%s-%s' % (branch, platform, type_),
-                           'slavebuilddir': 'test',
-                           'slavenames': slaves,
-                           'factory': f,
-                           'category': 'jetpack',
-                           'properties': {'branch': project_branch, 'platform': platform, 'product': 'jetpack'},
-                           'env': MozillaEnvironments.get("%s" % config['platforms'][platform].get('env'), {}).copy(),
-                           }
-                builders.append(builder)
-                nomergeBuilders.add(builder['name'])
-
-    # Set up polling
-    poller = HgPoller(
-        hgURL=config['hgurl'],
-        branch=config['repo_path'],
-        pollInterval=5 * 60,
-    )
-
-    # Set up scheduler
-    scheduler = Scheduler(
-        name="jetpack",
-        branch=config['repo_path'],
-        treeStableTimer=None,
-        builderNames=[b['name'] for b in builders],
-    )
-
-    return {
-        'builders': builders,
-        'change_source': [poller],
-        'schedulers': [scheduler],
-    }
-
-
 def generateProjectObjects(project, config, SLAVES, all_builders=None):
     builders = []
     schedulers = []
@@ -2821,11 +2752,6 @@ def generateProjectObjects(project, config, SLAVES, all_builders=None):
     if project.startswith('fuzzing'):
         fuzzingObjects = generateFuzzingObjects(config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, fuzzingObjects)
-
-    # Jetpack
-    elif project.startswith('jetpack'):
-        jetpackObjects = generateJetpackObjects(config, SLAVES)
-        buildObjects = mergeBuildObjects(buildObjects, jetpackObjects)
 
     # Spidermonkey
     elif project.startswith('spidermonkey'):
