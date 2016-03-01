@@ -1946,7 +1946,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         'script_name': 'scripts/release/generate-checksums.py',
         'extra_args': [
             "--stage-product", branch_config["stage_product"][product],
-            "--bucket-name-prefix", branch_config["beetmover_candidates_bucket"],
+            "--bucket-name-full", branch_config["beetmover_buckets"][product],
             "--credentials", branch_config["beetmover_credentials"],
             "--tools-repo", branch_config["platforms"]["linux64"]["tools_repo_cache"],
         ] + extra_extra_args
