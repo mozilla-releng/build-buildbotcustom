@@ -1972,6 +1972,7 @@ def generateBranchObjects(config, name, secrets=None):
                 tooltool_manifest_src=pf.get('tooltool_manifest_src'),
                 tooltool_script=pf.get('tooltool_script'),
                 tooltool_url_list=config.get('tooltool_url_list', []),
+                platform=platform,
             )
             mozilla2_valgrind_builder = {
                 'name': '%s valgrind' % pf['base_name'],
@@ -2096,9 +2097,9 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         talos_slave_platforms = branch_config['platforms'][platform].get(
             'talos_slave_platforms', platform_config.get('talos_slave_platforms', []))
 
-        # Map of # of test runs to builder names
-        talos_builders = {}
-        talos_pgo_builders = {}
+        # Mapping of skip configuration to talos builder names
+        talos_builders = collections.defaultdict(list)
+        talos_pgo_builders = collections.defaultdict(list)
 
         try_default = True
         if not branch_config['platforms'][platform].get('try_by_default', True):
@@ -2122,6 +2123,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     '%s_tests' % suite]
                 if tests == 0 or slave_platform not in platforms:
                     continue
+                assert tests == 1
+
+                skipconfig = None
+                if (slave_platform in branch_config['platforms'][platform] and
+                   'skipconfig' in branch_config['platforms'][platform][slave_platform]):
+                    skipconfig = branch_config['platforms'][platform][slave_platform]['skipconfig'].get(('talos', suite))
 
                 # We only want to append '-Non-PGO' to platforms that
                 # also have PGO builds.
@@ -2188,8 +2195,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                 pgo_only_suites = set(branch_config.get('pgo_only_suites', []))
 
                 if suite not in pgo_only_suites:
-                    talos_builders.setdefault(
-                        tests, []).append(builder['name'])
+                    talos_builders[skipconfig].append(builder['name'])
                     branchObjects['builders'].append(builder)
 
                 if create_pgo_builders:
@@ -2222,8 +2228,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     if not merge:
                         nomergeBuilders.add(pgo_builder['name'])
                     branchObjects['builders'].append(pgo_builder)
-                    talos_pgo_builders.setdefault(
-                        tests, []).append(pgo_builder['name'])
+                    talos_pgo_builders[1].append(pgo_builder['name'])
 
             # Skip talos only platforms, not active platforms, branches
             # with disabled unittests
@@ -2451,10 +2456,12 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
 
         def makeTalosScheduler(builders, pgo=False):
             schedulers = []
-            for tests, builder_names in builders.iteritems():
+            for skipconfig, builder_names in builders.iteritems():
                 extra_args = {}
-                assert tests == 1
                 scheduler_class = Scheduler
+                skipcount = 0
+                skiptimeout = 0
+
                 if pgo:
                     name = 'tests-%s-%s-pgo-talos' % (branch, platform)
                     scheduler_branch = '%s-%s-pgo-talos' % (branch, platform)
@@ -2468,6 +2475,14 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     extra_args['prettyNames'] = prettyNames
                     extra_args['talosSuites'] = SUITES.keys()
                     extra_args['buildbotBranch'] = branch
+                elif isinstance(skipconfig, tuple):
+                    skipcount, skiptimeout = skipconfig
+                    scheduler_class = EveryNthScheduler
+                    extra_args['n'] = skipcount
+                    extra_args['idleTimeout'] = skiptimeout
+                    name += "-%s-%s" % (skipcount, skiptimeout)
+                    for b in builder_names:
+                        builderMergeLimits[b] = skipcount
 
                 s = scheduler_class(
                     name=name,
