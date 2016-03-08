@@ -1972,6 +1972,7 @@ def generateBranchObjects(config, name, secrets=None):
                 tooltool_manifest_src=pf.get('tooltool_manifest_src'),
                 tooltool_script=pf.get('tooltool_script'),
                 tooltool_url_list=config.get('tooltool_url_list', []),
+                platform=platform,
             )
             mozilla2_valgrind_builder = {
                 'name': '%s valgrind' % pf['base_name'],
