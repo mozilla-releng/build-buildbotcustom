@@ -2020,11 +2020,6 @@ def _makeGenerateMozharnessTalosBuilderArgs(suite, talos_branch, platform,
         if factory_kwargs["talos_from_source_code"]:
             extra_args.append('--use-talos-json')
         scriptpath = "scripts/talos_script.py"
-    else:
-        extra_args.extend(['--talos-suite', suite,
-                           '--cfg', 'android/android_panda_talos_releng.py',
-                           '--branch-name', talos_branch])
-        scriptpath = "scripts/android_panda_talos.py"
     # add branch config specification if blobber is enabled
     if branch_config.get('blob_upload'):
         extra_args.extend(['--blob-upload-branch', talos_branch])
