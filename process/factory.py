@@ -222,6 +222,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['partialMarUrl'] = m
         elif '.sdk.' in m:
             retval['sdkUrl'] = m
+        elif m.endswith('bouncer.apk'):
+            pass
         elif m.find('geckoview') >= 0:
             pass
         elif m.find('cppunit') >= 0:
