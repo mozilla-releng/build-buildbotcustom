@@ -2651,6 +2651,10 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             extra_args += [variant]
             extra_args += ['--ttserver',
                            'https://api.pub.build.mozilla.org/tooltool/']
+            if 'win' in platform:
+                extra_args += ['--ttauthfile', 'c:\\builds\\relengapi.tok']
+            else:
+                extra_args += ['--ttauthfile', '/builds/relengapi.tok']
 
             f = ScriptFactory(
                 config['scripts_repo'],
