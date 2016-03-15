@@ -2103,6 +2103,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             try_default = False
 
         for slave_platform in set(slave_platforms + talos_slave_platforms):
+            if slave_platform not in platform_config:
+                continue
             platform_name = platform_config[slave_platform]['name']
             # this is to handle how a platform has more than one slave
             # platform
@@ -2116,8 +2118,10 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
             for suite, talosConfig in SUITES.iteritems():
                 tests, merge, extra, platforms = branch_config[
                     '%s_tests' % suite]
-                if tests == 0 or slave_platform not in platforms:
+
+                if tests == 0 or slave_platform not in platforms or slave_platform not in talos_slave_platforms:
                     continue
+
                 assert tests == 1
 
                 skipconfig = None
