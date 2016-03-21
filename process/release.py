@@ -12,15 +12,15 @@ from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.scheduler import Scheduler, Dependent
 from buildbot.status.mail import MailNotifier
 from buildbot.steps.trigger import Trigger
-from buildbot.steps.shell import WithProperties
 from buildbot.status.builder import Results
 from buildbot.process.factory import BuildFactory
 
+import buildbotcustom.common
 import release.platforms
 import release.paths
-import buildbotcustom.common
 import build.paths
 import release.info
+reload(buildbotcustom.common)
 reload(release.platforms)
 reload(release.paths)
 reload(build.paths)
@@ -1842,43 +1842,36 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(bouncer_builder)
 
-    uv_fmt_template = "release-{branch}_{platform}_update_verify_{channel}_{chunk}"
+    uv_fmt_template = "release-{branch}_{product}_{platform}_update_verify"
     for platform in branch_config.get("release_platforms"):
         pf = branch_config["platforms"][platform]
-        t_chunks = branch_config.get("update_verify_chunks", 6)
-        for channel in branch_config.get('release_channels'):
-            for n in range(1, t_chunks + 1):
-                uv_buildername = uv_fmt_template.format(
-                    branch=branch_name,
-                    platform=platform,
-                    channel=channel,
-                    chunk=n,
-                    chunks=t_chunks,
-                    product=branch_config.get("product_name"),
-                    )
-                uv_factory = ScriptFactory(
-                    scriptRepo=tools_repo,
-                    interpreter='bash',
-                    scriptName='scripts/release/updates/chunked-verify.sh',
-                    extra_args=["UNUSED", "UNUSED", str(t_chunks), str(n)],
-                    env=pf['env'],
-                )
+        uv_buildername = uv_fmt_template.format(
+            branch=branch_name,
+            platform=platform,
+            product=branch_config.get("product_name"),
+            )
+        uv_factory = ScriptFactory(
+            scriptRepo=tools_repo,
+            interpreter='bash',
+            scriptName='scripts/release/updates/chunked-verify.sh',
+            env=pf['env'],
+        )
 
-                uv_builder = {
-                    'name': uv_buildername,
-                    'slavenames': pf['slaves'],
-                    'builddir': uv_buildername,
-                    'slavebuilddir': normalizeName(uv_buildername),
-                    'factory': uv_factory,
-                    'category': category_name,
-                    'env': pf['env'],
-                    'properties': {
-                          "branch": branch_name,
-                          "platform": platform,
-                          "product": pf["product_name"],
-                      }
+        uv_builder = {
+            'name': uv_buildername,
+            'slavenames': pf['slaves'],
+            'builddir': uv_buildername,
+            'slavebuilddir': normalizeName(uv_buildername),
+            'factory': uv_factory,
+            'category': category_name,
+            'env': pf['env'],
+            'properties': {
+                    "branch": branch_name,
+                    "platform": platform,
+                    "product": pf["product_name"],
                 }
-                builders.append(uv_builder)
+        }
+        builders.append(uv_builder)
 
     updates_mh_cfg = {
         "script_name": "scripts/release/updates.py",
