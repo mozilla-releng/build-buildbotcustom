@@ -1848,7 +1848,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         uv_buildername = uv_fmt_template.format(
             branch=branch_name,
             platform=platform,
-            product=branch_config.get("product_name"),
+            product=product,
             )
         uv_factory = ScriptFactory(
             scriptRepo=tools_repo,
@@ -1868,7 +1868,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
             'properties': {
                     "branch": branch_name,
                     "platform": platform,
-                    "product": pf["product_name"],
+                    "product": product,
                 }
         }
         builders.append(uv_builder)
