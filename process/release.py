@@ -1781,7 +1781,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         mh_cfg = {
             "script_name": "scripts/desktop_l10n.py",
             "extra_args": [
-                "--branch-config", "single_locale/%s.py" % branch_name,
+                "--branch-config", "single_locale/%s.py" % branch_config.get('single_locale_branch_config',
+                                                                             branch_name),
                 "--platform-config", "single_locale/%s.py" % platform,
                 "--environment-config", env_config,
                 "--balrog-config", balrog_config,
@@ -1813,7 +1814,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     bouncer_mh_cfg = {
         "script_name": "scripts/bouncer_submitter.py",
         "extra_args": [
-             "-c",  branch_config['bouncer_submitter_config'],
+             "-c",  branch_config['bouncer_submitter_config'][product],
              "--credentials-file", "oauth.txt",
              "--bouncer-api-prefix", branch_config['tuxedoServerUrl'],
              "--repo", branch_config['repo_path'],
@@ -1876,7 +1877,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     updates_mh_cfg = {
         "script_name": "scripts/release/updates.py",
         "extra_args": [
-             "-c",  branch_config['updates_config'],
+             "-c",  branch_config['updates_config'][product],
         ]
     }
     updates_buildername = "release-{branch}-{product}_updates".format(
@@ -1904,7 +1905,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     version_bump_mh_cfg = {
         "script_name": "scripts/release/postrelease_version_bump.py",
         "extra_args": [
-             "-c",  branch_config['postrelease_version_bump_config'],
+             "-c",  branch_config['postrelease_version_bump_config'][product],
         ]
     }
     version_bump_buildername = "release-{branch}-{product}_version_bump".format(
