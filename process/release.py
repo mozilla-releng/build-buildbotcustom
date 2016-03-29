@@ -1930,6 +1930,35 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(version_bump_builder)
 
+    # bouncer aliases
+    bouncer_aliases_mh_cfg = {
+        "script_name": "scripts/release/postrelease_bouncer_aliases.py",
+        "extra_args": [
+             "-c",  branch_config['postrelease_bouncer_aliases_config'][product],
+        ]
+    }
+    bouncer_aliases_buildername = "release-{branch}-{product}_bouncer_aliases".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    bouncer_aliases_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=bouncer_aliases_mh_cfg, use_credentials_file=True)
+
+    bouncer_aliases_builder = {
+        "name": bouncer_aliases_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": bouncer_aliases_buildername,
+        "slavebuilddir": normalizeName(bouncer_aliases_buildername),
+        "factory": bouncer_aliases_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(bouncer_aliases_builder)
+
     # checksums
     checksums_buildername = "release-{branch}-{product}_chcksms".format(
         branch=branch_name, product=product)
