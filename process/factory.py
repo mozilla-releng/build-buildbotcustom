@@ -5202,7 +5202,8 @@ class CCSourceFactory(ReleaseFactory):
          timeout=60*60, # 1 hour
         ))
         self.addConfigSteps(workdir=self.branchName)
-        configEnv = self.env.copy()
+        configEnv = uploadEnv.copy()
+        configEnv.update({'MOZ_AUTOMATION': '1'})
         if 'PATH' in configEnv.keys():
             configEnv.update({'PATH': '/tools/python27/bin:%s' %
                                        configEnv['PATH']})
@@ -5210,7 +5211,7 @@ class CCSourceFactory(ReleaseFactory):
           name='configure',
           command=self.makeCmd + ['-f', 'client.mk', 'configure'],
           workdir=self.branchName,
-          env=uploadEnv,
+          env=configEnv,
           description=['configure'],
           mock=self.use_mock,
           target=self.mock_target,
