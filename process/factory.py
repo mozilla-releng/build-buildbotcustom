@@ -999,7 +999,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.absMozillaSrcDir = '%s%s' % (self.baseWorkDir, self.mozillaSrcDir)
         self.absMozillaObjDir = '%s/%s' % (self.baseWorkDir, self.mozillaObjdir)
 
-        self.latestDir = '/pub/mozilla.org/%s' % self.stageProduct + \
+        self.latestDir = '/pub/%s' % self.stageProduct + \
                          '/nightly/latest-%s' % self.branchName
         if self.post_upload_include_platform:
             self.latestDir += '-%s' % self.stagePlatform
@@ -1013,7 +1013,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         else:
             self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                              self.stagePlatform)
-            self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
+            self.logBaseUrl = 'http://%s/pub/%s/%s' % \
                         ( self.stageServer, self.stageProduct, self.logUploadDir)
 
         # Need to override toolsdir as set by MozillaBuildFactory because
@@ -1900,7 +1900,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 target=self.mock_target,
                 mock_workdir_prefix=None,
             ))
-        baseUrl = 'http://%s/pub/mozilla.org/%s/tinderbox-builds/mozilla-central-%s' % \
+        baseUrl = 'http://%s/pub/%s/tinderbox-builds/mozilla-central-%s' % \
             (self.stageServer, self.productName, self.platform)
 
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
@@ -3141,7 +3141,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.absMozillaSrcDir = "%s/%s" % (self.baseWorkDir, self.mozillaSrcDir)
         self.absMozillaObjDir = '%s/%s/%s' % (self.baseWorkDir, self.origSrcDir, self.mozillaObjdir)
 
-        self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
+        self.latestDir = '/pub/%s' % self.productName + \
                          '/nightly/latest-%s-l10n' % self.branchName
         
         if objdir != '':
@@ -3784,7 +3784,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             mbsdiff += '.exe'
         
         baseURL = 'http://%s' % self.stageServer + \
-                  '/pub/mozilla.org/%s' % self.productName + \
+                  '/pub/%s' % self.productName + \
                   '/nightly/latest-%s' % self.branchName + \
                   '/mar-tools/%s' % self.platform
         marURL = '%s/%s' % (baseURL, mar)
@@ -4250,7 +4250,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
         # Break this function early, since I'm testing
         return
         candidatesDir = 'http://%s' % self.stageServer + \
-                        '/pub/mozilla.org/%s/nightly' % self.project + \
+                        '/pub/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
                                                     self.buildNumber)
 
@@ -5637,7 +5637,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         mbsdiff = 'mbsdiff'
 
         baseURL = 'http://%s' % self.stagingServer + \
-                  '/pub/mozilla.org/%s' % self.productName + \
+                  '/pub/%s' % self.productName + \
                   '/nightly/%s-candidates' % self.version + \
                   '/build%s/mar-tools/%s' % (self.buildNumber, 'linux')
         marURL = '%s/%s' % (baseURL, mar)
