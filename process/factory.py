@@ -3841,13 +3841,18 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
 
     def doRepack(self):
         self.downloadMarTools()
+        updateEnv = self.env.copy()
+        updateEnv['MOZ_OBJDIR'] = WithProperties('%(basedir)s' +
+                                    '/%s/%s/%s' % (self.baseWorkDir,
+                                                   self.origSrcDir,
+                                                   self.objdir))
         self.addStep(MockCommand(
          name='repack_installers',
          description=['repack', 'installers'],
          command=self.makeCmd + [WithProperties('installers-%(locale)s'),
                                  WithProperties('LOCALE_MERGEDIR=%(basedir)s/' + \
                                                 "%s/merged" % self.baseWorkDir)],
-         env = self.env,
+         env = updateEnv, 
          haltOnFailure=True,
          workdir='%s/%s/locales' % (self.absObjDir, self.appName),
          mock=self.use_mock,
