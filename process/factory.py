@@ -3270,13 +3270,15 @@ class BaseRepackFactory(MozillaBuildFactory):
                 mock=self.use_mock,
                 target=self.mock_target,
             )))
+        confEnv = self.env.copy()
+        confEnv.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' + self.origSrcDir)})
         self.addStep(MockCommand( **self.processCommand(
             name='configure',
             command=self.makeCmd + [ '-f', 'client.mk', 'configure'],
             workdir=self.absSrcDir,
             description='configure',
             descriptionDone='configure done',
-            env=self.env,
+            env=confEnv,
             haltOnFailure=True,
             mock=self.use_mock,
             target=self.mock_target,
