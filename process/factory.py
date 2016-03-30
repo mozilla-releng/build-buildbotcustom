@@ -1572,6 +1572,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
              target=self.mock_target,
              mock_workdir_prefix=None,
             ))
+        pkg_env['MOZ_OBJDIR'] = WithProperties('%(basedir)s/build/' + self.objdir)
         self.addStep(MockCommand(
             name='make_pkg',
             command=self.makeCmd + ['package'] + pkgArgs,
