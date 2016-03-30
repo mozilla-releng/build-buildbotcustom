@@ -3065,6 +3065,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  mock_target=None,
                  mock_packages=None,
                  mock_copyin_files=None,
+                 archiveServer=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, use_mock=self.use_mock,
                                      mock_target=self.mock_target,
@@ -3084,6 +3085,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.stageServer = stageServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
+        self.archiveServer = archiveServer
         self.tree = tree
         self.mozconfig = mozconfig
         self.testPrettyNames = testPrettyNames
@@ -4022,7 +4024,7 @@ class ReleaseFactory(MozillaBuildFactory):
                          nightlyDir="nightly"):
         # can be used with rsync, eg host + ':' + getCandidatesDir()
         # and "http://' + host + getCandidatesDir()
-        return '/pub/mozilla.org/' + product + '/' + nightlyDir + '/' + \
+        return '/pub/' + product + '/' + nightlyDir + '/' + \
                str(version) + '-candidates/build' + str(buildNumber) + '/'
 
     def getShippedLocales(self, sourceRepo, baseTag, appName):
@@ -4301,8 +4303,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             mar += '.exe'
             mbsdiff += '.exe'
 
-        baseURL = 'http://%s' % self.stageServer + \
-                  '/pub/mozilla.org/%s/candidates' % self.project + \
+        baseURL = 'http://%s' % self.archiveServer + \
+                  '/pub/%s/candidates' % self.project + \
                   '/%s-candidates/build%s' % (self.version, self.buildNumber) + \
                   '/mar-tools/%s' % self.platform
         marURL = '%s/%s' % (baseURL, mar)
@@ -4338,14 +4340,15 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
 
     def doRepack(self):
         self.downloadMarTools()
-
+        repackEnv = self.env.copy()
+        repackEnv['MOZ_OBJDIR'] = WithProperties('%(basedir)s/' + self.absMozillaObjDir)
         self.addStep(MockCommand(
          name='repack_installers',
          description=['repack', 'installers'],
          command=self.makeCmd + [WithProperties('installers-%(locale)s'),
                                  WithProperties('LOCALE_MERGEDIR=%(basedir)s/' + \
                                                 "%s/merged" % self.baseWorkDir)],
-         env=self.env,
+         env=repackEnv,
          haltOnFailure=True,
          workdir='%s/%s/locales' % (self.absObjDir, self.appName),
          mock=self.use_mock,
@@ -5295,6 +5298,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  version, appVersion, baseTag, buildNumber,
                  oldVersion, oldAppVersion, oldBaseTag,  oldBuildNumber,
                  ftpServer, bouncerServer, stagingServer,
+                 stagingUploadServer ,s3bucket, s3credentials,
                  stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
                  ausServerUrl, hgSshKey, hgUsername, releaseChannel='release',
                  commitPatcherConfig=True, mozRepoPath=None, oldRepoPath=None,
@@ -5354,6 +5358,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.stagingServer = stagingServer
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
+        self.stagingUploadServer = stagingUploadServer
+        self.s3bucket = s3bucket
+        self.s3credentials = s3credentials
         self.ausUser = ausUser
         self.ausSshKey = ausSshKey
         self.ausHost = ausHost
@@ -5807,16 +5814,31 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          mock=self.use_mock,
          target=self.mock_target,
         ))
+        partialUploadCmd = WithProperties('%(toolsdir)s/scripts/release/partialmarupload.sh')
+        partialUploadEnv = self.env.copy()
+        if 'PATH' in partialUploadEnv.keys():
+            uploadPath = '/tools/python27-virtualenv/bin:%s' % \
+                partialUploadEnv['PATH']
+        else:
+            uploadPath = '/tools/python27/bin:/usr/local/bin:' + \
+                         '/usr/lib64/ccache:/usr/local/bin:' + \
+                         '/bin:/usr/bin:/usr/local/sbin:/usr/sbin:' + \
+                         '/sbin:/home/seabld/bin:' + \
+                         '/tools/python27-virtualenv/bin'
+        partialUploadEnv.update({'PATH': uploadPath})
         self.addStep(RetryingMockCommand(
          name='upload_partial_mars',
-         command=['rsync', '-av',
-                  '-e', 'ssh -oIdentityFile=~/.ssh/%s' % self.stageSshKey,
-                  '--exclude=*complete.mar',
-                  'update',
-                  '%s@%s:%s' % (self.stageUsername, self.stagingServer,
-                                self.candidatesDir)],
+         command=['/bin/sh',
+                  partialUploadCmd,
+                  self.productName,
+                  self.version,
+                  self.buildNumber,
+                  self.s3bucket,
+                  self.s3credentials,
+                  'update'],
          workdir=self.marDir,
          description=['upload', 'partial mars'],
+         env=partialUploadEnv,
          haltOnFailure=True,
          mock=self.use_mock,
          target=self.mock_target,
