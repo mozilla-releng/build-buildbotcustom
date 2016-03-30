@@ -3259,7 +3259,6 @@ class BaseRepackFactory(MozillaBuildFactory):
             workdir="build/" + self.origSrcDir,
           ))
 
-
     def configure(self):
         if self.mozillaDir:
             self.addStep(MockCommand( **self.processCommand(
@@ -3591,7 +3590,11 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  use_mock=False, mock_target=None, mock_packages=None,
                  mock_copyin_files=None,
                  mozillaDir=None,
-                 mozillaSrcDir=None, **kwargs):
+                 mozillaSrcDir=None,
+                 tooltool_manifest_src=None,
+                 tooltool_url_list=[],
+                 tooltool_script=None,
+                 tooltool_bootstrap=None, **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
@@ -3665,6 +3668,10 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                    mock_copyin_files=self.mock_copyin_files,
                                    mozillaDir=mozillaDir,
                                    mozillaSrcDir=mozillaSrcDir,
+                                   tooltool_manifest_src=tooltool_manifest_src,
+                                   tooltool_url_list=tooltool_url_list,
+                                   tooltool_script=tooltool_script,
+                                   tooltool_bootstrap=tooltool_bootstrap,
                                    **kwargs)
 
         if l10nNightlyUpdate:
@@ -3922,7 +3929,12 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                  mock_copyin_files=None,
                  objdir=None,
                  mozillaDir=None,
-                 mozillaSrcDir=None, **kwargs):
+                 mozillaSrcDir=None,
+                 tooltool_manifest_src=None,
+                 tooltool_bootstrap="setup.sh",
+                 tooltool_url_list=[],
+                 tooltool_script=None,
+                 **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -3939,6 +3951,10 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                                       use_mock=self.use_mock, mock_target=self.mock_target,
                                       mock_packages=self.mock_packages,
                                       mock_copyin_files=self.mock_copyin_files,
+                                      tooltool_manifest_src=tooltool_manifest_src,
+                                      tooltool_bootstrap=tooltool_bootstrap,
+                                      tooltool_url_list=tooltool_url_list,
+                                      tooltool_script=tooltool_script,
                                       objdir=self.objdir, **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way

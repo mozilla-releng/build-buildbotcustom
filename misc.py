@@ -2657,6 +2657,9 @@ def generateCCBranchObjects(config, name, secrets=None):
                         mock_target=pf.get('mock_target'),
                         mock_packages=pf.get('mock_packages'),
                         mock_copyin_files=pf.get('mock_copyin_files'),
+                        tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                        tooltool_url_list=config.get('tooltool_url_list', []),
+                        tooltool_script=pf.get('tooltool_script'),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2792,6 +2795,9 @@ def generateCCBranchObjects(config, name, secrets=None):
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
+                tooltool_url_list=config.get('tooltool_url_list', []),
+                tooltool_script=pf.get('tooltool_script'),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
