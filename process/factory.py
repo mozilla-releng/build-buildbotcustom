@@ -1326,11 +1326,13 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
 
         if self.profiledBuild:
             command.append('MOZ_PGO=1')
+        compileEnv = self.env.copy()
+        compileEnv.update({'TOOLTOOL_DIR': workdir})
         self.addStep(MockCommand(
          name='compile',
          command=command,
          description=['compile'],
-         env=self.env,
+         env=compileEnv,
          haltOnFailure=True,
          timeout=10800,
          # bug 650202 'timeout=7200', bumping to stop the bleeding while we diagnose
@@ -1410,6 +1412,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         env = self.env.copy()
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
+        env['TOOLTOOL_DIR'] = WithProperties('%(basedir:-)s/build')
         self.addStep(MockMozillaCheck(
                          test_name="check",
                          makeCmd=self.makeCmd,
