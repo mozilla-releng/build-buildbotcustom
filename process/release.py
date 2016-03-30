@@ -1836,7 +1836,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "factory": bouncer_submitter_factory,
         "category": category_name,
         "properties": {
-            "branch": branch_config["bouncer_branch"],
+            "branch": branch_name,
             "platform": None,
             "product": product,
         }
