@@ -1836,7 +1836,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         "factory": bouncer_submitter_factory,
         "category": category_name,
         "properties": {
-            "branch": branch_config["bouncer_branch"],
+            "branch": branch_name,
             "platform": None,
             "product": product,
         }
@@ -1994,6 +1994,36 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         }
     }
     builders.append(checksums_builder)
+
+    for platform in branch_config.get("partner_repacks_platforms", []):
+        buildername = "release-{branch}-{product}-{platform}_partner_repacks"
+        buildername = buildername.format(branch=branch_name, product=product,
+                                         platform=platform)
+        cfg = branch_config['partner_repack_config'][product]
+        mh_cfg = {
+            "script_name": cfg['script_name'],
+            "extra_args": cfg['extra_args'] + ["--platform", platform,
+                                               "--hgrepo", branch_config['repo_path']]
+        }
+        partner_repack_factory = makeMHFactory(
+            signingServers=secrets.get(pf.get("dep_signing_servers")),
+            config=branch_config,
+            pf=branch_config["platforms"][platform],
+            mh_cfg=mh_cfg)
+
+        builders.append({
+            'name': buildername,
+            'slavenames': branch_config['platforms']['macosx64']['slaves'],
+            'category': category_name,
+            'builddir': buildername,
+            'slavebuilddir': normalizeName(buildername),
+            'factory': partner_repack_factory,
+            'properties': {
+                'branch': branch_name,
+                'platform': platform,
+                'product': product,
+            }
+        })
 
     # Don't merge release builder requests
     nomergeBuilders.update([b['name'] for b in builders])
