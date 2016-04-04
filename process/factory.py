@@ -294,6 +294,7 @@ class MockMixin(object):
 
 
 class TooltoolMixin(object):
+
     def addTooltoolStep(self, **kwargs):
         cmd= [
             'sh',
@@ -314,6 +315,8 @@ class TooltoolMixin(object):
             command=cmd,
             env=self.env,
             haltOnFailure=True,
+            mock=self.use_mock,
+            target=self.mock_target,
             **kwargs
         ))
 
@@ -1331,7 +1334,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
          command=['cat', '.mozconfig'],
         ))
         if self.tooltool_manifest_src:
-            self.addTooltoolStep()
+            self.addTooltoolStep(workdir='build')
 
     def addDoBuildSteps(self):
         workdir=WithProperties('%(basedir)s/build')
@@ -3290,7 +3293,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             target=self.mock_target,
         ))
         if self.tooltool_manifest_src:
-            self.addTooltoolStep()
+            self.addTooltoolStep(workdir='build')
 
     def configure(self):
         if self.mozillaDir:
