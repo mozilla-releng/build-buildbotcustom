@@ -294,7 +294,6 @@ class MockMixin(object):
 
 
 class TooltoolMixin(object):
-
     def addTooltoolStep(self, **kwargs):
         cmd= [
             'sh',
@@ -310,13 +309,11 @@ class TooltoolMixin(object):
         if self.tooltool_token:
             cmd.extend(['--authentication-file', self.tooltool_token])
 
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
             name='run_tooltool',
             command=cmd,
             env=self.env,
             haltOnFailure=True,
-            mock=self.use_mock,
-            target=self.mock_target,
             **kwargs
         ))
 
