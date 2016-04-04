@@ -292,6 +292,32 @@ class MockMixin(object):
                 packages=self.mock_packages,
             ))
 
+
+class TooltoolMixin(object):
+    def addTooltoolStep(self, **kwargs):
+        cmd= [
+            'sh',
+            WithProperties(
+                '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
+            self.tooltool_manifest_src,
+            self.tooltool_url_list[0],
+            self.tooltool_bootstrap,
+        ]
+        if self.tooltool_script:
+            cmd.extend(self.tooltool_script)
+
+        if self.tooltool_token:
+            cmd.extend(['--authentication-file', self.tooltool_token])
+
+        self.addStep(ShellCommand(
+            name='run_tooltool',
+            command=cmd,
+            env=self.env,
+            haltOnFailure=True,
+            **kwargs
+        ))
+
+
 class BootstrapFactory(BuildFactory):
     def __init__(self, automation_tag, logdir, bootstrap_config):
         """
@@ -420,7 +446,7 @@ class RequestSortingBuildFactory(BuildFactory):
             log.err()
             return BuildFactory.newBuild(self, requests)
 
-class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
+class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
     ignore_dirs = [ 'info', 'rel-*']
 
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
@@ -429,7 +455,11 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             baseMirrorUrls=None, baseBundleUrls=None, signingServers=None,
             enableSigning=True, env={}, enable_pymake=False, use_mock=False,
             mock_target=None, mock_packages=None, mock_copyin_files=None,
-            mozillaDir=None, mozillaSrcDir=None, **kwargs):
+            mozillaDir=None, mozillaSrcDir=None,
+            tooltool_manifest_src=None,
+            tooltool_url_list=[], tooltool_script=None,
+            tooltool_token=None,
+            **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -454,6 +484,10 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
+        self.tooltool_manifest_src=tooltool_manifest_src
+        self.tooltool_url_list=tooltool_url_list
+        self.tooltool_script=tooltool_script
+        self.tooltool_token=tooltool_token
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -848,13 +882,21 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=None,
                  tooltool_script=None,
+                 tooltool_token=None,
                  use_mock=None,
                  mock_target=None,
                  mock_packages=None,
                  mock_copyin_files=None,
                  **kwargs):
-        MozillaBuildFactory.__init__(self, use_mock=use_mock, mock_target=mock_target, mock_packages=mock_packages,
-                 mock_copyin_files=mock_copyin_files, **kwargs)
+        MozillaBuildFactory.__init__(self, use_mock=use_mock,
+                                     mock_target=mock_target,
+                                     mock_packages=mock_packages,
+                                     mock_copyin_files=mock_copyin_files,
+                                     tooltool_manifest_src=tooltool_manifest_src,
+                                     tooltool_url_list=tooltool_url_list,
+                                     tooltool_script=tooltool_script,
+                                     tooltool_token=tooltool_token,
+                                     **kwargs)
 
         # Make sure we have a buildid and builduid
         self.addStep(FunctionalStep(
@@ -1289,22 +1331,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
          command=['cat', '.mozconfig'],
         ))
         if self.tooltool_manifest_src:
-          command=[
-              'sh',
-              WithProperties(
-                '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
-                self.tooltool_manifest_src,
-                self.tooltool_url_list[0],
-                self.tooltool_bootstrap,
-          ]
-          if self.tooltool_script:
-              command.extend(self.tooltool_script)
-          self.addStep(ShellCommand(
-            name='run_tooltool',
-            command=command,
-            env=self.env,
-            haltOnFailure=True,
-          ))
+            self.addTooltoolStep()
 
     def addDoBuildSteps(self):
         workdir=WithProperties('%(basedir)s/build')
@@ -2160,6 +2187,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
             unittestBranch=None, tinderboxBuildsDir=None, 
             mozillaDir=None,
             mozillaSrcDir=None,
+            tooltool_manifest_src=None,
+            tooltool_url_list=[], tooltool_script=None,
+            tooltool_token=None,
             **kwargs):
 
         self.talosMasters = talosMasters or []
@@ -2172,7 +2202,12 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
         self.tinderboxBuildsDir = tinderboxBuildsDir
         MercurialBuildFactory.__init__(self, mozillaDir=mozillaDir,
-                                       mozillaSrcDir=mozillaSrcDir, **kwargs)
+                                       mozillaSrcDir=mozillaSrcDir,
+                                       tooltool_manifest_src=tooltool_manifest_src,
+                                       tooltool_url_list=tooltool_url_list,
+                                       tooltool_script=tooltool_script,
+                                       tooltool_token=tooltool_token,
+                                       **kwargs)
 
     def makePartialTools(self):
         '''The mar and bsdiff tools are created by default when 
@@ -2641,7 +2676,11 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
                  mozillaDir=None,
                  mozillaSrcDir=None,
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, **kwargs):
+                 mock_copyin_files=None,
+                 tooltool_manifest_src=None,
+                 tooltool_url_list=[], tooltool_script=None,
+                 tooltool_token=None,
+                 **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
         self.inspectorRepoPath = inspectorRepoPath
@@ -2655,7 +2694,13 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
             mozillaDir=mozillaDir,
             mozillaSrcDir=mozillaSrcDir,
             mozconfigBranch='default', use_mock=use_mock, mock_target=mock_target,
-            mock_packages=mock_packages, mock_copyin_files=mock_copyin_files, **kwargs)
+            mock_packages=mock_packages,
+            mock_copyin_files=mock_copyin_files,
+            tooltool_manifest_src=tooltool_manifest_src,
+            tooltool_url_list=tooltool_url_list,
+            tooltool_script=tooltool_script,
+            tooltool_token=tooltool_token,
+            **kwargs)
 
     # MercurialBuildFactory defines those, and our inheritance chain makes us
     # look there before NightlyBuildFactory, so we need to define them here and
@@ -3042,7 +3087,7 @@ def identToProperties(default_prop=None):
     return list2dict
 
 
-class BaseRepackFactory(MozillaBuildFactory):
+class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
     # Override ignore_dirs so that we don't delete l10n nightly builds
     # before running a l10n nightly build
     ignore_dirs = MozillaBuildFactory.ignore_dirs + [reallyShort('*-nightly')]
@@ -3061,6 +3106,7 @@ class BaseRepackFactory(MozillaBuildFactory):
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=None,
                  tooltool_script=None,
+                 tooltool_token=None,
                  use_mock=False,
                  mock_target=None,
                  mock_packages=None,
@@ -3093,6 +3139,7 @@ class BaseRepackFactory(MozillaBuildFactory):
         self.tooltool_url_list = tooltool_url_list or []
         self.tooltool_script = tooltool_script
         self.tooltool_bootstrap = tooltool_bootstrap
+        self.tooltool_token = tooltool_token
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
@@ -3243,23 +3290,7 @@ class BaseRepackFactory(MozillaBuildFactory):
             target=self.mock_target,
         ))
         if self.tooltool_manifest_src:
-          command=[
-              'sh',
-              WithProperties(
-                '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
-                self.tooltool_manifest_src,
-                self.tooltool_url_list[0],
-                self.tooltool_bootstrap,
-          ]
-          if self.tooltool_script:
-              command.extend(self.tooltool_script)
-          self.addStep(ShellCommand(
-            name='run_tooltool',
-            command=command,
-            env=self.env,
-            haltOnFailure=True,
-            workdir="build/" + self.origSrcDir,
-          ))
+            self.addTooltoolStep()
 
     def configure(self):
         if self.mozillaDir:
@@ -3598,7 +3629,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  tooltool_manifest_src=None,
                  tooltool_url_list=[],
                  tooltool_script=None,
-                 tooltool_bootstrap=None, **kwargs):
+                 tooltool_bootstrap=None,
+                 tooltool_token=None,
+                 **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
         self.ausBaseUploadDir = ausBaseUploadDir
@@ -3676,6 +3709,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                    tooltool_url_list=tooltool_url_list,
                                    tooltool_script=tooltool_script,
                                    tooltool_bootstrap=tooltool_bootstrap,
+                                   tooltool_token=tooltool_token,
                                    **kwargs)
 
         if l10nNightlyUpdate:
@@ -3938,6 +3972,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=[],
                  tooltool_script=None,
+                 tooltool_token=None,
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -3959,6 +3994,7 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                                       tooltool_bootstrap=tooltool_bootstrap,
                                       tooltool_url_list=tooltool_url_list,
                                       tooltool_script=tooltool_script,
+                                      tooltool_token=tooltool_token,
                                       objdir=self.objdir, **kwargs)
 
     # it sucks to override all of updateEnUS but we need to do it that way

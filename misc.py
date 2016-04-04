@@ -2318,6 +2318,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'tooltool_manifest_src': pf.get('tooltool_manifest_src', None),
                 'tooltool_url_list': config.get('tooltool_url_list', []),
                 'tooltool_script': pf.get('tooltool_script'),
+                'tooltool_token':pf.get('tooltool_token'),
                 'enable_pymake': enable_pymake,
                 'mozillaDir': config.get('mozilla_dir', None),
                 'mozillaSrcDir': config.get('mozilla_srcdir', None),
@@ -2583,6 +2584,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=config.get('tooltool_url_list', []),
                 tooltool_script=pf.get('tooltool_script', None),
+                tooltool_token=pf.get('tooltool_token', None),
                 enable_pymake=enable_pymake,
                 use_mock=pf.get('use_mock'),
                 mock_target=pf.get('mock_target'),
@@ -2660,6 +2662,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                         tooltool_url_list=config.get('tooltool_url_list', []),
                         tooltool_script=pf.get('tooltool_script'),
+                        tooltool_token=pf.get('tooltool_token', None),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2798,6 +2801,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 tooltool_manifest_src=pf.get('tooltool_manifest_src', None),
                 tooltool_url_list=config.get('tooltool_url_list', []),
                 tooltool_script=pf.get('tooltool_script'),
+                tooltool_token=pf.get('tooltool_token', None),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
@@ -2995,6 +2999,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                  signingServers=secrets.get(pf.get('nightly_signing_servers')),
                  tooltool_manifest_src= pf.get('tooltool_manifest_src', None),
                  tooltool_url_list= config.get('tooltool_url_list', []),
+                 tooltool_script=pf.get('tooltool_script'),
+                 tooltool_token=pf.get('tooltool_token', None),
                  enable_pymake=enable_pymake,
                  use_mock=pf.get('use_mock'),
                  mock_target=pf.get('mock_target'),
