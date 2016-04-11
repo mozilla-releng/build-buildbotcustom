@@ -2008,7 +2008,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         partner_repack_factory = makeMHFactory(
             signingServers=secrets.get(pf.get("dep_signing_servers")),
             config=branch_config,
-            pf=branch_config["platforms"][platform],
+            pf=branch_config["platforms"]["macosx64"],
             mh_cfg=mh_cfg)
 
         builders.append({
