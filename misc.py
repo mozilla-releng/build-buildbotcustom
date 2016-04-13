@@ -2001,9 +2001,6 @@ def generateBranchObjects(config, name, secrets=None):
 
         # -- end of per-platform loop --
 
-    # Make sure builders have the right properties
-    addBuilderProperties(branchObjects['builders'])
-
     return branchObjects
 
 
@@ -2220,7 +2217,7 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         'name': "%s %s pgo talos %s" % (platform_name, branch, suite),
                         'slavenames': platform_config[slave_platform]['slaves'],
                         'builddir': builddir + '-pgo',
-                        'slavebuilddir': slavebuilddir,
+                        'slavebuilddir': slavebuilddir + '-pgo',
                         'factory': pgo_factory,
                         'category': branch,
                         'properties': properties,
@@ -2499,9 +2496,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
         # Create talos schedulers
         branchObjects['schedulers'].extend(makeTalosScheduler(talos_builders, False))
         branchObjects['schedulers'].extend(makeTalosScheduler(talos_pgo_builders, True))
-
-    # Make sure builders have the right properties
-    addBuilderProperties(branchObjects['builders'])
 
     return branchObjects
 
@@ -2956,7 +2950,6 @@ def mh_l10n_scheduler_name(config, platform):
     pf = config['platforms'][platform]
     return '%s nightly l10n' % (pf['base_name'])
 
-
 def mh_l10n_builder_names(config, platform, branch, is_nightly):
     # let's check if we need to create builders for this config/platform
     names = []
@@ -2975,33 +2968,3 @@ def mh_l10n_builder_names(config, platform, branch, is_nightly):
     return names
 
 
-def addBuilderProperties(builders):
-    for b in builders:
-        if not isinstance(b['factory'], ScriptFactory):
-            continue
-
-        # TODO: do the same for 'master' property?
-        if 'basedir' in b['properties']:
-            continue
-
-        if 'slavebuilddir' in b:
-            slavebuilddir = b['slavebuilddir']
-        else:
-            slavebuilddir = b['builddir']
-
-        platform = b['properties']['platform']
-
-        if platform.startswith('win') or platform.startswith('xp-'):
-            # On Windows, test slaves use C:\slave\test, but build slaves
-            # use /c/builds/moz2_slave
-            if slavebuilddir == 'test':  # TODO: This check is too fragile
-                rootdir = r'C:\slave'
-                basedir = '%s\%s' % (rootdir, slavebuilddir)
-            else:
-                rootdir = '/c/builds/moz2_slave'
-                basedir = '%s/%s' % (rootdir, slavebuilddir)
-        else:
-            rootdir = '/builds/slave'
-            basedir = '%s/%s' % (rootdir, slavebuilddir)
-
-        b['properties']['basedir'] = basedir
