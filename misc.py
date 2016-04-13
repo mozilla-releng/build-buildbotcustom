@@ -2787,6 +2787,9 @@ def generateProjectObjects(project, config, SLAVES, all_builders=None):
             project, config, SLAVES)
         buildObjects = mergeBuildObjects(buildObjects, spiderMonkeyObjects)
 
+    # Make sure builders have the right properties
+    addBuilderProperties(buildObjects['builders'])
+
     return buildObjects
 
 
@@ -2999,6 +3002,10 @@ def addBuilderProperties(builders):
             slavebuilddir = b['builddir']
 
         platform = b['properties']['platform']
+
+        # These are generally non-platform specific release jobs that run on linux machines
+        if not platform:
+            platform = 'linux'
 
         if platform.startswith('win') or platform.startswith('xp-'):
             # On Windows, test slaves use C:\slave\test, but build slaves
