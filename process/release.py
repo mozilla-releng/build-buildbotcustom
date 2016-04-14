@@ -30,7 +30,8 @@ from buildbotcustom.status.mail import ChangeNotifier
 from buildbotcustom.misc import (
     generateTestBuilderNames, generateTestBuilder, changeContainsProduct,
     nomergeBuilders, changeContainsProperties,
-    changeContainsScriptRepoRevision, makeMHFactory)
+    changeContainsScriptRepoRevision, makeMHFactory,
+    addBuilderProperties)
 from buildbotcustom.common import normalizeName
 from buildbotcustom.process.factory import (
     ScriptFactory, SingleSourceFactory, ReleaseBuildFactory,
@@ -1749,6 +1750,9 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if 'product' not in props:
             props['product'] = releaseConfig['productName'].capitalize()
 
+    # Make sure builders have the right properties
+    addBuilderProperties(builders)
+
     return {
         "builders": builders,
         "status": status,
@@ -2027,5 +2031,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
 
     # Don't merge release builder requests
     nomergeBuilders.update([b['name'] for b in builders])
+
+    # Make sure builders have the right properties
+    addBuilderProperties(builders)
 
     return builders
