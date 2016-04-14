@@ -823,6 +823,14 @@ def generateDesktopMozharnessBuilders(name, platform, config, secrets,
             desktop_mh_builders.extend(l10n_builders)
             builds_created['done_l10n_repacks'] = True
 
+    # Handle l10n for try
+    elif config.get('enable_try') and config['enable_l10n']:
+        if is_l10n_with_mh(config, platform):
+            l10n_builders = mh_l10n_builders(config, platform, name, secrets,
+                                             is_nightly=False)
+            desktop_mh_builders.extend(l10n_builders)
+            builds_created['done_l10n_repacks'] = True
+
     # if we_do_pgo:
     if (config['pgo_strategy'] in ('periodic', 'try') and
             platform in config['pgo_platforms']):
@@ -2890,12 +2898,13 @@ def mh_l10n_builders(config, platform, branch, secrets, is_nightly):
         this_chunk += 1
         builderName = bn
         builddir = mh_l10n_builddir_from_builder_name(bn, product_name)
-        extra_args = ['--branch-config', branch_config,
+        extra_args = ['--environment-config', environment_config,
+                      '--branch-config', branch_config,
                       '--platform-config', platform_config,
-                      '--environment-config', environment_config,
-                      '--balrog-config', balrog_config,
                       '--total-chunks', str(l10n_chunks),
                       '--this-chunk', str(this_chunk)]
+        if config.get('updates_enabled', False):
+            extra_args.extend(['--balrog-config', balrog_config])
         signing_servers = secrets.get(pf.get('nightly_signing_servers'))
         factory = SigningScriptFactory(
             signingServers=signing_servers,
@@ -2952,7 +2961,6 @@ def mh_l10n_scheduler_name(config, platform):
 
 def mh_l10n_builder_names(config, platform, branch, is_nightly):
     # let's check if we need to create builders for this config/platform
-    names = []
     pf = config['platforms'][platform]
     product_name = pf['product_name']
     name = '%s %s %s l10n' % (product_name, branch, platform)
@@ -2962,9 +2970,10 @@ def mh_l10n_builder_names(config, platform, branch, is_nightly):
     repacks = pf['mozharness_desktop_l10n']
 
     l10n_chunks = repacks['l10n_chunks']
-    for chunk in range(1, l10n_chunks + 1):
-        builder_name = "%s-%s" % (name, chunk)
-        names.append(builder_name)
+    if l10n_chunks == 1:
+        names = [name]
+    else:
+        names = ["%s-%s" % (name, chunk) for chunk in range(1, l10n_chunks + 1)]
     return names
 
 
