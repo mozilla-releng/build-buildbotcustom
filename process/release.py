@@ -2006,6 +2006,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
         cfg = branch_config['partner_repack_config'][product]
         mh_cfg = {
             "script_name": cfg['script_name'],
+            "script_maxtime": 6*3600,
             "extra_args": cfg['extra_args'] + ["--platform", platform,
                                                "--hgrepo", branch_config['repo_path']]
         }
