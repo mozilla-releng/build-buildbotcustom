@@ -2027,6 +2027,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
                 'branch': branch_name,
                 'platform': platform,
                 'product': product,
+                'basedir': normalizeName(buildername),
             }
         })
 
