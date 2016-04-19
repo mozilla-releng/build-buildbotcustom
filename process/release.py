@@ -2025,9 +2025,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
             'factory': partner_repack_factory,
             'properties': {
                 'branch': branch_name,
-                'platform': platform,
+                'platform': 'macosx64',
                 'product': product,
-                'basedir': normalizeName(buildername),
             }
         })
 
