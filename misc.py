@@ -2165,7 +2165,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         slave_platform].get('download_symbols', True),
                     "talos_from_source_code": branch_config.get('talos_from_source_code', False),
                     "credentialsFile": os.path.join(os.getcwd(), "BuildSlaves.py"),
-                    "datazillaUrl": branch_config.get('datazilla_url')
                 }
                 factory_kwargs.update(extra)
 
