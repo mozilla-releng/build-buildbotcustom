@@ -969,15 +969,6 @@ def generateBranchObjects(config, name, secrets=None):
                 pf['stage_product'], []).append('%s valgrind' % base_name)
             prettyNames["%s-valgrind" % platform] = "%s valgrind" % base_name
 
-        # Fill the l10n dep dict
-        if config['enable_l10n'] and platform in config['l10n_platforms'] and \
-                config['enable_l10n_onchange']:
-                l10nBuilders[base_name] = {}
-                l10nBuilders[base_name]['tree'] = config['l10n_tree']
-                l10nBuilders[base_name]['l10n_builder'] = \
-                    '%s %s %s l10n dep' % (pf['product_name'].capitalize(),
-                                           name, platform)
-                l10nBuilders[base_name]['platform'] = platform
         # Check if branch wants nightly builds
         if config['enable_nightly']:
             if 'enable_nightly' in pf:
@@ -1069,15 +1060,6 @@ def generateBranchObjects(config, name, secrets=None):
         repo_branch=repo_branch,
         pollInterval=pollInterval,
     ))
-
-    if config['enable_l10n'] and config['enable_l10n_onchange']:
-        hg_all_locales_poller = HgAllLocalesPoller(hgURL=config['hgurl'],
-                                                   repositoryIndex=config[
-                                                   'l10n_repo_path'],
-                                                   pollInterval=l10nPollInterval,
-                                                   branch=name)
-        hg_all_locales_poller.parallelRequests = 1
-        branchObjects['change_source'].append(hg_all_locales_poller)
 
     # schedulers
     # this one gets triggered by the HG Poller
@@ -1885,79 +1867,6 @@ def generateBranchObjects(config, name, secrets=None):
                         mozilla2_l10n_nightly_builder)
 
         # end do_nightly
-
-        # We still want l10n_dep builds if nightlies are off
-        if config['enable_l10n'] and config['enable_l10n_onchange'] and \
-           platform in config['l10n_platforms']:
-                dep_kwargs = {}
-                if config.get('call_client_py', False):
-                    dep_kwargs['callClientPy'] = True
-                    dep_kwargs['clientPyConfig'] = {
-                        'chatzilla_repo_path': config.get('chatzilla_repo_path', ''),
-                        'cvsroot': config.get('cvsroot', ''),
-                        'inspector_repo_path': config.get('inspector_repo_path', ''),
-                        'moz_repo_path': config.get('moz_repo_path', ''),
-                        'skip_blank_repos': config.get('skip_blank_repos', False),
-                        'venkman_repo_path': config.get('venkman_repo_path', ''),
-                    }
-                mozconfig = os.path.join(
-                    os.path.dirname(pf['src_mozconfig']), 'l10n-mozconfig')
-                mozilla2_l10n_dep_factory = NightlyRepackFactory(
-                    env=platform_env,
-                    objdir=l10n_objdir,
-                    platform=platform,
-                    hgHost=config['hghost'],
-                    tree=config['l10n_tree'],
-                    project=pf['product_name'],
-                    appName=pf['app_name'],
-                    enUSBinaryURL=config['enUS_binaryURL'],
-                    mozillaDir=config.get('mozilla_dir', None),
-                    mozillaSrcDir=config.get('mozilla_srcdir', None),
-                    nightly=False,
-                    l10nDatedDirs=config['l10nDatedDirs'],
-                    stageServer=config['stage_server'],
-                    stageUsername=config['stage_username'],
-                    stageSshKey=config['stage_ssh_key'],
-                    repoPath=config['repo_path'],
-                    l10nRepoPath=config['l10n_repo_path'],
-                    buildToolsRepoPath=config['build_tools_repo_path'],
-                    compareLocalesRepoPath=config['compare_locales_repo_path'],
-                    compareLocalesTag=config['compare_locales_tag'],
-                    buildSpace=l10nSpace,
-                    clobberURL=config['base_clobber_url'],
-                    clobberTime=clobberTime,
-                    signingServers=secrets.get(pf.get('dep_signing_servers')),
-                    baseMirrorUrls=config.get('base_mirror_urls'),
-                    extraConfigureArgs=config.get('l10n_extra_configure_args', []),
-                    buildsBeforeReboot=pf.get('builds_before_reboot', 0),
-                    use_mock=pf.get('use_mock'),
-                    mock_target=pf.get('mock_target'),
-                    mock_packages=pf.get('mock_packages'),
-                    mock_copyin_files=pf.get('mock_copyin_files'),
-                    mozconfig=mozconfig,
-                    enable_pymake=enable_pymake,
-                    tooltool_manifest_src=pf.get('tooltool_manifest_src'),
-                    tooltool_script=pf.get('tooltool_script'),
-                    tooltool_url_list=config.get('tooltool_url_list', []),
-                    **dep_kwargs
-                )
-                # eg. Thunderbird comm-central linux l10n dep
-                slavebuilddir = normalizeName('%s-%s-l10n-dep' % (name, platform), pf['stage_product'], max_=50)
-                mozilla2_l10n_dep_builder = {
-                    'name': l10nBuilders[pf['base_name']]['l10n_builder'],
-                    'slavenames': pf.get('l10n_slaves', pf['slaves']),
-                    'builddir': '%s-%s-l10n-dep' % (name, platform),
-                    'slavebuilddir': slavebuilddir,
-                    'factory': mozilla2_l10n_dep_factory,
-                    'category': name,
-                    'nextSlave': _nextAWSSlave_sort,
-                    'properties': {'branch': name,
-                                   'platform': platform,
-                                   'stage_platform': stage_platform,
-                                   'product': pf['stage_product'],
-                                   'slavebuilddir': slavebuilddir},
-                }
-                branchObjects['builders'].append(mozilla2_l10n_dep_builder)
 
         if config['enable_valgrind'] and \
                 platform in config['valgrind_platforms']:
