@@ -1934,6 +1934,35 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(version_bump_builder)
 
+    # uptake monitoring
+    uptake_monitoring_mh_cfg = {
+        "script_name": "scripts/release/uptake_monitoring.py",
+        "extra_args": [
+             "-c",  branch_config['uptake_monitoring_config'][product],
+        ]
+    }
+    uptake_monitoring_buildername = "release-{branch}-{product}_uptake_monitoring".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    uptake_monitoring_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=uptake_monitoring_mh_cfg, use_credentials_file=True)
+
+    uptake_monitoring_builder = {
+        "name": uptake_monitoring_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": uptake_monitoring_buildername,
+        "slavebuilddir": normalizeName(uptake_monitoring_buildername),
+        "factory": uptake_monitoring_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(uptake_monitoring_builder)
+
     # bouncer aliases
     bouncer_aliases_mh_cfg = {
         "script_name": "scripts/release/postrelease_bouncer_aliases.py",
