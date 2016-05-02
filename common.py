@@ -123,6 +123,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'thunderbird_tag_source': 't_tag_src',
         'thunderbird_tag_l10n': 't_tag_l10n',
         'start_uptake_monitoring': 'ut',
+        'uptake_monitoring': 'uptk_mntr',
         'final': 'fnl',
         'verification': 'vrfy',
         'shipping': 'shp',
