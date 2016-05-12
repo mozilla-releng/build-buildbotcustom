@@ -1377,7 +1377,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             if self.platform.startswith('win'):
                 python = ['c:/mozilla-build/python27/python', '-u']
             else:
-                python = ['/tools/buildbot/bin/python']
+                python = [WithProperties('%(basedir)s/' +
+                          '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
             if self.mozillaSrcDir:
                 machPath = '%(basedir)s/build/mozilla/mach'
             else:
@@ -1674,7 +1675,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
         else:
-            python = ['/tools/buildbot/bin/python']
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
         if self.mozillaSrcDir:
             machPath = '%(basedir)s/build/mozilla/mach'
         else:
@@ -2184,7 +2186,8 @@ class NightlyBuildFactory(MercurialBuildFactory):
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
         else:
-            python = ['/tools/buildbot/bin/python']
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
         if self.mozillaSrcDir:
             machPath = '%(basedir)s/build/mozilla/mach'
         else:
@@ -3583,7 +3586,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
         else:
-            python = ['/tools/buildbot/bin/python']
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
         if self.mozillaSrcDir:
             machPath = '%(basedir)s/build/mozilla/mach'
         else:
