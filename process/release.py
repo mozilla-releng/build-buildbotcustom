@@ -2058,6 +2058,34 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
                 'product': product,
             }
         })
+ 
+    publish_balrog_mh_cfg = {
+        "script_name": "scripts/release/publish_balrog.py",
+        "extra_args": [
+             "-c",  branch_config['updates_config'][product],
+        ]
+    }
+    publish_balrog_buildername = "release-{branch}-{product}_publish_balrog".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    publish_balrog_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=publish_balrog_mh_cfg, use_credentials_file=True)
+
+    publish_balrog_builder = {
+        "name": publish_balrog_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": publish_balrog_buildername,
+        "slavebuilddir": normalizeName(publish_balrog_buildername),
+        "factory": publish_balrog_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(publish_balrog_builder)
 
     # Don't merge release builder requests
     nomergeBuilders.update([b['name'] for b in builders])
