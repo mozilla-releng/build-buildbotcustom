@@ -842,14 +842,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                  tooltool_script=None,
                  enablePackaging=True,
                  enableInstaller=False,
-                 gaiaRepo=None,
-                 gaiaRevision=None,
-                 gaiaRevisionFile=None,
-                 gaiaLanguagesFile=None,
-                 gaiaLanguagesScript=None,
-                 gaiaL10nRoot=None,
-                 geckoL10nRoot=None,
-                 geckoLanguagesFile=None,
                  relengapi_archiver_repo_path=None,
                  relengapi_archiver_release_tag=None,
                  **kwargs):
@@ -909,20 +901,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.tooltool_url_list = tooltool_url_list or []
         self.tooltool_script = tooltool_script or ['/tools/tooltool.py']
         self.tooltool_bootstrap = tooltool_bootstrap
-        self.gaiaRepo = gaiaRepo
-        self.gaiaRepoUrl = "https://%s/%s" % (self.hgHost, self.gaiaRepo)
-        self.gaiaMirrors = None
-        if self.baseMirrorUrls and self.gaiaRepo:
-            self.gaiaMirrors = ['%s/%s' % (url, self.gaiaRepo)
-                                for url in self.baseMirrorUrls]
-        self.gaiaRevision = gaiaRevision
-        self.gaiaRevisionFile = gaiaRevisionFile
-        self.geckoL10nRoot = geckoL10nRoot
-        self.geckoLanguagesFile = geckoLanguagesFile
-        self.gaiaLanguagesFile = gaiaLanguagesFile
-        self.gaiaLanguagesScript = gaiaLanguagesScript
-        self.gaiaL10nRoot = gaiaL10nRoot
-        self.gaiaL10nBaseDir = WithProperties('%(basedir)s/build-gaia-l10n')
         self.compareLocalesRepoPath = compareLocalesRepoPath
         self.compareLocalesTag = compareLocalesTag
         self.multiLocaleScript = multiLocaleScript
@@ -1054,11 +1032,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addMultiLocaleRepoSteps()
 
         self.multiLocale = multiLocale
-
-        if gaiaLanguagesFile:
-            assert gaiaLanguagesScript and gaiaL10nRoot
-            self.env['LOCALE_BASEDIR'] = self.gaiaL10nBaseDir
-            self.env['LOCALES_FILE'] = self.gaiaLanguagesFile
 
         self.addBuildSteps()
         if self.uploadSymbols or (not self.disableSymbols and self.packageTests):
@@ -1218,65 +1191,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                      descriptionDone=['delete', 'old', 'package']
                      ))
 
-    def addGaiaSourceSteps(self):
-        if self.gaiaRevisionFile:
-            def parse_gaia_revision(rc, stdout, stderr):
-                properties = {}
-                stream = '\n'.join([stdout, stderr])
-                # ugh, regex searching json output, since json.loads(stdout)
-                # stack dumped on me
-                m = re.search('"repo_path": "([^"]+)"', stream, re.M)
-                if m:
-                    properties['gaiaRepoPath'] = m.group(1)
-                m = re.search('"revision": "(\w+)"', stream, re.M)
-                if m:
-                    properties['gaiaRevision'] = m.group(1)
-                return properties
-            self.addStep(SetProperty(
-                command=['cat', self.gaiaRevisionFile],
-                name="read_gaia_json",
-                extract_fn=parse_gaia_revision,
-            ))
-            self.gaiaRevision = WithProperties("%(gaiaRevision)s")
-            self.gaiaRepoUrl = WithProperties("https://" + self.hgHost + "/%(gaiaRepoPath)s")
-            if self.baseMirrorUrls:
-                self.gaiaMirrors = [WithProperties(url + "/%(gaiaRepoPath)s") for url in self.baseMirrorUrls]
-
-        self.addStep(self.makeHgtoolStep(
-            name="gaia_sources",
-            rev=self.gaiaRevision or 'default',
-            repo_url=self.gaiaRepoUrl,
-            workdir="build/",
-            use_properties=False,
-            mirrors=self.gaiaMirrors,
-            bundles=[],
-            wc='gaia',
-        ))
-        if self.gaiaLanguagesFile:
-            languagesFile = '%(basedir)s/build/gaia/' + \
-                self.gaiaLanguagesFile
-            cmd = ['python', '%s/%s' % (self.mozharness_path,
-                                        self.gaiaLanguagesScript),
-                   '--pull',
-                   '--gaia-languages-file', WithProperties(languagesFile),
-                   '--gaia-l10n-root', self.gaiaL10nRoot,
-                   '--gaia-l10n-base-dir', self.gaiaL10nBaseDir,
-                   '--config-file', self.multiLocaleConfig,
-                   '--gecko-l10n-root', self.geckoL10nRoot]
-            if self.geckoLanguagesFile:
-                cmd.extend(
-                    ['--gecko-languages-file', self.geckoLanguagesFile])
-            self.addStep(MockCommand(
-                name='clone_gaia_l10n_repos',
-                command=cmd,
-                env=self.env,
-                workdir=WithProperties('%(basedir)s'),
-                haltOnFailure=True,
-                mock=self.use_mock,
-                target=self.mock_target,
-                mock_workdir_prefix=None,
-            ))
-
     def addSourceSteps(self):
         if self.useSharedCheckouts:
             self.addStep(JSONPropertiesDownload(
@@ -1313,8 +1227,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                          property='got_revision'
                          ))
 
-        if self.gaiaRepo:
-            self.addGaiaSourceSteps()
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",
@@ -1645,7 +1557,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         # Get package details
         self.packageFilename = self.getPackageFilename(self.platform,
                                                        self.platform_variation)
-        if self.packageFilename and self.productName not in ('b2g',):
+        if self.packageFilename:
             self.addFilePropertiesSteps(filename=self.packageFilename,
                                         directory='build/%s/dist' % self.mozillaObjdir,
                                         fileType='package',
@@ -1715,15 +1627,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                    '--config-file', self.multiLocaleConfig]
             if self.multiLocaleMerge:
                 cmd.append('--merge-locales')
-            if self.gaiaLanguagesFile:
-                cmd.extend(['--gaia-languages-file', WithProperties(
-                    '%(basedir)s/build/gaia/' + self.gaiaLanguagesFile)])
-            if self.gaiaL10nRoot:
-                cmd.extend(['--gaia-l10n-root', self.gaiaL10nRoot])
-            if self.geckoLanguagesFile:
-                cmd.extend(['--gecko-languages-file', self.geckoLanguagesFile])
-            if self.geckoL10nRoot:
-                cmd.extend(['--gecko-l10n-root', self.geckoL10nRoot])
             cmd.extend(self.mozharnessMultiOptions)
             self.addStep(MockCommand(
                 name='mozharness_multilocale',
@@ -1735,10 +1638,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 target=self.mock_target,
                 mock_workdir_prefix=None,
             ))
-            # b2g doesn't get snippets, and these steps don't work it, so don't
-            # run them. Also ignore the Android release case where
+            # Ignore the Android release case where
             # packageFilename is undefined (bug 739959)
-            if self.productName != 'b2g' and self.packageFilename:
+            if self.packageFilename:
                 self.addFilePropertiesSteps(filename=self.packageFilename,
                                             directory='build/%s/dist' % self.mozillaObjdir,
                                             fileType='package',
@@ -1908,8 +1810,6 @@ class TryBuildFactory(MercurialBuildFactory):
                      command=['hg', 'parent', '--template={node}'],
                      extract_fn=short_hash
                      ))
-        if self.gaiaRepo:
-            self.addGaiaSourceSteps()
         self.addStep(SetBuildProperty(
             name='set_comments',
             property_name="comments",

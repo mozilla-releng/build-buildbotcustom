@@ -121,8 +121,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     av_slaves = []
     all_slaves = []
     for p in branchConfig['platforms']:
-        if p == 'b2g':
-            continue
         platform_slaves = branchConfig['platforms'][p].get('slaves', [])
         all_slaves.extend(platform_slaves)
         if 'linux64-av' in p:

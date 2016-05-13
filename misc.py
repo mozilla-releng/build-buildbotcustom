@@ -123,33 +123,6 @@ _product_excludes = {
 
         re.compile('^xulrunner/')
     ],
-    'b2g': [
-        re.compile('^accessible/public/ia2'),
-        re.compile('^accessible/public/msaa'),
-        re.compile('^accessible/src/mac'),
-        re.compile('^accessible/src/windows'),
-
-        re.compile('^browser/'),
-
-        re.compile('^build/macosx'),
-        re.compile('^build/mobile'),
-        re.compile('^build/package/mac_osx'),
-        re.compile('^build/win32'),
-        re.compile('^build/win64'),
-
-        re.compile('^devtools/client'),
-
-        re.compile('^mobile/'),
-
-        re.compile('^webapprt/win'),
-        re.compile('^webapprt/mac'),
-
-        re.compile('^widget/cocoa'),
-        re.compile('^widget/gonk'),
-        re.compile('^widget/windows'),
-
-        re.compile('^xulrunner/')
-    ],
     'thunderbird': [
         re.compile("^im/"),
         re.compile("^suite/")
@@ -918,7 +891,7 @@ def generateBranchObjects(config, name, secrets=None):
         base_name = pf['base_name']
 
         if 'mozharness_config' in pf:
-            # this is a spider or b2g build. mozharness desktop builds use same
+            # this is a spider build. mozharness desktop builds use same
             # scheduling/naming logic as the non mozharness equivalent.
             if pf.get('enable_dep', True):
                 buildername = '%s_dep' % pf['base_name']
@@ -1256,7 +1229,7 @@ def generateBranchObjects(config, name, secrets=None):
             pass  # keep going
         elif 'mozharness_config' in pf:
             # this is not a desktop mozharness build
-            # e.g. it could be b2g or spider)
+            # e.g. it could be spider)
 
             # at the end of this block we 'continue' because we have
             # finished all the builders needed for this platform and
@@ -1389,16 +1362,10 @@ def generateBranchObjects(config, name, secrets=None):
             extra_args['mozillaSrcDir'] = config['mozilla_srcdir']
 
         multiargs = {}
-        if pf.get('product_name') == 'b2g':
-            multiargs[
-                'multiLocaleScript'] = 'scripts/b2g_desktop_multilocale.py'
-            # b2g builds require mozharness
+        if 'android' in platform:
+            multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
+            # android nightlies require mozharness
             multiargs['mozharnessRepoPath'] = config.get('mozharness_repo_path')
-        else:
-            if 'android' in platform:
-                multiargs['multiLocaleScript'] = 'scripts/multil10n.py'
-                # android nightlies require mozharness
-                multiargs['mozharnessRepoPath'] = config.get('mozharness_repo_path')
         if pf.get('multi_config_name'):
             multiargs['multiLocaleConfig'] = pf['multi_config_name']
         else:
@@ -1490,22 +1457,12 @@ def generateBranchObjects(config, name, secrets=None):
                     'tooltool_manifest_src': pf.get('tooltool_manifest_src'),
                     'tooltool_script': pf.get('tooltool_script'),
                     'tooltool_url_list': config.get('tooltool_url_list', []),
-                    'gaiaRepo': pf.get('gaia_repo'),
-                    'gaiaRevision': config.get('gaia_revision'),
-                    'gaiaRevisionFile': pf.get('gaia_revision_file'),
-                    'gaiaLanguagesFile': pf.get('gaia_languages_file'),
-                    'gaiaLanguagesScript': pf.get('gaia_languages_script', 'scripts/b2g_desktop_multilocale.py'),
-                    'gaiaL10nRoot': config.get('gaia_l10n_root'),
                     'mozharness_repo_cache': mozharness_repo_cache,
                     'tools_repo_cache': pf.get('tools_repo_cache'),
                     'mozharnessTag': config.get('mozharness_tag'),
-                    'geckoL10nRoot': config.get('gecko_l10n_root'),
-                    'geckoLanguagesFile': pf.get('gecko_languages_file'),
                     'enable_pymake': enable_pymake,
                 }
                 factory_kwargs.update(extra_args)
-                if pf.get('product_name') == 'b2g':
-                    factory_kwargs.update(multiargs)
 
                 mozilla2_dep_factory = factory_class(**factory_kwargs)
                 # eg. TB Linux comm-central build
@@ -1740,16 +1697,7 @@ def generateBranchObjects(config, name, secrets=None):
                     tooltool_manifest_src=pf.get('tooltool_manifest_src'),
                     tooltool_script=pf.get('tooltool_script'),
                     tooltool_url_list=config.get('tooltool_url_list', []),
-                    gaiaRepo=pf.get('gaia_repo'),
-                    gaiaRevision=config.get('gaia_revision'),
-                    gaiaRevisionFile=pf.get('gaia_revision_file'),
-                    gaiaLanguagesFile=pf.get('gaia_languages_file'),
-                    gaiaLanguagesScript=pf.get('gaia_languages_script',
-                                               'scripts/b2g_desktop_multilocale.py'),
-                    gaiaL10nRoot=config.get('gaia_l10n_root'),
                     mozharnessTag=config.get('mozharness_tag'),
-                    geckoL10nRoot=config.get('gecko_l10n_root'),
-                    geckoLanguagesFile=pf.get('gecko_languages_file'),
                     enable_pymake=enable_pymake,
                     mozharness_repo_cache=mozharness_repo_cache,
                     tools_repo_cache=pf.get('tools_repo_cache'),
