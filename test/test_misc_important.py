@@ -39,7 +39,7 @@ class TestProductImportance(unittest.TestCase):
         f = makeImportantFunc(
             'https://hg.mozilla.org/mozilla-central', 'firefox')
         c = Change(revlink="https://hg.mozilla.org/mozilla-central/rev/1234",
-                   files=['b2g/foo', 'mobile/bar'])
+                   files=['android/foo', 'mobile/bar'])
         self.assertFalse(f(c))
 
     def testDontBuild(self):
