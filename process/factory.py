@@ -1285,15 +1285,19 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
             del printconfig_env['MOZ_OBJDIR']
             printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
+
+            if self.mozillaSrcDir:
+                machPath = '%(basedir)s/build/mozilla/mach'
+                python = [WithProperties('%(basedir)s/' +
+                          '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
+            else:
+                machPath = '%(basedir)s/build/mach'
+                python = ['/tools/buildbot/bin/python']
+
             # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
             if self.platform.startswith('win'):
                 python = ['c:/mozilla-build/python27/python', '-u']
-            else:
-                python = ['/tools/buildbot/bin/python']
-            if self.mozillaSrcDir:
-                machPath = '%(basedir)s/build/mozilla/mach'
-            else:
-                machPath = '%(basedir)s/build/mach'
+
             # we need abs paths because we are in a non relative workdir
             printconfig_base_command = python + [
                 WithProperties(machPath), 'python',
@@ -1582,15 +1586,19 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
+
+        if self.mozillaSrcDir:
+            machPath = '%(basedir)s/build/mozilla/mach'
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
+        else:
+            machPath = '%(basedir)s/build/mach'
+            python = ['/tools/buildbot/bin/python']
+
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
-        else:
-            python = ['/tools/buildbot/bin/python']
-        if self.mozillaSrcDir:
-            machPath = '%(basedir)s/build/mozilla/mach'
-        else:
-            machPath = '%(basedir)s/build/mach'
+
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
             WithProperties(machPath), 'python',
@@ -2080,15 +2088,19 @@ class NightlyBuildFactory(MercurialBuildFactory):
         printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
+
+        if self.mozillaSrcDir:
+            machPath = '%(basedir)s/build/mozilla/mach'
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
+        else:
+            machPath = '%(basedir)s/build/mach'
+            python = ['/tools/buildbot/bin/python']
+
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
             python = ['c:/mozilla-build/python27/python', '-u']
-        else:
-            python = ['/tools/buildbot/bin/python']
-        if self.mozillaSrcDir:
-            machPath = '%(basedir)s/build/mozilla/mach'
-        else:
-            machPath = '%(basedir)s/build/mach'
+
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
             WithProperties(machPath), 'python',
@@ -3480,14 +3492,19 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
-        if self.platform.startswith('win'):
-            python = ['c:/mozilla-build/python27/python', '-u']
-        else:
-            python = ['/tools/buildbot/bin/python']
+
         if self.mozillaSrcDir:
             machPath = '%(basedir)s/build/mozilla/mach'
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
         else:
             machPath = '%(basedir)s/build/mach'
+            python = ['/tools/buildbot/bin/python']
+
+        # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
+        if self.platform.startswith('win'):
+            python = ['c:/mozilla-build/python27/python', '-u']
+
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
             WithProperties(machPath), 'python',
