@@ -1286,13 +1286,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             del printconfig_env['MOZ_OBJDIR']
             printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
 
-            if self.mozillaSrcDir:
-                machPath = '%(basedir)s/build/mozilla/mach'
-                python = [WithProperties('%(basedir)s/' +
-                          '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
-            else:
-                machPath = '%(basedir)s/build/mach'
-                python = ['/tools/buildbot/bin/python']
+            machPath = '%(basedir)s' + self.absMozillaSrcDir + '/mach'
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
 
             # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
             if self.platform.startswith('win'):
@@ -1587,13 +1583,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
 
-        if self.mozillaSrcDir:
-            machPath = '%(basedir)s/build/mozilla/mach'
-            python = [WithProperties('%(basedir)s/' +
-                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
-        else:
-            machPath = '%(basedir)s/build/mach'
-            python = ['/tools/buildbot/bin/python']
+        machPath = '%(basedir)s' + self.absMozillaSrcDir + '/mach'
+        python = [WithProperties('%(basedir)s/' +
+                  '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
 
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
@@ -2089,13 +2081,9 @@ class NightlyBuildFactory(MercurialBuildFactory):
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
 
-        if self.mozillaSrcDir:
-            machPath = '%(basedir)s/build/mozilla/mach'
-            python = [WithProperties('%(basedir)s/' +
-                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
-        else:
-            machPath = '%(basedir)s/build/mach'
-            python = ['/tools/buildbot/bin/python']
+        machPath = '%(basedir)s' + self.absMozillaSrcDir + '/mach'
+        python = [WithProperties('%(basedir)s/' +
+                  '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
 
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
@@ -3493,13 +3481,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
 
-        if self.mozillaSrcDir:
-            machPath = '%(basedir)s/build/mozilla/mach'
-            python = [WithProperties('%(basedir)s/' +
-                      '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
-        else:
-            machPath = '%(basedir)s/build/mach'
-            python = ['/tools/buildbot/bin/python']
+        machPath = '%(basedir)s' + self.absMozillaSrcDir + '/mach'
+        python = [WithProperties('%(basedir)s/' +
+                  '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
 
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
