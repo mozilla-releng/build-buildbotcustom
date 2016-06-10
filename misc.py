@@ -648,36 +648,6 @@ def generateBranchObjects(config, name, secrets=None):
     if config['enable_weekly_bundle']:
         weeklyBuilders.append('%s hg bundle' % name)
 
-    # Currently, each branch goes to a different tree
-    # If this changes in the future this may have to be
-    # moved out of the loop
-    if not config.get('disable_tinderbox_mail'):
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
-        # XULRunner builds
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['xulrunner_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=xulrunnerNightlyBuilders,
-            logCompression="gzip"
-        ))
-        # Code coverage builds go to a different tree
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['weekly_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=coverageBuilders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
-
     # Try Server notifier
     if config.get('enable_mail_notifier'):
         packageUrl = config['package_url']
@@ -713,26 +683,6 @@ def generateBranchObjects(config, name, secrets=None):
             l10n_binaryURL = l10n_binaryURL[:-1]
         l10n_binaryURL += "-l10n"
         nomergeBuilders.extend(l10n_builders)
-
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="bootstrap@mozilla.com",
-            tree=config['l10n_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
-
-        # We only want the builds from the specified builders
-        # since their builds have a build property called "locale"
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="bootstrap@mozilla.com",
-            tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
 
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
     if config['hgurl'].startswith('https:'):
@@ -828,16 +778,6 @@ def generateBranchObjects(config, name, secrets=None):
             treeStableTimer=None,
             **extra_args
         ))
-
-        if not config.get('disable_tinderbox_mail'):
-            branchObjects['status'].append(TinderboxMailNotifier(
-                fromaddr="mozilla2.buildbot@build.mozilla.org",
-                tree=config['packaged_unittest_tinderbox_tree'],
-                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-                builders=test_builders,
-                logCompression="gzip",
-                errorparser="unittest"
-            ))
 
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
@@ -1890,37 +1830,6 @@ def generateCCBranchObjects(config, name, secrets=None):
     if config['enable_weekly_bundle']:
         weeklyBuilders.append('%s hg bundle' % name)
 
-    # Currently, each branch goes to a different tree
-    # If this changes in the future this may have to be
-    # moved out of the loop
-    if not config.get('disable_tinderbox_mail'):
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="comm.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=builders + nightlyBuilders + unittestBuilders + debugBuilders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
-        if config.get('enable_xulrunner'):
-            # XULRunner builds
-            branchObjects['status'].append(TinderboxMailNotifier(
-                fromaddr="comm.buildbot@build.mozilla.org",
-                tree=config['xulrunner_tinderbox_tree'],
-                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-                builders=xulrunnerNightlyBuilders,
-                logCompression="gzip"
-            ))
-        # Code coverage builds go to a different tree
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="comm.buildbot@build.mozilla.org",
-            tree=config['weekly_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=coverageBuilders,
-            logCompression="gzip",
-            errorparser="unittest"
-        ))
-
     # Try Server notifier
     if config.get('enable_mail_notifier'):
         packageUrl = config['package_url']
@@ -1956,26 +1865,6 @@ def generateCCBranchObjects(config, name, secrets=None):
             l10n_binaryURL = l10n_binaryURL[:-1]
         l10n_binaryURL += "-l10n"
         nomergeBuilders.extend(l10n_builders)
-
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="comm.buildbot@build.mozilla.org",
-            tree=config['l10n_tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
-
-        # We only want the builds from the specified builders
-        # since their builds have a build property called "locale"
-        branchObjects['status'].append(TinderboxMailNotifier(
-            fromaddr="comm.buildbot@build.mozilla.org",
-            tree=WithProperties(config['l10n_tinderbox_tree'] + "-%(locale)s"),
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            logCompression="gzip",
-            builders=l10n_builders,
-            binaryURL=l10n_binaryURL
-        ))
 
     # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
     if config['hgurl'].startswith('https:'):
@@ -2083,16 +1972,6 @@ def generateCCBranchObjects(config, name, secrets=None):
             treeStableTimer=None,
             **extra_args
         ))
-
-        if not config.get('disable_tinderbox_mail'):
-            branchObjects['status'].append(TinderboxMailNotifier(
-                fromaddr="comm.buildbot@build.mozilla.org",
-                tree=config['packaged_unittest_tinderbox_tree'],
-                extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-                builders=test_builders,
-                logCompression="gzip",
-                errorparser="unittest"
-            ))
 
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
@@ -3372,28 +3251,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                         )
                 branchObjects['schedulers'].append(s)
 
-    if not branch_config.get('disable_tinderbox_mail'):
-        for tinderboxTree in branch_builders.keys():
-            if len(branch_builders[tinderboxTree]):
-                branchObjects['status'].append(TinderboxMailNotifier(
-                               fromaddr="talos.buildbot@build.mozilla.org",
-                               tree=tinderboxTree,
-                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                               builders=branch_builders[tinderboxTree],
-                               useChangeTime=False,
-                               logCompression="gzip"))
-        ###  Unittests need specific errorparser
-        for tinderboxTree in all_test_builders.keys():
-            if len(all_test_builders[tinderboxTree]):
-                branchObjects['status'].append(TinderboxMailNotifier(
-                               fromaddr="talos.buildbot@build.mozilla.org",
-                               tree=tinderboxTree,
-                               extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org",],
-                               builders=all_test_builders[tinderboxTree],
-                               useChangeTime=False,
-                               errorparser="unittest",
-                               logCompression="gzip"))
-
     if branch_config.get('release_tests'):
         releaseObjects = generateTalosReleaseBranchObjects(branch,
                 branch_config, PLATFORMS, SUITES, ACTIVE_UNITTEST_PLATFORMS, factory_class)
@@ -3550,23 +3407,11 @@ def generateNanojitObjects(config, SLAVES):
             builderNames=[b['name'] for b in builders],
             )
 
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-        )
-        status = [tbox_mailer]
-
     return {
             'builders': builders,
             'change_source': [poller],
             'schedulers': [scheduler],
-            'status': status,
+            'status': [],
             }
 
 def generateSpiderMonkeyObjects(config, SLAVES):
@@ -3626,23 +3471,10 @@ def generateSpiderMonkeyObjects(config, SLAVES):
             fileIsImportant=isImportant,
             )
 
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-            errorparser="unittest"
-        )
-        status = [tbox_mailer]
-
     return {
             'builders': builders,
             'schedulers': [scheduler],
-            'status': status,
+            'status': [],
             }
 
 def generateJetpackObjects(config, SLAVES):
@@ -3693,23 +3525,11 @@ def generateJetpackObjects(config, SLAVES):
             builderNames=[b['name'] for b in builders],
             )
 
-    # Tinderbox notifier
-    status = []
-    if not config.get("disable_tinderbox_mail"):
-        tbox_mailer = TinderboxMailNotifier(
-            fromaddr="mozilla2.buildbot@build.mozilla.org",
-            tree=config['tinderbox_tree'],
-            extraRecipients=["tinderbox-daemon@tinderbox.mozilla.org"],
-            builders=[b['name'] for b in builders],
-            logCompression="gzip",
-        )
-        status = [tbox_mailer]
-
     return {
             'builders': builders,
             'change_source': [poller],
             'schedulers': [scheduler],
-            'status': status,
+            'status': [],
             }
 
 def generateProjectObjects(project, config, SLAVES):
