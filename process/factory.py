@@ -1781,12 +1781,15 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
 
     def addBuildSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        symbolenv = self.env.copy()
+        symbolenv.update({'MOZ_OBJDIR': objdir})
+
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
         self.addStep(MockCommand(
          name='make_buildsymbols',
          command=self.makeCmd + ['buildsymbols'],
-         env=self.env,
+         env=symbolenv,
          workdir=objdir,
          haltOnFailure=True,
          timeout=60*60*3,
@@ -6316,12 +6319,15 @@ class UnittestBuildFactory(MozillaBuildFactory):
          target=self.mock_target,
         ))
 
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        symbolenv = self.env.copy()
+        symbolenv.update({'MOZ_OBJDIR': objdir})
         self.addStep(MockCommand(
          name='make_buildsymbols',
          command=self.makeCmd + ['buildsymbols'],
          workdir='build/%s' % self.objdir,
          timeout=60*60,
-         env=self.env,
+         env=symbolenv,
          mock=self.use_mock,
          target=self.mock_target,
         ))
@@ -6715,11 +6721,14 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          target=self.mock_target,
         ))
 
+        objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        symbolenv = self.env.copy()
+        symbolenv.update({'MOZ_OBJDIR': objdir})
         self.addStep(MockCommand(
          name='make_buildsymbols',
          command=self.makeCmd + ['buildsymbols'],
          workdir='build/%s' % self.objdir,
-         env=self.env,
+         env=symbolenv,
          mock=self.use_mock,
          target=self.mock_target,
         ))
