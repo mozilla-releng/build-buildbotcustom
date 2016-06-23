@@ -1800,12 +1800,15 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
 
     def addUploadSymbolsStep(self):
         objdir = WithProperties('%(basedir)s/build/' + self.objdir)
+        uploadEnv = self.env.copy()
+        uploadEnv.update({'MOZ_OBJDIR': objdir})
+
         if self.platform.startswith('win'):
             objdir = 'build/%s' % self.objdir
         self.addStep(RetryingMockCommand(
          name='make_uploadsymbols',
          command=self.makeCmd + ['uploadsymbols'],
-         env=self.env,
+         env=uploadEnv,
          workdir=objdir,
          haltOnFailure=True,
          timeout=2400, # 40 minutes
