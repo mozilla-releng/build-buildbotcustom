@@ -935,13 +935,6 @@ def generateBranchObjects(config, name, secrets=None):
             if pf.get('consider_for_nightly', True):
                 buildersForNightly.append(buildername)
 
-        if config['enable_valgrind'] and \
-                platform in config['valgrind_platforms']:
-            builders.append('%s valgrind' % base_name)
-            buildersByProduct.setdefault(
-                pf['stage_product'], []).append('%s valgrind' % base_name)
-            prettyNames["%s-valgrind" % platform] = "%s valgrind" % base_name
-
         # Check if branch wants nightly builds
         if config['enable_nightly']:
             if 'enable_nightly' in pf:
@@ -1318,7 +1311,6 @@ def generateBranchObjects(config, name, secrets=None):
         l10nSpace = config['default_l10n_space']
         clobberTime = pf.get('clobber_time', config['default_clobber_time'])
         checkTest = pf.get('enable_checktests', False)
-        valgrindCheck = pf.get('enable_valgrind_checktests', False)
         # Turn pymake on by default for Windows, and off by default for
         # other platforms.
         if 'win' in platform:
@@ -1429,7 +1421,6 @@ def generateBranchObjects(config, name, secrets=None):
                     'doBuildAnalysis': doBuildAnalysis,
                     'baseName': pf['base_name'],
                     'checkTest': checkTest,
-                    'valgrindCheck': valgrindCheck,
                     'uploadPackages': uploadPackages,
                     'uploadSymbols': uploadSymbols,
                     'disableSymbols': disableSymbols,
@@ -1815,46 +1806,6 @@ def generateBranchObjects(config, name, secrets=None):
                         mozilla2_l10n_nightly_builder)
 
         # end do_nightly
-
-        if config['enable_valgrind'] and \
-                platform in config['valgrind_platforms']:
-            valgrind_env = pf['env'].copy()
-            valgrind_env['REVISION'] = WithProperties("%(revision)s")
-            mozilla2_valgrind_factory = ScriptFactory(
-                scriptRepo="%s%s" % (config['hgurl'],
-                                     config['build_tools_repo_path']),
-                scriptName='scripts/valgrind/valgrind.sh',
-                use_mock=pf.get('use_mock'),
-                mock_target=pf.get('mock_target'),
-                mock_packages=pf.get('mock_packages'),
-                mock_copyin_files=pf.get('mock_copyin_files'),
-                env=valgrind_env,
-                reboot_command=['python',
-                                'scripts/buildfarm/maintenance/count_and_reboot.py',
-                                '-f', './reboot_count.txt',
-                                '-n', '0',
-                                '-z'],
-                tooltool_manifest_src=pf.get('tooltool_manifest_src'),
-                tooltool_script=pf.get('tooltool_script'),
-                tooltool_url_list=config.get('tooltool_url_list', []),
-                platform=platform,
-            )
-            mozilla2_valgrind_builder = {
-                'name': '%s valgrind' % pf['base_name'],
-                'slavenames': pf['slaves'],
-                'builddir': '%s-%s-valgrind' % (name, platform),
-                'slavebuilddir': normalizeName('%s-%s-valgrind' % (name, platform), pf['stage_product']),
-                'factory': mozilla2_valgrind_factory,
-                'category': name,
-                'env': valgrind_env,
-                'nextSlave': _nextAWSSlave_sort,
-                'properties': {'branch': name,
-                               'platform': platform,
-                               'stage_platform': stage_platform,
-                               'product': pf['stage_product'],
-                               'slavebuilddir': normalizeName('%s-%s-valgrind' % (name, platform), pf['stage_product'])},
-            }
-            branchObjects['builders'].append(mozilla2_valgrind_builder)
 
         if platform in ('linux64',):
             if config.get('enable_blocklist_update', False) or \
