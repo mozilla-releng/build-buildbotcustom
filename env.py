@@ -91,7 +91,8 @@ MozillaEnvironments['macosx-unittest'] = {
     "NO_EM_RESTART": '1',
     "XPCOM_DEBUG_BREAK": 'warn',
     "NO_FAIL_ON_TEST_ERRORS": '1',
-    "MOZ_HIDE_RESULTS_TABLE": '1'
+    "MOZ_HIDE_RESULTS_TABLE": '1',
+    "MOZ_NODE_PATH": "/usr/local/bin/node"
 }
 
 MozillaEnvironments['macosx64-unittest'] = MozillaEnvironments[
