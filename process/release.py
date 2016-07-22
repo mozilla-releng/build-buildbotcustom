@@ -1828,7 +1828,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
                 "--balrog-config", balrog_config,
                                    ],
             "script_timeout": 1800,
-            "script_maxtime": 7200,
+            "script_maxtime": 10800,
         }
 
         l10n_factory = makeMHFactory(branch_config, pf,
