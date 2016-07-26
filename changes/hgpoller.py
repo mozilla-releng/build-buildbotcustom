@@ -108,11 +108,29 @@ from buildbot.changes import base, changes
 from buildbot.util import json
 
 
-def _parse_changes(data):
-    pushes = json.loads(data)['pushes'].values()
-    # Sort by push date
-    pushes.sort(key=lambda p: p['date'])
-    return pushes
+def parse_pushlog_json(data):
+    """Parse pushlog data version 2.
+
+    Returns a normalized version of the data. The "pushes" key
+    is a list of pushlog entries in order instead of a dict.
+    """
+    data = json.loads(data)
+
+    pushes = []
+    for pushid, push in data['pushes'].items():
+        # Keys are strings in the JSON. We convert to int so the sort
+        # below works appropriately. (A string sort may not always
+        # have appropriate ordering.)
+        push['pushid'] = int(pushid)
+        pushes.append(push)
+
+    # Sort by the push id because that is the monotonically incrementing
+    # key.
+    pushes.sort(key=lambda p: p['pushid'])
+
+    data['pushes'] = pushes
+
+    return data
 
 
 class Pluggable(object):
@@ -267,8 +285,8 @@ class BaseHgPoller(BasePoller):
         return self.super_class.dataFailed(self, res)
 
     def processData(self, query):
-        pushes = _parse_changes(query)
-        if len(pushes) == 0:
+        push_data = parse_pushlog_json(query)
+        if not push_data['pushes']:
             if self.lastChangeset is None:
                 # We don't have a lastChangeset, and there are no changes.  Assume
                 # the repository is empty.
@@ -285,7 +303,7 @@ class BaseHgPoller(BasePoller):
         # latest ones and possibly discard earlier ones.
         change_list = []
         too_many = False
-        for push in reversed(pushes):
+        for push in reversed(push_data['pushes']):
             # Used for merging push changes
             c = dict(
                 user=push['user'],
@@ -403,7 +421,7 @@ class BaseHgPoller(BasePoller):
         # Use the last change found by the poller, regardless of if it's on our
         # branch or not. This is so we don't have to constantly ignore it in
         # future polls.
-        self.lastChangeset = pushes[-1]["changesets"][-1]["node"]
+        self.lastChangeset = push_data['pushes'][-1]['changesets'][-1]['node']
         if self.verbose:
             log.msg("last changeset %s on %s" %
                     (self.lastChangeset, self.baseURL))

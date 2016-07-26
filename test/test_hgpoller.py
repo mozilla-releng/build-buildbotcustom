@@ -271,7 +271,8 @@ malformedPushlog = """
 
 class PushlogParsing(unittest.TestCase):
     def testValidPushlog(self):
-        pushes = hgpoller._parse_changes(validPushlog)
+        push_data = hgpoller.parse_pushlog_json(validPushlog)
+        pushes = push_data['pushes']
         self.failUnlessEqual(len(pushes), 2)
 
         self.failUnlessEqual(pushes[0]['changesets'][0]['node'],
@@ -302,10 +303,10 @@ class PushlogParsing(unittest.TestCase):
 
     def testMalformedPushlog(self):
         self.failUnlessRaises(
-            JSONDecodeError, hgpoller._parse_changes, malformedPushlog)
+            JSONDecodeError, hgpoller.parse_pushlog_json, malformedPushlog)
 
     def testEmptyPushlog(self):
-        self.failUnlessRaises(JSONDecodeError, hgpoller._parse_changes, "")
+        self.failUnlessRaises(JSONDecodeError, hgpoller.parse_pushlog_json, "")
 
 
 class RepoBranchHandling(unittest.TestCase):
