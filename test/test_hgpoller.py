@@ -1,6 +1,5 @@
 from twisted.trial import unittest
 import threading
-import socket
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 from buildbot.util import json
