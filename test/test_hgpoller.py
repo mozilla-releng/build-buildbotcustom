@@ -369,6 +369,43 @@ class PushlogReset(PollingTest):
                          'http://localhost/whatever/json-pushes?version=2&full=1',
                          'pushlog URL should start from the end')
 
+class EmptyChangesets(PollingTest):
+    def testEmptyChangesets(self):
+        poller = self.doTest(data="""
+        {
+            "lastpushid": 42,
+            "pushes": {
+                "41": {
+                    "changesets": [],
+                    "date": 1282358416,
+                    "user": "someone@somewhere.com"
+                },
+                "42": {
+                    "changesets": [
+                        {
+                            "author": "Jim Chen <jchen@mozilla.com>",
+                            "branch": "default",
+                            "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec",
+                            "files": [
+                                "embedding/android/GeckoInputConnection.java"
+                            ],
+                            "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
+                            "parents": [
+                                "935c15d506516a2269cee35a1a80748aaec1ae08"
+                            ],
+                            "tags": []
+                        }
+                    ],
+                    "date": 1282358417,
+                    "user": "someoneelse@somewhere.com"
+                }
+            }
+        }
+        """)
+
+        self.assertEqual(poller.lastPushID, 42)
+        self.assertEqual(len(self.changes), 1)
+
 
 class EmptyPushes(PollingTest):
     def testEmptyPushes(self):

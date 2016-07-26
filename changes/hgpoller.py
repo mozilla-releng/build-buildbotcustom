@@ -320,6 +320,11 @@ class BaseHgPoller(BasePoller):
         change_list = []
         too_many = False
         for push in reversed(push_data['pushes']):
+            # If no changesets in this push, do nothing. This likely
+            # occurs when changesets are obsoleted.
+            if not push['changesets']:
+                continue
+
             # Used for merging push changes
             c = dict(
                 user=push['user'],
