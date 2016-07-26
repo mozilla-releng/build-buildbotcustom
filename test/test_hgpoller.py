@@ -342,6 +342,47 @@ class EmptyLastPushID(PollingTest):
         self.assertTrue(poller.emptyRepo, 'repo marked as empty')
 
 
+class PushlogReset(PollingTest):
+    def testDecreasingLastPushID(self):
+        poller = self.doTest(data=validPushlog)
+        self.assertEqual(poller.lastPushID, 15227)
+
+        poller.processData("""
+        {
+            "lastpushid": 15225,
+            "pushes": {
+                "15200": {
+                    "changesets": [
+                        {
+                            "author": "Jim Chen <jchen@mozilla.com>",
+                            "branch": "GECKO20b5pre_20100820_RELBRANCH",
+                            "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec",
+                            "files": [
+                                "embedding/android/GeckoInputConnection.java",
+                                "embedding/android/GeckoSurfaceView.java",
+                                "widget/src/android/nsWindow.cpp",
+                                "widget/src/android/nsWindow.h"
+                            ],
+                            "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
+                            "parents": [
+                                "935c15d506516a2269cee35a1a80748aaec1ae08"
+                            ],
+                            "tags": []
+                        }
+                    ],
+                    "date": 1282358416,
+                    "user": "dougt@mozilla.com"
+                }
+            }
+        }
+        """)
+        self.assertIsNone(poller.lastPushID, 'last push ID should be None')
+        self.assertIsNone(poller.lastChangeset, 'last changeset should be None')
+        self.assertEqual(poller._make_url(),
+                         'http://localhost/whatever/json-pushes?version=2&full=1',
+                         'pushlog URL should start from the end')
+
+
 class RepoBranchHandling(PollingTest):
     def testNoRepoBranch(self):
         self.doTest(repo_branch=None)

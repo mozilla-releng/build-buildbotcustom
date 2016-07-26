@@ -233,6 +233,7 @@ class BaseHgPoller(BasePoller):
         self.pushlogUrlOverride = pushlogUrlOverride
         self.tipsOnly = tipsOnly
         self.lastChangeset = None
+        self.lastPushID = None
         self.startLoad = 0
         self.loadTime = None
         self.repo_branch = repo_branch
@@ -291,8 +292,35 @@ class BaseHgPoller(BasePoller):
         # string, the pushlog is empty and there is no data to consume.
         if not push_data['lastpushid']:
             self.emptyRepo = True
+            self.lastPushID = None
             if self.verbose:
                 log.msg('%s is empty' % self.baseURL)
+            return
+
+        # If nothing has changed and we're fully caught up, the remote
+        # lastpushid will be the same as self.lastPushID.
+        #
+        # If the remote lastpushid is less than a previously observed value,
+        # this could mean one of the following:
+        #
+        #    a) Data from the pushlog was removed (perhaps the repo was
+        #       stripped)
+        #    b) The repo/pushlog was reset.
+        #
+        # These scenarios should be rare. In both of them, our assumption
+        # about the behavior of the pushlog always being monotonically
+        # increasing have been invalidated. So we reset state and start
+        # again.
+        #
+        # It's worth noting that a reset repo's pushlog could have *more*
+        # entries than the former repo. In this case, this code will fail
+        # to detect a reset repo from the pushlog alone.
+        if self.lastPushID and push_data['lastpushid'] < self.lastPushID:
+            self.emptyRepo = False
+            self.lastPushID = None
+            self.lastChangeset = None
+            log.msg('%s appears to have been reset; clearing state' %
+                    self.baseURL)
             return
 
         # We want to add at most self.maxChanges changes per push. If
@@ -421,6 +449,7 @@ class BaseHgPoller(BasePoller):
         # branch or not. This is so we don't have to constantly ignore it in
         # future polls.
         self.lastChangeset = push_data['pushes'][-1]['changesets'][-1]['node']
+        self.lastPushID = push_data['pushes'][-1]['pushid']
         if self.verbose:
             log.msg("last changeset %s on %s" %
                     (self.lastChangeset, self.baseURL))
