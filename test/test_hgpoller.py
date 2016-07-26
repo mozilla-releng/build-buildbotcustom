@@ -309,17 +309,16 @@ class PushlogParsing(unittest.TestCase):
         self.failUnlessRaises(JSONDecodeError, hgpoller.parse_pushlog_json, "")
 
 
-class RepoBranchHandling(unittest.TestCase):
-    def setUp(self):
+class PollingTest(unittest.TestCase):
+    def doTest(self, data=validPushlog, **kwargs):
         self.changes = []
 
-    def doTest(self, repo_branch):
         changes = self.changes
 
         class TestPoller(hgpoller.BaseHgPoller):
             def __init__(self):
                 hgpoller.BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
-                                      repo_branch=repo_branch)
+                                               **kwargs)
                 self.emptyRepo = True
 
         class parent:
@@ -328,15 +327,18 @@ class RepoBranchHandling(unittest.TestCase):
 
         p = TestPoller()
         p.parent = parent()
-        p.processData(validPushlog)
+        p.processData(data)
+        return p
 
+
+class RepoBranchHandling(PollingTest):
     def testNoRepoBranch(self):
-        self.doTest(None)
+        self.doTest(repo_branch=None)
 
         self.assertEquals(len(self.changes), 2)
 
     def testDefaultRepoBranch(self):
-        self.doTest('default')
+        self.doTest(repo_branch='default')
 
         # mergePushChanges is on by default, so we end up with a single change
         # here
@@ -352,37 +354,17 @@ class RepoBranchHandling(unittest.TestCase):
                           'Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking\'s push-and-run bustage.')
 
     def testRelbranch(self):
-        self.doTest('GECKO20b5pre_20100820_RELBRANCH')
+        self.doTest(repo_branch='GECKO20b5pre_20100820_RELBRANCH')
 
         self.assertEquals(len(self.changes), 1)
         self.assertEquals(self.changes[0].revision,
                           '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
 
 
-class MaxChangesHandling(unittest.TestCase):
-    def setUp(self):
-        self.changes = []
-
-    def doTest(self, repo_branch, maxChanges, mergePushChanges):
-        changes = self.changes
-
-        class TestPoller(hgpoller.BaseHgPoller):
-            def __init__(self):
-                hgpoller.BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
-                                      repo_branch=repo_branch, maxChanges=maxChanges, mergePushChanges=mergePushChanges)
-                self.emptyRepo = True
-
-        class parent:
-            def addChange(self, change):
-                changes.append(change)
-
-        p = TestPoller()
-        p.parent = parent()
-        p.processData(validPushlog)
-
+class MaxChangesHandling(PollingTest):
     def testNoRepoBigMax(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, 10, False)
+        self.doTest(repo_branch=None, maxChanges=10, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 3)
         # Check that we got the right changes
@@ -395,7 +377,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testMergingNoRepoBigMax(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, 10, True)
+        self.doTest(repo_branch=None, maxChanges=10, mergePushChanges=True)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -406,7 +388,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testNoRepoUnlimited(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, None, False)
+        self.doTest(repo_branch=None, maxChanges=None, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 3)
         # Check that we got the right changes
@@ -419,7 +401,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testMergingNoRepoUnlimited(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, None, True)
+        self.doTest(repo_branch=None, maxChanges=None, mergePushChanges=True)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -430,7 +412,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testNoRepoSmallMax(self):
         # Test that we get only 2 changes if maxChanges is set to 2
-        self.doTest(None, 2, False)
+        self.doTest(repo_branch=None, maxChanges=2, mergePushChanges=False)
 
         # The extra change is the overflow indicator
         self.assertEquals(len(self.changes), 3)
@@ -444,7 +426,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testMergingNoRepoSmallMax(self):
         # Test that we get only 1 change if maxChanges is set to 1
-        self.doTest(None, 1, True)
+        self.doTest(repo_branch=None, maxChanges=1, mergePushChanges=True)
 
         self.assertEquals(len(self.changes), 1)
         # Check that we got the right changes
@@ -456,7 +438,7 @@ class MaxChangesHandling(unittest.TestCase):
                      0].files, self.changes[0].files)
 
     def testDefaultRepoBigMax(self):
-        self.doTest('default', 10, False)
+        self.doTest(repo_branch='default', maxChanges=10, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -466,7 +448,7 @@ class MaxChangesHandling(unittest.TestCase):
                           '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testDefaultRepoSmallMax(self):
-        self.doTest('default', 1, False)
+        self.doTest(repo_branch='default', maxChanges=1, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -476,6 +458,7 @@ class MaxChangesHandling(unittest.TestCase):
                           '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testRelbranchSmallMax(self):
-        self.doTest('GECKO20b5pre_20100820_RELBRANCH', 1, False)
+        self.doTest(repo_branch='GECKO20b5pre_20100820_RELBRANCH',
+                    maxChanges=1, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 1)
