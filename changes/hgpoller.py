@@ -286,14 +286,13 @@ class BaseHgPoller(BasePoller):
 
     def processData(self, query):
         push_data = parse_pushlog_json(query)
-        if not push_data['pushes']:
-            if self.lastChangeset is None:
-                # We don't have a lastChangeset, and there are no changes.  Assume
-                # the repository is empty.
-                self.emptyRepo = True
-                if self.verbose:
-                    log.msg("%s is empty" % self.baseURL)
-            # Nothing else to do
+
+        # The payload tells us the most recent push ID. If it is the empty
+        # string, the pushlog is empty and there is no data to consume.
+        if not push_data['lastpushid']:
+            self.emptyRepo = True
+            if self.verbose:
+                log.msg('%s is empty' % self.baseURL)
             return
 
         # We want to add at most self.maxChanges changes per push. If

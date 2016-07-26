@@ -331,6 +331,17 @@ class PollingTest(unittest.TestCase):
         return p
 
 
+class EmptyLastPushID(PollingTest):
+    def testEmptyLastPushID(self):
+        poller = self.doTest(data="""
+        {
+            "lastpushid": "",
+            "pushes": {}
+        }
+        """)
+        self.assertTrue(poller.emptyRepo, 'repo marked as empty')
+
+
 class RepoBranchHandling(PollingTest):
     def testNoRepoBranch(self):
         self.doTest(repo_branch=None)
