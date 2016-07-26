@@ -65,11 +65,11 @@ class UrlCreation(unittest.TestCase):
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
-    def testUrlWithLastChangeset(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&fromchange=123456'
+    def testUrlWithLastPushID(self):
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&startID=42'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
-        poller.lastChangeset = '123456'
+        poller.lastPushID = 42
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
@@ -81,35 +81,23 @@ class UrlCreation(unittest.TestCase):
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
-    def testTipsOnlyWithLastChangeset(self):
+    def testTipsOnlyWithLastPushID(self):
         # there's two possible correct URLs in this case
-        correctUrls = [
-            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?version=2&full=1&fromchange=123456&tipsonly=1',
-            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?version=2&full=1&tipsonly=1&fromchange=123456'
-        ]
+        correctUrl = 'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?version=2&full=1&startID=42&tipsonly=1'
         poller = hgpoller.BaseHgPoller(hgURL='https://hg.mozilla.org',
                               branch='releases/mozilla-1.9.1', tipsOnly=True)
-        poller.lastChangeset = '123456'
+        poller.lastPushID = 42
         url = poller._make_url()
-        self.failUnlessIn(url, correctUrls)
+        self.failUnlessEqual(url, correctUrl)
 
     def testOverrideUrl(self):
-        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1&startID=42'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
             pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1')
-        poller.lastChangeset = '123456'
+        poller.lastPushID = 42
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
-
-    def testUrlWithUnicodeLastChangeset(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&fromchange=123456'
-        poller = hgpoller.BaseHgPoller(
-            hgURL='https://hg.mozilla.org', branch='mozilla-central')
-        poller.lastChangeset = u'123456'
-        url = poller._make_url()
-        self.failUnlessEqual(url, correctUrl)
-        self.failUnless(isinstance(url, str))
 
 
 fakeLocalesFile = """/l10n-central/af/
@@ -377,10 +365,24 @@ class PushlogReset(PollingTest):
         }
         """)
         self.assertIsNone(poller.lastPushID, 'last push ID should be None')
-        self.assertIsNone(poller.lastChangeset, 'last changeset should be None')
         self.assertEqual(poller._make_url(),
                          'http://localhost/whatever/json-pushes?version=2&full=1',
                          'pushlog URL should start from the end')
+
+
+class EmptyPushes(PollingTest):
+    def testEmptyPushes(self):
+        poller = self.doTest(data=validPushlog)
+        self.assertEqual(poller._make_url(), 'http://localhost/whatever/json-pushes?version=2&full=1&startID=15227')
+
+        # This simulates what happens on subsequent polls when no new
+        # data is available.
+        poller.processData("""
+        {
+            "lastpushid": 15227,
+            "pushes": {}
+        }
+        """)
 
 
 class RepoBranchHandling(PollingTest):

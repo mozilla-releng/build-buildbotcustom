@@ -232,7 +232,6 @@ class BaseHgPoller(BasePoller):
         self.baseURL = "/".join(fragments)
         self.pushlogUrlOverride = pushlogUrlOverride
         self.tipsOnly = tipsOnly
-        self.lastChangeset = None
         self.lastPushID = None
         self.startLoad = 0
         self.loadTime = None
@@ -259,8 +258,8 @@ class BaseHgPoller(BasePoller):
             url = "/".join((self.baseURL, 'json-pushes?version=2&full=1'))
 
         args = []
-        if self.lastChangeset is not None:
-            args.append('fromchange=' + self.lastChangeset)
+        if self.lastPushID is not None:
+            args.append('startID=%d' % self.lastPushID)
         if self.tipsOnly:
             args.append('tipsonly=1')
         if args:
@@ -305,9 +304,12 @@ class BaseHgPoller(BasePoller):
         if self.lastPushID and push_data['lastpushid'] < self.lastPushID:
             self.emptyRepo = False
             self.lastPushID = None
-            self.lastChangeset = None
             log.msg('%s appears to have been reset; clearing state' %
                     self.baseURL)
+            return
+
+        # No pushes to process. Exit early.
+        if not push_data['pushes']:
             return
 
         # We want to add at most self.maxChanges changes per push. If
@@ -404,16 +406,16 @@ class BaseHgPoller(BasePoller):
         # Un-reverse the list of changes so they get added in the right order
         change_list.reverse()
 
-        # If we have a lastChangeset we're comparing against, we've been
-        # running for a while and so any changes returned here are new.
+        # If we have a lastPushID, we've consumed data already so any changes
+        # returned here are new.
 
         # If the repository was previously empty (indicated by emptyRepo=True),
         # we also want to pay attention to all these pushes.
 
-        # If we don't have a lastChangeset and the repository isn't empty, then
-        # don't trigger any new builds, and start monitoring for changes since
-        # the latest changeset in the repository
-        if self.lastChangeset is not None or self.emptyRepo:
+        # If we don't have a lastPushID and the repository isn't empty, then
+        # don't trigger any new builds, and start monitoring for changes
+        # from the last push ID.
+        if self.lastPushID is not None or self.emptyRepo:
             for change in change_list:
                 link = "%s/rev/%s" % (self.baseURL, change["node"])
                 c = changes.Change(who=change["user"],
@@ -433,13 +435,11 @@ class BaseHgPoller(BasePoller):
         # The repository isn't empty any more!
         self.emptyRepo = False
         # Use the last change found by the poller, regardless of if it's on our
-        # branch or not. This is so we don't have to constantly ignore it in
-        # future polls.
-        self.lastChangeset = push_data['pushes'][-1]['changesets'][-1]['node']
+        # branch or not.
         self.lastPushID = push_data['pushes'][-1]['pushid']
         if self.verbose:
-            log.msg("last changeset %s on %s" %
-                    (self.lastChangeset, self.baseURL))
+            log.msg('last processed push id on %s is %d' %
+                    (self.baseURL, self.lastPushID))
 
     def changeHook(self, change):
         pass
