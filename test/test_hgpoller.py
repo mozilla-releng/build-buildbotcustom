@@ -59,14 +59,14 @@ class TestHTTPServer(object):
 
 class UrlCreation(unittest.TestCase):
     def testSimpleUrl(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithLastChangeset(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&fromchange=123456'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = '123456'
@@ -74,7 +74,7 @@ class UrlCreation(unittest.TestCase):
         self.failUnlessEqual(url, correctUrl)
 
     def testTipsOnlyUrl(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&tipsonly=1'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&tipsonly=1'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
             tipsOnly=True)
@@ -84,8 +84,8 @@ class UrlCreation(unittest.TestCase):
     def testTipsOnlyWithLastChangeset(self):
         # there's two possible correct URLs in this case
         correctUrls = [
-            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&fromchange=123456&tipsonly=1',
-            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&tipsonly=1&fromchange=123456'
+            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?version=2&full=1&fromchange=123456&tipsonly=1',
+            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?version=2&full=1&tipsonly=1&fromchange=123456'
         ]
         poller = hgpoller.BaseHgPoller(hgURL='https://hg.mozilla.org',
                               branch='releases/mozilla-1.9.1', tipsOnly=True)
@@ -94,16 +94,16 @@ class UrlCreation(unittest.TestCase):
         self.failUnlessIn(url, correctUrls)
 
     def testOverrideUrl(self):
-        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1&fromchange=123456'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
-            pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?full=1')
+            pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1')
         poller.lastChangeset = '123456'
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testUrlWithUnicodeLastChangeset(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&fromchange=123456'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         poller.lastChangeset = u'123456'
@@ -198,80 +198,74 @@ class TestPolling(unittest.TestCase):
 
 validPushlog = """
 {
- "15226": {
-  "date": 1282358416,
-  "changesets": [
-   {
-    "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
-    "files": [
-     "embedding/android/GeckoInputConnection.java",
-     "embedding/android/GeckoSurfaceView.java",
-     "widget/src/android/nsWindow.cpp",
-     "widget/src/android/nsWindow.h"
-    ],
-    "tags": [],
-    "author": "Jim Chen <jchen@mozilla.com>",
-    "branch": "GECKO20b5pre_20100820_RELBRANCH",
-    "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec"
-   }
-  ],
-  "user": "dougt@mozilla.com"
- },
- "15227": {
-  "date": 1282362551,
-  "changesets": [
-   {
-    "node": "ee6fb954cbc3de0f76e84cad6bdff452116e1b03",
-    "files": [
-     "browser/base/content/browser.js",
-     "browser/components/privatebrowsing/content/aboutPrivateBrowsing.xhtml",
-     "browser/locales/en-US/chrome/overrides/netError.dtd",
-     "build/automation.py.in",
-     "docshell/resources/content/netError.xhtml",
-     "dom/locales/en-US/chrome/netErrorApp.dtd",
-     "extensions/cookie/nsPermissionManager.cpp"
-    ],
-    "tags": [],
-    "author": "Bobby Holley <bobbyholley@gmail.com>",
-    "branch": "default",
-    "desc": "Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking's push-and-run bustage. a=backout"
-   },
-   {
-    "node": "33be08836cb164f9e546231fc59e9e4cf98ed991",
-    "files": [
-     "modules/libpref/src/init/all.js"
-    ],
-    "tags": [],
-    "author": "Bobby Holley <bobbyholley@gmail.com>",
-    "branch": "default",
-    "desc": "Bug 563088 - Re-enable image discarding.r=joe,a=blocker"
-   }
-  ],
-  "user": "bobbyholley@stanford.edu"
- }
+    "lastpushid": 30492,
+    "pushes": {
+        "15226": {
+            "changesets": [
+                {
+                    "author": "Jim Chen <jchen@mozilla.com>",
+                    "branch": "GECKO20b5pre_20100820_RELBRANCH",
+                    "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec",
+                    "files": [
+                        "embedding/android/GeckoInputConnection.java",
+                        "embedding/android/GeckoSurfaceView.java",
+                        "widget/src/android/nsWindow.cpp",
+                        "widget/src/android/nsWindow.h"
+                    ],
+                    "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
+                    "parents": [
+                        "935c15d506516a2269cee35a1a80748aaec1ae08"
+                    ],
+                    "tags": []
+                }
+            ],
+            "date": 1282358416,
+            "user": "dougt@mozilla.com"
+        },
+        "15227": {
+            "changesets": [
+                {
+                    "author": "Bobby Holley <bobbyholley@gmail.com>",
+                    "branch": "default",
+                    "desc": "Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking's push-and-run bustage. a=backout",
+                    "files": [
+                        "browser/base/content/browser.js",
+                        "browser/components/privatebrowsing/content/aboutPrivateBrowsing.xhtml",
+                        "browser/locales/en-US/chrome/overrides/netError.dtd",
+                        "build/automation.py.in",
+                        "docshell/resources/content/netError.xhtml",
+                        "dom/locales/en-US/chrome/netErrorApp.dtd",
+                        "extensions/cookie/nsPermissionManager.cpp"
+                    ],
+                    "node": "ee6fb954cbc3de0f76e84cad6bdff452116e1b03",
+                    "parents": [
+                        "baff7b7b32bc3dd7132cddd3957f6898b5bebfaf"
+                    ],
+                    "tags": []
+                },
+                {
+                    "author": "Bobby Holley <bobbyholley@gmail.com>",
+                    "branch": "default",
+                    "desc": "Bug 563088 - Re-enable image discarding.r=joe,a=blocker",
+                    "files": [
+                        "modules/libpref/src/init/all.js"
+                    ],
+                    "node": "33be08836cb164f9e546231fc59e9e4cf98ed991",
+                    "parents": [
+                        "ee6fb954cbc3de0f76e84cad6bdff452116e1b03"
+                    ],
+                    "tags": []
+                }
+            ],
+            "date": 1282362551,
+            "user": "bobbyholley@stanford.edu"
+        }
+    }
 }
 """
 
 malformedPushlog = """
-{
- "15226": {
-  "date": 1282358416,
-  "changesets": [
-   {
-    "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
-    "files": [
-     "embedding/android/GeckoInputConnection.java",
-     "embedding/android/GeckoSurfaceView.java",
-     "widget/src/android/nsWindow.cpp",
-     "widget/src/android/nsWindow.h"
-    ],
-    "tags": [],
-    "author": "Jim Chen <jchen@mozilla.com>",
-    "branch": "GECKO20b5pre_20100820_RELBRANCH",
-    "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec"
-   }
-  ],
-  "user": "dougt@mozilla.com"
+{ "invalid json" }
 """
 
 

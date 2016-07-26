@@ -44,44 +44,56 @@ as on a group of hg repositories. It's polling the json feed of pushlog,
 which of the form
 
 {
- "15092": {
-  "date": 1281863455,
-  "changesets": [
-   {
-    "node": "ace72819f4a94b9175519a8fa5a1db654edae098",
-    "files": [
-     "gfx/thebes/gfxBlur.cpp"
-    ],
-    "tags": [],
-    "author": "Julian Seward <jseward@acm.org>",
-    "branch": "default",
-    "desc": "Bug 582668 - gfxAlphaBoxBlur::Paint appears to pass garbage down through Cairo. r=roc"
-   },
-   {
-    "node": "43b490ef9dab30db2c4e2706110ad5d524a21597",
-    "files": [
-     "content/html/document/src/nsHTMLDocument.cpp",
-     "dom/interfaces/html/nsIDOMNSHTMLDocument.idl",
-     "js/src/xpconnect/src/dom_quickstubs.qsconf"
-    ],
-    "tags": [],
-    "author": "Ms2ger <ms2ger@gmail.com>",
-    "branch": "default",
-    "desc": "Bug 585877 - remove document.height / document.width. r=sicking, sr=jst"
-   },
-   {
-    "node": "75caf7ab03760f6bc39775cd8c4e097f33161c58",
-    "files": [
-     "modules/plugin/base/src/nsNPAPIPlugin.cpp"
-    ],
-    "tags": [],
-    "author": "Martin Str\u00e1nsk\u00fd <stransky@redhat.com>",
-    "branch": "default",
-    "desc": "Bug 574354 - Disable OOP for plugins wrapped by nspluginwrapper. r=josh"
-   }
-  ],
-  "user": "dgottwald@mozilla.com"
- }
+    "lastpushid": 30492,
+    "pushes": {
+        "15092": {
+            "changesets": [
+                {
+                    "author": "Julian Seward <jseward@acm.org>",
+                    "branch": "default",
+                    "desc": "Bug 582668 - gfxAlphaBoxBlur::Paint appears to pass garbage down through Cairo. r=roc",
+                    "files": [
+                        "gfx/thebes/gfxBlur.cpp"
+                    ],
+                    "node": "ace72819f4a94b9175519a8fa5a1db654edae098",
+                    "parents": [
+                        "f2af48b0cd7c22c0af016d33a34ae5dc6e3141ab"
+                    ],
+                    "tags": []
+                },
+                {
+                    "author": "Ms2ger <ms2ger@gmail.com>",
+                    "branch": "default",
+                    "desc": "Bug 585877 - remove document.height / document.width. r=sicking, sr=jst",
+                    "files": [
+                        "content/html/document/src/nsHTMLDocument.cpp",
+                        "dom/interfaces/html/nsIDOMNSHTMLDocument.idl",
+                        "js/src/xpconnect/src/dom_quickstubs.qsconf"
+                    ],
+                    "node": "43b490ef9dab30db2c4e2706110ad5d524a21597",
+                    "parents": [
+                        "ace72819f4a94b9175519a8fa5a1db654edae098"
+                    ],
+                    "tags": []
+                },
+                {
+                    "author": "Martin Str\u00e1nsk\u00fd <stransky@redhat.com>",
+                    "branch": "default",
+                    "desc": "Bug 574354 - Disable OOP for plugins wrapped by nspluginwrapper. r=josh",
+                    "files": [
+                        "modules/plugin/base/src/nsNPAPIPlugin.cpp"
+                    ],
+                    "node": "75caf7ab03760f6bc39775cd8c4e097f33161c58",
+                    "parents": [
+                        "43b490ef9dab30db2c4e2706110ad5d524a21597"
+                    ],
+                    "tags": []
+                }
+            ],
+            "date": 1281863455,
+            "user": "dgottwald@mozilla.com"
+        }
+    }
 }
 """
 
@@ -97,7 +109,7 @@ from buildbot.util import json
 
 
 def _parse_changes(data):
-    pushes = json.loads(data).values()
+    pushes = json.loads(data)['pushes'].values()
     # Sort by push date
     pushes.sort(key=lambda p: p['date'])
     return pushes
@@ -225,7 +237,7 @@ class BaseHgPoller(BasePoller):
         if self.pushlogUrlOverride:
             url = self.pushlogUrlOverride
         else:
-            url = "/".join((self.baseURL, 'json-pushes?full=1'))
+            url = "/".join((self.baseURL, 'json-pushes?version=2&full=1'))
 
         args = []
         if self.lastChangeset is not None:
