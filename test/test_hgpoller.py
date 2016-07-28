@@ -1,6 +1,5 @@
 from twisted.trial import unittest
 import threading
-import socket
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 from buildbot.util import json
@@ -60,57 +59,45 @@ class TestHTTPServer(object):
 
 class UrlCreation(unittest.TestCase):
     def testSimpleUrl(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
-    def testUrlWithLastChangeset(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
+    def testUrlWithLastPushID(self):
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&startID=42'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central')
-        poller.lastChangeset = '123456'
+        poller.lastPushID = 42
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
     def testTipsOnlyUrl(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&tipsonly=1'
+        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?version=2&full=1&tipsonly=1'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
             tipsOnly=True)
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
 
-    def testTipsOnlyWithLastChangeset(self):
+    def testTipsOnlyWithLastPushID(self):
         # there's two possible correct URLs in this case
-        correctUrls = [
-            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&fromchange=123456&tipsonly=1',
-            'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?full=1&tipsonly=1&fromchange=123456'
-        ]
+        correctUrl = 'https://hg.mozilla.org/releases/mozilla-1.9.1/json-pushes?version=2&full=1&startID=42&tipsonly=1'
         poller = hgpoller.BaseHgPoller(hgURL='https://hg.mozilla.org',
                               branch='releases/mozilla-1.9.1', tipsOnly=True)
-        poller.lastChangeset = '123456'
+        poller.lastPushID = 42
         url = poller._make_url()
-        self.failUnlessIn(url, correctUrls)
+        self.failUnlessEqual(url, correctUrl)
 
     def testOverrideUrl(self):
-        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?full=1&fromchange=123456'
+        correctUrl = 'https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1&startID=42'
         poller = hgpoller.BaseHgPoller(
             hgURL='https://hg.mozilla.org', branch='mozilla-central',
-            pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?full=1')
-        poller.lastChangeset = '123456'
+            pushlogUrlOverride='https://hg.mozilla.org/other_repo/json-pushes?version=2&full=1')
+        poller.lastPushID = 42
         url = poller._make_url()
         self.failUnlessEqual(url, correctUrl)
-
-    def testUrlWithUnicodeLastChangeset(self):
-        correctUrl = 'https://hg.mozilla.org/mozilla-central/json-pushes?full=1&fromchange=123456'
-        poller = hgpoller.BaseHgPoller(
-            hgURL='https://hg.mozilla.org', branch='mozilla-central')
-        poller.lastChangeset = u'123456'
-        url = poller._make_url()
-        self.failUnlessEqual(url, correctUrl)
-        self.failUnless(isinstance(url, str))
 
 
 fakeLocalesFile = """/l10n-central/af/
@@ -199,86 +186,81 @@ class TestPolling(unittest.TestCase):
 
 validPushlog = """
 {
- "15226": {
-  "date": 1282358416,
-  "changesets": [
-   {
-    "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
-    "files": [
-     "embedding/android/GeckoInputConnection.java",
-     "embedding/android/GeckoSurfaceView.java",
-     "widget/src/android/nsWindow.cpp",
-     "widget/src/android/nsWindow.h"
-    ],
-    "tags": [],
-    "author": "Jim Chen <jchen@mozilla.com>",
-    "branch": "GECKO20b5pre_20100820_RELBRANCH",
-    "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec"
-   }
-  ],
-  "user": "dougt@mozilla.com"
- },
- "15227": {
-  "date": 1282362551,
-  "changesets": [
-   {
-    "node": "ee6fb954cbc3de0f76e84cad6bdff452116e1b03",
-    "files": [
-     "browser/base/content/browser.js",
-     "browser/components/privatebrowsing/content/aboutPrivateBrowsing.xhtml",
-     "browser/locales/en-US/chrome/overrides/netError.dtd",
-     "build/automation.py.in",
-     "docshell/resources/content/netError.xhtml",
-     "dom/locales/en-US/chrome/netErrorApp.dtd",
-     "extensions/cookie/nsPermissionManager.cpp"
-    ],
-    "tags": [],
-    "author": "Bobby Holley <bobbyholley@gmail.com>",
-    "branch": "default",
-    "desc": "Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking's push-and-run bustage. a=backout"
-   },
-   {
-    "node": "33be08836cb164f9e546231fc59e9e4cf98ed991",
-    "files": [
-     "modules/libpref/src/init/all.js"
-    ],
-    "tags": [],
-    "author": "Bobby Holley <bobbyholley@gmail.com>",
-    "branch": "default",
-    "desc": "Bug 563088 - Re-enable image discarding.r=joe,a=blocker"
-   }
-  ],
-  "user": "bobbyholley@stanford.edu"
- }
+    "lastpushid": 30492,
+    "pushes": {
+        "15226": {
+            "changesets": [
+                {
+                    "author": "Jim Chen <jchen@mozilla.com>",
+                    "branch": "GECKO20b5pre_20100820_RELBRANCH",
+                    "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec",
+                    "files": [
+                        "embedding/android/GeckoInputConnection.java",
+                        "embedding/android/GeckoSurfaceView.java",
+                        "widget/src/android/nsWindow.cpp",
+                        "widget/src/android/nsWindow.h"
+                    ],
+                    "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
+                    "parents": [
+                        "935c15d506516a2269cee35a1a80748aaec1ae08"
+                    ],
+                    "tags": []
+                }
+            ],
+            "date": 1282358416,
+            "user": "dougt@mozilla.com"
+        },
+        "15227": {
+            "changesets": [
+                {
+                    "author": "Bobby Holley <bobbyholley@gmail.com>",
+                    "branch": "default",
+                    "desc": "Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking's push-and-run bustage. a=backout",
+                    "files": [
+                        "browser/base/content/browser.js",
+                        "browser/components/privatebrowsing/content/aboutPrivateBrowsing.xhtml",
+                        "browser/locales/en-US/chrome/overrides/netError.dtd",
+                        "build/automation.py.in",
+                        "docshell/resources/content/netError.xhtml",
+                        "dom/locales/en-US/chrome/netErrorApp.dtd",
+                        "extensions/cookie/nsPermissionManager.cpp"
+                    ],
+                    "node": "ee6fb954cbc3de0f76e84cad6bdff452116e1b03",
+                    "parents": [
+                        "baff7b7b32bc3dd7132cddd3957f6898b5bebfaf"
+                    ],
+                    "tags": []
+                },
+                {
+                    "author": "Bobby Holley <bobbyholley@gmail.com>",
+                    "branch": "default",
+                    "desc": "Bug 563088 - Re-enable image discarding.r=joe,a=blocker",
+                    "files": [
+                        "modules/libpref/src/init/all.js"
+                    ],
+                    "node": "33be08836cb164f9e546231fc59e9e4cf98ed991",
+                    "parents": [
+                        "ee6fb954cbc3de0f76e84cad6bdff452116e1b03"
+                    ],
+                    "tags": []
+                }
+            ],
+            "date": 1282362551,
+            "user": "bobbyholley@stanford.edu"
+        }
+    }
 }
 """
 
 malformedPushlog = """
-{
- "15226": {
-  "date": 1282358416,
-  "changesets": [
-   {
-    "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
-    "files": [
-     "embedding/android/GeckoInputConnection.java",
-     "embedding/android/GeckoSurfaceView.java",
-     "widget/src/android/nsWindow.cpp",
-     "widget/src/android/nsWindow.h"
-    ],
-    "tags": [],
-    "author": "Jim Chen <jchen@mozilla.com>",
-    "branch": "GECKO20b5pre_20100820_RELBRANCH",
-    "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec"
-   }
-  ],
-  "user": "dougt@mozilla.com"
+{ "invalid json" }
 """
 
 
 class PushlogParsing(unittest.TestCase):
     def testValidPushlog(self):
-        pushes = hgpoller._parse_changes(validPushlog)
+        push_data = hgpoller.parse_pushlog_json(validPushlog)
+        pushes = push_data['pushes']
         self.failUnlessEqual(len(pushes), 2)
 
         self.failUnlessEqual(pushes[0]['changesets'][0]['node'],
@@ -309,23 +291,22 @@ class PushlogParsing(unittest.TestCase):
 
     def testMalformedPushlog(self):
         self.failUnlessRaises(
-            JSONDecodeError, hgpoller._parse_changes, malformedPushlog)
+            JSONDecodeError, hgpoller.parse_pushlog_json, malformedPushlog)
 
     def testEmptyPushlog(self):
-        self.failUnlessRaises(JSONDecodeError, hgpoller._parse_changes, "")
+        self.failUnlessRaises(JSONDecodeError, hgpoller.parse_pushlog_json, "")
 
 
-class RepoBranchHandling(unittest.TestCase):
-    def setUp(self):
+class PollingTest(unittest.TestCase):
+    def doTest(self, data=validPushlog, **kwargs):
         self.changes = []
 
-    def doTest(self, repo_branch):
         changes = self.changes
 
         class TestPoller(hgpoller.BaseHgPoller):
             def __init__(self):
                 hgpoller.BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
-                                      repo_branch=repo_branch)
+                                               **kwargs)
                 self.emptyRepo = True
 
         class parent:
@@ -334,15 +315,121 @@ class RepoBranchHandling(unittest.TestCase):
 
         p = TestPoller()
         p.parent = parent()
-        p.processData(validPushlog)
+        p.processData(data)
+        return p
 
+
+class EmptyLastPushID(PollingTest):
+    def testEmptyLastPushID(self):
+        poller = self.doTest(data="""
+        {
+            "lastpushid": "",
+            "pushes": {}
+        }
+        """)
+        self.assertTrue(poller.emptyRepo, 'repo marked as empty')
+
+
+class PushlogReset(PollingTest):
+    def testDecreasingLastPushID(self):
+        poller = self.doTest(data=validPushlog)
+        self.assertEqual(poller.lastPushID, 15227)
+
+        poller.processData("""
+        {
+            "lastpushid": 15225,
+            "pushes": {
+                "15200": {
+                    "changesets": [
+                        {
+                            "author": "Jim Chen <jchen@mozilla.com>",
+                            "branch": "GECKO20b5pre_20100820_RELBRANCH",
+                            "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec",
+                            "files": [
+                                "embedding/android/GeckoInputConnection.java",
+                                "embedding/android/GeckoSurfaceView.java",
+                                "widget/src/android/nsWindow.cpp",
+                                "widget/src/android/nsWindow.h"
+                            ],
+                            "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
+                            "parents": [
+                                "935c15d506516a2269cee35a1a80748aaec1ae08"
+                            ],
+                            "tags": []
+                        }
+                    ],
+                    "date": 1282358416,
+                    "user": "dougt@mozilla.com"
+                }
+            }
+        }
+        """)
+        self.assertIsNone(poller.lastPushID, 'last push ID should be None')
+        self.assertEqual(poller._make_url(),
+                         'http://localhost/whatever/json-pushes?version=2&full=1',
+                         'pushlog URL should start from the end')
+
+class EmptyChangesets(PollingTest):
+    def testEmptyChangesets(self):
+        poller = self.doTest(data="""
+        {
+            "lastpushid": 42,
+            "pushes": {
+                "41": {
+                    "changesets": [],
+                    "date": 1282358416,
+                    "user": "someone@somewhere.com"
+                },
+                "42": {
+                    "changesets": [
+                        {
+                            "author": "Jim Chen <jchen@mozilla.com>",
+                            "branch": "default",
+                            "desc": "Bug 588456 - Properly commit Android IME composition on blur; r=mwu a=blocking-fennec",
+                            "files": [
+                                "embedding/android/GeckoInputConnection.java"
+                            ],
+                            "node": "4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6",
+                            "parents": [
+                                "935c15d506516a2269cee35a1a80748aaec1ae08"
+                            ],
+                            "tags": []
+                        }
+                    ],
+                    "date": 1282358417,
+                    "user": "someoneelse@somewhere.com"
+                }
+            }
+        }
+        """)
+
+        self.assertEqual(poller.lastPushID, 42)
+        self.assertEqual(len(self.changes), 1)
+
+
+class EmptyPushes(PollingTest):
+    def testEmptyPushes(self):
+        poller = self.doTest(data=validPushlog)
+        self.assertEqual(poller._make_url(), 'http://localhost/whatever/json-pushes?version=2&full=1&startID=15227')
+
+        # This simulates what happens on subsequent polls when no new
+        # data is available.
+        poller.processData("""
+        {
+            "lastpushid": 15227,
+            "pushes": {}
+        }
+        """)
+
+
+class RepoBranchHandling(PollingTest):
     def testNoRepoBranch(self):
-        self.doTest(None)
+        self.doTest(repo_branch=None)
 
         self.assertEquals(len(self.changes), 2)
 
     def testDefaultRepoBranch(self):
-        self.doTest('default')
+        self.doTest(repo_branch='default')
 
         # mergePushChanges is on by default, so we end up with a single change
         # here
@@ -358,37 +445,17 @@ class RepoBranchHandling(unittest.TestCase):
                           'Backout of changesets c866e73f3209 and baff7b7b32bc because of sicking\'s push-and-run bustage.')
 
     def testRelbranch(self):
-        self.doTest('GECKO20b5pre_20100820_RELBRANCH')
+        self.doTest(repo_branch='GECKO20b5pre_20100820_RELBRANCH')
 
         self.assertEquals(len(self.changes), 1)
         self.assertEquals(self.changes[0].revision,
                           '4c23e51a484f077ea27af3ea4a4ee13da5aeb5e6')
 
 
-class MaxChangesHandling(unittest.TestCase):
-    def setUp(self):
-        self.changes = []
-
-    def doTest(self, repo_branch, maxChanges, mergePushChanges):
-        changes = self.changes
-
-        class TestPoller(hgpoller.BaseHgPoller):
-            def __init__(self):
-                hgpoller.BaseHgPoller.__init__(self, 'http://localhost', 'whatever',
-                                      repo_branch=repo_branch, maxChanges=maxChanges, mergePushChanges=mergePushChanges)
-                self.emptyRepo = True
-
-        class parent:
-            def addChange(self, change):
-                changes.append(change)
-
-        p = TestPoller()
-        p.parent = parent()
-        p.processData(validPushlog)
-
+class MaxChangesHandling(PollingTest):
     def testNoRepoBigMax(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, 10, False)
+        self.doTest(repo_branch=None, maxChanges=10, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 3)
         # Check that we got the right changes
@@ -401,7 +468,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testMergingNoRepoBigMax(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, 10, True)
+        self.doTest(repo_branch=None, maxChanges=10, mergePushChanges=True)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -412,7 +479,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testNoRepoUnlimited(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, None, False)
+        self.doTest(repo_branch=None, maxChanges=None, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 3)
         # Check that we got the right changes
@@ -425,7 +492,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testMergingNoRepoUnlimited(self):
         # Test that we get all of the changes when maxChanges is large enough
-        self.doTest(None, None, True)
+        self.doTest(repo_branch=None, maxChanges=None, mergePushChanges=True)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -436,7 +503,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testNoRepoSmallMax(self):
         # Test that we get only 2 changes if maxChanges is set to 2
-        self.doTest(None, 2, False)
+        self.doTest(repo_branch=None, maxChanges=2, mergePushChanges=False)
 
         # The extra change is the overflow indicator
         self.assertEquals(len(self.changes), 3)
@@ -450,7 +517,7 @@ class MaxChangesHandling(unittest.TestCase):
 
     def testMergingNoRepoSmallMax(self):
         # Test that we get only 1 change if maxChanges is set to 1
-        self.doTest(None, 1, True)
+        self.doTest(repo_branch=None, maxChanges=1, mergePushChanges=True)
 
         self.assertEquals(len(self.changes), 1)
         # Check that we got the right changes
@@ -462,7 +529,7 @@ class MaxChangesHandling(unittest.TestCase):
                      0].files, self.changes[0].files)
 
     def testDefaultRepoBigMax(self):
-        self.doTest('default', 10, False)
+        self.doTest(repo_branch='default', maxChanges=10, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -472,7 +539,7 @@ class MaxChangesHandling(unittest.TestCase):
                           '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testDefaultRepoSmallMax(self):
-        self.doTest('default', 1, False)
+        self.doTest(repo_branch='default', maxChanges=1, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 2)
         # Check that we got the right changes
@@ -482,6 +549,7 @@ class MaxChangesHandling(unittest.TestCase):
                           '33be08836cb164f9e546231fc59e9e4cf98ed991')
 
     def testRelbranchSmallMax(self):
-        self.doTest('GECKO20b5pre_20100820_RELBRANCH', 1, False)
+        self.doTest(repo_branch='GECKO20b5pre_20100820_RELBRANCH',
+                    maxChanges=1, mergePushChanges=False)
 
         self.assertEquals(len(self.changes), 1)

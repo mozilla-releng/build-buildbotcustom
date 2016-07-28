@@ -44,44 +44,56 @@ as on a group of hg repositories. It's polling the json feed of pushlog,
 which of the form
 
 {
- "15092": {
-  "date": 1281863455,
-  "changesets": [
-   {
-    "node": "ace72819f4a94b9175519a8fa5a1db654edae098",
-    "files": [
-     "gfx/thebes/gfxBlur.cpp"
-    ],
-    "tags": [],
-    "author": "Julian Seward <jseward@acm.org>",
-    "branch": "default",
-    "desc": "Bug 582668 - gfxAlphaBoxBlur::Paint appears to pass garbage down through Cairo. r=roc"
-   },
-   {
-    "node": "43b490ef9dab30db2c4e2706110ad5d524a21597",
-    "files": [
-     "content/html/document/src/nsHTMLDocument.cpp",
-     "dom/interfaces/html/nsIDOMNSHTMLDocument.idl",
-     "js/src/xpconnect/src/dom_quickstubs.qsconf"
-    ],
-    "tags": [],
-    "author": "Ms2ger <ms2ger@gmail.com>",
-    "branch": "default",
-    "desc": "Bug 585877 - remove document.height / document.width. r=sicking, sr=jst"
-   },
-   {
-    "node": "75caf7ab03760f6bc39775cd8c4e097f33161c58",
-    "files": [
-     "modules/plugin/base/src/nsNPAPIPlugin.cpp"
-    ],
-    "tags": [],
-    "author": "Martin Str\u00e1nsk\u00fd <stransky@redhat.com>",
-    "branch": "default",
-    "desc": "Bug 574354 - Disable OOP for plugins wrapped by nspluginwrapper. r=josh"
-   }
-  ],
-  "user": "dgottwald@mozilla.com"
- }
+    "lastpushid": 30492,
+    "pushes": {
+        "15092": {
+            "changesets": [
+                {
+                    "author": "Julian Seward <jseward@acm.org>",
+                    "branch": "default",
+                    "desc": "Bug 582668 - gfxAlphaBoxBlur::Paint appears to pass garbage down through Cairo. r=roc",
+                    "files": [
+                        "gfx/thebes/gfxBlur.cpp"
+                    ],
+                    "node": "ace72819f4a94b9175519a8fa5a1db654edae098",
+                    "parents": [
+                        "f2af48b0cd7c22c0af016d33a34ae5dc6e3141ab"
+                    ],
+                    "tags": []
+                },
+                {
+                    "author": "Ms2ger <ms2ger@gmail.com>",
+                    "branch": "default",
+                    "desc": "Bug 585877 - remove document.height / document.width. r=sicking, sr=jst",
+                    "files": [
+                        "content/html/document/src/nsHTMLDocument.cpp",
+                        "dom/interfaces/html/nsIDOMNSHTMLDocument.idl",
+                        "js/src/xpconnect/src/dom_quickstubs.qsconf"
+                    ],
+                    "node": "43b490ef9dab30db2c4e2706110ad5d524a21597",
+                    "parents": [
+                        "ace72819f4a94b9175519a8fa5a1db654edae098"
+                    ],
+                    "tags": []
+                },
+                {
+                    "author": "Martin Str\u00e1nsk\u00fd <stransky@redhat.com>",
+                    "branch": "default",
+                    "desc": "Bug 574354 - Disable OOP for plugins wrapped by nspluginwrapper. r=josh",
+                    "files": [
+                        "modules/plugin/base/src/nsNPAPIPlugin.cpp"
+                    ],
+                    "node": "75caf7ab03760f6bc39775cd8c4e097f33161c58",
+                    "parents": [
+                        "43b490ef9dab30db2c4e2706110ad5d524a21597"
+                    ],
+                    "tags": []
+                }
+            ],
+            "date": 1281863455,
+            "user": "dgottwald@mozilla.com"
+        }
+    }
 }
 """
 
@@ -96,11 +108,29 @@ from buildbot.changes import base, changes
 from buildbot.util import json
 
 
-def _parse_changes(data):
-    pushes = json.loads(data).values()
-    # Sort by push date
-    pushes.sort(key=lambda p: p['date'])
-    return pushes
+def parse_pushlog_json(data):
+    """Parse pushlog data version 2.
+
+    Returns a normalized version of the data. The "pushes" key
+    is a list of pushlog entries in order instead of a dict.
+    """
+    data = json.loads(data)
+
+    pushes = []
+    for pushid, push in data['pushes'].items():
+        # Keys are strings in the JSON. We convert to int so the sort
+        # below works appropriately. (A string sort may not always
+        # have appropriate ordering.)
+        push['pushid'] = int(pushid)
+        pushes.append(push)
+
+    # Sort by the push id because that is the monotonically incrementing
+    # key.
+    pushes.sort(key=lambda p: p['pushid'])
+
+    data['pushes'] = pushes
+
+    return data
 
 
 class Pluggable(object):
@@ -202,7 +232,7 @@ class BaseHgPoller(BasePoller):
         self.baseURL = "/".join(fragments)
         self.pushlogUrlOverride = pushlogUrlOverride
         self.tipsOnly = tipsOnly
-        self.lastChangeset = None
+        self.lastPushID = None
         self.startLoad = 0
         self.loadTime = None
         self.repo_branch = repo_branch
@@ -225,11 +255,11 @@ class BaseHgPoller(BasePoller):
         if self.pushlogUrlOverride:
             url = self.pushlogUrlOverride
         else:
-            url = "/".join((self.baseURL, 'json-pushes?full=1'))
+            url = "/".join((self.baseURL, 'json-pushes?version=2&full=1'))
 
         args = []
-        if self.lastChangeset is not None:
-            args.append('fromchange=' + self.lastChangeset)
+        if self.lastPushID is not None:
+            args.append('startID=%d' % self.lastPushID)
         if self.tipsOnly:
             args.append('tipsonly=1')
         if args:
@@ -241,29 +271,45 @@ class BaseHgPoller(BasePoller):
 
         return str(url)
 
-    def dataFailed(self, res):
-        # XXX: disabled for bug 774862
-        # if hasattr(res.value, 'status') and res.value.status == '500' and \
-                #'unknown revision' in res.value.response:
-            ## Indicates that the revision can't be found.  The repo has most
-            ## likely been reset.  Forget about our lastChangeset, and set
-            ## emptyRepo to True so we can trigger builds for new changes there
-            # if self.verbose:
-                # log.msg("%s has been reset" % self.baseURL)
-            # self.lastChangeset = None
-            # self.emptyRepo = True
-        return self.super_class.dataFailed(self, res)
-
     def processData(self, query):
-        pushes = _parse_changes(query)
-        if len(pushes) == 0:
-            if self.lastChangeset is None:
-                # We don't have a lastChangeset, and there are no changes.  Assume
-                # the repository is empty.
-                self.emptyRepo = True
-                if self.verbose:
-                    log.msg("%s is empty" % self.baseURL)
-            # Nothing else to do
+        push_data = parse_pushlog_json(query)
+
+        # The payload tells us the most recent push ID. If it is the empty
+        # string, the pushlog is empty and there is no data to consume.
+        if not push_data['lastpushid']:
+            self.emptyRepo = True
+            self.lastPushID = None
+            if self.verbose:
+                log.msg('%s is empty' % self.baseURL)
+            return
+
+        # If nothing has changed and we're fully caught up, the remote
+        # lastpushid will be the same as self.lastPushID.
+        #
+        # If the remote lastpushid is less than a previously observed value,
+        # this could mean one of the following:
+        #
+        #    a) Data from the pushlog was removed (perhaps the repo was
+        #       stripped)
+        #    b) The repo/pushlog was reset.
+        #
+        # These scenarios should be rare. In both of them, our assumption
+        # about the behavior of the pushlog always being monotonically
+        # increasing have been invalidated. So we reset state and start
+        # again.
+        #
+        # It's worth noting that a reset repo's pushlog could have *more*
+        # entries than the former repo. In this case, this code will fail
+        # to detect a reset repo from the pushlog alone.
+        if self.lastPushID and push_data['lastpushid'] < self.lastPushID:
+            self.emptyRepo = False
+            self.lastPushID = None
+            log.msg('%s appears to have been reset; clearing state' %
+                    self.baseURL)
+            return
+
+        # No pushes to process. Exit early.
+        if not push_data['pushes']:
             return
 
         # We want to add at most self.maxChanges changes per push. If
@@ -273,7 +319,12 @@ class BaseHgPoller(BasePoller):
         # latest ones and possibly discard earlier ones.
         change_list = []
         too_many = False
-        for push in reversed(pushes):
+        for push in reversed(push_data['pushes']):
+            # If no changesets in this push, do nothing. This likely
+            # occurs when changesets are obsoleted.
+            if not push['changesets']:
+                continue
+
             # Used for merging push changes
             c = dict(
                 user=push['user'],
@@ -360,16 +411,16 @@ class BaseHgPoller(BasePoller):
         # Un-reverse the list of changes so they get added in the right order
         change_list.reverse()
 
-        # If we have a lastChangeset we're comparing against, we've been
-        # running for a while and so any changes returned here are new.
+        # If we have a lastPushID, we've consumed data already so any changes
+        # returned here are new.
 
         # If the repository was previously empty (indicated by emptyRepo=True),
         # we also want to pay attention to all these pushes.
 
-        # If we don't have a lastChangeset and the repository isn't empty, then
-        # don't trigger any new builds, and start monitoring for changes since
-        # the latest changeset in the repository
-        if self.lastChangeset is not None or self.emptyRepo:
+        # If we don't have a lastPushID and the repository isn't empty, then
+        # don't trigger any new builds, and start monitoring for changes
+        # from the last push ID.
+        if self.lastPushID is not None or self.emptyRepo:
             for change in change_list:
                 link = "%s/rev/%s" % (self.baseURL, change["node"])
                 c = changes.Change(who=change["user"],
@@ -389,12 +440,11 @@ class BaseHgPoller(BasePoller):
         # The repository isn't empty any more!
         self.emptyRepo = False
         # Use the last change found by the poller, regardless of if it's on our
-        # branch or not. This is so we don't have to constantly ignore it in
-        # future polls.
-        self.lastChangeset = pushes[-1]["changesets"][-1]["node"]
+        # branch or not.
+        self.lastPushID = push_data['pushes'][-1]['pushid']
         if self.verbose:
-            log.msg("last changeset %s on %s" %
-                    (self.lastChangeset, self.baseURL))
+            log.msg('last processed push id on %s is %d' %
+                    (self.baseURL, self.lastPushID))
 
     def changeHook(self, change):
         pass
