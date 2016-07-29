@@ -47,7 +47,7 @@ def uploadLog(args):
     print output
 
     # Look for URLs
-    url = re.search("http://\S+", output)
+    url = re.search("https?://\S+", output)
     if url:
         return url.group(), retcode
     return None, retcode
