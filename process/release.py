@@ -838,6 +838,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                         mock_copyin_files=pf.get('mock_copyin_files'),
                         use_credentials_file=True,
                         copy_properties=['buildid'],
+                        extra_signing_env=releaseConfig.get("extra_signing_env"),
                     )
 
                 builders.append({

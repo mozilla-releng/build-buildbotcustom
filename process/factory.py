@@ -4555,9 +4555,11 @@ class ScriptFactory(RequestSortingBuildFactory, TooltoolMixin):
 
 class SigningScriptFactory(ScriptFactory):
 
-    def __init__(self, signingServers, enableSigning=True, **kwargs):
+    def __init__(self, signingServers, enableSigning=True,
+                 extra_signing_env=None, **kwargs):
         self.signingServers = signingServers
         self.enableSigning = enableSigning
+        self.extra_signing_env = extra_signing_env or {}
         ScriptFactory.__init__(self, **kwargs)
 
     def runScript(self):
@@ -4597,6 +4599,7 @@ class SigningScriptFactory(ScriptFactory):
             signing_env = self.env.copy()
             signing_env['MOZ_SIGN_CMD'] = WithProperties(get_signing_cmd(
                 self.signingServers, self.env.get('PYTHON26')))
+            signing_env.update({key: WithProperties(value) for key, value in self.extra_signing_env.iteritems()})
             signing_env['MOZ_SIGNING_SERVERS'] = ",".join(
                 "%s:%s" % (":".join(s[3]), s[0]) for s in self.signingServers)
 
