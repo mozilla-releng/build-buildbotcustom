@@ -1443,6 +1443,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         env['MINIDUMP_STACKWALK'] = getPlatformMinidumpPath(self.platform)
         env['MINIDUMP_SAVE_PATH'] = WithProperties('%(basedir:-)s/minidumps')
         env['TOOLTOOL_DIR'] = WithProperties('%(basedir:-)s/build')
+        env.update({'MOZ_OBJDIR': WithProperties('%(basedir)s/build/' + self.objdir)})
+
         self.addStep(MockMozillaCheck(
                          test_name="check",
                          makeCmd=self.makeCmd,
