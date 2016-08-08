@@ -20,12 +20,14 @@ class HTTPSVerifyingContextFactory(ContextFactory):
     def __init__(self, hostname, certfile):
         self.hostname = hostname
         data = open(certfile).read()
+        self.certfile = certfile
         self.cert = load_certificate(FILETYPE_PEM, data)
 
     def getContext(self):
         ctx = Context(TLSv1_METHOD)
         store = ctx.get_cert_store()
         store.add_cert(self.cert)
+        ctx.load_verify_locations(self.certfile)
         ctx.set_verify(VERIFY_PEER | VERIFY_FAIL_IF_NO_PEER_CERT,
                        self.verifyHostname)
         ctx.set_options(OP_NO_SSLv2)
@@ -33,7 +35,7 @@ class HTTPSVerifyingContextFactory(ContextFactory):
 
     def verifyHostname(self, connection, x509, errno, depth, preverifyOK):
         if preverifyOK:
-            if self.hostname == x509.get_subject().commonName:
+            if x509.get_subject().commonName not in (self.hostname, "mozilla.com", None):
                 return False
         return preverifyOK
 
