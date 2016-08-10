@@ -35,6 +35,8 @@ class HTTPSVerifyingContextFactory(ContextFactory):
 
     def verifyHostname(self, connection, x509, errno, depth, preverifyOK):
         if preverifyOK:
+            # Accept a hostname that matches the cert's commonName,
+            # or 'mozilla.com' for the releng_CA, or None for the old cert.
             if x509.get_subject().commonName not in (self.hostname, "mozilla.com", None):
                 return False
         return preverifyOK
@@ -107,8 +109,10 @@ class SigningServerAuthenication(StringDownload):
         headers = self.generateHeaders(
             method=method,
             credentials=(self.username, self.password))
+        # send the HTTPSVerifyingContextFactory the hostname of the signing
+        # server + the cert
         contextFactory = HTTPSVerifyingContextFactory(
-            URLPath(self.uri).netloc, self.server_cert)
+            URLPath.fromString(self.uri).netloc.split(':')[0], self.server_cert)
         d = getPage(self.uri, method=method, headers=headers,
                     postdata=urlencode(postdata), contextFactory=contextFactory)
         d.addCallbacks(self.downloadSignature, self.requestFailed)
