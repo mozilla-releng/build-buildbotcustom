@@ -321,7 +321,6 @@ if __name__ == "__main__":
             uploadArgs = dict(
                 branch=options.branch,
                 product=options.product,
-                log=True,
             )
 
             # Make sure debug platforms are properly identified
