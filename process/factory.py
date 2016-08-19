@@ -2453,6 +2453,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
                 target=self.mock_target,
                 workdir='%s/dist' % self.absMozillaObjDir,
                 haltOnFailure=True,
+                timeout=2400,
             ))
             # the previous script exits 0 always, need to check if mar exists
             self.addStep(ShellCommand(
