@@ -503,6 +503,10 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
                 self.signingServers, self.env.get('PYTHON26'))
             self.env['MOZ_SIGN_CMD'] = WithProperties(self.signing_command)
 
+        if 'MOZ_OBJDIR' in self.env and not os.path.isabs(self.env['MOZ_OBJDIR']):
+            self.env['MOZ_OBJDIR'] = WithProperties('%(basedir)s' + '/%s/%s' %
+                                                    (self.baseWorkDir, self.env['MOZ_OBJDIR']))
+
         if self.enable_pymake:
           pythonCmd = self.pythonWithJson('win32')
           self.makeCmd = [pythonCmd, WithProperties("%(basedir)s/build/build/pymake/make.py")]
