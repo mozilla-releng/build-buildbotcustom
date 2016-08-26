@@ -2029,6 +2029,35 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     }
     builders.append(bouncer_aliases_builder)
 
+    # mark release as shipped
+    mark_as_shipped_mh_cfg = {
+        "script_name": "scripts/release/postrelease_mark_as_shipped.py",
+        "extra_args": [
+             "-c",  branch_config['postrelease_mark_as_shipped_config'][product],
+        ]
+    }
+    mark_as_shipped_buildername = "release-{branch}-{product}_mark_as_shipped".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (linux64 in this case)
+    mark_as_shipped_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['linux64'],
+        mh_cfg=mark_as_shipped_mh_cfg, use_credentials_file=True)
+
+    mark_as_shipped_builder = {
+        "name": mark_as_shipped_buildername,
+        "slavenames": branch_config["platforms"]["linux64"]["slaves"],
+        "builddir": mark_as_shipped_buildername,
+        "slavebuilddir": normalizeName(mark_as_shipped_buildername),
+        "factory": mark_as_shipped_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(mark_as_shipped_builder)
+
     # checksums
     checksums_buildername = "release-{branch}-{product}_chcksms".format(
         branch=branch_name, product=product)
