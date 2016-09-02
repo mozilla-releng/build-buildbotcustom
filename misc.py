@@ -395,8 +395,8 @@ def _nextIdleSlave(nReserved):
 
 # Globals for mergeRequests
 nomergeBuilders = set()
-# Default to max of 3 merged requests.
-builderMergeLimits = collections.defaultdict(lambda: 3)
+# Default to max of 8 merged requests.
+builderMergeLimits = collections.defaultdict(lambda: 8)
 # For tracking state in mergeRequests below
 _mergeCount = 0
 _mergeId = None
