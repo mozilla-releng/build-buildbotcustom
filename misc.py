@@ -2348,7 +2348,6 @@ def generatePeriodicFileUpdateBuilder(config, branch_name, platform, base_name, 
     kwargs = {}
     kwargs['env'] = env
 
-    extra_args += mirrorAndBundleArgs(config)
     if pf['product_name'] is not None:
         extra_args.extend(['-p', pf['product_name']])
     if config['hg_username'] is not None:
@@ -2365,6 +2364,8 @@ def generatePeriodicFileUpdateBuilder(config, branch_name, platform, base_name, 
         extra_args.extend(['--hsts'])
     if config['enable_hpkp_update'] is True:
         extra_args.extend(['--hpkp'])
+    if config.get('use_ftp_for_xpcshell', False) is True:
+        extra_args.extend(['--use-ftp-builds'])
 
     periodic_file_update_factory = ScriptFactory(
         "%s%s" % (config['hgurl'],
