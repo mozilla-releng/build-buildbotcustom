@@ -249,6 +249,27 @@ def getLastBuiltRevision(db, t, branch, builderNames):
         return result[0]
     return None
 
+def getLastBuiltRevisions(db, t, branch, builderNames, limit=5):
+    """ Returns the latest revision that was built on builderNames """
+    # Find the latest revision web uilt on any of the builderNames
+
+    q = db.quoteq("""SELECT sourcestamps.revision FROM
+                buildrequests, buildsets, sourcestamps
+            WHERE
+                buildrequests.buildsetid = buildsets.id AND
+                buildsets.sourcestampid = sourcestamps.id AND
+                sourcestamps.branch = ? AND
+                buildrequests.buildername IN %s
+            ORDER BY
+                buildsets.submitted_at DESC
+            LIMIT ?""" % db.parmlist(len(builderNames)))
+
+    t.execute(q, (branch,) + tuple(builderNames) + (limit,))
+    retval = []
+    for row in t.fetchall():
+        retval.append(row[0])
+    return retval
+
 def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=None):
     """Returns a function that returns the latest revision on branch that was
     green for all builders in builderNames.
@@ -312,5 +333,33 @@ def lastGoodFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=
                 log.msg("lastGoodRev: Building %s since it's newer than %s" %
                         (later_rev, rev))
                 rev = later_rev
+        return SourceStamp(branch=scheduler.branch, revision=rev)
+    return ssFunc
+
+def lastRevFunc(branch, builderNames, triggerBuildIfNoChanges=True, l10nBranch=None, forceBuildLastChange=True):
+    """Returns a function that returns the latest revision on branch. """
+    def ssFunc(scheduler, t):
+        db = scheduler.parent.db
+
+        c = lastChange(db, t, branch)
+        if not c: 
+            log.msg("No last change")
+
+        if not c:
+            return None
+
+        rev = c.revision
+
+        if not forceBuildLastChange:
+            last_built_revs = getLastBuiltRevisions(db, t, branch,
+                                                    builderNames)
+            log.msg("lastBuiltRevisions: %s" % last_built_revs)
+
+            if last_built_revs:
+                # make sre that rev is newer than the last revision we built
+                later_rev = getLatestRev(db, t, branch, rev, last_built_revs[0])
+                if later_rev in last_built_revs and not triggerBuildIfNoChanges:
+                    log.msg("lastGoodRev: Skipping %s since we've already built it" % rev)
+                    return None
         return SourceStamp(branch=scheduler.branch, revision=rev)
     return ssFunc
