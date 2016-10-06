@@ -3302,7 +3302,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             target=self.mock_target,
         ))
         if self.tooltool_manifest_src:
-            self.addTooltoolStep(workdir='build')
+            self.addTooltoolStep(workdir=self.absSrcDir)
 
     def configure(self):
         if self.mozillaDir:
