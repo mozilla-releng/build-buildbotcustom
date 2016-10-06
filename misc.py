@@ -59,7 +59,7 @@ from buildbotcustom.status.mail import MercurialEmailLookup, ChangeNotifier
 from buildbotcustom.status.generators import buildTryChangeMessage
 from buildbotcustom.env import MozillaEnvironments
 from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
-    buildUIDSchedFunc, lastGoodFunc, lastRevFunc
+    buildUIDSchedFunc, lastGoodFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from build.paths import getRealpath
 
@@ -1976,12 +1976,11 @@ def generateCCBranchObjects(config, name, secrets=None):
     # Now, setup the nightly en-US schedulers and maybe,
     # their downstream l10n ones
     if nightlyBuilders or xulrunnerNightlyBuilders:
-        goodFunc = lastRevFunc(
+        goodFunc = lastGoodFunc(
                 branch=config['repo_path'],
                 builderNames=builders,
-                triggerBuildIfNoChanges=True,
-                l10nBranch=config.get('l10n_repo_path'),
-                forceBuildLastChange=False,
+                triggerBuildIfNoChanges=False,
+                l10nBranch=config.get('l10n_repo_path')
                 )
 
         nightly_scheduler = makePropertiesScheduler(
