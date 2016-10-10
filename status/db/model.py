@@ -146,8 +146,8 @@ class Property(Base):
 
         new_props = set(names) - set([p.name for p in retval])
         for name in new_props:
-            p = cls(name=unicode(name), value=props[name],
-                    source=unicode(props.getPropertySource(name)))
+            p = cls(name=unicode(name)[:40], value=props[name],
+                    source=unicode(props.getPropertySource(name))[:40])
             retval.append(p)
         return retval
 
