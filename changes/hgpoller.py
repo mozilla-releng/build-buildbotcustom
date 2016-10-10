@@ -358,7 +358,7 @@ class BaseHgPoller(BasePoller):
                     # should use the comments and revision of the first change
                     # in this loop
                     if c['node'] is None:
-                        c['desc'] = change['desc']
+                        c['desc'] = change['desc'][:500]
                         c['node'] = change['node']
 
                     title = change['desc'].split('\n', 1)[0]
@@ -380,7 +380,7 @@ class BaseHgPoller(BasePoller):
                         user=push['user'],
                         date=push['date'],
                         files=change['files'],
-                        desc=change['desc'],
+                        desc=change['desc'][:500],
                         node=change['node'],
                         branch=change['branch'],
                     )
