@@ -857,7 +857,7 @@ def generateBranchObjects(config, name, secrets=None):
     buildersByProduct = {}
     nightlyBuilders = []
     periodicBuilders = []
-    weeklyBuilders = []
+    dailyBuilders = []
     # prettyNames is a mapping to pass to the try_parser for validation
     PRETTY_NAME = '%(basename)s %(trystatus)sbuild'
     NAME = '%(basename)s build'
@@ -983,7 +983,7 @@ def generateBranchObjects(config, name, secrets=None):
             if config.get('enable_blocklist_update', False) or \
                config.get('enable_hsts_update', False) or \
                config.get('enable_hpkp_update', False):
-                weeklyBuilders.append('%s periodic file update' % base_name)
+                dailyBuilders.append('%s periodic file update' % base_name)
 
     # Try Server notifier
     if config.get('enable_mail_notifier'):
@@ -1170,15 +1170,14 @@ def generateBranchObjects(config, name, secrets=None):
                                                     'localesURL', None)
                                                 ))
 
-    if weeklyBuilders and config.get("enable_weekly_scheduler", True):
-        weekly_scheduler = Nightly(
-            name='weekly-%s' % scheduler_name_prefix,
+    if dailyBuilders and config.get("enable_daily_scheduler", True):
+        daily_scheduler = Nightly(
+            name='daily-%s' % scheduler_name_prefix,
             branch=config['repo_path'],
-            dayOfWeek=5,  # Saturday
             hour=[3], minute=[02],
-            builderNames=weeklyBuilders,
+            builderNames=dailyBuilders,
         )
-        branchObjects['schedulers'].append(weekly_scheduler)
+        branchObjects['schedulers'].append(daily_scheduler)
 
     # We iterate throught the platforms a second time, so we need
     # to ensure that disabled platforms aren't configured the second time
