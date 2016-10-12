@@ -3218,9 +3218,15 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         # use this factory, so is safe
         self.complete_platform = ''
 
+        if 'branchName' in kwargs:
+            branchName = kwargs['branchName']
+        else:
+            branchName = self.getRepoName(kwargs['repoPath'])
+
         env = env.copy()
 
         env.update({'EN_US_BINARY_URL': enUSBinaryURL})
+        env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' + branchName)})
 
         # Unfortunately, we can't call BaseRepackFactory.__init__() before this
         # because it needs self.postUploadCmd set
@@ -3228,11 +3234,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         assert 'repoPath' in kwargs
 
         # 1) upload preparation
-        if 'branchName' in kwargs:
-            uploadDir = '%s-l10n' % kwargs['branchName']
-        else:
-            uploadDir = '%s-l10n' % self.getRepoName(kwargs['repoPath'])
-
+        uploadDir = '%s-l10n' % branchName
         uploadArgs = dict(
             product=kwargs['project'],
             branch=uploadDir,
