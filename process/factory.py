@@ -961,7 +961,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         self.absMozillaObjDir = '%s/%s' % (
             self.baseWorkDir, self.mozillaObjdir)
 
-        self.latestDir = '/pub/mozilla.org/%s' % self.stageProduct + \
+        self.latestDir = '/pub/%s' % self.stageProduct + \
                          '/nightly/latest-%s' % self.branchName
         if self.post_upload_include_platform:
             self.latestDir += '-%s' % self.stagePlatform
@@ -977,7 +977,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
         else:
             self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                              self.stagePlatform)
-            self.logBaseUrl = 'http://%s/pub/mozilla.org/%s/%s' % \
+            self.logBaseUrl = 'http://%s/pub/%s/%s' % \
                 (self.stageServer,
                  self.stageProduct, self.logUploadDir)
 
@@ -2759,7 +2759,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         self.absMozillaObjDir = '%s/%s/%s' % (
             self.baseWorkDir, self.origSrcDir, self.mozillaObjdir)
 
-        self.latestDir = '/pub/mozilla.org/%s' % self.productName + \
+        self.latestDir = '/pub/%s' % self.productName + \
                          '/nightly/latest-%s-l10n' % self.branchName
 
         if objdir != '':
@@ -3386,8 +3386,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             mar += '.exe'
             mbsdiff += '.exe'
 
-        baseURL = 'http://%s' % self.stageServer + \
-                  '/pub/mozilla.org/%s' % self.productName + \
+        baseURL = self.downloadBaseURL + \
                   '/nightly/latest-%s' % self.branchName + \
                   '/mar-tools/%s' % self.platform
         marURL = '%s/%s' % (baseURL, mar)
@@ -3527,7 +3526,7 @@ class ReleaseFactory(MozillaBuildFactory):
                          nightlyDir="nightly"):
         # can be used with rsync, eg host + ':' + getCandidatesDir()
         # and "http://' + host + getCandidatesDir()
-        return '/pub/mozilla.org/' + product + '/' + nightlyDir + '/' + \
+        return '/pub/' + product + '/' + nightlyDir + '/' + \
                str(version) + '-candidates/build' + str(buildNumber) + '/'
 
     def getShippedLocales(self, sourceRepo, baseTag, appName):
