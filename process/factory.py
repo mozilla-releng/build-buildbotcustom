@@ -3386,8 +3386,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             mar += '.exe'
             mbsdiff += '.exe'
 
-        baseURL = 'http://%s' % self.stageServer + \
-                  '/pub/mozilla.org/%s' % self.productName + \
+        baseURL = self.downloadBaseURL + \
                   '/nightly/latest-%s' % self.branchName + \
                   '/mar-tools/%s' % self.platform
         marURL = '%s/%s' % (baseURL, mar)
