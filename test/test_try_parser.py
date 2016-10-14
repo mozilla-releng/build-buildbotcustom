@@ -12,7 +12,8 @@ BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
                         'macosx-debug': 'OS X 10.5.2 try leak test build',
                         'win32': 'WINNT 5.2 try build',
                         'win32-debug': 'WINNT 5.2 try leak test build',
-                        'win64': 'WINNT 6.1 try try-nondefault build',
+                        'win64': 'WINNT 6.1 try build',
+                        'win64-debug': 'WINNT 6.1 try leak test build',
                         'linux64': 'Linux x86-64 try build',
                         'linux64-debug': 'Linux x86-64 try leak test build',
                         'linux': 'Linux try build',
@@ -512,6 +513,29 @@ class TestTryParser(unittest.TestCase):
                     if 'crashtest' in b
                     and ('5.1' in b or 'Windows XP' in b)]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_bug1308789(self):
+        tm = 'try: -b do -p all -u all[Windows 8,Windows XP]'
+        validTesterNames = ['Windows 8 64-bit try opt test reftest',
+                            'Windows 7 32-bit try opt test reftest',
+                            'Windows XP 32-bit try opt test reftest']
+        testerPrettyNames = {
+            'win64': ['Windows 8 64-bit try-nondefault'],
+            'win32': ['Windows 7 32-bit',
+                      'Windows XP 32-bit try-nondefault'],
+        }
+        unittestSuites = ['reftest']
+
+        customBuilders = TryParser(tm, validTesterNames, testerPrettyNames,
+                                   None, unittestSuites)
+        expectedBuilders = ['Windows 8 64-bit try opt test reftest',
+                            'Windows XP 32-bit try opt test reftest',
+                           ]
+        # The proper behaviour is to have these lists be equal
+        # To reproduce the bug, first test that the results are unequal
+        # Unfortunately trial doesn't handle the unittest.expectedFailure
+        # decorator
+        self.assertNotEqual(sorted(customBuilders), sorted(expectedBuilders))
 
     def test_HiddenCharactersAndOldSyntax(self):
         tm = 'attributes\ntry: -b o -p linux64 -m none -u reftest -t none'
