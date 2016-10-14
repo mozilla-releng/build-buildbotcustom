@@ -3459,7 +3459,10 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             haltOnFailure=True,
         ))
         printconfig_env = self.env.copy()
-        printconfig_env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build')})
+        printconfig_env.update({
+            'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' +
+                                           self.branchName)
+            })
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
@@ -3477,7 +3480,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             WithProperties(machPath), 'python',
             # abs*Dir attrs lie. they are not absolute paths
             WithProperties('%(basedir)s/' + '%s/config/printconfigsetting.py' % self.absMozillaSrcDir),
-            WithProperties('%(basedir)s/' + self.absMozillaObjDir + '%(inipath)s')
+            WithProperties('%(basedir)s/' + self.absMozillaObjDir + '/%(inipath)s')
         ]
         self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'BuildID'],
@@ -3485,6 +3488,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             workdir=printconfig_workdir,
             env=printconfig_env,
             property='buildid',
+            description=['getting', 'buildid'],
+            descriptionDone=['got', 'buildid'],
         ))
         self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'Version'],
@@ -3492,6 +3497,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='get_app_version',
             workdir=printconfig_workdir,
             env=printconfig_env,
+            description=['getting', 'appVersion'],
+            descriptionDone=['got', 'appVersion'],
         ))
         self.addStep(SetProperty(
             command=printconfig_base_command + ['App', 'Name'],
@@ -3499,6 +3506,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             name='get_app_name',
             workdir=printconfig_workdir,
             env=printconfig_env,
+            description=['getting', 'appName'],
+            descriptionDone=['got', 'appName'],
         ))
 
         if self.l10nNightlyUpdate:
