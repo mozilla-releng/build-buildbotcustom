@@ -531,11 +531,7 @@ class TestTryParser(unittest.TestCase):
         expectedBuilders = ['Windows 8 64-bit try opt test reftest',
                             'Windows XP 32-bit try opt test reftest',
                            ]
-        # The proper behaviour is to have these lists be equal
-        # To reproduce the bug, first test that the results are unequal
-        # Unfortunately trial doesn't handle the unittest.expectedFailure
-        # decorator
-        self.assertNotEqual(sorted(customBuilders), sorted(expectedBuilders))
+        self.assertEqual(sorted(customBuilders), sorted(expectedBuilders))
 
     def test_HiddenCharactersAndOldSyntax(self):
         tm = 'attributes\ntry: -b o -p linux64 -m none -u reftest -t none'
