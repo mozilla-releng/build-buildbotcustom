@@ -366,9 +366,7 @@ def TryParser(
     # included in -p all
     default_platforms = set()
     if unittestSuites or talosSuites:
-        for p in all_platforms:
-            default_platforms.update(
-                [p for n in prettyNames[p] if 'try-nondefault' not in n])
+        default_platforms = prettyNames.keys()
     else:
         defaultPrettyNames = dict([(k, v)
                                    for k, v in prettyNames.iteritems()
