@@ -1011,7 +1011,7 @@ def generateBranchObjects(config, name, secrets=None):
 
     tipsOnly = False
     maxChanges = 100
-    if config.get('enable_try', False):
+    if config.get('watch_all_branches'):
         # Pay attention to all branches for pushes to try
         repo_branch = None
     else:
