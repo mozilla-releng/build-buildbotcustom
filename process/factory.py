@@ -3470,10 +3470,9 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         machPath = '%(basedir)s/' + self.absMozillaSrcDir + '/mach'
         python = [WithProperties('%(basedir)s/' +
                   '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
-
-        # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
         if self.platform.startswith('win'):
-            python = ['c:/mozilla-build/python27/python', '-u']
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/Scripts/python' % self.absMozillaObjDir)]
 
         # we need abs paths because we are in a non relative workdir
         printconfig_base_command = python + [
