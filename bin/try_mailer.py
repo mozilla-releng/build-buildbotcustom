@@ -71,9 +71,9 @@ def makeTryMessage(build, log_url):
     tree = props['branch']
 
     if 'got_revision' in props:
-        revision = props['got_revision'][:12]
+        revision = props['got_revision']
     elif 'revision' in props:
-        revision = props['revision'][:12]
+        revision = props['revision']
     else:
         revision = 'unknown'
 

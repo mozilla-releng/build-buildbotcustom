@@ -209,6 +209,7 @@ def lastGoodRev(db, t, branch, builderNames, starttime, endtime):
 
 def getLatestRev(db, t, branch, revs):
     """Returns whichever of revs has the latest when_timestamp"""
+    # Retain short revs here as these are queries to a database
     # Strip out duplicates
     short_revs = set(r[:12] for r in revs)
     if len(short_revs) == 1:
