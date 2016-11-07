@@ -230,13 +230,6 @@ def parse_make_upload(rc, stdout, stderr):
     return retval
 
 
-def short_hash(rc, stdout, stderr):
-    ''' This function takes an hg changeset id and returns just the first 12 chars'''
-    retval = {}
-    retval['got_revision'] = stdout[:12]
-    return retval
-
-
 def get_signing_cmd(signingServers, python):
     if not python:
         python = 'python'
@@ -1198,7 +1191,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
             self.addStep(SetProperty(
                 name='set_got_revision',
                 command=['hg', 'parent', '--template={node}'],
-                extract_fn=short_hash
+                property='got_revision'
             ))
         else:
             self.addStep(Mercurial(
@@ -1790,7 +1783,7 @@ class TryBuildFactory(MercurialBuildFactory):
         self.addStep(SetProperty(
                      name='set_got_revision',
                      command=['hg', 'parent', '--template={node}'],
-                     extract_fn=short_hash
+                     property='got_revision'
                      ))
         self.addStep(SetBuildProperty(
             name='set_comments',
