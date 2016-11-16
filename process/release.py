@@ -1001,15 +1001,15 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 "--build-number", releaseConfig["buildNumber"],
                 "--bucket-name-prefix", branchConfig["bucket_prefix"],
                 "--credentials", releaseConfig["S3Credentials"],
-                "--tools-repo", branchConfig["platforms"]["linux64"]["tools_repo_cache"],
             ] + extra_extra_args,
             relengapi_archiver_repo_path=relengapi_archiver_repo_path,
             relengapi_archiver_release_tag=releaseTag,
         )
+        env = builder_env.copy()
+        env.update(branchConfig['platforms']['linux64']['env'])
         builders.append({
             'name': builderPrefix('%s_checksums' % releaseConfig['productName']),
-            'slavenames': branchConfig['platforms']['linux']['slaves'] +
-            branchConfig['platforms']['linux64']['slaves'],
+            'slavenames': branchConfig['platforms']['linux64']['slaves'],
             'category': builderPrefix(''),
             'builddir': builderPrefix(
                 '%s_checksums' % releaseConfig['productName']),
@@ -1017,7 +1017,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 builderPrefix(
                     '%s_checksums' % releaseConfig['productName']), releaseConfig['productName']),
             'factory': checksums_factory,
-            'env': builder_env,
+            'env': env,
             'properties': {
                 'slavebuilddir': normalizeName(builderPrefix(
                     '%s_checksums' % releaseConfig['productName'])),
