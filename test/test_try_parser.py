@@ -142,30 +142,26 @@ class TestTryParser(unittest.TestCase):
         self.assertEqual(sorted(self.customBuilders), [])
 
     def test_JunkMessageBuilders(self):
-        # Should get default set with junk input
+        # Should get empty set with junk input
         tm = "try: junk"
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = self.removeNondefaults(
-            VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+        self.assertEqual(sorted(self.customBuilders), [])
 
     def test_JunkMessageTesters(self):
-        # Should get default set with junk input to the test masters
+        # Should get empty set with junk input to the test masters
         tm = "try: junk"
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [b for b in VALID_TESTER_NAMES if 'talos' not in b]
         builders = self.removeNondefaults(builders, TESTER_PRETTY_NAMES)
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+        self.assertEqual(sorted(self.customBuilders), [])
 
     def test_JunkBuildMessage(self):
-        # Should get default set with junk input for --build
+        # Should get empty set with junk input for --build
         tm = "try: -b k -p linux"
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = dictslice(
-            BUILDER_PRETTY_NAMES, ['linux', 'linux-debug']).values()
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+        self.assertEqual(sorted(self.customBuilders), [])
 
     def test_DebugOnlyBuild(self):
         tm = "try: -b d -p linux64,linux"
@@ -264,20 +260,6 @@ class TestTryParser(unittest.TestCase):
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = self.filterTesters(['macosx64'])
         builders = [b for b in builders if 'talos' not in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_AllOnTestMaster(self):
-        tm = 'try: -a'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [n for n in VALID_TESTER_NAMES if 'talos' not in n]
-        builders = self.removeNondefaults(builders, TESTER_PRETTY_NAMES)
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_AllOnTestMasterCC(self):
-        tm = 'try: -a'
-        self.customBuilders = TryParser(tm, VALID_TESTER_TB_NAMES, TESTER_PRETTY_TB_NAMES, None, UNITTEST_SUITES_TB, None, "try-comm-central")
-        builders = VALID_TESTER_TB_NAMES
-        builders = self.removeNondefaults(builders, TESTER_PRETTY_TB_NAMES)
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_MochitestAliasesOnBuilderMaster(self):
@@ -537,28 +519,6 @@ class TestTryParser(unittest.TestCase):
         tm = 'attributes\ntry: -b o -p linux64 -m none -u reftest -t none'
         self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = [BUILDER_PRETTY_NAMES['linux64']]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_NoBuildTypeSelected(self):
-        tm = 'try: -m none -u crashtest -p win32'
-        # should get both build types for the selected platform
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [BUILDER_PRETTY_NAMES['win32'],
-                    BUILDER_PRETTY_NAMES['win32-debug']]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-        # should get debug win32 in the builder_master test builders
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = self.filterBuilders(['win32-debug'],
-                                       pretties=UNITTEST_PRETTY_NAMES,
-                                       valid=VALID_BUILDER_NAMES + VALID_UPN)
-        builders = [t for t in builders if 'crashtest' in t]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-        # should get both build types in test_builders
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = self.filterTesters(['win32', 'win32-debug'])
-        builders = [t for t in builders if 'crashtest' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def _testNewLineProcessMessage(self, message, value=None):

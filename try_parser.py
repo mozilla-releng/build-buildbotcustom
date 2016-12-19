@@ -294,7 +294,6 @@ def TryParser(
                                      that need schedulers.')
 
     parser.add_argument('--build', '-b',
-                        default='do',
                         dest='build',
                         help='accepts the build types requested')
     parser.add_argument('--platform', '-p',
@@ -317,8 +316,6 @@ def TryParser(
 
     (options, unknown_args) = parser.parse_known_args(message)
 
-    # Build options include a possible override of 'all' to get a buildset
-    # that matches m-c
     if options.build == 'do' or options.build == 'od':
         options.build = ['opt', 'debug']
     elif options.build == 'd':
@@ -326,8 +323,8 @@ def TryParser(
     elif options.build == 'o':
         options.build = ['opt']
     else:
-        # for any input other than do/od, d, o, all set to default
-        options.build = ['opt', 'debug']
+        # If known build options aren't given, don't build anything
+        return []
 
     if buildersWithSetsMap and type(buildersWithSetsMap) is dict:
         # The TryChooser user has set a comma separated list of test suites
