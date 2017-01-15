@@ -1248,8 +1248,6 @@ def generateBranchObjects(config, name, secrets=None):
                     'repo_path': config['repo_path'],
                     'script_repo_revision': pf.get('mozharness_tag', config['mozharness_tag']),
                     'hgurl': config.get('hgurl'),
-                    'base_mirror_urls': config.get('base_mirror_urls'),
-                    'base_bundle_urls': config.get('base_bundle_urls'),
                     'tooltool_url_list': config.get('tooltool_url_list'),
                     'mock_target': pf.get('mock_target'),
                     'upload_ssh_server': config.get('stage_server'),
@@ -1441,8 +1439,6 @@ def generateBranchObjects(config, name, secrets=None):
                     'l10nCheckTest': pf.get('l10n_check_test', False),
                     'post_upload_include_platform': pf.get('post_upload_include_platform', False),
                     'signingServers': secrets.get(pf.get('dep_signing_servers')),
-                    'baseMirrorUrls': config.get('base_mirror_urls'),
-                    'baseBundleUrls': config.get('base_bundle_urls'),
                     'mozillaDir': config.get('mozilla_dir', None),
                     'mozillaSrcDir': config.get('mozilla_srcdir', None),
                     'tooltool_manifest_src': pf.get('tooltool_manifest_src'),
@@ -1681,8 +1677,6 @@ def generateBranchObjects(config, name, secrets=None):
                     post_upload_include_platform=pf.get(
                         'post_upload_include_platform', False),
                     signingServers=secrets.get(pf.get('nightly_signing_servers')),
-                    baseMirrorUrls=config.get('base_mirror_urls'),
-                    baseBundleUrls=config.get('base_bundle_urls'),
                     mozillaDir=config.get('mozilla_dir', None),
                     mozillaSrcDir=config.get('mozilla_srcdir', None),
                     tooltool_manifest_src=pf.get('tooltool_manifest_src'),
@@ -1772,7 +1766,6 @@ def generateBranchObjects(config, name, secrets=None):
                         mozillaSrcDir=config.get('mozilla_srcdir', None),
                         signingServers=secrets.get(
                             pf.get('nightly_signing_servers')),
-                        baseMirrorUrls=config.get('base_mirror_urls'),
                         extraConfigureArgs=config.get(
                             'l10n_extra_configure_args', []),
                         buildsBeforeReboot=pf.get('builds_before_reboot', 0),
@@ -2321,25 +2314,6 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
     return branchObjects
 
 
-def mirrorAndBundleArgs(config):
-    args = []
-    mirrors = None
-    if config.get('base_mirror_urls'):
-        mirrors = ["%s/%s" % (url, config['repo_path'])
-                   for url in config['base_mirror_urls']]
-    if mirrors:
-        for mirror in mirrors:
-            args.extend(["--mirror", mirror])
-    bundles = None
-    if config['base_bundle_urls']:
-        bundles = ["%s/%s.hg" % (url, config['repo_path'].rstrip(
-            '/').split('/')[-1]) for url in config['base_bundle_urls']]
-    if bundles:
-        for bundle in bundles:
-            args.extend(["--bundle", bundle])
-    return args
-
-
 def generatePeriodicFileUpdateBuilder(config, branch_name, platform, base_name, slaves):
     pf = config['platforms'].get(platform, {})
     extra_args = ['-b', config['repo_path']]
@@ -2472,7 +2446,6 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
 
             extra_args = ['-r', WithProperties("%(revision)s")]
             extra_args += ['--platform', platform]  # distinguish win64
-            extra_args += mirrorAndBundleArgs(bconfig)
             extra_args += [variant]
             extra_args += ['--ttserver',
                            'https://api.pub.build.mozilla.org/tooltool/']
