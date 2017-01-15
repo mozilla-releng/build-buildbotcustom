@@ -397,7 +397,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
     def __init__(self, hgHost, repoPath, buildToolsRepoPath, buildSpace=0,
                  clobberURL=None, clobberBranch=None, clobberTime=None,
                  buildsBeforeReboot=None, branchName=None, baseWorkDir='build',
-                 hashType='sha512', baseMirrorUrls=None, baseBundleUrls=None,
+                 hashType='sha512',
                  signingServers=None, enableSigning=True, env={},
                  balrog_api_root=None, balrog_credentials_file=None,
                  balrog_submitter_extra_args=None, balrog_username=None,
@@ -417,8 +417,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
         self.buildsBeforeReboot = buildsBeforeReboot
         self.baseWorkDir = baseWorkDir
         self.hashType = hashType
-        self.baseMirrorUrls = baseMirrorUrls
-        self.baseBundleUrls = baseBundleUrls
         self.signingServers = signingServers
         self.enableSigning = enableSigning
         self.env = env.copy()
@@ -714,8 +712,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
             extract_fn=self.unsetFilepath,
         ))
 
-    def makeHgtoolStep(self, name='hg_update', repo_url=None, wc=None,
-                       mirrors=None, bundles=None, env=None,
+    def makeHgtoolStep(self, name='hg_update', repo_url=None, wc=None, env=None,
                        clone_by_revision=False, rev=None, workdir='build',
                        use_properties=True, locks=None, autoPurge=False):
 
@@ -731,22 +728,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin):
 
         if clone_by_revision:
             cmd.append('--clone-by-revision')
-
-        if mirrors is None and self.baseMirrorUrls:
-            mirrors = ["%s/%s" % (url, self.repoPath)
-                       for url in self.baseMirrorUrls]
-
-        if mirrors:
-            for mirror in mirrors:
-                cmd.extend(["--mirror", mirror])
-
-        if bundles is None and self.baseBundleUrls:
-            bundles = ["%s/%s.hg" % (url, self.getRepoName(
-                self.repository)) for url in self.baseBundleUrls]
-
-        if bundles:
-            for bundle in bundles:
-                cmd.extend(["--bundle", bundle])
 
         if not repo_url:
             repo_url = self.repository
@@ -2948,9 +2929,6 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         )
         self.addStep(step)
 
-        mirrors = []
-        if self.baseMirrorUrls:
-            mirrors = [WithProperties(url + "/" + self.l10nRepoPath + "/%(locale)s") for url in self.baseMirrorUrls]
         step = self.makeHgtoolStep(
             name='get_locale_src',
             rev=WithProperties("%(l10n_revision)s"),
@@ -2959,7 +2937,6 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             workdir='%s/l10n' % self.baseWorkDir,
             locks=[hg_l10n_lock.access('counting')],
             use_properties=False,
-            mirrors=mirrors,
         )
         self.addStep(step)
 
