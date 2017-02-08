@@ -1051,7 +1051,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin, TooltoolMixin):
                 command=['bash', '-c',
                          'wget -Oarchiver_client.py ' +
                          '--no-check-certificate --tries=10 --waitretry=3 ' +
-                         'http://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
+                         'https://hg.mozilla.org/build/tools/raw-file/default/buildfarm/utils/archiver_client.py'],
                 haltOnFailure=True,
                 workdir='.',
             ))

@@ -6,7 +6,6 @@ from collections import defaultdict
 import os
 import re
 import hashlib
-from distutils.version import LooseVersion
 
 from buildbot.process.buildstep import regex_log_evaluator
 from buildbot.scheduler import Scheduler, Dependent
@@ -537,16 +536,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     partialUpdates = releaseConfig.get('partialUpdates', {}).copy()
 
     for platform in releaseConfig['enUSPlatforms']:
-        # FIXME: the follwong hack can be removed when win64 has the same list
-        # of partial update as other platforms. Check mozilla-esr38 to be sure.
-        if platform in releaseConfig.get('HACK_first_released_version', {}):
-            partialUpdates_hacked = {
-                k: v for k, v in partialUpdates.iteritems() if
-                LooseVersion(k) >= LooseVersion(releaseConfig['HACK_first_released_version'][platform])
-            }
-        else:
-            partialUpdates_hacked = partialUpdates
-        # FIXME: end of hack
         # shorthand
         pf = branchConfig['platforms'][platform]
         mozconfig = '%s/%s/release' % (platform, sourceRepoInfo['name'])
@@ -609,7 +598,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 version=releaseConfig['version'],
                 appVersion=releaseConfig['appVersion'],
                 buildNumber=releaseConfig['buildNumber'],
-                partialUpdates=partialUpdates_hacked,  # FIXME: hack
+                partialUpdates=partialUpdates,
                 talosMasters=talosMasters,
                 packageTests=packageTests,
                 packageSDK=releaseConfig.get('packageSDK', False),
@@ -1037,11 +1026,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         if not updateConfig.get("enabled", True):
             continue
         pf = branchConfig['platforms']['linux']
-        try:
-            moz_repo_path = releaseConfig[
-                'sourceRepositories']['mozilla']['path']
-        except KeyError:
-            moz_repo_path = sourceRepoInfo['path']
         balrog_credentials_file = releaseConfig.get('balrog_credentials_file',
                                                     branchConfig.get('balrog_credentials_file', None))
 
@@ -1732,20 +1716,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             changeContainsProduct(c, releaseConfig['productName']) and
             changeContainsScriptRepoRevision(c, releaseTag)
         ))
-    for recipient in releaseConfig['ImportantRecipients']:
-        if hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
-            # send a message when android signing is complete
-            status.append(ChangeNotifier(
-                fromaddr="release@mozilla.com",
-                sendToInterestedUsers=False,
-                extraRecipients=[recipient],
-                extraHeaders={'In-Reply-To': email_message_id,
-                              'References': email_message_id},
-                branches=[builderPrefix('android_post_signing')],
-                messageFormatter=createReleaseChangeMessage,
-                changeIsImportant=lambda c:
-                changeContainsProperties(c, dict(who=enUS_signed_apk_url))
-            ))
 
     non_ui_update_verify_builders = [b["name"] for b in builders[:] if "ui_update_verify" not in b["name"]]
     non_ui_update_verify_builders.extend([b["name"] for b in test_builders])
