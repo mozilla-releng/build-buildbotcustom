@@ -3829,7 +3829,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             mar += '.exe'
             mbsdiff += '.exe'
         
-        baseURL = 'http://%s' % self.stageServer + \
+        baseURL = 'http://%s' % self.archiveServer + \
                   '/pub/%s' % self.productName + \
                   '/nightly/latest-%s' % self.branchName + \
                   '/mar-tools/%s' % self.platform
@@ -5349,6 +5349,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
                  stagingUploadServer ,s3bucket, s3credentials,
                  stageUsername, stageSshKey, ausUser, ausSshKey, ausHost,
                  ausServerUrl, hgSshKey, hgUsername, releaseChannel='release',
+                 candidatesPathName='nightly',
                  commitPatcherConfig=True, mozRepoPath=None, oldRepoPath=None,
                  brandName=None, buildSpace=22, triggerSchedulers=None,
                  releaseNotesUrl=None, binaryName=None, oldBinaryName=None,
@@ -5404,6 +5405,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.ftpServer = ftpServer
         self.bouncerServer = bouncerServer
         self.stagingServer = stagingServer
+        self.candidatesPathName = candidatesPathName
         self.stageUsername = stageUsername
         self.stageSshKey = stageSshKey
         self.stagingUploadServer = stagingUploadServer
@@ -5436,10 +5438,11 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.oldShippedLocales = self.getShippedLocales(self.oldRepository,
                                                         self.oldBaseTag,
                                                         self.appName)
-        self.candidatesDir = self.getCandidatesDir(productName, version, buildNumber)
+        self.candidatesDir = self.getCandidatesDir(productName, version, buildNumber,
+                                                   nightlyDir=candidatesPathName)
         self.updateDir = 'build/temp/%s/%s-%s' % (productName, oldVersion, version)
-        self.marDir = '%s/ftp/%s/nightly/%s-candidates/build%s' % \
-          (self.updateDir, productName, version, buildNumber)
+        self.marDir = '%s/ftp/%s/%s/%s-candidates/build%s' % \
+          (self.updateDir, productName, candidatesPathName, version, buildNumber)
 
         self.origSrcDir = self.branchName
         self.mozillaDir = 'mozilla'
@@ -5684,9 +5687,9 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         mar = 'mar'
         mbsdiff = 'mbsdiff'
 
-        baseURL = 'http://%s' % self.stagingServer + \
+        baseURL = 'http://%s' % self.ftpServer + \
                   '/pub/%s' % self.productName + \
-                  '/nightly/%s-candidates' % self.version + \
+                  '/%s/%s-candidates' % (self.candidatesPathName, self.version) + \
                   '/build%s/mar-tools/%s' % (self.buildNumber, 'linux')
         marURL = '%s/%s' % (baseURL, mar)
         mbsdiffURL = '%s/%s' % (baseURL, mbsdiff)
@@ -7178,7 +7181,9 @@ class L10nVerifyFactory(ReleaseFactory):
                  buildNumber, oldVersion, oldBuildNumber,
                  platform, verifyDir='verify', linuxExtension='bz2',
                  buildSpace=4, use_mock=False, mock_target=None,
-                 mock_packages=None, mock_copyin_files=None, **kwargs):
+                 mock_packages=None, mock_copyin_files=None,
+                 candidatesPathName='nightly',
+                 bucketName=None, **kwargs):
         # MozillaBuildFactory needs the 'repoPath' argument, but we don't
         self.use_mock = use_mock
         self.mock_target = mock_target
@@ -7190,8 +7195,11 @@ class L10nVerifyFactory(ReleaseFactory):
                                 mock_copyin_files=self.mock_copyin_files,
                                 **kwargs)
 
-        verifyDirVersion = 'tools/release/l10n'
-        platformFtpDir = getPlatformFtpDir(platform)
+        self.bucketName = bucketName
+        self.productName = productName
+        self.candidatesPathName = candidatesPathName
+        self.verifyDirVersion = 'tools/release/l10n'
+        self.platformFtpDir = getPlatformFtpDir(platform)
 
         # Remove existing verify dir
         self.addStep(MockCommand(
@@ -7209,95 +7217,21 @@ class L10nVerifyFactory(ReleaseFactory):
          name='mkdir_verify',
          description=['(re)create', 'verify', 'dir'],
          descriptionDone=['(re)created', 'verify', 'dir'],
-         command=['bash', '-c', 'mkdir -p ' + verifyDirVersion],
+         command=['bash', '-c', 'mkdir -p ' + self.verifyDirVersion],
          workdir='.',
          haltOnFailure=True,
          mock=self.use_mock,
          target=self.mock_target,
         ))
 
-        # Download current release
-        self.addStep(RetryingMockCommand(
-         name='download_current_release',
-         description=['download', 'current', 'release'],
-         descriptionDone=['downloaded', 'current', 'release'],
-         command=['rsync',
-                  '-Lav',
-                  '-e', 'ssh',
-                  '--exclude=*.asc',
-                  '--exclude=*.checksums',
-                  '--exclude=source',
-                  '--exclude=xpi',
-                  '--exclude=unsigned',
-                  '--exclude=update',
-                  '--exclude=*.crashreporter-symbols.zip',
-                  '--exclude=*.tests.zip',
-                  '--exclude=*.tests.tar.bz2',
-                  '--exclude=*.txt',
-                  '--exclude=logs',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
-                   (stagingServer, productName, version, str(buildNumber),
-                    platformFtpDir),
-                  '%s-%s-build%s/' % (productName,
-                                      version,
-                                      str(buildNumber))
-                  ],
-         workdir=verifyDirVersion,
-         haltOnFailure=True,
-         timeout=60*60,
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
+        curProduct = self.download_release('current', version, buildNumber)
+        prevProduct = self.download_release('previous', oldVersion, oldBuildNumber)
 
-        # Download previous release
-        self.addStep(RetryingMockCommand(
-         name='download_previous_release',
-         description=['download', 'previous', 'release'],
-         descriptionDone =['downloaded', 'previous', 'release'],
-         command=['rsync',
-                  '-Lav',
-                  '-e', 'ssh',
-                  '--exclude=*.asc',
-                  '--exclude=*.checksums',
-                  '--exclude=source',
-                  '--exclude=xpi',
-                  '--exclude=unsigned',
-                  '--exclude=update',
-                  '--exclude=*.crashreporter-symbols.zip',
-                  '--exclude=*.tests.zip',
-                  '--exclude=*.tests.tar.bz2',
-                  '--exclude=*.txt',
-                  '--exclude=logs',
-                  '%s:/home/ftp/pub/%s/nightly/%s-candidates/build%s/%s' %
-                   (stagingServer,
-                    productName,
-                    oldVersion,
-                    str(oldBuildNumber),
-                    platformFtpDir),
-                  '%s-%s-build%s/' % (productName,
-                                      oldVersion,
-                                      str(oldBuildNumber))
-                  ],
-         workdir=verifyDirVersion,
-         haltOnFailure=True,
-         timeout=60*60,
-         mock=self.use_mock,
-         target=self.mock_target,
-        ))
-
-        currentProduct = '%s-%s-build%s' % (productName,
-                                            version,
-                                            str(buildNumber))
-        previousProduct = '%s-%s-build%s' % (productName,
-                                             oldVersion,
-                                             str(oldBuildNumber))
-
-        for product in [currentProduct, previousProduct]:
+        for product in [curProduct, prevProduct]:
             self.addStep(MockCommand(
                          name='recreate_product_dir',
                          description=['(re)create', 'product', 'dir'],
-                         descriptionDone=['(re)created', 'product', 'dir'],
-                         command=['bash', '-c', 'mkdir -p %s/%s' % (verifyDirVersion, product)],
+                         command=['bash', '-c', 'mkdir -p %s/%s' % (self.verifyDirVersion, product)],
                          workdir='.',
                          haltOnFailure=True,
                          mock=self.use_mock,
@@ -7309,18 +7243,56 @@ class L10nVerifyFactory(ReleaseFactory):
                          descriptionDone=['verified', 'l10n', product],
                          command=["bash", "-c",
                                   "./verify_l10n.sh %s %s" % (product,
-                                                              platformFtpDir)],
-                         workdir=verifyDirVersion,
+                                                              self.platformFtpDir)],
+                         workdir=self.verifyDirVersion,
                          haltOnFailure=True,
                          mock=self.use_mock,
                          target=self.mock_target,
             ))
 
-        self.addStep(L10nVerifyMetaDiff(
-                     currentProduct=currentProduct,
-                     previousProduct=previousProduct,
-                     workdir=verifyDirVersion,
+    def download_release(self, which_rel, versionnum, buildnum):
+        s3_param = '%s/pub/%s/%s/%s-candidates/build%s/%s/' % (
+          self.bucketName, self.productName, self.candidatesPathName,
+          versionnum, str(buildnum), self.platformFtpDir)
+        to_dir_param = '%s-%s-build%s' % (self.productName, versionnum,
+                                          str(buildnum))
+
+        tmpEnv = self.env.copy()
+        if 'PATH' in tmpEnv.keys():
+            pathenv = '/Users/seabld/.local/lib/aws/bin:%s' % tmpEnv['PATH']
+        else:
+            pathenv = '/Users/seabld/.local/lib/aws/bin:/tools/python27/bin:' + \
+                      '/usr/local/bin:/usr/lib64/ccache:/usr/local/bin:/bin:' + \
+                      '/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/home/seabld/bin'
+
+        tmpEnv.update({'PATH': pathenv})
+
+        self.addStep(ShellCommand(
+         name='download_%s_release' % which_rel,
+         description=['download', which_rel, 'release'],
+         descriptionDone=['downloaded', which_rel, 'release'],
+         command=['/Users/seabld/.local/lib/aws/bin/aws',
+                  's3',
+                  'sync',
+                  's3://%s' % s3_param,
+                  '%s/%s/' % (to_dir_param, self.platformFtpDir),
+                  '--exclude=*.asc',
+                  '--exclude=*.checksums',
+                  '--exclude=source',
+                  '--exclude=xpi',
+                  '--exclude=unsigned',
+                  '--exclude=update',
+                  '--exclude=*.crashreporter-symbols.zip',
+                  '--exclude=*.tests.zip',
+                  '--exclude=*.tests.tar.bz2',
+                  '--exclude=*.txt',
+                  '--exclude=logs',
+                  ],
+         workdir=self.verifyDirVersion,
+         haltOnFailure=True,
+         timeout=60*60,
         ))
+        return to_dir_param
 
 
 def parse_sendchange_files(build, include_substr='', exclude_substrs=[]):
