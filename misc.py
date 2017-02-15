@@ -1866,38 +1866,34 @@ def generateCCBranchObjects(config, name, secrets=None):
         l10n_binaryURL += "-l10n"
         nomergeBuilders.extend(l10n_builders)
 
-    # Skip https repos until bug 592060 is fixed and we have a https-capable HgPoller
-    if config['hgurl'].startswith('https:'):
-        pass
+    if config.get('enable_try', False):
+        tipsOnly = True
+        # Pay attention to all branches for pushes to try
+        repo_branch = None
     else:
-        if config.get('enable_try', False):
-            tipsOnly = True
-            # Pay attention to all branches for pushes to try
-            repo_branch = None
-        else:
-            tipsOnly = True
-            # Other branches should only pay attention to the default branch
-            repo_branch = "default"
+        tipsOnly = True
+        # Other branches should only pay attention to the default branch
+        repo_branch = "default"
 
-        branchObjects['change_source'].append(HgPoller(
-            hgURL=config['hgurl'],
-            branch=config['repo_path'],
-            tipsOnly=tipsOnly,
-            repo_branch=repo_branch,
-            pollInterval=pollInterval,
-            storeRev="polled_comm_revision",
-        ))
-        # for Mozilla tree, need valid branch, so override pushlog URL
-        branchObjects['change_source'].append(HgPoller(
-            hgURL=config['hgurl'],
-            branch=config['repo_path'],
-            pushlogUrlOverride='%s/%s/json-pushes?full=1' % (config['hgurl'],
-                                                  config['mozilla_repo_path']),
-            tipsOnly=tipsOnly,
-            repo_branch=repo_branch,
-            pollInterval=pollInterval,
-            storeRev="polled_moz_revision",
-        ))
+    branchObjects['change_source'].append(HgPoller(
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        tipsOnly=tipsOnly,
+        repo_branch=repo_branch,
+        pollInterval=pollInterval,
+        storeRev="polled_comm_revision",
+    ))
+    # for Mozilla tree, need valid branch, so override pushlog URL
+    branchObjects['change_source'].append(HgPoller(
+        hgURL=config['hgurl'],
+        branch=config['repo_path'],
+        pushlogUrlOverride='%s/%s/json-pushes?full=1' % (config['hgurl'],
+                                              config['mozilla_repo_path']),
+        tipsOnly=tipsOnly,
+        repo_branch=repo_branch,
+        pollInterval=pollInterval,
+        storeRev="polled_moz_revision",
+    ))
 
     if config['enable_l10n'] and config['enable_l10n_onchange']:
         hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
