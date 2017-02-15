@@ -11,7 +11,7 @@ def buildTryChangeMessage(change, packageDir):
                           "References": "<try-%(revision)s>" % locals(),
                           }
     msgdict["body"] = """\
-Thanks for your try submission (http://hg.mozilla.org/try/pushloghtml?changeset=%(revision)s).  It's the best!
+Thanks for your try submission (https://hg.mozilla.org/try/pushloghtml?changeset=%(revision)s).  It's the best!
 
 Watch https://tbpl.mozilla.org/?tree=Try&rev=%(revision)s for your results to come in.
 

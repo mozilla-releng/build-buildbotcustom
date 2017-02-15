@@ -294,7 +294,7 @@ class MozillaTryServerHgClone(Mercurial):
     haltOnFailure = True
     flunkOnFailure = True
     
-    def __init__(self, baseURL="http://hg.mozilla.org/", mode='clobber',
+    def __init__(self, baseURL="https://hg.mozilla.org/", mode='clobber',
                  defaultBranch='mozilla-central', timeout=3600, **kwargs):
         # repourl overridden in startVC
         Mercurial.__init__(self, baseURL=baseURL, mode=mode,

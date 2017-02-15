@@ -4489,11 +4489,11 @@ class ReleaseTaggingFactory(ReleaseFactory):
             repositories[name]['relbranchOverride']: branch name
             repositories[name]['bumpFiles']: [filesToBump]
            eg:
-            repositories['http://hg.mozilla.org/mozilla-central']['revision']:
+            repositories['https://hg.mozilla.org/mozilla-central']['revision']:
               d6a0a4fca081
-            repositories['http://hg.mozilla.org/mozilla-central']['relbranchOverride']:
+            repositories['https://hg.mozilla.org/mozilla-central']['relbranchOverride']:
               GECKO191_20080828_RELBRANCH
-            repositories['http://hg.mozilla.org/mozilla-central']['bumpFiles']:
+            repositories['https://hg.mozilla.org/mozilla-central']['bumpFiles']:
               ['client.mk', 'browser/config/version.txt',
                'js/src/config/milestone.txt', 'config/milestone.txt']
             relbranchOverride is typically used in two situations:
@@ -6447,7 +6447,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         )
 
     def addPrintChangesetStep(self):
-        changesetLink = ''.join(['<a href=http://hg.mozilla.org/',
+        changesetLink = ''.join(['<a href=https://hg.mozilla.org/',
             self.repoPath,
             '/rev/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'])
         self.addStep(OutputStep(
@@ -8955,7 +8955,7 @@ class PartnerRepackFactory(ReleaseFactory):
             self.addStep(ShellCommand(
                 name='download_pkg-dmg',
                 command=['bash', '-c',
-                         'wget http://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
+                         'wget https://hg.mozilla.org/%s/raw-file/%s/build/package/mac_osx/pkg-dmg' % (self.repoPath, self.releaseTag)],
                 description=['download', 'pkg-dmg'],
                 workdir='%s/scripts' % self.partnersRepackDir,
                 haltOnFailure=True,
