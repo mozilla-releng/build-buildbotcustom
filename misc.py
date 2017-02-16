@@ -91,6 +91,7 @@ _product_excludes = {
         re.compile('^b2g/'),
         re.compile('^build/mobile'),
         re.compile('^mobile/'),
+        re.compile('^servo/'),
         re.compile('^testing/mochitest/runrobocop.py')
     ],
     'mobile': [
