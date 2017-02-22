@@ -2403,7 +2403,7 @@ def generateFuzzingObjects(config, SLAVES):
     fuzzing_scheduler = PersistentScheduler(
         name="fuzzer",
         builderNames=[b['name'] for b in builders],
-        numPending=2,
+        numPending=0,
         pollInterval=300,  # Check every 5 minutes
     )
     return {
