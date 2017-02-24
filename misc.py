@@ -2497,6 +2497,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         ausUser=config['aus2_user'],
                         ausSshKey=config['aus2_ssh_key'],
                         ausHost=config['aus2_host'],
+                        archiveServer=config['archive_server'],
                         hashType=config['hash_type'],
                         stageServer=config['stage_server'],
                         stageUsername=config['stage_username'],

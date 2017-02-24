@@ -3643,6 +3643,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                  tooltool_script=None,
                  tooltool_bootstrap=None,
                  tooltool_token=None,
+                 archiveServer=None,
                  **kwargs):
         self.nightly = nightly
         self.l10nNightlyUpdate = l10nNightlyUpdate
@@ -3722,6 +3723,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                    tooltool_script=tooltool_script,
                                    tooltool_bootstrap=tooltool_bootstrap,
                                    tooltool_token=tooltool_token,
+                                   archiveServer=archiveServer,
                                    **kwargs)
 
         if l10nNightlyUpdate:
@@ -3829,7 +3831,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             mar += '.exe'
             mbsdiff += '.exe'
         
-        baseURL = 'http://%s' % self.archiveServer + \
+        baseURL = 'https://%s' % self.archiveServer + \
                   '/pub/%s' % self.productName + \
                   '/nightly/latest-%s' % self.branchName + \
                   '/mar-tools/%s' % self.platform
