@@ -990,6 +990,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 "--build-number", releaseConfig["buildNumber"],
                 "--bucket-name-prefix", branchConfig["bucket_prefix"],
                 "--credentials", releaseConfig["S3Credentials"],
+                "--format", "sha512",  # Hardcode sha512 for old automation
             ] + extra_extra_args,
             relengapi_archiver_repo_path=relengapi_archiver_repo_path,
             relengapi_archiver_release_tag=releaseTag,
