@@ -83,6 +83,7 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'ubuntu64': 'ub64',
         'ubuntu32': 'ub32',
         'repack': 'rpk',
+        'repacks': 'rpks',
         'alder': 'a',
         'holly': 'h',
         'larch': 'l',
