@@ -5201,7 +5201,6 @@ class CCSourceFactory(ReleaseFactory):
         self.env['MOZ_PKG_PRETTYNAMES'] = '1'
         self.env['MOZ_PKG_VERSION'] = version
         self.env['MOZ_PKG_APPNAME'] = productName
-        self.env['no_tooltool'] = "1"
 
         releaseTag = '%s_RELEASE' % (baseTag)
         sourceTarball = 'source/%s-%s.source.tar.bz2' % (productName,
