@@ -224,6 +224,8 @@ def parse_make_upload(rc, stdout, stderr):
             retval['robocopApkUrl'] = m
         elif 'jsshell-' in m and m.endswith('.zip'):
             retval['jsshellUrl'] = m
+        elif m.endswith('mozharness.zip'):
+            retval['mozharness'] = m
         else:
             retval['packageUrl'] = m
     return retval
