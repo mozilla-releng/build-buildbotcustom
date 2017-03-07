@@ -679,7 +679,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
 
     def getRepository(self, repoPath, hgHost=None, push=False):
         assert repoPath
-        for prefix in ('http://', 'ssh://'):
+        for prefix in ('https://', 'ssh://'):
             if repoPath.startswith(prefix):
                 return repoPath
         if repoPath.startswith('/'):
@@ -1064,7 +1064,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         else:
             self.logUploadDir = 'tinderbox-builds/%s-%s/' % (self.branchName,
                                                              self.stagePlatform)
-            self.logBaseUrl = 'http://%s/pub/%s/%s' % \
+            self.logBaseUrl = 'https://%s/pub/%s/%s' % \
                         ( self.stageServer, self.stageProduct, self.logUploadDir)
 
         # Need to override toolsdir as set by MozillaBuildFactory because
@@ -1272,7 +1272,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addStep(Mercurial(
              name='hg_update',
              mode='update',
-             baseURL='http://%s/' % self.hgHost,
+             baseURL='https://%s/' % self.hgHost,
              defaultBranch=self.repoPath,
              timeout=60*60, # 1 hour
             ))
@@ -1295,7 +1295,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
                                                            self.repoPath)
         else: 
-            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost,
                                                           self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
@@ -1891,7 +1891,7 @@ class TryBuildFactory(MercurialBuildFactory):
             self.addStep(Mercurial(
             name='hg_update',
             mode='clobber',
-            baseURL='http://%s/' % self.hgHost,
+            baseURL='https://%s/' % self.hgHost,
             defaultBranch=self.repoPath,
             timeout=60*60, # 1 hour
             locks=[hg_try_lock.access('counting')],
@@ -1910,7 +1910,7 @@ class TryBuildFactory(MercurialBuildFactory):
          command=['hg', 'parent', '--template={node}'],
          extract_fn = short_hash
         ))
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+        changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost,
                                                       self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
@@ -1941,7 +1941,7 @@ class TryBuildFactory(MercurialBuildFactory):
                 target=self.mock_target,
                 mock_workdir_prefix=None,
             ))
-        baseUrl = 'http://%s/pub/%s/tinderbox-builds/mozilla-central-%s' % \
+        baseUrl = 'https://%s/pub/%s/tinderbox-builds/mozilla-central-%s' % \
             (self.stageServer, self.productName, self.platform)
 
         self.addLeakTestStepsCommon(baseUrl, leakEnv, False)
@@ -2083,7 +2083,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             self.addStep(Mercurial(
                 name='hg_update',
                 mode='update',
-                baseURL='http://%s/' % self.hgHost,
+                baseURL='https://%s/' % self.hgHost,
                 defaultBranch=self.repoPath,
                 alwaysUseLatest=True,
                 timeout=60*60 # 1 hour
@@ -2105,7 +2105,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
                                                            self.repoPath)
         else: 
-            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost,
                                                           self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
@@ -2156,7 +2156,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost[6:],
                                                            self.mozRepoPath)
         else: 
-            changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost,
+            changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost,
                                                           self.mozRepoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.addStep(OutputStep(
@@ -2312,7 +2312,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             haltOnFailure=False,
             warnOnFailure=True
         ))
-        previousMarURL = WithProperties('http://%s' % self.stageServer + \
+        previousMarURL = WithProperties('https://%s' % self.stageServer + \
                           '%s' % self.latestDir + \
                           '/%(previousMarFilename)s')
         self.addStep(RetryingMockCommand(
@@ -3035,7 +3035,7 @@ class XulrunnerReleaseBuildFactory(ReleaseBuildFactory):
                                        '-n %s ' % self.buildNumber + \
                                        '--release-to-candidates-dir'
         def get_url(rc, stdout, stderr):
-            for m in re.findall("^(http://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
+            for m in re.findall("^(https://.*?\.(?:tar\.bz2|dmg|zip))", "\n".join([stdout, stderr]), re.M):
                 if m.endswith("crashreporter-symbols.zip"):
                     continue
                 if m.endswith("tests.tar.bz2"):
@@ -3384,7 +3384,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         step = self.makeHgtoolStep(
                 name='get_locale_src',
                 rev=WithProperties("%(l10n_revision)s"),
-                repo_url=WithProperties("http://" + self.hgHost + "/" + \
+                repo_url=WithProperties("https://" + self.hgHost + "/" + \
                                  self.l10nRepoPath + "/%(locale)s"),
                 workdir='%s/l10n' % self.baseWorkDir,
                 locks=[hg_l10n_lock.access('counting')],
@@ -4155,7 +4155,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                          'hg -R '+self.origSrcDir+' up -C ;'+
                          'else ' +
                          'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.repoPath+' ' +
+                         'https://'+self.hgHost+'/'+self.repoPath+' ' +
                          self.origSrcDir+' ; ' +
                          'fi ' +
                          '&& hg -R '+self.origSrcDir+' update -C -r %(en_revision)s')],
@@ -4171,7 +4171,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
                          'hg -R %(locale)s pull -r default ; ' +
                          'else ' +
                          'hg clone ' +
-                         'http://'+self.hgHost+'/'+self.l10nRepoPath+ 
+                         'https://'+self.hgHost+'/'+self.l10nRepoPath+ 
                            '/%(locale)s/ ; ' +
                          'fi ' +
                          '&& hg -R %(locale)s update -C -r %(l10n_revision)s')],
@@ -4301,7 +4301,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
 
         # Break this function early, since I'm testing
         return
-        candidatesDir = 'http://%s' % self.stageServer + \
+        candidatesDir = 'https://%s' % self.stageServer + \
                         '/pub/%s/nightly' % self.project + \
                         '/%s-candidates/build%s' % (self.version,
                                                     self.buildNumber)
@@ -4355,7 +4355,7 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
             mar += '.exe'
             mbsdiff += '.exe'
 
-        baseURL = 'http://%s' % self.archiveServer + \
+        baseURL = 'https://%s' % self.archiveServer + \
                   '/pub/%s/candidates' % self.project + \
                   '/%s-candidates/build%s' % (self.version, self.buildNumber) + \
                   '/mar-tools/%s' % self.platform
@@ -5690,7 +5690,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         mar = 'mar'
         mbsdiff = 'mbsdiff'
 
-        baseURL = 'http://%s' % self.ftpServer + \
+        baseURL = 'https://%s' % self.ftpServer + \
                   '/pub/%s' % self.productName + \
                   '/%s/%s-candidates' % (self.candidatesPathName, self.version) + \
                   '/build%s/mar-tools/%s' % (self.buildNumber, 'linux')
@@ -6283,7 +6283,7 @@ class UnittestBuildFactory(MozillaBuildFactory):
         self.addStep(Mercurial(
          name='hg_update',
          mode='update',
-         baseURL='http://%s/' % self.hgHost,
+         baseURL='https://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          timeout=60*60 # 1 hour
         ))
@@ -6674,7 +6674,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
         self.addStep(Mercurial(
          name='hg_update',
          mode='update',
-         baseURL='http://%s/' % self.hgHost,
+         baseURL='https://%s/' % self.hgHost,
          defaultBranch=self.repoPath,
          alwaysUseLatest=True,
          timeout=60*60 # 1 hour
@@ -6917,7 +6917,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                 )
 
     def addPrintChangesetStep(self):
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.repoPath)
+        changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost, self.repoPath)
         changesetLink += '/%(got_revision)s title="Built from revision %(got_revision)s">rev:%(got_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
@@ -6930,7 +6930,7 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
          workdir='build%s' % self.mozillaDir,
          property='hg_revision'
         ))
-        changesetLink = '<a href=http://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
+        changesetLink = '<a href=https://%s/%s/rev' % (self.hgHost, self.mozRepoPath)
         changesetLink += '/%(hg_revision)s title="Built from Mozilla revision %(hg_revision)s">moz:%(hg_revision)s</a>'
         self.addStep(OutputStep(
          name='tinderboxprint_changeset',
@@ -8937,7 +8937,7 @@ class PartnerRepackFactory(ReleaseFactory):
         self.addStep(MercurialCloneCommand(
             name='clone_partners_repo',
             command=['hg', 'clone',
-                     'http://%s/%s' % (self.hgHost,
+                     'https://%s/%s' % (self.hgHost,
                                           self.partnersRepoPath),
                      self.partnersRepackDir
                     ],
