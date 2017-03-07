@@ -81,7 +81,6 @@ _product_excludes = {
         re.compile('^CLOBBER'),
         re.compile('/docs/'),
         re.compile('^tools/mercurial/hgsetup/'),
-        re.compile('^taskcluster/'),
     ],
     'firefox': [
         re.compile('android'),
