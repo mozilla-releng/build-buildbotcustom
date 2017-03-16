@@ -2142,3 +2142,202 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     addBuilderProperties(builders)
 
     return builders
+
+
+def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
+                                           secrets):
+    builders = []
+    category_name = "release-%s" % branch_name
+    tools_repo_path = branch_config.get('build_tools_repo_path')
+    tools_repo = '%s%s' % (branch_config['hgurl'], tools_repo_path)
+
+    bouncer_mh_cfg = {
+        "script_name": "scripts/bouncer_submitter.py",
+        "extra_args": [
+             "-c",  branch_config['bouncer_submitter_config'][product],
+             "--credentials-file", "oauth.txt",
+             "--bouncer-api-prefix", branch_config['tuxedoServerUrl'],
+             "--repo", branch_config['repo_path'],
+        ]
+    }
+
+    bouncer_buildername = "release-{branch}-{product}_bncr_sub".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (android-api-15 in this case)
+    bouncer_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        mh_cfg=bouncer_mh_cfg, use_credentials_file=True)
+
+    bouncer_builder = {
+        "name": bouncer_buildername,
+        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "builddir": bouncer_buildername,
+        "slavebuilddir": normalizeName(bouncer_buildername),
+        "factory": bouncer_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(bouncer_builder)
+
+    version_bump_mh_cfg = {
+        "script_name": "scripts/release/postrelease_version_bump.py",
+        "extra_args": [
+             "-c",  branch_config['postrelease_version_bump_config'][product],
+        ]
+    }
+    version_bump_buildername = "release-{branch}-{product}_version_bump".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (android-api-15 in this case)
+    version_bump_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        mh_cfg=version_bump_mh_cfg, use_credentials_file=True)
+
+    version_bump_builder = {
+        "name": version_bump_buildername,
+        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "builddir": version_bump_buildername,
+        "slavebuilddir": normalizeName(version_bump_buildername),
+        "factory": version_bump_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(version_bump_builder)
+
+    # uptake monitoring
+    uptake_monitoring_mh_cfg = {
+        "script_name": "scripts/release/uptake_monitoring.py",
+        "extra_args": [
+             "-c",  branch_config['uptake_monitoring_config'][product],
+        ]
+    }
+    uptake_monitoring_buildername = "release-{branch}-{product}_uptake_monitoring".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (android-api-15 in this case)
+    uptake_monitoring_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        mh_cfg=uptake_monitoring_mh_cfg, use_credentials_file=True)
+
+    uptake_monitoring_builder = {
+        "name": uptake_monitoring_buildername,
+        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "builddir": uptake_monitoring_buildername,
+        "slavebuilddir": normalizeName(uptake_monitoring_buildername),
+        "factory": uptake_monitoring_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(uptake_monitoring_builder)
+
+    # bouncer aliases
+    bouncer_aliases_mh_cfg = {
+        "script_name": "scripts/release/postrelease_bouncer_aliases.py",
+        "extra_args": [
+             "-c",  branch_config['postrelease_bouncer_aliases_config'][product],
+        ]
+    }
+    bouncer_aliases_buildername = "release-{branch}-{product}_bouncer_aliases".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (android-api-15 in this case)
+    bouncer_aliases_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        mh_cfg=bouncer_aliases_mh_cfg, use_credentials_file=True)
+
+    bouncer_aliases_builder = {
+        "name": bouncer_aliases_buildername,
+        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "builddir": bouncer_aliases_buildername,
+        "slavebuilddir": normalizeName(bouncer_aliases_buildername),
+        "factory": bouncer_aliases_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(bouncer_aliases_builder)
+
+    # mark release as shipped
+    mark_as_shipped_mh_cfg = {
+        "script_name": "scripts/release/postrelease_mark_as_shipped.py",
+        "extra_args": [
+             "-c",  branch_config['postrelease_mark_as_shipped_config'][product],
+        ]
+    }
+    mark_as_shipped_buildername = "release-{branch}-{product}_mark_as_shipped".format(
+        branch=branch_name, product=product)
+    # Explicitly define pf using the slave platform (android-api-15 in this case)
+    mark_as_shipped_submitter_factory = makeMHFactory(
+        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        mh_cfg=mark_as_shipped_mh_cfg, use_credentials_file=True)
+
+    mark_as_shipped_builder = {
+        "name": mark_as_shipped_buildername,
+        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "builddir": mark_as_shipped_buildername,
+        "slavebuilddir": normalizeName(mark_as_shipped_buildername),
+        "factory": mark_as_shipped_submitter_factory,
+        "category": category_name,
+        "properties": {
+            "branch": branch_name,
+            "platform": None,
+            "product": product,
+        }
+    }
+    builders.append(mark_as_shipped_builder)
+
+    # checksums
+    checksums_buildername = "release-{branch}-{product}_chcksms".format(
+        branch=branch_name, product=product)
+    extra_extra_args = []
+    if product == 'fennec':
+        extra_extra_args = ['--add-action=copy-info-files']
+    checksums_mh_cfg = {
+        'script_name': 'scripts/release/generate-checksums.py',
+        'extra_args': [
+            "--stage-product", branch_config["stage_product"][product],
+            "--bucket-name-full", branch_config["beetmover_buckets"][product],
+            "--credentials", branch_config["beetmover_credentials"],
+            "--tools-repo", branch_config["platforms"]["android-api-15"]["tools_repo_cache"],
+        ] + extra_extra_args
+    }
+    checksums_factory = makeMHFactory(
+        config=branch_config, pf=branch_config['platforms']['android-api-15'],
+        mh_cfg=checksums_mh_cfg,
+        signingServers=secrets.get("release-signing"),
+    )
+    checksums_builder = {
+        'name': checksums_buildername,
+        'slavenames': branch_config['platforms']['android-x86']['slaves'] +
+                      branch_config['platforms']['android-api-15']['slaves'],
+        'category': category_name,
+        'builddir': checksums_buildername,
+        'slavebuilddir': normalizeName(checksums_buildername),
+        'factory': checksums_factory,
+        'properties': {
+            'branch': branch_name,
+            'platform': None,
+            'product': product,
+        }
+    }
+    builders.append(checksums_builder)
+
+    # Don't merge release builder requests
+    nomergeBuilders.update([b['name'] for b in builders])
+
+    # Make sure builders have the right properties
+    addBuilderProperties(builders)
+
+    return builders
