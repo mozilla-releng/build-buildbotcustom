@@ -1871,9 +1871,9 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             '-l', self.balrog_api_root,
             '-u', self.balrog_username,
             '-t', type_,
-            '-p', self.product,
+            '-p', self.productName,
             '-v', self.version,
-            '-n', self.buildnum,
+            '-n', self.buildNumber,
         ]
         if self.balrog_submitter_extra_args:
             cmd.extend(self.balrog_submitter_extra_args)
