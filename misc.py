@@ -2188,6 +2188,12 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'mock_target': pf.get('mock_target'),
                 'mock_packages': pf.get('mock_packages'),
                 'mock_copyin_files' : pf.get('mock_copyin_files'),
+                'balrog_api_root': config.get('balrog_api_root', None),
+                'balrog_username': config.get('balrog_username', None),
+                'balrog_submitter_extra_args': config.get('balrog_submitter_extra_args', []),
+                'balrog_credentials_file': pf.get('balrog_credentials_file', None),
+                'balrog_submit_type': config.get('releaseChannel', '_nightly'),
+                'balrog_submit': config.get('balrog_submit', False),
             }
             factory_kwargs.update(extra_args)
 
@@ -2452,6 +2458,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 mock_target=pf.get('mock_target'),
                 mock_packages=pf.get('mock_packages'),
                 mock_copyin_files=pf.get('mock_copyin_files'),
+                balrog_api_root=config.get('balrog_api_root', None),
+                balrog_username=config.get('balrog_username', None),
+                balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
+                balrog_credentials_file=pf.get('balrog_credentials_file', None),
                 **nightly_kwargs
             )
 
@@ -2526,6 +2536,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                         tooltool_url_list=config.get('tooltool_url_list', []),
                         tooltool_script=pf.get('tooltool_script'),
                         tooltool_token=pf.get('tooltool_token', None),
+                        balrog_api_root=config.get('balrog_api_root', None),
+                        balrog_username=config.get('balrog_username', None),
+                        balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
+                        balrog_credentials_file=pf.get('balrog_credentials_file', None),
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
@@ -2665,6 +2679,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 tooltool_url_list=config.get('tooltool_url_list', []),
                 tooltool_script=pf.get('tooltool_script'),
                 tooltool_token=pf.get('tooltool_token', None),
+                balrog_api_root=config.get('balrog_api_root', None),
+                balrog_username=config.get('balrog_username', None),
+                balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
+                balrog_credentials_file=pf.get('balrog_credentials_file', None)
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],

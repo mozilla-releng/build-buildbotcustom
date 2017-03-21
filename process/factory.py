@@ -463,8 +463,13 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
             mozillaDir=None, mozillaSrcDir=None,
             tooltool_manifest_src=None,
             tooltool_url_list=[], tooltool_script=None,
-            tooltool_token=None,
-            **kwargs):
+            tooltool_token=None, platform='',
+            balrog_credentials_file=None,
+            balrog_api_root=None,
+            balrog_username=None,
+            balrog_submitter_extra_args=[],
+            balrog_submit_type='nightly',
+            balrog_submit=False, **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -493,6 +498,14 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
         self.tooltool_url_list=tooltool_url_list
         self.tooltool_script=tooltool_script
         self.tooltool_token=tooltool_token
+        self.platform = platform
+        self.balrog_credentials_file=balrog_credentials_file
+        self.balrog_api_root=balrog_api_root
+        self.balrog_username=balrog_username
+        self.balrog_submitter_extra_args=balrog_submitter_extra_args
+        self.balrog_submit_type=balrog_submit_type
+        self.balrog_submit=balrog_submit
+
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -586,6 +599,13 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
             workdir='tools',
             env=self.env,
         ))
+
+        self.addStep(SetProperty(
+            name='set platform',
+            command='echo %s' % self.platform,
+            property='platform',
+        ))
+
 
         if self.clobberURL is not None:
             self.addStep(MozillaClobberer(
@@ -897,7 +917,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  mock_packages=None,
                  mock_copyin_files=None,
                  **kwargs):
-        MozillaBuildFactory.__init__(self, use_mock=use_mock,
+        MozillaBuildFactory.__init__(self, platform=platform,
+                                     use_mock=use_mock,
                                      mock_target=mock_target,
                                      mock_packages=mock_packages,
                                      mock_copyin_files=mock_copyin_files,
@@ -914,7 +935,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         ))
 
         self.objdir = objdir
-        self.platform = platform
         self.configRepoPath = configRepoPath
         self.configSubDir = configSubDir
         self.profiledBuild = profiledBuild
@@ -1131,6 +1151,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             self.addL10nCheckTestSteps()
         if self.checkTest:
             self.addCheckTestSteps()
+        if self.balrog_submit:
+            self.submitBalrogUpdates(type_=self.balrog_submit_type)
         if self.valgrindCheck:
             self.addValgrindCheckSteps()
         if self.createSnippet:
@@ -1833,6 +1855,45 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
              mock=self.use_mock,
              target=self.mock_target,
             ))
+
+    def submitBalrogUpdates(self, type_='nightly'):
+        self.addStep(JSONPropertiesDownload(
+            name='download_balrog_props',
+            slavedest='buildprops_balrog.json',
+            workdir='.',
+            flunkOnFailure=False,
+        ))
+        cmd = [
+            self.pythonWithJson(self.platform),
+            WithProperties(
+                '%(toolsdir)s/scripts/balrog/balrog-submit.py'),
+            '--props', 'buildprops_balrog.json',
+            '-l', self.balrog_api_root,
+            '-u', self.balrog_username,
+            '-t', type_,
+            '-p', self.product,
+            '-v', self.version,
+            '-n', self.buildnum,
+        ]
+        if self.balrog_submitter_extra_args:
+            cmd.extend(self.balrog_submitter_extra_args)
+        if self.balrog_credentials_file:
+            credentialsFile = os.path.join(os.getcwd(),
+                                           self.balrog_credentials_file)
+            target_file_name = os.path.basename(credentialsFile)
+            cmd.extend(['--credentials-file', target_file_name])
+            self.addStep(FileDownload(
+                mastersrc=credentialsFile,
+                slavedest=target_file_name,
+                workdir='.',
+                flunkOnFailure=False,
+            ))
+        self.addStep(RetryingShellCommand(
+            name='submit_balrog_updates',
+            command=cmd,
+            workdir='.',
+            flunkOnFailure=True,
+        ))
 
 class TryBuildFactory(MercurialBuildFactory):
     def __init__(self,talosMasters=None, unittestMasters=None, packageUrl=None,
@@ -3126,14 +3187,20 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                  mock_packages=None,
                  mock_copyin_files=None,
                  archiveServer=None,
+                 balrog_credentials_file=None,
+                 balrog_api_root=None,
+                 balrog_username=None,
+                 balrog_submitter_extra_args=[],
+                 balrog_submit=False,
+                 balrog_submit_type='nightly',
                  **kwargs):
-        MozillaBuildFactory.__init__(self, use_mock=self.use_mock,
+        MozillaBuildFactory.__init__(self, platform=platform,
+                                     use_mock=self.use_mock,
                                      mock_target=self.mock_target,
                                      mock_packages=self.mock_packages,
                                      mock_copyin_files=self.mock_copyin_files,
                                      **kwargs)
 
-        self.platform = platform
         self.project = project
         self.productName = project
         self.appName = appName
@@ -3158,6 +3225,12 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         self.mock_target = mock_target
         self.mock_packages = mock_packages
         self.mock_copyin_files = mock_copyin_files
+        self.balrog_api_root=balrog_api_root
+        self.balrog_username=balrog_username
+        self.balrog_submitter_extra_args=balrog_submitter_extra_args
+        self.balrog_credentials_file=balrog_credentials_file
+        self.balrog_submit=balrog_submit
+        self.balrog_submit_type=balrog_submit_type
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
