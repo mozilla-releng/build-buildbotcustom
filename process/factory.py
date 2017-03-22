@@ -555,7 +555,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
     def pythonWithJson(self, platform):
         if platform in ('macosx64'):
             return "/tools/buildbot/bin/python"
-        elif platform in ('linux'):
+        elif platform in ('linux', 'linux64'):
             return "/tools/python27/bin/python"
         elif platform in ('win32'):
             return "D:\\mozilla-build\\python27\\python.exe"
@@ -1881,7 +1881,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             credentialsFile = os.path.join(os.getcwd(),
                                            self.balrog_credentials_file)
             target_file_name = os.path.basename(credentialsFile)
-            cmd.extend(['--credentials-file', target_file_name])
+            cmd.extend(['-c', target_file_name])
             self.addStep(FileDownload(
                 mastersrc=credentialsFile,
                 slavedest=target_file_name,
