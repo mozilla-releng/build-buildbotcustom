@@ -423,6 +423,9 @@ class BaseHgPoller(BasePoller):
         if self.lastPushID is not None or self.emptyRepo:
             for change in change_list:
                 link = "%s/rev/%s" % (self.baseURL, change["node"])
+                # change['desc'] can contain unicode characters that break DB
+                # insertion, convert them to '?'
+                change['desc'] = change['desc'].encode('ascii', 'replace')
                 c = changes.Change(who=change["user"],
                                    files=change["files"],
                                    revision=change["node"],
