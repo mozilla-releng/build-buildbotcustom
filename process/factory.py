@@ -706,7 +706,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
             repoPath = repoPath.lstrip('/')
         if not hgHost:
             hgHost = self.hgHost
-        proto = 'ssh' if push else 'http'
+        proto = 'ssh' if push else 'https'
         return '%s://%s/%s' % (proto, hgHost, repoPath)
 
     def getPackageFilename(self, platform, platform_variation):
