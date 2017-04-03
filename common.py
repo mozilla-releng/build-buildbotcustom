@@ -124,6 +124,8 @@ def normalizeName(name, product=None, min_=30, max_=30, filler='0'):
         'verify': 'v',
         'updates': 'upds',
         'tests': 't',
+        'schedule': 'sc',
+        'publishing': 'pub',
     }
     for word in sorted(mappings):
         replacement = mappings[word]
