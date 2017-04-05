@@ -2790,7 +2790,6 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         self.downloadBuilds()
         self.updateEnUS()
         self.tinderboxPrintRevisions()
-        self.compareLocalesSetup()
         self.compareLocales()
         if self.signingServers and self.enableSigning:
             self.addGetTokenSteps()
@@ -3003,34 +3002,9 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
         '''
         pass
 
-    def compareLocalesSetup(self):
-        compareLocalesRepo = self.getRepository(self.compareLocalesRepoPath)
-        self.addStep(ShellCommand(
-                     name='rm_compare_locales',
-                     command=['rm', '-rf', 'compare-locales'],
-                     description=['remove', 'compare-locales'],
-                     workdir=self.baseWorkDir,
-                     haltOnFailure=True
-                     ))
-        self.addStep(MercurialCloneCommand(
-                     name='clone_compare_locales',
-                     command=['hg', 'clone',
-                              compareLocalesRepo, 'compare-locales'],
-                     description=['checkout', 'compare-locales'],
-                     workdir=self.baseWorkDir,
-                     haltOnFailure=True
-                     ))
-        self.addStep(ShellCommand(
-                     name='update_compare_locales',
-                     command=['hg', 'up', '-C', '-r', self.compareLocalesTag],
-                     description='update compare-locales',
-                     workdir='%s/compare-locales' % self.baseWorkDir,
-                     haltOnFailure=True
-                     ))
-
     def compareLocales(self):
         if self.mergeLocales:
-            mergeLocaleOptions = ['-m',
+            mergeLocaleOptions = ['--merge-dir',
                                   WithProperties('%(basedir)s/' +
                                                  "%s/merged" % self.baseWorkDir)]
             flunkOnFailure = False
@@ -3041,6 +3015,20 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             flunkOnFailure = True
             haltOnFailure = True
             warnOnFailure = False
+
+        machPath = '%(basedir)s/' + self.absMozillaSrcDir + '/mach'
+        python = [WithProperties('%(basedir)s/' +
+                  '%s/_virtualenv/bin/python' % self.absMozillaObjDir)]
+        if self.platform.startswith('win'):
+            python = [WithProperties('%(basedir)s/' +
+                      '%s/_virtualenv/Scripts/python' % self.absMozillaObjDir)]
+
+        command = python + [WithProperties(machPath), 'compare-locales'] + mergeLocaleOptions + [
+            "--l10n-ini", "%s/locales/l10n.ini" % self.appName,
+            "--l10n-base", "../l10n",
+            WithProperties('%(locale)s')
+        ]
+
         self.addStep(ShellCommand(
                      name='rm_merged',
                      command=['rm', '-rf', 'merged'],
@@ -3050,19 +3038,12 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                      ))
         self.addStep(ShellCommand(
                      name='run_compare_locales',
-                     command=['python',
-                              '../../../compare-locales/scripts/compare-locales'] +
-                     mergeLocaleOptions +
-                     ["l10n.ini",
-                      "../../../l10n",
-                      WithProperties('%(locale)s')],
+                     command=command,
                      description='comparing locale',
-                     env={'PYTHONPATH': ['../../../compare-locales/lib']},
                      flunkOnFailure=flunkOnFailure,
                      warnOnFailure=warnOnFailure,
                      haltOnFailure=haltOnFailure,
-                     workdir="%s/%s/locales" % (self.absSrcDir,
-                                                self.appName),
+                     workdir=self.absSrcDir
                      ))
 
     def doRepack(self):
