@@ -1998,6 +1998,8 @@ def generateTalosBranchObjects(branch, branch_config, PLATFORMS, SUITES,
                     'properties': properties,
                     'env': MozillaEnvironments[platform_config['env_name']],
                 }
+                if 'skip_runnable_jobs' in branch_config['platforms'][platform]:
+                    builder['skip_runnable_jobs'] = branch_config['platforms'][platform]['skip_runnable_jobs']
 
                 if not merge:
                     nomergeBuilders.add(builder['name'])
