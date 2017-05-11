@@ -4,10 +4,7 @@ pulse status plugin for buildbot
 import re
 import os.path
 import time
-import traceback
 
-from twisted.internet.threads import deferToThread
-from twisted.internet.defer import DeferredLock
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor
 from twisted.python import log
@@ -185,15 +182,33 @@ class PulseStatus(StatusPush):
     # Events we publish #
 
     def buildStarted(self, builderName, build):
+        try:
+            core_builder = self.parent.getStatus().botmaster.builders[builderName]
+            core_build = core_builder.getBuild(build.number)
+            request_ids = [int(r.id) for r in core_build.requests[:100]]
+        except:
+            log.msg("Exception getting request ids")
+            log.err()
+            request_ids = []
+
         builderName = escape(self._translateBuilderName(builderName))
         self.push("build.%s.%i.started" % (builderName, build.number),
-                  build=build)
+                  build=build, request_ids=request_ids)
         return self
 
     def buildFinished(self, builderName, build, results):
+        try:
+            core_builder = self.parent.getStatus().botmaster.builders[builderName]
+            core_build = core_builder.getBuild(build.number)
+            request_ids = [int(r.id) for r in core_build.requests[:100]]
+        except:
+            log.msg("Exception getting request ids")
+            log.err()
+            request_ids = []
+
         builderName = escape(self._translateBuilderName(builderName))
         self.push("build.%s.%i.finished" % (builderName, build.number),
-                  build=build, results=results)
+                  build=build, results=results, request_ids=request_ids)
 
     def slaveConnected(self, slavename):
         self.push("slave.%s.connected" % escape(slavename),
