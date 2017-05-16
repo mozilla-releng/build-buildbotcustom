@@ -2072,8 +2072,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     builders.append(checksums_builder)
 
     partner_repacks_platforms = set(
-        list(branch_config.get("partner_repacks_platforms", [])) +
-        list(branch_config.get("eme_free_repacks_platforms", [])) +
+        list(branch_config.get("partner_repacks_platforms", {}).get(product, [])) +
+        list(branch_config.get("eme_free_repacks_platforms", {}).get(product, [])) +
         list(branch_config.get("sha1_repacks_platforms", []))
     )
     for platform in partner_repacks_platforms:
