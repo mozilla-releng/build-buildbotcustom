@@ -2511,7 +2511,17 @@ def generateSpiderMonkeyObjects(project, config, SLAVES):
             return False
 
         for f in change.files:
-            if f.startswith("js/src") or f.startswith("js/public"):
+            # Same as m-c's list in taskcluster/ci/spidermonkey/kind.yml
+            if f.startswith(
+                ('build/', 'config/', 'dom/bindings/', 'intl/icu/',
+                 'js/public/', 'js/src/', 'layout/tools/reftest/reftest/',
+                 'media/webrtc/trunk/tools/gyp/', 'memory/', 'mfbt/',
+                 'modules/fdlibm/', 'modules/zlib/src/', 'mozglue/',
+                 'nsprpub/', 'testing/mozbase/')) or f in (
+                'configure.py', 'js/moz.configure', 'Makefile.in',
+                'moz.build', 'moz.configure', 'test.mozbuild',
+                'toolkit/mozapps/installer/package-name.mk',
+                'toolkit/mozapps/installer/upload-files.mk'):
                 return True
 
         return False
