@@ -1796,15 +1796,21 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
             env_config = "single_locale/staging.py"
             balrog_config = "balrog/staging.py"
 
+        single_locale_platform_config = platform
+        if product == "devedition":
+            # XXX hack: not all platforms in config.py have a devedition variant defined
+            # e.g. linux. Therefore, we do not have a clean platform namespace in buildbot-configs
+            # for this item outside of right here.
+            single_locale_platform_config = "%s_devedition" % (platform,)
+
         mh_cfg = {
             "script_name": "scripts/desktop_l10n.py",
             "extra_args": [
-                "--branch-config", "single_locale/%s.py" % branch_config.get('single_locale_branch_config',
-                                                                             branch_name),
-                "--platform-config", "single_locale/%s.py" % platform,
+                "--branch-config", "single_locale/%s.py" % branch_config['single_locale_branch_config'][product],
+                "--platform-config", "single_locale/%s.py" % single_locale_platform_config,
                 "--environment-config", env_config,
                 "--balrog-config", balrog_config,
-                                   ],
+            ],
             "script_timeout": 1800,
             "script_maxtime": 10800,
         }
