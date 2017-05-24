@@ -205,7 +205,7 @@ def parse_make_upload(rc, stdout, stderr):
             pass
         elif m.endswith("crashreporter-symbols-full.zip"):
             retval['symbolsUrl'] = m
-        elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
+        elif m.endswith(("tests.tar.bz2", "tests.zip", "tests.tar.gz")):
             retval['testsUrl'] = m
         elif m.endswith('apk') and 'unsigned-unaligned' in m:
             retval['unsignedApkUrl'] = m
