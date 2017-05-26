@@ -1781,6 +1781,13 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     category_name = "release-%s" % branch_name
     tools_repo_path = branch_config.get('build_tools_repo_path')
     tools_repo = '%s%s' % (branch_config['hgurl'], tools_repo_path)
+    # Devedition uses the same platform names with Firefox for its release
+    # builders. Additionally, not all platforms have their signig sever configs
+    # set, because they are moved to TaskCluster.
+    signing_servers = secrets.get("release-signing")
+    if product == "devedition":
+        signing_servers = secrets.get("nightly-signing")
+
 
     for platform in branch_config["l10n_release_platforms"]:
         pf = branch_config["platforms"][platform]
@@ -1817,7 +1824,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
 
         l10n_factory = makeMHFactory(branch_config, pf,
                                      mh_cfg=mh_cfg,
-                                     signingServers=secrets.get(pf.get("dep_signing_servers")),
+                                     signingServers=signing_servers,
                                      use_credentials_file=True,
                                      )
         l10n_builder = {
@@ -2059,7 +2066,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
     checksums_factory = makeMHFactory(
         config=branch_config, pf=branch_config['platforms']['linux64'],
         mh_cfg=checksums_mh_cfg,
-        signingServers=secrets.get("release-signing"),
+        signingServers=signing_servers,
     )
     checksums_builder = {
         'name': checksums_buildername,
@@ -2094,7 +2101,7 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
                                                "--hgrepo", branch_config['repo_path']]
         }
         partner_repack_factory = makeMHFactory(
-            signingServers=secrets.get(pf.get("dep_signing_servers")),
+            signingServers=signing_servers,
             config=branch_config,
             pf=branch_config["platforms"]["macosx64"],
             mh_cfg=mh_cfg)
