@@ -23,6 +23,8 @@ def testSuiteMatches(v, u):
         return v in ['mochitest-other', 'mochitest-a11y', 'mochitest-chrome']
     elif u == 'xpcshell':
         return v.startswith('xpcshell')
+    elif u in ('mozmill', 'mozmills'):
+        return v.startswith('mozmill')
     elif u == 'robocop':
         return v.startswith(u)
     elif u == 'mochitest-dt':
