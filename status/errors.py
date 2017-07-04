@@ -14,6 +14,7 @@ global_errors = ((re_compile("No space left on device"), RETRY),
                  (re_compile("program finished with exit code 80"), RETRY),
                  (re_compile("INFRA-ERROR"), RETRY),
                  (re_compile("Failure instance: Traceback (failure with no frames): <class 'twisted.spread.pb.PBConnectionLost'>"), RETRY),
+                 (re_compile("Couldn't reserve space for cygwin's heap, Win32 error 0"), RETRY),
                  )
 hg_errors = ((re_compile("abort: HTTP Error 5\d{2}"), RETRY),
              (re_compile("abort: .*: no match found!"), RETRY),
