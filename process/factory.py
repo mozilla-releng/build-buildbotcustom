@@ -2174,7 +2174,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          data=['TinderboxPrint:', WithProperties(changesetLink)]
         ))
         # build up the checkout command with all options
-        co_command = ['python', 'client.py', 'checkout']
+        python_cmd = self.pythonWithJson(self.platform)
+        co_command = [python_cmd, 'client.py', 'checkout']
         # comm-* is handled by code above, no need to do network churn here
         co_command.append("--skip-comm")
         if (not self.useSharedCheckouts) and self.mozRepoPath:
@@ -3668,7 +3669,8 @@ class CCBaseRepackFactory(BaseRepackFactory):
     def getSources(self):
         BaseRepackFactory.getSources(self)
         # build up the checkout command with all options
-        co_command = ['python', 'client.py', 'checkout',
+        python_cmd = self.pythonWithJson(self.platform)
+        co_command = [python_cmd, 'client.py', 'checkout',
                       WithProperties('--comm-rev=%(en_revision)s')]
         if self.mozRepoPath:
             co_command.append('--mozilla-repo=%s' % self.getRepository(self.mozRepoPath))
@@ -4254,7 +4256,8 @@ class CCReleaseRepackFactory(CCBaseRepackFactory, ReleaseFactory):
          workdir='%s/l10n' % self.baseWorkDir
         ))
         # build up the checkout command with all options
-        co_command = ['python', 'client.py', 'checkout',
+        python_cmd = self.pythonWithJson(self.platform)
+        co_command = [python_cmd, 'client.py', 'checkout',
                       WithProperties('--comm-rev=%(en_revision)s')]
         if self.mozRepoPath:
             co_command.append('--mozilla-repo=%s' % self.getRepository(self.mozRepoPath))
@@ -5327,7 +5330,8 @@ class CCSourceFactory(ReleaseFactory):
           haltOnFailure=True,
         ))
         # build up the checkout command that will bring us up to the release version
-        co_command = ['python', 'client.py', 'checkout',
+        python_cmd = self.pythonWithJson('linux')
+        co_command = [python_cmd, 'client.py', 'checkout',
                       '--comm-rev=%s' % releaseTag,
                       '--mozilla-repo=%s' % self.getRepository(mozRepoPath),
                       '--mozilla-rev=%s' % releaseTag]
