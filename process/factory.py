@@ -225,6 +225,8 @@ def parse_make_upload(rc, stdout, stderr):
             pass
         elif m.find('cppunit') >= 0:
             pass
+        elif m.endswith('stylo-bindings.zip'):
+            pass
         else:
             retval['packageUrl'] = m
     return retval
