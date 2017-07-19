@@ -5806,7 +5806,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
 
     def runPatchers(self):
         # clone mozilla-beta into build/mozilla
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
           name='update_mozilla',
           command=['hg', 'clone', self.mozRepository, 'mozilla'],
           description=['update', 'mozilla'],
@@ -5814,12 +5814,10 @@ class ReleaseUpdatesFactory(ReleaseFactory):
           timeout=3600,
           haltOnFailure=True,
           workdir='build',
-          mock=self.use_mock,
-          target=self.mock_target,
         ))
 
         # update mozilla repo to the version stored in patcherToolsTag
-        self.addStep(MockCommand(
+        self.addStep(ShellCommand(
           name='update_mozilla_to_tag',
           command=['hg', 'update', self.patcherToolsTag],
           description=['update', 'mozilla', 'to', 'R17 tag'],
@@ -5827,8 +5825,6 @@ class ReleaseUpdatesFactory(ReleaseFactory):
           timeout=3600,
           haltOnFailure=True,
           workdir='build/mozilla',
-          mock=self.use_mock,
-          target=self.mock_target,
         ))
 
         # get mar/mbsdiff from candidates dir.
