@@ -5518,6 +5518,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
         self.oldShippedLocales = self.getShippedLocales(self.oldRepository,
                                                         self.oldBaseTag,
                                                         self.appName)
+        self.candidatesPathName = candidatesPathName
         self.candidatesDir = self.getCandidatesDir(productName, version, buildNumber,
                                                    nightlyDir=candidatesPathName)
         self.updateDir = 'build/temp/%s/%s-%s' % (productName, oldVersion, version)
@@ -6037,7 +6038,8 @@ class ReleaseUpdatesFactory(ReleaseFactory):
     def getUpdateVerifyBumpCommand(self, platform):
         oldCandidatesDir = self.getCandidatesDir(self.productName,
                                                  self.oldVersion,
-                                                 self.oldBuildNumber)
+                                                 self.oldBuildNumber,
+                                                 nightlyDir=self.candidatesPathName)
         verifyConfigPath = 'verification/%s' % \
                             self.verifyConfigs[platform]
 
