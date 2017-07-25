@@ -346,10 +346,9 @@ class Change(Base):
                 comments=unicode(change.comments),
                 when=when,
                 )
-        if len(change.files) > 20:
-            c.files = File.getall(session, change.files)
-        else:
-            c.files = [File.get(session, path) for path in change.files]
+        # don't attempt to track all the files in a change, just the first 20,
+        # avoiding a lot of overhead creating a Sourcestamp for the change
+        c.files = [File.get(session, path) for path in change.files[:20]]
         return c
 
 
