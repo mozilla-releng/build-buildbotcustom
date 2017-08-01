@@ -2949,7 +2949,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
 
         # build up the checkout command with all options
         skipBlankRepos = c.get('skip_blank_repos', False)
-        co_command = ['python', 'client.py', 'checkout']
+        co_command = ['python2.7', 'client.py', 'checkout']
         if c.get('moz_repo_path'):
             co_command.append('--mozilla-repo=%s' %
                               self.getRepository(c.get('moz_repo_path')))
