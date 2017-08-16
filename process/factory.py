@@ -217,13 +217,7 @@ def parse_make_upload(rc, stdout, stderr):
         elif m.endswith("crashreporter-symbols.zip"):
             retval['symbolsUrl'] = m
         elif m.endswith("tests.tar.bz2") or m.endswith("tests.zip"):
-            found_test = False
-            for test_name in ['crashtest', 'mochitest', 'reftest', 'xpcshell']:
-                if test_name in m:
-                    retval['%sUrl' % test_name] = m
-                    found_test = True
-            if not found_test:
-                retval['testUrl'] = m
+            retval['testsUrl'] = m
         elif m.endswith('apk') and 'unsigned-unaligned' in m:
             retval['unsignedApkUrl'] = m
         elif m.endswith('apk') and 'robocop' in m:
@@ -2083,13 +2077,6 @@ class TryBuildFactory(MercurialBuildFactory):
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
             ))
-        test_files = []
-        for test in ['mochitest', 'reftest', 'xpcshell']:
-            test_files.append(WithProperties('%(%sUrl)s' % test))
-
-        test_files.extend([WithProperties('%(packageUrl)s'),
-                           WithProperties('%(symbolsUrl)s')])
-
         for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -2098,7 +2085,8 @@ class TryBuildFactory(MercurialBuildFactory):
              retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties('%(got_revision)s'),
-             files=test_files,
+             files=[WithProperties('%(packageUrl)s'),
+                     WithProperties('%(testsUrl)s')],
              user=WithProperties('%(who)s'),
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
@@ -2739,9 +2727,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
 
             files = [WithProperties('%(packageUrl)s')]
             if '1.9.1' not in self.branchName:
-                for test_item in ['mochitest',
-                                  'reftest', 'xpcshell']:
-                    files.append(WithProperties('%(' + test_item + 'Url)s'))
+                files.append(WithProperties('%(testsUrl)s'))
 
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
@@ -3081,12 +3067,6 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              sendchange_props=sendchange_props,
             ))
 
-        test_files = [WithProperties('%(packageUrl)s'),
-                      WithProperties('%(testUrl)s')]
-
-        for test_item in ['mochitest', 'reftest', 'xpcshell']:
-            test_files.append(WithProperties('%(' + test_item + 'Url:-)'))
-
         for master, warn, retries in self.unittestMasters:
             self.addStep(SendChangeStep(
              name='sendchange_%s' % master,
@@ -3095,7 +3075,8 @@ class ReleaseBuildFactory(MercurialBuildFactory):
              retries=retries,
              branch=self.unittestBranch,
              revision=WithProperties("%(got_revision)s"),
-             files=test_files,
+             files=[WithProperties('%(packageUrl)s'),
+                    WithProperties('%(testsUrl)s')],
              user="sendchange-unittest",
              comments=WithProperties('%(comments:-)s'),
              sendchange_props=sendchange_props,
@@ -6519,12 +6500,6 @@ class UnittestBuildFactory(MozillaBuildFactory):
                     'buildid': WithProperties('%(buildid:-)s'),
                     'builduid': WithProperties('%(builduid:-)s'),
                     }
-            test_files = [WithProperties('%(packageUrl)s'),
-                          WithProperties('%(testUrl)s')]
-
-            for test_item in ['mochitest', 'reftest', 'xpcshell']:
-                test_files.append(WithProperties('%(' + test_item + 'Url:-)'))
-
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6533,7 +6508,8 @@ class UnittestBuildFactory(MozillaBuildFactory):
                  retries=retries,
                  revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
-                 files=test_files,
+                 files=[WithProperties('%(packageUrl)s'),
+                        WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest",
                  comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
@@ -6921,12 +6897,6 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                     'buildid': WithProperties('%(buildid:-)s'),
                     'builduid': WithProperties('%(builduid:-)s'),
                     }
-            test_files = [WithProperties('%(packageUrl)s'),
-                      WithProperties('%(testUrl)s')]
-
-            for test_item in ['crashtest', 'mochitest', 'reftest', 'xpcshell']:
-                test_files.append(WithProperties('%(' + test_item + ':-)'))
-
             for master, warn, retries in self.unittestMasters:
                 self.addStep(SendChangeStep(
                  name='sendchange_%s' % master,
@@ -6935,7 +6905,8 @@ class CCUnittestBuildFactory(MozillaBuildFactory):
                  retries=retries,
                  revision=WithProperties('%(got_revision)s'),
                  branch=self.unittestBranch,
-                 files=test_files,
+                 files=[WithProperties('%(packageUrl)s'),
+                        WithProperties('%(testsUrl)s')],
                  user="sendchange-unittest",
                  comments=WithProperties('%(comments:-)s'),
                  sendchange_props=sendchange_props,
@@ -7444,7 +7415,7 @@ class MozillaTestFactory(MozillaBuildFactory):
 
         assert self.platform in getSupportedPlatforms()
 
-        MozillaBuildFactory.__init__(self, platform=self.platform, **kwargs)
+        MozillaBuildFactory.__init__(self, **kwargs)
 
         self.ignoreCerts = False
         if self.branchName.lower().startswith('shadow'):
@@ -7506,11 +7477,8 @@ class MozillaTestFactory(MozillaBuildFactory):
         def get_build_url(build):
             '''Make sure that there is at least one build in the file list'''
             assert len(build.source.changes[-1].files) > 0, 'Unittest sendchange has no files'
-            return parse_sendchange_files(build,
-                                          exclude_substrs=['mozharness.zip',
-                                                           '.crashreporter-symbols.',
-                                                           '.tests.',
-                                                           '.json'])
+            return parse_sendchange_files(build, exclude_substrs=['.crashreporter-symbols.',
+                                                   '.tests.'])
         self.addStep(DownloadFile(
             url_fn=get_build_url,
             filename_property='build_filename',
@@ -7609,27 +7577,7 @@ class MozillaTestFactory(MozillaBuildFactory):
                     if build_url.endswith(suffix):
                         return build_url[:-len(suffix)] + '.tests.tar.bz2'
             else:
-                test_substr = build.getProperty('%(test_type)') + '.tests'
-                return parse_sendchange_files(build, include_substr=test_substr)
-
-        def get_test_type(build):
-            retval = 'mochitest'
-            if self.test_suites:
-                if len(self.test_suites) == 1:
-                    m = self.test_suites[0]
-                    if m.startswith('crash'):
-                        retval = 'crashtest'
-                    elif m.startswith('xpcshell'):
-                        retval = 'xpcshell'
-                    elif m.startswith('reftest'):
-                        retval = 'reftest'
-            return retval
-
-        self.addStep(SetBuildProperty(
-          property_name='test_type',
-          value=get_test_type,
-        ))
-
+                return parse_sendchange_files(build, include_substr='.tests.')
         self.addStep(DownloadFile(
             url_fn=get_tests_url,
             filename_property='tests_filename',
@@ -7712,11 +7660,9 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  mochitest_leak_threshold=None,
                  crashtest_leak_threshold=None, totalChunks=None,
                  thisChunk=None, chunkByDir=None, stackwalk_cgi=None,
-                 pip_server, tooltool_manifest_src=None, tooltool_script=[],
                  **kwargs):
         platform = platform.split('-')[0]
         self.test_suites = test_suites
-        self.pip_server = pip_server
         self.totalChunks = totalChunks
         self.thisChunk = thisChunk
         self.chunkByDir = chunkByDir
@@ -7739,130 +7685,8 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                                     downloadTests=True, stackwalk_cgi=stackwalk_cgi,
                                     **kwargs)
 
-    def addTooltoolStep(self, **kwargs):
-        cmd= [
-            'sh',
-            WithProperties(
-                '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
-            WithProperties('%(toolsdir)s/' + self.tooltool_manifest_src),
-            self.tooltool_url_list[0],
-            self.tooltool_bootstrap,
-        ]
-        if self.tooltool_script:
-            cmd.extend(self.tooltool_script)
-
-        if self.tooltool_token:
-            cmd.extend(['--authentication-file', self.tooltool_token])
-
-        self.addStep(MockCommand(
-            name='run_tooltool',
-            command=cmd,
-            env=self.env,
-            haltOnFailure=True,
-            mock=self.use_mock,
-            target=self.mock_target,
-            **kwargs
-        ))
- 
     def addSetupSteps(self):
-        python_cmd= self.pythonWithJson(self.platform)
-        self.addStep(ShellCommand(
-          name="setup virtualenv",
-          workdir="build",
-          haltOnFailure=True,
-          command=[python_cmd, '/tools/misc-python/virtualenv.py',
-                   '--no-site-packages',
-                   '--distribute',
-                   WithProperty('%(basedir)s/build/venv')]
-        ))
-        self.addStep(SetProperty(
-             command=[WithProperty('%(basedir)s/build/venv/pip', '--version'],
-             property='pip_ver'
-        ))
-
-        pip_cmd = [WithProperties('%(basedir)s/build/venv/bin/pip'),
-                   '--find-links',
-                   self.pip_server]
-
-        self.addStep(ShellCommand(
-          name="install_reqs",
-          workdir="build/config",
-          haltOnFailure=True,
-          command=[pip_cmd, 'install',
-                   '-r',
-                   WithProperty('%(basedir)s/build/config/requirements.txt']
-        ))
-
-        self.addStep(ShellCommand(
-          name="install_mozbase_reqs",
-          workdir="build/config",
-          haltOnFailure=True,
-          command=[pip_cmd, 'install',
-                   '--no-deps',
-                   '--timeout',
-                   120,
-                   '-r',
-                   WithProperty('%(basedir)s/build/config/mozbase_requirements.txt',
-                   '--no-index']
-        ))
-
-        for suite in self.test_suites:
-            # Unpack the tests
-            self.addStep(UnpackTest(
-              filename=WithProperties('%(tests_filename)s'),
-              testtype=WithProperties('%(test_type)s'),
-              haltOnFailure=True,
-              name=WithProperty('unpack %(test_type)s tests'),
-            ))
-
-        self.addStep(ShellCommand(
-          name="install_marionette_reqs",
-          workdir="build/config",
-          haltOnFailure=True,
-          command=[pip_cmd, 'install',
-                   '--no-deps',
-                   '--timeout',
-                   120,
-                   '-r',
-                   WithProperty('%(basedir)s/build/config/mozbase_requirements.txt',
-                   '--no-index']
-        ))
-
-        self.addStep(MockCommand(
-          name="install_websocket_reqs",
-          workdir="build",
-          haltOnFailure=True,
-          command=[pip_cmd, 'install',
-                   '--no-deps',
-                   '--timeout',
-                   120,
-                   '-r',
-                   WithProperty('%(basedir)s/%(test_type)s/websocketprocessbridge/websocketprocessbridge_requirements.txt'),
-                   '--no-index'],
-          mock=self.use_mock,
-          target=self.mock_target,
-        ))
-
-        self.addStep(ShellCommand(
-          name="pip freeze",
-          workdir="build",
-          haltOnFailure=True,
-          command=[pip_cmd, 'freeze']
-        ))
-
-        self.addStep(ShellCommand(
-          name="mozinstall application",
-          workdir="build",
-          haltOnFailure=True,
-          command=[WithProperty('%(basedir)s/build/venv/bin/mozinstall'),
-                   '--app',
-                   'seamonkey',
-                   WithProperties('%(basedir)s/build/%(build_filename)s'),
-                   '--destination',
-                   WithProperties('%(basedir)s/build/application')]
-        ))
-
-        self.addTooltoolStep()
+        pass
         #if 'linux' in self.platform:
         #    self.addStep(ShellCommand(
         #        name='disable_screensaver',
@@ -7905,9 +7729,33 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  maxTime=90*60, # One and a half hours, to allow for slow minis
                 ))
             elif suite.startswith('mochitest'):
+                # Unpack the tests
+                def glob2list(rc, stdout, stderr):
+                    lfiles = [ l.strip() for l in stdout.split('\n')]
+                    n = []
+                    ret = ""
+                    for l in lfiles:
+                        if ".py" not in l and ".ini" not in l and l:
+                            if self.platform.startswith("win"):
+                                ret += "mozbase\\" + l + ";"
+                            else:
+                                ret += "mozbase/" + l + ":"
+                    return {'files' : ret}
+
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='mochitest',
+                 haltOnFailure=True,
+                 name='unpack mochitest tests',
+                 ))
+
                 tmpEnv = self.testEnv.copy()
+                self.addStep(SetProperty(
+                               name="get_mozbase",
+                               command=["ls", "-1", "mozbase"],
+                               extract_fn=glob2list))
+                tmpEnv['PYTHONPATH'] = WithProperties('%(files)s')
                 tmpEnv['OS'] = self.platform
-                tmpEnv['LD_LIBRARY_PATH'] = WithProperties('%(basedir)s/build/gcc/lib:%(basedir)s/build/gtk3/usr/local/lib')
                 variant = suite.split('-', 1)[1]
                 self.addStep(MockMozillaPackagedMochitests(
                  variant=variant,
@@ -7923,11 +7771,16 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                  target=self.mock_target,
                 ))
             elif suite == 'xpcshell':
-                tmpEnv = self.testEnv.copy()
-                tmpEnv['OS'] = self.platform
-                tmpEnv['LD_LIBRARY_PATH'] = WithProperties('%(basedir)s/build/gcc/lib:%(basedir)s/build/gtk3/usr/local/lib')
+                # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='xpcshell',
+                 haltOnFailure=True,
+                 name='unpack xpcshell tests',
+                 ))
+
                 self.addStep(MockMozillaPackagedXPCShellTests(
-                 env=tmpEnv,
+                 env=self.env,
                  platform=self.platform,
                  symbols_path=symbols_path,
                  maxTime=120*60, # Two Hours
@@ -7978,10 +7831,13 @@ class UnittestPackagedBuildFactory(MozillaTestFactory):
                     self.env.update({'MOZ_ACCELERATED':'11'})
                 if suite in ('reftest-ipc', 'crashtest-ipc'):
                     self.env.update({'MOZ_LAYERS_FORCE_SHMEM_SURFACES':'1'})
-                if suite in ('reftest', 'crashtest'):
-                    self.env.update({'OS': self.platform,
-                                     'LD_LIBRARY_PATH': WithProperties('%(basedir)s/build/gcc/lib:%(basedir)s/build/gtk3/usr/local/lib')})
                 # Unpack the tests
+                self.addStep(UnpackTest(
+                 filename=WithProperties('%(tests_filename)s'),
+                 testtype='reftest',
+                 haltOnFailure=True,
+                 name='unpack reftest tests',
+                 ))
                 self.addStep(MockMozillaPackagedReftests(
                  suite=suite,
                  env=self.env,
