@@ -3,11 +3,12 @@ import re
 
 def buildTryChangeMessage(change, packageDir):
     got_revision = revision = change.revision
+    short_revision = revision[:7]
     who = change.who
     tree = change.branch
     packageDir = packageDir % locals()
     msgdict = {"type": "plain"}
-    msgdict['subject'] = "%(tree)s submission %(revision)s" % locals()
+    msgdict['subject'] = "%(tree)s submission %(short_revision)s" % locals()
     msgdict['headers'] = {"In-Reply-To": "<%(tree)s-%(revision)s>" % locals(),
                           "References": "<%(tree)s-%(revision)s>" % locals(),
                           }

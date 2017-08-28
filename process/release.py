@@ -2184,6 +2184,10 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
 
     return builders
 
+# TODO: Add mozilla-beta.
+# TODO: Add mozilla-release once Fennec 56 reaches release
+BRANCHES_WITH_API_LEVEL_16 = ('jamun',)
+
 
 def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
                                            secrets):
@@ -2191,6 +2195,10 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
     category_name = "release-%s" % branch_name
     tools_repo_path = branch_config.get('build_tools_repo_path')
     tools_repo = '%s%s' % (branch_config['hgurl'], tools_repo_path)
+
+    api_level = 'api-16' if branch_name in BRANCHES_WITH_API_LEVEL_16 else 'api-15'
+    arm_platform = 'android-%s' % api_level
+    arm_platform_config = branch_config['platforms'][arm_platform]
 
     bouncer_mh_cfg = {
         "script_name": "scripts/bouncer_submitter.py",
@@ -2204,14 +2212,13 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
 
     bouncer_buildername = "release-{branch}-{product}_bncr_sub".format(
         branch=branch_name, product=product)
-    # Explicitly define pf using the slave platform (android-api-15 in this case)
     bouncer_submitter_factory = makeMHFactory(
-        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        config=branch_config, pf=arm_platform_config,
         mh_cfg=bouncer_mh_cfg, use_credentials_file=True)
 
     bouncer_builder = {
         "name": bouncer_buildername,
-        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "slavenames": arm_platform_config["slaves"],
         "builddir": bouncer_buildername,
         "slavebuilddir": normalizeName(bouncer_buildername),
         "factory": bouncer_submitter_factory,
@@ -2232,14 +2239,13 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
     }
     version_bump_buildername = "release-{branch}-{product}_version_bump".format(
         branch=branch_name, product=product)
-    # Explicitly define pf using the slave platform (android-api-15 in this case)
     version_bump_submitter_factory = makeMHFactory(
-        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        config=branch_config, pf=arm_platform_config,
         mh_cfg=version_bump_mh_cfg, use_credentials_file=True)
 
     version_bump_builder = {
         "name": version_bump_buildername,
-        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "slavenames": arm_platform_config["slaves"],
         "builddir": version_bump_buildername,
         "slavebuilddir": normalizeName(version_bump_buildername),
         "factory": version_bump_submitter_factory,
@@ -2261,14 +2267,13 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
     }
     uptake_monitoring_buildername = "release-{branch}-{product}_uptake_monitoring".format(
         branch=branch_name, product=product)
-    # Explicitly define pf using the slave platform (android-api-15 in this case)
     uptake_monitoring_submitter_factory = makeMHFactory(
-        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        config=branch_config, pf=arm_platform_config,
         mh_cfg=uptake_monitoring_mh_cfg, use_credentials_file=True)
 
     uptake_monitoring_builder = {
         "name": uptake_monitoring_buildername,
-        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "slavenames": arm_platform_config["slaves"],
         "builddir": uptake_monitoring_buildername,
         "slavebuilddir": normalizeName(uptake_monitoring_buildername),
         "factory": uptake_monitoring_submitter_factory,
@@ -2290,14 +2295,13 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
     }
     bouncer_aliases_buildername = "release-{branch}-{product}_bouncer_aliases".format(
         branch=branch_name, product=product)
-    # Explicitly define pf using the slave platform (android-api-15 in this case)
     bouncer_aliases_submitter_factory = makeMHFactory(
-        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        config=branch_config, pf=arm_platform_config,
         mh_cfg=bouncer_aliases_mh_cfg, use_credentials_file=True)
 
     bouncer_aliases_builder = {
         "name": bouncer_aliases_buildername,
-        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "slavenames": arm_platform_config["slaves"],
         "builddir": bouncer_aliases_buildername,
         "slavebuilddir": normalizeName(bouncer_aliases_buildername),
         "factory": bouncer_aliases_submitter_factory,
@@ -2319,14 +2323,13 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
     }
     mark_as_shipped_buildername = "release-{branch}-{product}_mark_as_shipped".format(
         branch=branch_name, product=product)
-    # Explicitly define pf using the slave platform (android-api-15 in this case)
     mark_as_shipped_submitter_factory = makeMHFactory(
-        config=branch_config, pf=branch_config["platforms"]['android-api-15'],
+        config=branch_config, pf=arm_platform_config,
         mh_cfg=mark_as_shipped_mh_cfg, use_credentials_file=True)
 
     mark_as_shipped_builder = {
         "name": mark_as_shipped_buildername,
-        "slavenames": branch_config["platforms"]["android-api-15"]["slaves"],
+        "slavenames": arm_platform_config["slaves"],
         "builddir": mark_as_shipped_buildername,
         "slavebuilddir": normalizeName(mark_as_shipped_buildername),
         "factory": mark_as_shipped_submitter_factory,
@@ -2351,18 +2354,18 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
             "--stage-product", branch_config["stage_product"][product],
             "--bucket-name-full", branch_config["beetmover_buckets"][product],
             "--credentials", branch_config["beetmover_credentials"],
-            "--tools-repo", branch_config["platforms"]["android-api-15"]["tools_repo_cache"],
+            "--tools-repo", arm_platform_config["tools_repo_cache"],
         ] + extra_extra_args
     }
     checksums_factory = makeMHFactory(
-        config=branch_config, pf=branch_config['platforms']['android-api-15'],
+        config=branch_config, pf=arm_platform_config,
         mh_cfg=checksums_mh_cfg,
         signingServers=secrets.get("release-signing"),
     )
     checksums_builder = {
         'name': checksums_buildername,
         'slavenames': branch_config['platforms']['android-x86']['slaves'] +
-                      branch_config['platforms']['android-api-15']['slaves'],
+                      arm_platform_config['slaves'],
         'category': category_name,
         'builddir': checksums_buildername,
         'slavebuilddir': normalizeName(checksums_buildername),
