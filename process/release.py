@@ -2184,9 +2184,8 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
 
     return builders
 
-# TODO: Add mozilla-beta.
 # TODO: Add mozilla-release once Fennec 56 reaches release
-BRANCHES_WITH_API_LEVEL_16 = ('jamun',)
+BRANCHES_WITH_API_LEVEL_16 = ('jamun', 'mozilla-beta')
 
 
 def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
