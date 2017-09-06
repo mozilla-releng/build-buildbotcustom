@@ -7,7 +7,7 @@ def base_platform(platform):
 
 ###### TEST CASES #####
 
-BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
+LEGACY_BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
                         'macosx64-debug': 'OS X 10.6.2 try leak test build',
                         'macosx-debug': 'OS X 10.5.2 try leak test build',
                         'win32': 'WINNT 5.2 try build',
@@ -21,8 +21,9 @@ BUILDER_PRETTY_NAMES = {'macosx64': 'OS X 10.6.2 try build',
                         'android-r7': 'Android R7 try build',
                         'maemo5-gtk': 'Maemo 5 GTK try build',
                         }
+BUILDER_PRETTY_NAMES = { k : v for k, v in LEGACY_BUILDER_PRETTY_NAMES.iteritems() if "win" not in k and "macosx" not in k}
 # TODO -- need to check on how to separate out the two win32 prettynames
-TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
+LEGACY_TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
                        'macosx64': ['Rev3 MacOSX Snow Leopard 10.6.2',
                                     'Rev3 MacOSX Leopard 9.0 try-nondefault'],
                        'win32': ['Rev3 WINNT 5.1',
@@ -31,8 +32,12 @@ TESTER_PRETTY_NAMES = {'macosx': ['Rev3 MacOSX Leopard 10.5.8'],
                        'linux64': ['Rev3 Fedora 12x64'],
                        'linux': ['Rev3 Fedora 12'],
                        }
+TESTER_PRETTY_NAMES = { k : v for k, v in LEGACY_TESTER_PRETTY_NAMES.iteritems() if "win" not in k  and "macsox" not in k}
 TESTER_PRETTY_TB_NAMES = {'linux': ['TB Rev3 Fedora 12']}
-UNITTEST_PRETTY_NAMES = {'win32-debug': 'WINNT 5.2 try debug test'}
+UNITTEST_PRETTY_NAMES = {'win32-debug': 'WINNT 5.2 try debug test',
+                         'win64-debug': 'WINNT 6.1 try debug test',
+                         'linux64-debug': 'Linux x86-64 try debug'
+                        }
 
 TALOS_SUITES = ['tp4', 'chrome']
 UNITTEST_SUITES = ['reftest',
@@ -58,7 +63,9 @@ VALID_REFTEST_NAMES = ['WINNT 5.2 try debug test reftest',
                        'WINNT 5.2 try debug test reftest-3']
 VALID_BUILDER_NAMES = [base_platform(b)
                        for b in BUILDER_PRETTY_NAMES.values()]
-VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
+LEGACY_VALID_BUILDER_NAMES = [base_platform(b)
+                       for b in LEGACY_BUILDER_PRETTY_NAMES.values()]
+LEGACY_VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 Fedora 12 try opt test mochitest-browser-chrome',
                       'Rev3 Fedora 12 try opt test mochitest-other',
                       'Rev3 Fedora 12 try opt test crashtest',
@@ -80,6 +87,7 @@ VALID_TESTER_NAMES = ['Rev3 Fedora 12 try opt test mochitest-1',
                       'Rev3 WINNT 6.1 try talos tp4',
                       'Rev3 WINNT 5.1 try talos tp4',
                       'Rev3 WINNT 6.1 try talos chrome',]
+VALID_TESTER_NAMES = [l for l in  LEGACY_VALID_TESTER_NAMES if "win" not in l.lower() ]
 VALID_TESTER_TB_NAMES = ['TB Rev3 Fedora 12 try-comm-central opt test mozmill',
                          'TB Rev3 Fedora 12 try-comm-central opt test xpcshell']
 
@@ -164,45 +172,57 @@ class TestTryParser(unittest.TestCase):
         self.assertEqual(sorted(self.customBuilders), [])
 
     def test_DebugOnlyBuild(self):
-        tm = "try: -b d -p linux64,linux"
+        tm = "try: -b d -p win64,win32 --buildbot"
         self.customBuilders = TryParser(
-            tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [BUILDER_PRETTY_NAMES[p] for p in [
-            'linux64-debug', 'linux-debug']]
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in [
+            'win64-debug', 'win32-debug']]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
+
     def test_OptOnlyBuild(self):
-        tm = "try: -b o -p macosx64,linux"
+        tm = "try: -b o -p win32,macosx64 --buildbot"
         self.customBuilders = TryParser(
-            tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [BUILDER_PRETTY_NAMES[p] for p in ['macosx64', 'linux']]
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in ['win32', 'macosx64']]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_BothBuildTypes(self):
         # User can send 'do' or 'od' for both
-        tm = ['try: -b od -p win32', 'try: -b do -p win32']
+        tm = ['try: -b od -p win32 --buildbot', 'try: -b do -p win32 --buildbot']
         for m in tm:
             self.customBuilders = TryParser(
-                m, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-            builders = [BUILDER_PRETTY_NAMES[p] for p in [
+                m, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+            builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in [
                 'win32', 'win32-debug']]
             self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_SpecificPlatform(self):
         # Testing a specific platform, eg: mac only
         # should specify macosx and macosx64 to get opt and debug
-        tm = 'try: -b od -p macosx64,macosx'
+        #tm = 'try: -b od -p win32,win64 --buildbot'
+        tm = 'try: -b od -p win32 --buildbot'
         self.customBuilders = TryParser(
-            tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [BUILDER_PRETTY_NAMES[p] for p in ['macosx64',
-                                                      'macosx64-debug', 'macosx-debug']]
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        #builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win64',
+        #                                               'win32-debug', 'win64-debug']]
+        builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
+        self.assertEquals(sorted(self.customBuilders), sorted(builders))
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_FullPlatformsBoth(self):
         tm = 'try: -b od -p full'
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = VALID_BUILDER_NAMES
+        # builders should be [] unless --buildbot is specified
+        builders = []
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_FullPlatformsBothLegacy(self):
+        tm = 'try: -b od -p full --buildbot'
+        self.customBuilders = TryParser(
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = LEGACY_VALID_BUILDER_NAMES
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_FullPlatformsOpt(self):
@@ -211,6 +231,16 @@ class TestTryParser(unittest.TestCase):
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
         builders = dictslice(
             BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
+        # builders should be [] unless --buildbot is specified
+        builders = []
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_FullPlatformsOptLegacy(self):
+        tm = 'try: -b o -p full --buildbot'
+        self.customBuilders = TryParser(
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = dictslice(
+            LEGACY_BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
         builders = [base_platform(b) for b in builders]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
@@ -218,15 +248,31 @@ class TestTryParser(unittest.TestCase):
         tm = 'try: -b d -p full'
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
+        # builders should be [] unless --buildbot is specified
+        builders = []
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_FullPlatformsDebugLegacy(self):
+        tm = 'try: -b d -p full --buildbot'
+        self.customBuilders = TryParser(
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
         builders = dictslice(
-            BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
+            LEGACY_BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_AllPlatformsBoth(self):
         tm = 'try: -b od -p all'
         self.customBuilders = TryParser(
             tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES)
-        builders = [b for b in BUILDER_PRETTY_NAMES.values(
+        # builders should be [] unless --buildbot is specified
+        builders = []
+        self.assertEqual(sorted(self.customBuilders), sorted(builders))
+
+    def test_AllPlatformsBothLegacy(self):
+        tm = 'try: -b od -p all --buildbot'
+        self.customBuilders = TryParser(
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = [b for b in LEGACY_BUILDER_PRETTY_NAMES.values(
         ) if 'nondefault' not in b]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
@@ -237,6 +283,14 @@ class TestTryParser(unittest.TestCase):
         builders = dictslice(
             BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
         builders = [b for b in builders if 'nondefault' not in b]
+
+    def test_AllPlatformsOptLegacy(self):
+        tm = 'try: -b o -p all --buildbot'
+        self.customBuilders = TryParser(
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = dictslice(
+            LEGACY_BUILDER_PRETTY_NAMES, lambda p: 'debug' not in p).values()
+        builders = [b for b in builders if 'nondefault' not in b]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_AllPlatformsDebug(self):
@@ -246,98 +300,106 @@ class TestTryParser(unittest.TestCase):
         builders = dictslice(
             BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
         builders = [b for b in builders if 'nondefault' not in b]
+
+    def test_AllPlatformsDebugLegacy(self):
+        tm = 'try: -b d -p all --buildbot'
+        self.customBuilders = TryParser(
+            tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES)
+        builders = dictslice(
+            LEGACY_BUILDER_PRETTY_NAMES, lambda p: 'debug' in p).values()
+        builders = [b for b in builders if 'nondefault' not in b]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_NoNondefaultTests(self):
-        tm = 'try: -b d -p macosx64 -u all'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        tm = 'try: -b d -p macosx64 -u all --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = self.filterTesters(['macosx64'])
-        builders = self.removeNondefaults(builders, TESTER_PRETTY_NAMES)
+        builders = self.removeNondefaults(builders, LEGACY_TESTER_PRETTY_NAMES)
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_NondefaultsTest(self):
-        tm = 'try: -b d -p macosx64 -u all[]'
+        tm = 'try: -b d -p macosx64 -u all[] --buildbot'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = self.filterTesters(['macosx64'])
         builders = [b for b in builders if 'talos' not in b]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_MochitestAliasesOnBuilderMaster(self):
-        tm = 'try: -b od -p win32 -u mochitests'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = [BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
+        tm = 'try: -b od -p win32 -u mochitests --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, LEGACY_BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
         builders += [t for t in VALID_UPN if 'mochitest' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b od -p win32 -u mochitest-bc'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = [BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
+        tm = 'try: -b od -p win32 -u mochitest-bc --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, LEGACY_BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
         builders += [t for t in VALID_UPN if 'mochitest-browser-chrome' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b od -p win32 -u mochitest-o'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = [BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
+        tm = 'try: -b od -p win32 -u mochitest-o --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, LEGACY_BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES[p] for p in ['win32', 'win32-debug']]
         builders += [t for t in VALID_UPN if 'mochitest-other' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_MochitestAliasesOnTestMaster(self):
-        tm = 'try: -b od -p all -u mochitests'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [t for t in VALID_TESTER_NAMES if 'mochitest' in t]
+        tm = 'try: -b od -p all -u mochitests --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [t for t in LEGACY_VALID_TESTER_NAMES if 'mochitest' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b od -p win32 -u mochitest-bc'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [t for t in self.filterTesters(['win32'])
+        tm = 'try: -b od -p linux64 -u mochitest-bc'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [t for t in self.filterTesters(['linux64'])
                     if 'mochitest-browser-chrome' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b od -p win32 -u mochitest-o'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [t for t in self.filterTesters(['win32'])
+        tm = 'try: -b od -p linux64 -u mochitest-o'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [t for t in self.filterTesters(['linux64'])
                     if 'mochitest-other' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_MochitestAliasesOnTestMasterDebugOnly(self):
-        tm = 'try: -b d -p all -u mochitests'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [t for t in VALID_TESTER_NAMES if 'mochitest' in t and 'debug' in t]
+        tm = 'try: -b d -p all -u mochitests --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [t for t in LEGACY_VALID_TESTER_NAMES if 'mochitest' in t and 'debug' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_BuildMasterDebugWin32Tests(self):
-        tm = 'try: -b d -p win32 -u mochitests'
+        tm = 'try: -b d -p win32 -u mochitests --buildbot'
         # test in the getBuilders (for local builder_master unittests)
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
         builders = self.filterBuilders(['win32-debug'],
-                                       valid=VALID_BUILDER_NAMES + VALID_UPN,
+                                       valid=LEGACY_VALID_BUILDER_NAMES + VALID_UPN,
                                        pretties=UNITTEST_PRETTY_NAMES)
         builders = [t for t in builders if 'mochitest' in t and 'debug' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_ReftestAliases(self):
-        tm = 'try: -b d -p win32 -u reftests'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        tm = 'try: -b d -p win32 -u reftests --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
         builders = self.filterBuilders(['win32-debug'],
-                                       valid=VALID_BUILDER_NAMES + VALID_UPN,
+                                       valid=LEGACY_VALID_BUILDER_NAMES + VALID_UPN,
                                        pretties=UNITTEST_PRETTY_NAMES)
         builders = [t for t in builders if 'reftest' in t]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b d -p win32 -u reftest'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        tm = 'try: -b d -p win32 -u reftest --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_DevtoolsE10sAliases(self):
-        tm = 'try: -b d -p win32 -u mochitest-e10s-devtools-chrome'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        tm = 'try: -b d -p win32 -u mochitest-e10s-devtools-chrome --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, {}, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
         builders = self.filterBuilders(['win32-debug'],
-                                       valid=VALID_BUILDER_NAMES + VALID_UPN,
+                                       valid=LEGACY_VALID_BUILDER_NAMES + VALID_UPN,
                                        pretties=UNITTEST_PRETTY_NAMES)
         builders = [t for t in builders if 'mochitest-e10s-devtools-chrome' in t]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
         self.assertEquals(len(self.customBuilders), 1)
 
     def test_ReftestMobileAliases(self):
-        tm = 'try: -b d -p win32 -u reftests'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_REFTEST_NAMES, {}, UNITTEST_PRETTY_NAMES, MOBILE_UNITTEST_SUITES)
+        tm = 'try: -b d -p win32 -u reftests --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_REFTEST_NAMES, {}, UNITTEST_PRETTY_NAMES, MOBILE_UNITTEST_SUITES)
         builders = self.filterBuilders(['win32-debug'],
-                                       valid=VALID_BUILDER_NAMES +
+                                       valid=LEGACY_VALID_BUILDER_NAMES +
                                        VALID_REFTEST_NAMES,
                                        pretties=UNITTEST_PRETTY_NAMES)
         # MOBILE_UNITTEST_SUITES only has 'reftest-1' and 'reftest-3', not
@@ -347,157 +409,97 @@ class TestTryParser(unittest.TestCase):
         # now by only accepting the substring 'reftest-'.
         builders = [t for t in builders if 'reftest-' in t]
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
-        tm = 'try: -b d -p win32 -u reftest'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_REFTEST_NAMES, {}, UNITTEST_PRETTY_NAMES, MOBILE_UNITTEST_SUITES)
+        tm = 'try: -b d -p win32 -u reftest --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_REFTEST_NAMES, {}, UNITTEST_PRETTY_NAMES, MOBILE_UNITTEST_SUITES)
         self.assertEquals(sorted(self.customBuilders), sorted(builders))
 
     def test_SelectTests(self):
-        tm = 'try: -b od -p win32 -u crashtest,mochitest-other'
+        tm = 'try: -b od -p win32 -u crashtest,mochitest-other --buildbot'
         # test in the getBuilders (for local builder_master unittests)
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES + VALID_UPN, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = [BUILDER_PRETTY_NAMES['win32'],
-                    BUILDER_PRETTY_NAMES['win32-debug']]
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES + VALID_UPN, LEGACY_BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES['win32'],
+                    LEGACY_BUILDER_PRETTY_NAMES['win32-debug']]
         testers = self.filterBuilders(['win32-debug'],
-                                      valid=VALID_BUILDER_NAMES + VALID_UPN,
+                                      valid=LEGACY_VALID_BUILDER_NAMES + VALID_UPN,
                                       pretties=UNITTEST_PRETTY_NAMES)
         builders += [
-            t for t in testers if 'crashtest' in t or 'mochitest-other' in t]
-
+             t for t in testers if 'crashtest' in t or 'mochitest-other' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
         # test in the getTestBuilders (for local builder_master unittests)
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = self.filterTesters(['win32'])
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = self.filterTesters(['linux64'])
         builders = [
             t for t in builders if 'crashtest' in t or 'mochitest-other' in t]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
-    def testAllTestsWithSets(self):
-        tm = 'try: -b o -p android-x86 -u all -t none'
-        builders_with_sets = {'xpcshell': 'androidx86-set-4'}
-        selected_builders = TryParser(tm,
-                                      ['Android 4.2 x86 Emulator try opt test androidx86-set-4'],
-                                      {
-                                          'android-x86': 'Android 4.2 x86 Emulator',
-                                      },
-                                      None,
-                                      ['androidx86-set-4'],
-                                      buildersWithSetsMap=builders_with_sets)
-        self.assertEqual(selected_builders,
-                         ['Android 4.2 x86 Emulator try opt test androidx86-set-4'])
+
+    # these builds and tests have been deprecated on buildbot
+    #def testAllTestsWithSets(self):
+    #    tm = 'try: -b o -p android-x86 -u all -t none'
+    #    builders_with_sets = {'xpcshell': 'androidx86-set-4'}
+    #    selected_builders = TryParser(tm,
+    #                                  ['Android 4.2 x86 Emulator try opt test androidx86-set-4'],
+    #                                  {
+    #                                      'android-x86': 'Android 4.2 x86 Emulator',
+    #                                  },
+    #                                  None,
+    #                                  ['androidx86-set-4'],
+    #                                  buildersWithSetsMap=builders_with_sets)
+    #    self.assertEqual(selected_builders,
+    #                     ['Android 4.2 x86 Emulator try opt test androidx86-set-4'])
+
 
     def test_NoTests(self):
-        tm = 'try: -b od -p linux,win32 -u none'
+        tm = 'try: -b od -p win32 -u none --buildbot'
         # test in getBuilders
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES, UNITTEST_PRETTY_NAMES, UNITTEST_SUITES)
-        builders = self.filterBuilders(
-            ['linux', 'linux-debug', 'win32', 'win32-debug'])
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES, LEGACY_TESTER_PRETTY_NAMES, UNITTEST_SUITES)
+        builders = self.filterBuilders(['win32', 'win32-debug'], LEGACY_BUILDER_PRETTY_NAMES, LEGACY_VALID_BUILDER_NAMES )
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
         # test in getTestBuilders
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
         builders = []
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_AllTalos(self):
         # should get all unittests too since that's the default set
-        tm = 'try: -b od -t all'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES, TALOS_SUITES)
+        tm = 'try: -b od -t all --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, UNITTEST_SUITES, TALOS_SUITES)
         builders = self.removeNondefaults(
-            VALID_TESTER_NAMES, TESTER_PRETTY_NAMES)
+            LEGACY_VALID_TESTER_NAMES, LEGACY_TESTER_PRETTY_NAMES)
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_SelecTalos(self):
-        tm = 'try: -b od -p win32 -t tp4'
+        tm = 'try: -b od -p linux64 -t tp4'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
-        builders = self.filterTesters(['win32'])
+        builders = self.filterTesters(['linux64'])
         builders = [t for t in builders if 'tp4' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_SelecTalosWithNoTalosPlatforms(self):
-        tm = 'try: -b od -p win32,android-r7 -t tp4'
+        tm = 'try: -b od -p linux64,android-r7 -t tp4'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
-        builders = self.filterTesters(['win32', 'android-r7'])
+        builders = self.filterTesters(['linux64', 'android-r7'])
         builders = [t for t in builders if 'tp4' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_NoTalos(self):
-        tm = 'try: -b od -p linux,win32 -t none'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
+        tm = 'try: -b od -p linux,win32 -t none --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_TESTER_PRETTY_NAMES, None, None, TALOS_SUITES)
         builders = []
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_DebugWin32OnTestMaster(self):
-        tm = 'try: -b do -p win32 -u crashtest'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = self.filterTesters(['win32'])
-        builders = [t for t in builders if 'crashtest' in t]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def test_RestrictionBaseline(self):
         # This isn't really a test of anything. It's mostly to make reading the
         # following tests easier by giving the full set of possible builds
         # without any filtering.
-        tm = 'try: -b do -p win32 -u crashtest,reftest'
+        tm = 'try: -b do -p linux64 -u crashtest,reftest'
         self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = self.filterTesters(['win32'])
+        builders = self.filterTesters(['linux64'])
         builders = [t for t in builders if 'crashtest' in t or 'reftest' in t]
         self.assertEqual(sorted(self.baselineBuilders), sorted(builders))
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
-    def test_Include5_1(self):
-        tm = 'try: -b do -p win32 -u crashtest[5.1]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [b for b in self.baselineBuilders if 'crashtest' in b and '5.1' in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_IncludeExclude(self):
-        tm = 'try: -b do -p win32 -u crashtest[-5.1,debug]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [b for b in self.baselineBuilders
-                    if 'crashtest' in b
-                          and '5.1' not in b
-                          and 'debug' in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_IncludeExcludeEmpty(self):
-        tm = 'try: -b do -p win32 -u crashtest[-5.1,5.1]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = []
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_IncludeDummyExclude(self):
-        tm = 'try: -b do -p win32 -u crashtest[5.1,-notfound]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [b for b in self.baselineBuilders
-                    if 'crashtest' in b
-                          and '5.1' in b
-                          and 'notfound' not in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_Exclude5_1(self):
-        tm = 'try: -b do -p win32 -u crashtest[-5.1]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [b for b in self.baselineBuilders
-                    if 'crashtest' in b
-                          and '5.1' not in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_MultipleInclusions(self):
-        tm = 'try: -b do -p win32 -u all[5.1,crash]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [
-            b for b in self.baselineBuilders if '5.1' in b or 'crash' in b]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
-    def test_bug875252(self):
-        tm = 'try: -b do -p win32 -u crashtest[5.1,Windows XP]'
-        self.customBuilders = TryParser(tm, VALID_TESTER_NAMES, TESTER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [b for b in self.baselineBuilders
-                    if 'crashtest' in b
-                    and ('5.1' in b or 'Windows XP' in b)]
-        self.assertEqual(sorted(self.customBuilders), sorted(builders))
-
     def test_bug1308789(self):
-        tm = 'try: -b do -p all -u all[Windows 8,Windows XP]'
+        tm = 'try: -b do -p all -u all[Windows 8,Windows XP] --buildbot'
         validTesterNames = ['Windows 8 64-bit try opt test reftest',
                             'Windows 7 32-bit try opt test reftest',
                             'Windows XP 32-bit try opt test reftest']
@@ -516,9 +518,9 @@ class TestTryParser(unittest.TestCase):
         self.assertEqual(sorted(customBuilders), sorted(expectedBuilders))
 
     def test_HiddenCharactersAndOldSyntax(self):
-        tm = 'attributes\ntry: -b o -p linux64 -m none -u reftest -t none'
-        self.customBuilders = TryParser(tm, VALID_BUILDER_NAMES, BUILDER_PRETTY_NAMES, None, UNITTEST_SUITES)
-        builders = [BUILDER_PRETTY_NAMES['linux64']]
+        tm = 'attributes\ntry: -b o -p win32 -m none -u reftest -t none --buildbot'
+        self.customBuilders = TryParser(tm, LEGACY_VALID_BUILDER_NAMES, LEGACY_BUILDER_PRETTY_NAMES, None, UNITTEST_SUITES)
+        builders = [LEGACY_BUILDER_PRETTY_NAMES['win32']]
         self.assertEqual(sorted(self.customBuilders), sorted(builders))
 
     def _testNewLineProcessMessage(self, message, value=None):

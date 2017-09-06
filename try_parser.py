@@ -312,6 +312,9 @@ def TryParser(
                         default='none',
                         dest='talos',
                         help='provide a list of talos tests, or specify all (default is None)')
+    parser.add_argument('--buildbot',
+                        action='store_true',
+                        help='run windows buildbot windows jobs')
 
     message = processMessage(message)
     if message is None:
@@ -378,14 +381,24 @@ def TryParser(
             elif p + '-debug' in defaultPrettyNames:
                 default_platforms.add(p)
 
+
     user_platforms = set()
     for platform in options.user_platforms.split(','):
         if platform == 'all':
-            user_platforms.update(default_platforms)
+            # Bug 1384706 - trychooser syntax should not invoke buildbot jobs by default
+            if options.buildbot:
+                user_platforms.update(default_platforms)
+            # otherwise user_platforms stays as an empty set because we don't have buildbot jobs to run
         elif platform == 'full':
-            user_platforms.update(all_platforms)
+            if options.buildbot:
+                user_platforms.update(all_platforms)
+            # otherwise user_platforms stays as an empty set because we don't have buildbot jobs to run
         else:
-            user_platforms.add(platform)
+            if options.buildbot and platform in ['win32', 'win64', 'macosx64']:
+                user_platforms.add(platform)
+    # if the user platforms don't specify win32 we just exit
+    if user_platforms == set([]):
+        return []
 
     options.user_platforms = user_platforms
 
