@@ -2184,10 +2184,6 @@ def generateReleasePromotionBuilders(branch_config, branch_name, product,
 
     return builders
 
-# TODO: Add mozilla-beta.
-# TODO: Add mozilla-release once Fennec 56 reaches release
-BRANCHES_WITH_API_LEVEL_16 = ('jamun',)
-
 
 def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
                                            secrets):
@@ -2196,9 +2192,11 @@ def generateFennecReleasePromotionBuilders(branch_config, branch_name, product,
     tools_repo_path = branch_config.get('build_tools_repo_path')
     tools_repo = '%s%s' % (branch_config['hgurl'], tools_repo_path)
 
-    api_level = 'api-16' if branch_name in BRANCHES_WITH_API_LEVEL_16 else 'api-15'
-    arm_platform = 'android-%s' % api_level
-    arm_platform_config = branch_config['platforms'][arm_platform]
+    # In release promotion, the API level is just used to name and identify API-agnostic
+    # machines. Thus, there is no need to upgrade/define a new config for higher APIs.
+    # For more details, see https://bugzilla.mozilla.org/show_bug.cgi?id=1384482#c85
+    # and following comments.
+    arm_platform_config = branch_config['platforms']['android-api-15']
 
     bouncer_mh_cfg = {
         "script_name": "scripts/bouncer_submitter.py",
