@@ -2371,7 +2371,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             command=[python_cmd, script_file,
                      '-s', self.stageServer,
                      '-d', use_latest_dir,
-                     '-m', marPattern]
+                     '-m', marPattern],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
             flunkOnFailure=False,
             haltOnFailure=False,
