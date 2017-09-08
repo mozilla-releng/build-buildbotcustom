@@ -34,11 +34,6 @@ class HTTPSVerifyingContextFactory(ContextFactory):
         return ctx
 
     def verifyHostname(self, connection, x509, errno, depth, preverifyOK):
-        if preverifyOK:
-            # Accept a hostname that matches the cert's commonName,
-            # or 'mozilla.com' for the releng_CA
-            if x509.get_subject().commonName not in (self.hostname, "mozilla.com"):
-                return False
         return preverifyOK
 
 
