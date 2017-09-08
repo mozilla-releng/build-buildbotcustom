@@ -2359,16 +2359,19 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # from staging. Version bumps can also often involve multiple mars
         # living in the latest dir, so we grab the latest one.            
         marPattern = self.getCompleteMarPatternMatch()
+        python_cmd = self.pythonWithJson(self.platform)
+        script_file = WithProperties('%(toolsdir)/scripts/marutil/get_mar_filename.py')
+        use_latest_dir = self.latestDir
+        if use_latest_dir[-1] != '/':
+            # the archive.mozilla.org server needs / at the end for paths.
+            use_latest_dir += '/'
         self.addStep(SetProperty(
             name='get_previous_mar_filename',
             description=['get', 'previous', 'mar', 'filename'],
-            command=['bash', '-c',
-                     WithProperties('ssh -l %s -i ~/.ssh/%s %s ' % (self.stageUsername,
-                                                                    self.stageSshKey,
-                                                                    self.stageServer) +
-                                    'ls -1t %s | grep %s$ | head -n 1' % (self.latestDir,
-                                                                        marPattern))
-                     ],
+            command=[python_cmd, script_file,
+                     '-s', self.stageServer,
+                     '-d', use_latest_dir,
+                     '-m', marPattern]
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
             flunkOnFailure=False,
             haltOnFailure=False,
