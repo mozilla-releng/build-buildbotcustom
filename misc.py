@@ -2190,10 +2190,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'mock_copyin_files' : pf.get('mock_copyin_files'),
                 'balrog_api_root': config.get('balrog_api_root', None),
                 'balrog_username': config.get('balrog_username', None),
-                'balrog_submitter_extra_args': config.get('balrog_submitter_extra_args', []),
-                'balrog_credentials_file': pf.get('balrog_credentials_file', None),
-                'balrog_submit_type': config.get('releaseChannel', '_nightly'),
-                'balrog_submit': config.get('balrog_submit', False),
+                'balrog_submitter_extra_args': pf.get('balrog_submitter_extra_args', []),
+                'balrog_credentials_file': config.get('balrog_credentials_file', None),
+                'balrog_submit_type': 'regular',
+                'balrog_submit': pf.get('balrog_submit', False),
             }
             factory_kwargs.update(extra_args)
 
@@ -2460,8 +2460,10 @@ def generateCCBranchObjects(config, name, secrets=None):
                 mock_copyin_files=pf.get('mock_copyin_files'),
                 balrog_api_root=config.get('balrog_api_root', None),
                 balrog_username=config.get('balrog_username', None),
-                balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
-                balrog_credentials_file=pf.get('balrog_credentials_file', None),
+                balrog_submitter_extra_args=pf.get('balrog_submitter_extra_args', []),
+                balrog_credentials_file=config.get('balrog_credentials_file', None),
+                balrog_submit_type='nightly',
+                balrog_submit=pf.get('balrog_submit', False),
                 **nightly_kwargs
             )
 
@@ -2539,6 +2541,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         balrog_api_root=config.get('balrog_api_root', None),
                         balrog_username=config.get('balrog_username', None),
                         balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
+                        balrog_submit_type='nightly',
                         balrog_credentials_file=pf.get('balrog_credentials_file', None),
                     )
                     mozilla2_l10n_nightly_builder = {
@@ -2682,6 +2685,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                 balrog_api_root=config.get('balrog_api_root', None),
                 balrog_username=config.get('balrog_username', None),
                 balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
+                balrog_submit_type='regular',
+                balrog_submit=False,
                 balrog_credentials_file=pf.get('balrog_credentials_file', None)
             )
             mozilla2_l10n_dep_builder = {
