@@ -3418,7 +3418,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             self.addGetTokenSteps()
         self.doRepack()
         self.doUpload()
-        self.submitBalrogUpdates(type_=self.balrog_submit_type):
+        self.submitBalrogUpdates(type_=self.balrog_submit_type)
         if self.testPrettyNames:
             self.doTestPrettyNames()
 
