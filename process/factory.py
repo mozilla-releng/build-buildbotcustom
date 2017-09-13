@@ -970,6 +970,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  balrog_credentials_file=None,
                  balrog_submit_type=None,
                  balrog_submit=False,
+                 mozillaRelBranch='default',
                  **kwargs):
         MozillaBuildFactory.__init__(self, platform=platform,
                                      use_mock=use_mock,
@@ -1056,6 +1057,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         self.mock_copyin_files = mock_copyin_files
         self.mozillaDir = mozillaDir
         self.mozillaSrcDir = mozillaSrcDir
+        self.mozillaRelBranch = mozillaRelBranch
 
         assert len(self.tooltool_url_list) <= 1, "multiple urls not currently supported by tooltool"
 
@@ -2172,6 +2174,14 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 timeout=60*60 # 1 hour
             ))
 
+        if self.mozillaRelBranch != 'default':
+            self.addStep(ShellCommand(
+                name='Use branch : %s' % self.mozillaRelBranch,
+                command=['hg', 'up', '-r', self.mozillaRelBranch]
+                haltOnFailure=True,
+                workdir='build',
+            ))
+
         if self.buildRevision:
             self.addStep(ShellCommand(
              name='hg_update',
@@ -2294,6 +2304,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             balrog_credentials_file=None,
             balrog_submit_type=None,
             balrog_submit=False,
+            mozillaRelBranch='default',
             **kwargs):
 
         self.talosMasters = talosMasters or []
@@ -2317,6 +2328,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                                        balrog_credentials_file=balrog_credentials_file,
                                        balrog_submit_type=balrog_submit_type,
                                        balrog_submit=balrog_submit,
+                                       mozillaRelBranch=mozillaRelBranch,
                                        **kwargs)
 
     def makePartialTools(self):
@@ -2799,6 +2811,7 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
                  balrog_credentials_file=None,
                  balrog_submit_type=None,
                  balrog_submit=False,
+                 mozillaRelBranch='default',
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -2826,6 +2839,7 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
             balrog_credentials_file=balrog_credentials_file,
             balrog_submit_type=balrog_submit_type,
             balrog_submit=balrog_submit,
+            mozillaRelBranch=mozillaRelBranch,
             **kwargs)
 
     # MercurialBuildFactory defines those, and our inheritance chain makes us

@@ -2129,6 +2129,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'objdir': pf['platform_objdir'],
                 'mozillaDir': config.get('mozilla_dir', None),
                 'mozillaSrcDir': config.get('mozilla_srcdir', None),
+                'mozillaRelbranch': config.get('mozilla_relbranch', 'default'),
                 'platform': platform,
                 'hgHost': config['hghost'],
                 'repoPath': config['repo_path'],
