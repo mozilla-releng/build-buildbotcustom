@@ -2181,7 +2181,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 name='Use branch : %s' % self.mozillaRelBranch,
                 command=['hg', 'up', '-r', self.mozillaRelBranch],
                 haltOnFailure=True,
-                workdir='build',
+                workdir='build/mozilla',
             ))
 
         if self.buildRevision:
