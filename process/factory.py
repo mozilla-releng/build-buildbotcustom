@@ -2394,7 +2394,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
         # living in the latest dir, so we grab the latest one.            
         marPattern = self.getCompleteMarPatternMatch()
         python_cmd = self.pythonWithJson(self.platform)
-        script_file = WithProperties('%(toolsdir)/scripts/marutils/get_mar_filename.py')
+        script_file = WithProperties('%(toolsdir)s/scripts/marutils/get_mar_filename.py')
         use_latest_dir = self.latestDir
         if use_latest_dir[-1] != '/':
             # the archive.mozilla.org server needs / at the end for paths.
