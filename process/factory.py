@@ -2176,14 +2176,6 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
                 timeout=60*60 # 1 hour
             ))
 
-        if self.mozillaRelBranch != 'default':
-            self.addStep(ShellCommand(
-                name='Use branch : %s' % self.mozillaRelBranch,
-                command=['hg', 'up', '-r', self.mozillaRelBranch],
-                haltOnFailure=True,
-                workdir='build/mozilla',
-            ))
-
         if self.buildRevision:
             self.addStep(ShellCommand(
              name='hg_update',
@@ -2240,6 +2232,14 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
          haltOnFailure=True,
          timeout=60*60, # 1 hour
         ))
+
+        if self.mozillaRelBranch != 'default':
+            self.addStep(ShellCommand(
+                name='Use branch : %s' % self.mozillaRelBranch,
+                command=['hg', 'up', '-r', self.mozillaRelBranch],
+                haltOnFailure=True,
+                workdir='build/mozilla',
+            ))
 
         self.addStep(SetProperty(
          name='set_hg_revision',
