@@ -469,7 +469,9 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
             balrog_submitter_extra_args=[],
             balrog_credentials_file=None,
             balrog_submit_type=None,
-            balrog_submit=False, **kwargs):
+            balrog_submit=False,
+            mozillaRelBranch=None,
+            **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
         if hgHost.endswith('/'):
@@ -2177,7 +2179,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         if self.mozillaRelBranch != 'default':
             self.addStep(ShellCommand(
                 name='Use branch : %s' % self.mozillaRelBranch,
-                command=['hg', 'up', '-r', self.mozillaRelBranch]
+                command=['hg', 'up', '-r', self.mozillaRelBranch],
                 haltOnFailure=True,
                 workdir='build',
             ))
