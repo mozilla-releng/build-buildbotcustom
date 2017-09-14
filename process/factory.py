@@ -471,7 +471,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
             balrog_submit_type=None,
             balrog_submit=False,
             mozillaRelBranch=None,
-            archiveServer=None,
             **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
@@ -508,7 +507,6 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
         self.balrog_submitter_extra_args = balrog_submitter_extra_args
         self.balrog_submit_type = balrog_submit_type
         self.balrog_submit = balrog_submit
-        self.archiveServer = archiveServer
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -975,7 +973,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  balrog_submit_type=None,
                  balrog_submit=False,
                  mozillaRelBranch='default',
-                 archiveServer=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, platform=platform,
                                      use_mock=use_mock,
@@ -992,7 +989,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                                      balrog_credentials_file=balrog_credentials_file,
                                      balrog_submit_type=balrog_submit_type,
                                      balrog_submit=balrog_submit,
-                                     archiveServer=archiveServer,
                                      **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -2311,7 +2307,6 @@ class NightlyBuildFactory(MercurialBuildFactory):
             balrog_submit_type=None,
             balrog_submit=False,
             mozillaRelBranch='default',
-            archiveServer=None,
             **kwargs):
 
         self.talosMasters = talosMasters or []
@@ -2336,7 +2331,6 @@ class NightlyBuildFactory(MercurialBuildFactory):
                                        balrog_submit_type=balrog_submit_type,
                                        balrog_submit=balrog_submit,
                                        mozillaRelBranch=mozillaRelBranch,
-                                       archiveServer=archiveServer,
                                        **kwargs)
 
     def makePartialTools(self):
@@ -2423,7 +2417,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             name='get_previous_mar_filename',
             description=['get', 'previous', 'mar', 'filename'],
             command=[python_cmd, script_file,
-                     '-s', self.archiveServer,
+                     '-s', self.stageServer,
                      '-d', use_latest_dir,
                      '-m', marPattern],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
@@ -2431,7 +2425,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             haltOnFailure=False,
             warnOnFailure=True
         ))
-        previousMarURL = WithProperties('https://%s' % self.archiveServer + \
+        previousMarURL = WithProperties('https://%s' % self.stageServer + \
                           '%s' % self.latestDir + \
                           '/%(previousMarFilename)s')
         self.addStep(RetryingMockCommand(
@@ -2820,7 +2814,6 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
                  balrog_submit_type=None,
                  balrog_submit=False,
                  mozillaRelBranch='default',
-                 archiveServer=None,
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -2849,7 +2842,6 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
             balrog_submit_type=balrog_submit_type,
             balrog_submit=balrog_submit,
             mozillaRelBranch=mozillaRelBranch,
-            archiveServer=archiveServer,
             **kwargs)
 
     # MercurialBuildFactory defines those, and our inheritance chain makes us
@@ -3299,7 +3291,6 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                  balrog_submitter_extra_args=[],
                  balrog_submit=False,
                  balrog_submit_type='nightly',
-                 archiveServer=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, platform=platform,
                                      use_mock=self.use_mock,
@@ -3312,7 +3303,6 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                                      balrog_credentials_file=balrog_credentials_file,
                                      balrog_submit_type=balrog_submit_type,
                                      balrog_submit=balrog_submit,
-                                     archiveServer=archiveServer,
                                      **kwargs)
 
         self.project = project
@@ -4167,7 +4157,6 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                  objdir=None,
                  mozillaDir=None,
                  mozillaSrcDir=None,
-                 archiveServer=None,
                  tooltool_manifest_src=None,
                  tooltool_bootstrap="setup.sh",
                  tooltool_url_list=[],
