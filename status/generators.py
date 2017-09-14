@@ -50,6 +50,10 @@ def getSensibleCommitTitle(titles):
     Returns the first non-trychooser title with unnecessary cruft removed.
     """
     for title in titles:
+        # Skip try fuzzy commit.
+        if title.startswith("Pushed via 'mach try fuzzy'"):
+            continue
+
         # Remove trychooser syntax.
         title = re.sub(r'\btry: .*', '', title)
 
