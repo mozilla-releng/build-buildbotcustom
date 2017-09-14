@@ -471,6 +471,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
             balrog_submit_type=None,
             balrog_submit=False,
             mozillaRelBranch=None,
+            archiveServer=None,
             **kwargs):
         BuildFactory.__init__(self, **kwargs)
 
@@ -973,6 +974,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                  balrog_submit_type=None,
                  balrog_submit=False,
                  mozillaRelBranch='default',
+                 archiveServer=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, platform=platform,
                                      use_mock=use_mock,
@@ -989,6 +991,7 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                                      balrog_credentials_file=balrog_credentials_file,
                                      balrog_submit_type=balrog_submit_type,
                                      balrog_submit=balrog_submit,
+                                     archiveServer=archiveServer,
                                      **kwargs)
 
         # Make sure we have a buildid and builduid
@@ -2307,6 +2310,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             balrog_submit_type=None,
             balrog_submit=False,
             mozillaRelBranch='default',
+            archiveServer=None,
             **kwargs):
 
         self.talosMasters = talosMasters or []
@@ -2331,6 +2335,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
                                        balrog_submit_type=balrog_submit_type,
                                        balrog_submit=balrog_submit,
                                        mozillaRelBranch=mozillaRelBranch,
+                                       archiveServer=archiveServer,
                                        **kwargs)
 
     def makePartialTools(self):
@@ -2814,6 +2819,7 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
                  balrog_submit_type=None,
                  balrog_submit=False,
                  mozillaRelBranch='default',
+                 archiveServer=None,
                  **kwargs):
         self.skipBlankRepos = skipBlankRepos
         self.mozRepoPath = mozRepoPath
@@ -2842,6 +2848,7 @@ class CCNightlyBuildFactory(CCMercurialBuildFactory, NightlyBuildFactory):
             balrog_submit_type=balrog_submit_type,
             balrog_submit=balrog_submit,
             mozillaRelBranch=mozillaRelBranch,
+            archiveServer=archiveServer,
             **kwargs)
 
     # MercurialBuildFactory defines those, and our inheritance chain makes us
@@ -3284,13 +3291,13 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                  mock_target=None,
                  mock_packages=None,
                  mock_copyin_files=None,
-                 archiveServer=None,
                  balrog_credentials_file=None,
                  balrog_api_root=None,
                  balrog_username=None,
                  balrog_submitter_extra_args=[],
                  balrog_submit=False,
                  balrog_submit_type='nightly',
+                 archiveServer=None,
                  **kwargs):
         MozillaBuildFactory.__init__(self, platform=platform,
                                      use_mock=self.use_mock,
@@ -3303,6 +3310,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                                      balrog_credentials_file=balrog_credentials_file,
                                      balrog_submit_type=balrog_submit_type,
                                      balrog_submit=balrog_submit,
+                                     archiveServer=archiveServer,
                                      **kwargs)
 
         self.project = project

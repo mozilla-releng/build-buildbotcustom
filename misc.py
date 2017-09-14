@@ -2195,6 +2195,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'balrog_credentials_file': config.get('balrog_credentials_file', None),
                 'balrog_submit_type': 'regular',
                 'balrog_submit': pf.get('balrog_submit', False),
+                'archiveServer': config.get('archive_server', None),
             }
             factory_kwargs.update(extra_args)
 
@@ -2465,6 +2466,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 balrog_credentials_file=config.get('balrog_credentials_file', None),
                 balrog_submit_type='nightly',
                 balrog_submit=pf.get('balrog_submit', False),
+                archiveServer=config.get('archive_server', None),
                 **nightly_kwargs
             )
 
