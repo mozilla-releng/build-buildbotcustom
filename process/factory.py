@@ -508,6 +508,7 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
         self.balrog_submitter_extra_args = balrog_submitter_extra_args
         self.balrog_submit_type = balrog_submit_type
         self.balrog_submit = balrog_submit
+        self.archiveServer = archiveServer
 
         self.repository = self.getRepository(repoPath)
         if branchName:
@@ -2422,7 +2423,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             name='get_previous_mar_filename',
             description=['get', 'previous', 'mar', 'filename'],
             command=[python_cmd, script_file,
-                     '-s', self.stageServer,
+                     '-s', self.archiveServer,
                      '-d', use_latest_dir,
                      '-m', marPattern],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
@@ -2430,7 +2431,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             haltOnFailure=False,
             warnOnFailure=True
         ))
-        previousMarURL = WithProperties('https://%s' % self.stageServer + \
+        previousMarURL = WithProperties('https://%s' % self.archiveServer + \
                           '%s' % self.latestDir + \
                           '/%(previousMarFilename)s')
         self.addStep(RetryingMockCommand(
