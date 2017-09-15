@@ -2422,7 +2422,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             name='get_previous_mar_filename',
             description=['get', 'previous', 'mar', 'filename'],
             command=[python_cmd, script_file,
-                     '-s', self.archiveServer,
+                     '-s', self.stageServer,
                      '-d', use_latest_dir,
                      '-m', marPattern],
             extract_fn=marFilenameToProperty(prop_name='previousMarFilename'),
@@ -2430,7 +2430,7 @@ class NightlyBuildFactory(MercurialBuildFactory):
             haltOnFailure=False,
             warnOnFailure=True
         ))
-        previousMarURL = WithProperties('https://%s' % self.archiveServer + \
+        previousMarURL = WithProperties('https://%s' % self.stageServer + \
                           '%s' % self.latestDir + \
                           '/%(previousMarFilename)s')
         self.addStep(RetryingMockCommand(
@@ -2943,7 +2943,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             (self.productName, self.oldVersion, self.version)
         oldCandidatesDir = makeCandidatesDir(
             self.productName, self.oldVersion, self.oldBuildNumber,
-            protocol='http', server=self.archiveServer)
+            protocol='http', server=self.stageServer)
         previousMarURL = '%s/update/%s/en-US/%s' % \
             (oldCandidatesDir, getPlatformFtpDir(self.platform),
              previous_mar_name)
