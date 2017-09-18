@@ -74,14 +74,20 @@ def get_l10n_repositories(file, l10nRepoPath, relbranch):
         l10nRepoPath = l10nRepoPath + '/'
     repositories = {}
     for localeLine in open(file).readlines():
-        locale, revision = localeLine.rstrip().split()
+        line_list = localeLine.rstrip().split()
+        if len(line_list) == 2:
+            locale, revision = line_list
+            use_relbranch = relbranch
+        elif len(line_list) == 3:
+            locale, revision, use_relbranch = line_list
+
         if revision == 'FIXME':
             raise Exception('Found FIXME in %s for locale "%s"' % \
                            (file, locale))
         locale = urljoin(l10nRepoPath, locale)
         repositories[locale] = {
             'revision': revision,
-            'relbranchOverride': relbranch,
+            'relbranchOverride': use_relbranch,
             'bumpFiles': []
         }
 
