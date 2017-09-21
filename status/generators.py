@@ -35,8 +35,10 @@ https://treeherder.mozilla.org/perf.html#/comparechooser?newProject=try&newRevis
         msgdict['subject'] += ': %(title)s' % locals()
         msgdict['body'] += """\
 
-Once completed, builds and logs will be available at:
-%(packageDir)s
+Once completed, all build and log artifacts will be available through the Treeherder URL above.
+
+All Taskcluster based artifacts can also be found in the Taskcluster Artifact Index:
+e.g.  https://tools.taskcluster.net/index/artifacts/gecko.v2.try.revision.%(revision)s
 
 Summary:
   * %(allTitles)s
