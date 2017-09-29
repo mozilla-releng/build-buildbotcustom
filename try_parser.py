@@ -323,6 +323,10 @@ def TryParser(
 
     (options, unknown_args) = parser.parse_known_args(message)
 
+    # Bug 1384706 - trychooser syntax should not invoke buildbot jobs by default
+    if not options.buildbot:
+        return []
+
     if options.build == 'do' or options.build == 'od':
         options.build = ['opt', 'debug']
     elif options.build == 'd':
@@ -381,21 +385,14 @@ def TryParser(
             elif p + '-debug' in defaultPrettyNames:
                 default_platforms.add(p)
 
-
     user_platforms = set()
     for platform in options.user_platforms.split(','):
         if platform == 'all':
-            # Bug 1384706 - trychooser syntax should not invoke buildbot jobs by default
-            if options.buildbot:
-                user_platforms.update(default_platforms)
-            # otherwise user_platforms stays as an empty set because we don't have buildbot jobs to run
+            user_platforms.update(default_platforms)
         elif platform == 'full':
-            if options.buildbot:
-                user_platforms.update(all_platforms)
-            # otherwise user_platforms stays as an empty set because we don't have buildbot jobs to run
+            user_platforms.update(all_platforms)
         else:
-            if options.buildbot and platform in ['win32', 'win64', 'macosx64']:
-                user_platforms.add(platform)
+            user_platforms.add(platform)
     # if the user platforms don't specify win32 we just exit
     if user_platforms == set([]):
         return []
