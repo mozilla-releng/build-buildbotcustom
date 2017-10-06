@@ -67,9 +67,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     l10nChunks = releaseConfig.get('l10nChunks', DEFAULT_PARALLELIZATION)
     updateVerifyChunks = releaseConfig.get(
         'updateVerifyChunks', DEFAULT_PARALLELIZATION)
-    # Re-use the same chunking configuration
-    ui_update_verify_chunks = releaseConfig.get(
-        'updateVerifyChunks', DEFAULT_PARALLELIZATION)
     tools_repo_path = releaseConfig.get('build_tools_repo_path',
                                         branchConfig['build_tools_repo_path'])
     tools_repo = '%s%s' % (branchConfig['hgurl'], tools_repo_path)
@@ -306,10 +303,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
         return parallelizeBuilders("update_verify_%s" % channel, platform,
                                    updateVerifyChunks)
 
-    def ui_update_verify_builders(platform, channel):
-        return parallelizeBuilders("ui_update_verify_%s" % channel, platform,
-                                   ui_update_verify_chunks)
-
     def hasPlatformSubstring(platforms, substring):
         if isinstance(platforms, basestring):
             platforms = (platforms,)
@@ -337,7 +330,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
     post_signing_builders = []
     extra_updates_builders = []
     update_verify_builders = defaultdict(list)
-    ui_update_tests_builders = defaultdict(list)
     deliverables_builders = []
     post_deliverables_builders = []
     email_message_id = getMessageId()
@@ -1179,54 +1171,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 })
                 update_verify_builders[channel].append(builderName)
 
-            if releaseConfig.get('ui_update_tests'):
-                # Append Firefox UI update verify tests
-                for n, builder_name in ui_update_verify_builders(platform, channel).iteritems():
-                    ui_uv_factory = ScriptFactory(
-                        interpreter='python',
-                        scriptRepo=mozharness_repo,
-                        scriptName='scripts/firefox_ui_updates.py',
-                        extra_args=[
-                            '--cfg', 'generic_releng_config.py',
-                            '--cfg', 'generic_releng_%s.py' % platform,
-                            '--firefox-ui-branch', sourceRepoInfo['name'],
-                            '--update-verify-config', updateConfig['verifyConfigs'][platform],
-                            '--tools-tag', runtimeTag,
-                            '--total-chunks', str(ui_update_verify_chunks),
-                            '--this-chunk', str(n),
-                            "--build-number", releaseConfig['buildNumber'],
-                        ],
-                        relengapi_archiver_repo_path=relengapi_archiver_repo_path,
-                        relengapi_archiver_release_tag=releaseTag,
-                    )
-
-                    builddir = '%(prefix)s_%(this_chunk)s' % {
-                        'prefix': builderPrefix(postfix='%s_%s_update_tests' % (platform, channel)),
-                        'this_chunk': str(n)
-                    }
-
-                    builders.append({
-                        'name': builder_name,
-                        'slavenames': branchConfig['platforms'][platform]['slaves'],
-                        'category': builderPrefix(''),
-                        'builddir': builddir,
-                        'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
-                        'factory': ui_uv_factory,
-                        'properties': {
-                            'builddir': builddir,
-                            'slavebuilddir': normalizeName(builddir, releaseConfig['productName']),
-                            'script_repo_revision': releaseTag,
-                            'release_tag': releaseTag,
-                            'release_config': releaseConfigFile,
-                            'platform': platform,
-                            'branch': 'release-%s' % sourceRepoInfo['name'],
-                            'chunkTotal': int(ui_update_verify_chunks),
-                            'chunkNum': int(n),
-                            'event_group': 'update_verify',
-                        },
-                    })
-                    ui_update_tests_builders[channel].append(builder_name)
-
     if not releaseConfig.get("updateChannels") or \
       hasPlatformSubstring(releaseConfig['enUSPlatforms'], 'android'):
         builders.append(makeDummyBuilder(
@@ -1607,13 +1551,6 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 upstreamBuilders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], channel))],
                 builderNames=builderNames,
             ))
-            # Add Firefox UI update test builders
-            schedulers.append(AggregatingScheduler(
-                name=builderPrefix('%s_ui_update_verify' % channel),
-                branch=sourceRepoInfo['path'],
-                upstreamBuilders=[builderPrefix('%s_%s_updates' % (releaseConfig['productName'], channel))],
-                builderNames=ui_update_tests_builders[channel],
-            ))
 
     if releaseConfig.get('enableAutomaticPushToMirrors'):
         push_to_mirrors_upstreams.extend([
@@ -1718,11 +1655,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
             changeContainsScriptRepoRevision(c, releaseTag)
         ))
 
-    non_ui_update_verify_builders = [b["name"] for b in builders[:] if "ui_update_verify" not in b["name"]]
-    non_ui_update_verify_builders.extend([b["name"] for b in test_builders])
-    for b in ui_update_tests_builders.values():
-        if b in non_ui_update_verify_builders:
-            non_ui_update_verify_builders.remove(b)
+    builder_names = [b["name"] for b in builders + test_builders]
 
     # send all release messages
     status.append(MailNotifier(
@@ -1733,7 +1666,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                       'References': email_message_id,
                       'Reply-To': ",".join(releaseConfig['AllRecipients'])},
         mode='all',
-        builders=non_ui_update_verify_builders,
+        builders=builder_names,
         messageFormatter=createReleaseMessage,
     ))
 

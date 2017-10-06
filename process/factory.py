@@ -2691,7 +2691,10 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                      haltOnFailure=True
                      ))
 
-        self.origSrcDir = self.branchName
+        if 'esr52' not in self.branchName:
+            self.origSrcDir = 'source'
+        else:
+            self.origSrcDir = self.branchName
 
         if self.enable_pymake:
             self.makeCmd = ['python', WithProperties("%(basedir)s/build/" + "%s/build/pymake/make.py" % self.origSrcDir)]
