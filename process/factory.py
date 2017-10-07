@@ -2694,6 +2694,7 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                      haltOnFailure=True
                      ))
 
+        # This logic is duplicated in NightlyRepackFactory.__init__.
         if 'esr52' not in self.branchName:
             self.origSrcDir = 'source'
         else:
@@ -3182,10 +3183,17 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         else:
             branchName = self.getRepoName(kwargs['repoPath'])
 
+        # This logic is duplicated from BaseRepackFactory.__init__. This needs to be here
+        # because we can't call until self.postUploadCmd is set.
+        if 'esr52' not in branchName:
+            origSrcDir = 'source'
+        else:
+            origSrcDir = branchName
+
         env = env.copy()
 
         env.update({'EN_US_BINARY_URL': enUSBinaryURL})
-        env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' + branchName)})
+        env.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' + origSrcDir)})
 
         # Unfortunately, we can't call BaseRepackFactory.__init__() before this
         # because it needs self.postUploadCmd set
