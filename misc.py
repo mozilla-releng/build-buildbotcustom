@@ -2696,7 +2696,8 @@ def generateCCBranchObjects(config, name, secrets=None):
                 balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
                 balrog_submit_type='regular',
                 balrog_submit=False,
-                balrog_credentials_file=pf.get('balrog_credentials_file', None)
+                balrog_credentials_file=pf.get('balrog_credentials_file', None),
+                archiveServer=config.get('archive_server', None),
             )
             mozilla2_l10n_dep_builder = {
                 'name': l10nBuilders[pf['base_name']]['l10n_builder'],
