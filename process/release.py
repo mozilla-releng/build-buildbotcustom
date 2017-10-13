@@ -639,6 +639,7 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 balrog_credentials_file=balrog_credentials_file,
                 bucketPrefix=branchConfig.get('bucket_prefix'),
                 ftpServer=releaseConfig['ftpServer'],
+                marSignatureFormat=releaseConfig.get('marSignatureFormat', 'mar')
             )
 
             builders.append({

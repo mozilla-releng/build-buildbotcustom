@@ -2276,7 +2276,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         self, env, version, buildNumber, partialUpdates, ftpServer, brandName=None,
             unittestMasters=None, unittestBranch=None, talosMasters=None,
             usePrettyNames=True, enableUpdatePackaging=True, appVersion=None,
-            bucketPrefix=None, **kwargs):
+            bucketPrefix=None, marSignatureFormat='mar', **kwargs):
         self.version = version
         self.buildNumber = buildNumber
         self.partialUpdates = partialUpdates
@@ -2285,6 +2285,7 @@ class ReleaseBuildFactory(MercurialBuildFactory):
         self.unittestMasters = unittestMasters or []
         self.unittestBranch = unittestBranch
         self.enableUpdatePackaging = enableUpdatePackaging
+        self.marSignatureFormat = marSignatureFormat
         if self.unittestMasters:
             assert self.unittestBranch
 
@@ -2444,7 +2445,9 @@ class ReleaseBuildFactory(MercurialBuildFactory):
             if self.enableSigning and self.signingServers:
                 partial_mar_path = '%s/dist/%s/%s' % \
                     (self.absMozillaObjDir, self.update_dir, partial_mar_name)
-                cmd = '%s -f mar "%s"' % (self.signing_command, partial_mar_path)
+                cmd = '%s -f %s "%s"' % (self.signing_command,
+                                         self.marSignatureFormat,
+                                         partial_mar_path)
                 self.addStep(MockCommand(
                     name='sign_partial_mar',
                     description=['sign', 'partial', 'mar'],
