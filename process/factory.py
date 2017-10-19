@@ -3426,10 +3426,6 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
             haltOnFailure=True,
         ))
         printconfig_env = self.env.copy()
-        printconfig_env.update({
-            'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' +
-                                           self.branchName)
-            })
         del printconfig_env['MOZ_OBJDIR']
         printconfig_workdir = WithProperties('%(basedir)s/build/' + self.objdir)
         # hax https://bugzilla.mozilla.org/show_bug.cgi?id=1232466#c10
