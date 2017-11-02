@@ -403,7 +403,7 @@ class SendChangeStep(ShellCommand):
     properties: %s""" % (self.master, branch, revision, comments,
                          user, files, sendchange_props))
             bb_cmd = ['buildbot', 'sendchange', '--master', self.master,
-                      '--username', user, '--branch', branch,
+                      '--who', user, '--branch', branch,
                       '--revision', revision]
             if isinstance(comments, basestring):
                 if re.search('try: ', comments, re.MULTILINE):
