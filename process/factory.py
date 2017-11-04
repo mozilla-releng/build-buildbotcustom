@@ -1421,6 +1421,18 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         if self.tooltool_manifest_src:
             self.addTooltoolStep(workdir='build')
 
+        if self.platform.startswith('macosx'):
+            self.addStep(ShellCommand(
+                name="Copy_sdk_to_build",
+                command=['cp', '/builds/osx.tar.xz', '.'],
+                workdir="build"
+            ))
+            self.addStep(ShellCommand(
+                name="Uncompress SDK",
+                command=['tar', '-xvf', 'osx.tar.xz'],
+                workdir="build"
+            ))
+
     def addDoBuildSteps(self):
         workdir=WithProperties('%(basedir)s/build')
         if self.platform.startswith('win'):
