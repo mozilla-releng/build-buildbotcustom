@@ -701,9 +701,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 if pf.get('tooltool_script'):
                     for script in pf['tooltool_script']:
                         extra_args.extend(['--tooltool-script', script])
+                    extra_args.extend(['--tooltool-script', '--authentication-file'])
                     if platform in ('win32', 'win64'):
-                        extra_args.extend(['--tooltool-script', '--authentication-file',
-                                           '--tooltool-script', 'c:\\builds\\relengapi.tok'])
+                        extra_args.extend(['--tooltool-script', 'c:\\builds\\relengapi.tok'])
+                    else:
+                        extra_args.extend(['--tooltool-script', '/builds/relengapi.tok'])
                 for url in branchConfig['tooltool_url_list']:
                     extra_args.extend(['--tooltool-url', url])
                 if balrog_api_root:
@@ -797,9 +799,11 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     if pf.get('tooltool_script'):
                         for script in pf['tooltool_script']:
                             extra_args.extend(['--tooltool-script', script])
+                        extra_args.extend(['--tooltool-script', '--authentication-file'])
                         if platform in ('win32', 'win64'):
-                            extra_args.extend(['--tooltool-script', '--authentication-file',
-                                               '--tooltool-script', 'c:\\builds\\relengapi.tok'])
+                            extra_args.extend(['--tooltool-script', 'c:\\builds\\relengapi.tok'])
+                        else:
+                            extra_args.extend(['--tooltool-script', '/builds/relengapi.tok'])
                     for url in branchConfig['tooltool_url_list']:
                         extra_args.extend(['--tooltool-url', url])
                     if balrog_api_root:
