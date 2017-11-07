@@ -205,6 +205,8 @@ class PostRunner(object):
 
     def updateStatusDB(self, build, request_ids):
         log.info("Updating statusdb")
+        log.info("  - ignoring adding to statusdb due to rejected access")
+        log.info("  - re: bug 1366933")
         session = model.connect(self.config['statusdb.url'])()
         master = model.Master.get(session, self.config['statusdb.master_url'])
         master.name = unicode(self.config['statusdb.master_name'])
@@ -222,23 +224,23 @@ class PostRunner(object):
         if build.started:
             starttime = datetime.utcfromtimestamp(build.started)
 
-        log.debug("searching for build")
-        q = session.query(model.Build).filter_by(
-            master_id=master.id,
-            builder=db_builder,
-            buildnumber=build.number,
-            starttime=starttime,
-        )
-        db_build = q.first()
-        if not db_build:
-            log.debug("creating new build")
-            db_build = model.Build.fromBBBuild(
-                session, build, builder_name, master.id)
-        else:
-            log.debug("updating old build")
-            db_build.updateFromBBBuild(session, build)
-        session.commit()
-        log.debug("committed")
+        # log.debug("searching for build")
+        # q = session.query(model.Build).filter_by(
+        #     master_id=master.id,
+        #     builder=db_builder,
+        #     buildnumber=build.number,
+        #     starttime=starttime,
+        #  )
+        # db_build = q.first()
+        # if not db_build:
+        #     log.debug("creating new build")
+        #    db_build = model.Build.fromBBBuild(
+        #        session, build, builder_name, master.id)
+        #else:
+        #    log.debug("updating old build")
+        #    db_build.updateFromBBBuild(session, build)
+        # session.commit()
+        # log.debug("committed")
 
         log.debug("updating schedulerdb_requests table")
 
