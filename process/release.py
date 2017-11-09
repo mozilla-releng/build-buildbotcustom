@@ -698,14 +698,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                 if pf.get('tooltool_manifest_src'):
                     extra_args.extend(['--tooltool-manifest',
                                       pf.get('tooltool_manifest_src')])
-                if pf.get('tooltool_script'):
-                    for script in pf['tooltool_script']:
-                        extra_args.extend(['--tooltool-script', script])
-                    extra_args.extend(['--tooltool-script', '--authentication-file'])
-                    if platform in ('win32', 'win64'):
-                        extra_args.extend(['--tooltool-script', 'c:\\builds\\relengapi.tok'])
-                    else:
-                        extra_args.extend(['--tooltool-script', '/builds/relengapi.tok'])
+
+                tooltool_script = pf.get('tooltool_script', ['/tools/tooltool.py'])
+                for script in tooltool_script:
+                    extra_args.extend(['--tooltool-script', script])
+                extra_args.extend(['--tooltool-script', '--authentication-file'])
+                if platform in ('win32', 'win64'):
+                    extra_args.extend(['--tooltool-script', 'c:\\builds\\relengapi.tok'])
+                else:
+                    extra_args.extend(['--tooltool-script', '/builds/relengapi.tok'])
+
                 for url in branchConfig['tooltool_url_list']:
                     extra_args.extend(['--tooltool-url', url])
                 if balrog_api_root:
@@ -796,14 +798,16 @@ def generateReleaseBranchObjects(releaseConfig, branchConfig,
                     if pf.get('tooltool_manifest_src'):
                         extra_args.extend(['--tooltool-manifest',
                                           pf.get('tooltool_manifest_src')])
-                    if pf.get('tooltool_script'):
-                        for script in pf['tooltool_script']:
-                            extra_args.extend(['--tooltool-script', script])
-                        extra_args.extend(['--tooltool-script', '--authentication-file'])
-                        if platform in ('win32', 'win64'):
-                            extra_args.extend(['--tooltool-script', 'c:\\builds\\relengapi.tok'])
-                        else:
-                            extra_args.extend(['--tooltool-script', '/builds/relengapi.tok'])
+
+                    tooltool_script = pf.get('tooltool_script', ['/tools/tooltool.py'])
+                    for script in tooltool_script:
+                        extra_args.extend(['--tooltool-script', script])
+                    extra_args.extend(['--tooltool-script', '--authentication-file'])
+                    if platform in ('win32', 'win64'):
+                        extra_args.extend(['--tooltool-script', 'c:\\builds\\relengapi.tok'])
+                    else:
+                        extra_args.extend(['--tooltool-script', '/builds/relengapi.tok'])
+
                     for url in branchConfig['tooltool_url_list']:
                         extra_args.extend(['--tooltool-url', url])
                     if balrog_api_root:
