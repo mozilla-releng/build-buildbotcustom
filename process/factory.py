@@ -3499,6 +3499,21 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
                 mock=self.use_mock,
                 target=self.mock_target,
             )))
+        # Bug 1420538 - Mac platforms need the new MacOSX SDK 10.10 and
+        # since bug 1413824, we can't use the tooltool package,
+        # it's now copying from the build to the workdir.
+        if self.platform.startswith('macosx'):
+            self.addStep(ShellCommand(
+                name="Copy_sdk_to_build",
+                command=['cp', '/builds/osx.tar.xz', '.'],
+                workdir=self.absSrcDir,
+            ))
+            self.addStep(ShellCommand(
+                name="Uncompress SDK",
+                command=['tar', '-xvf', 'osx.tar.xz'],
+                workdir=self.absSrcDir,
+            ))
+
         confEnv = self.env.copy()
         confEnv.update({'TOOLTOOL_DIR': WithProperties('%(basedir)s/build/' + self.origSrcDir)})
         self.addStep(MockCommand( **self.processCommand(
