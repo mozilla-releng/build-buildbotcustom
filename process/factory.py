@@ -885,33 +885,34 @@ class MozillaBuildFactory(RequestSortingBuildFactory, MockMixin, TooltoolMixin):
               debug: leak test builds
               release: release builds
         """
-        self.addStep(
-            JSONPropertiesDownload(
-                name='download_balrog_props',
-                slavedest='buildprops_balrog.json',
-                workdir='.',
-                flunkOnFailure=False, ))
-        # Note: balrog-submit.py requires productName, version and buildNumber
-        #       to work.  So we need those values in buildprops_balrog.json
-        #       Question is how do we get those values into this json file?
-        cmd = [
-            self.pythonWithJson(self.platform),
-            WithProperties(
-                '%(toolsdir)s/scripts/balrog/balrog-submit.py'),
-            '--props', 'buildprops_balrog.json',
-            '-l', self.balrog_api_root,
-            '-u', self.balrog_username,
-            '-t', type_, ]
-
-        if type_ == 'release':
-            cmd.extend(
-                ['-p', self.productName,
-                 '-v', self.version,
-                 '-n', self.buildNumber, ])
-
-        if self.balrog_submitter_extra_args:
-            cmd.extend(self.balrog_submitter_extra_args)
         if self.balrog_credentials_file:
+            self.addStep(
+                JSONPropertiesDownload(
+                    name='download_balrog_props',
+                    slavedest='buildprops_balrog.json',
+                    workdir='.',
+                    flunkOnFailure=False, ))
+            # Note: balrog-submit.py requires productName, version and buildNumber
+            #       to work.  So we need those values in buildprops_balrog.json
+            #       Question is how do we get those values into this json file?
+            cmd = [
+                self.pythonWithJson(self.platform),
+                WithProperties(
+                    '%(toolsdir)s/scripts/balrog/balrog-submit.py'),
+                '--props', 'buildprops_balrog.json',
+                '-l', self.balrog_api_root,
+                '-u', self.balrog_username,
+                '-t', type_, ]
+
+            if type_ == 'release':
+                cmd.extend(
+                    ['-p', self.productName,
+                     '-v', self.version,
+                     '-n', self.buildNumber, ])
+
+            if self.balrog_submitter_extra_args:
+                cmd.extend(self.balrog_submitter_extra_args)
+
             target_file_name = os.path.basename(self.balrog_credentials_file)
             cmd.extend(['-c', target_file_name])
             self.addStep(
