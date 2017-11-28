@@ -2200,7 +2200,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                 'balrog_submitter_extra_args': pf.get('balrog_submitter_extra_args', []),
                 'balrog_credentials_file': pf.get('balrog_credentials_file', None),
                 'balrog_submit_type': 'regular',
-                'balrog_submit': pf.get('balrog_submit', False),
+                'balrog_submit': False,
                 'archiveServer': config.get('archive_server', None),
             }
             factory_kwargs.update(extra_args)
@@ -2552,7 +2552,7 @@ def generateCCBranchObjects(config, name, secrets=None):
                         balrog_submitter_extra_args=config.get('balrog_submitter_extra_args', []),
                         balrog_submit_type='nightly',
                         balrog_credentials_file=pf.get('balrog_credentials_file', None),
-                        balrog_submit=pf.get('balrog_submit', False),
+                        balrog_submit=False,
                     )
                     mozilla2_l10n_nightly_builder = {
                         'name': l10nNightlyBuilders[nightly_builder]['l10n_builder'],
