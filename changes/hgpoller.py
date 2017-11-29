@@ -530,3 +530,82 @@ class HgAllLocalesPoller(base.ChangeSource, BasePoller):
     def __str__(self):
         return "<HgAllLocalesPoller for %s/%s/>" % (self.hgURL,
                                                    self.repositoryIndex)
+
+
+class HgFilteredLocalesPoller(HgAllLocalesPoller):
+    """Poll the list of localization repositories from an index page.
+
+    For a index page like https://hg.mozilla.org/releases/l10n-mozilla-1.9.1/,
+    all links look like /releases/l10n-mozilla-1.9.1/af/, where the last
+    path step will be the locale code, and the others will be passed
+    as branch for the changes, i.e. 'releases/l10n-mozilla-1.9.1'.
+
+    if locale_list is empty, this act as HgAllLocalesPoller
+    """
+
+
+    compare_attrs = ['repositoryIndex', 'pollInterval', 'locale_list']
+
+    def __init__(self, hgURL, repositoryIndex, pollInterval=120,
+                 locale_list=[], parallelRequests=1):
+        """
+        @type  repositoryIndex:      string
+        @param repositoryIndex:      The URL listing all locale repos
+        @type  pollInterval        int
+        @param pollInterval        The time (in seconds) between queries for
+                                   changes
+        @type locale_list:         list
+        @param locale_list         list of locales to poll
+        """
+        HgAllLocalesPoller.__init__(self, hgURL, repositoryIndex,
+                                    pollInterval=pollInterval)
+        self.locale_list = locale_list
+        self.parallelRequests = parallelRequests
+
+    def __str__(self):
+        return "<HgFilteredLocalesPoller for %s/%s/>" % (self.hgURL,
+                                                         self.repositoryIndex)
+    def describe(self):
+        locale_str = "all locales"
+        if self.locale_list:
+            locale_str = ",".join(self.locale_list)
+        return "Getting changes from %s at %s" % (locale_str,
+                                                  self.repositoryIndex)
+
+    def getData(self):
+        locale_str = "all locales"
+        if self.locale_list:
+            locale_str = ",".join(self.locale_list)
+
+        log.msg("Polling %s at %s/%s/" % (locale_str,
+                                          self.hgURL,
+                                          self.repositoryIndex))
+        return getPage(self.hgURL + '/' + self.repositoryIndex + '/?style=raw',
+                       timeout = self.timeout)
+
+    def processData(self, data):
+        locales = filter(None, data.split())
+        # get locales and branches
+        def brancher(link):
+            steps = filter(None, link.split('/'))
+            loc = steps.pop()
+            branch = '/'.join(steps)
+            return (loc, branch)
+        # locales is now locale code / branch tuple
+        locales = map(brancher, locales)
+        if locales != self.locales:
+            log.msg("new locale list: " + " ".join(map(str, locales)))
+        if self.locale_list:
+            self.locales = [locale for locale in locales if locale[0] in self.locale_list]
+        else:
+            self.locales = locales
+        self.pendingLocales = self.locales[:]
+        # prune removed locales from pollers
+        for oldLoc in self.localePollers.keys():
+            if oldLoc not in locales:
+                self.localePollers.pop(oldLoc)
+                log.msg("not polling %s on %s anymore, dropped from repositories" %
+                        oldLoc)
+        for i in xrange(self.parallelRequests):
+            self.activeRequests += 1
+            reactor.callLater(0, self.pollNextLocale)

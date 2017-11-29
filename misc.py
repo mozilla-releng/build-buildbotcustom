@@ -8,6 +8,7 @@ import collections
 import random
 import re
 import sys, os, time
+import subprocess
 
 from copy import deepcopy
 
@@ -45,7 +46,8 @@ reload(build.paths)
 reload(mozilla_buildtools.queuedir)
 
 from buildbotcustom.common import reallyShort
-from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller
+from buildbotcustom.changes.hgpoller import HgPoller, HgAllLocalesPoller, \
+  HgFilteredLocalesPoller
 from buildbotcustom.process.factory import NightlyBuildFactory, \
   NightlyRepackFactory, UnittestBuildFactory, CodeCoverageFactory, \
   UnittestPackagedBuildFactory, TalosFactory, CCNightlyBuildFactory, \
@@ -62,6 +64,7 @@ from buildbotcustom.misc_scheduler import tryChooser, buildIDSchedFunc, \
     buildUIDSchedFunc, lastGoodFunc, lastRevFunc
 from buildbotcustom.status.log_handlers import SubprocessLogHandler
 from build.paths import getRealpath
+from master_common import get_gecko_version
 
 # This file contains misc. helper function that don't make sense to put in
 # other files. For example, functions that are called in a master.cfg
@@ -117,6 +120,36 @@ def get_locales_from_json(jsonFile, l10nRepoPath, relbranch):
             platformLocales[platform][locale] = localesJson[locale]['platforms']
 
     return (l10nRepositories, platformLocales)
+
+
+# This function grabs the branch's all-locales and returns
+# the list of locales that are supported by the project.
+def getSupportedLocales(hgUrl, branch, locale_file="all-locales"):
+    def get_tree(in_branch):
+        # in_branch is the name of the tree (comm-central, etc..)
+        # but is from the list of keys from the BRANCHES dictionary.
+        # i.e comm-central-trunk, comm-beta, comm-esr, comm-release
+        # need to convert it to a tree name such that hg.mozilla.org
+        # understands
+        if in_branch.endswith("trunk"):
+            retval = "comm-central"
+        elif in_branch.endswith("esr"):
+            retval = "comm-esr%d" % get_gecko_version(in_branch)
+        else:
+            retval = in_branch
+        return retval
+
+    if hgUrl.endswith("/"):
+        hgUrl = hgUrl[:-1]
+    locale_url = "%s/%s/raw-file/tip/%s" % (hgUrl, get_tree(branch),
+                                            locale_file)
+
+    results = subprocess.Popen(["wget", "-qO-", locale_url],
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE).communicate()
+
+    return [x for x in results[0].split("\n") if x]
+
 
 # This function is used as fileIsImportant parameter for Buildbots that do both
 # dep/nightlies and release builds. Because they build the same "branch" this
@@ -1901,12 +1934,21 @@ def generateCCBranchObjects(config, name, secrets=None):
         storeRev="polled_moz_revision",
     ))
 
+    # get the list of supported locales from the repository's
+    # suite/locales/all-locales file.
+    all_locales = getSupportedLocales(
+        config['hgurl'],
+        name,
+        locale_file=config["all_locales_file"], )
+
     if config['enable_l10n'] and config['enable_l10n_onchange']:
-        hg_all_locales_poller = HgAllLocalesPoller(hgURL = config['hgurl'],
-                            repositoryIndex = config['l10n_repo_path'],
-                            pollInterval=l10nPollInterval)
-        hg_all_locales_poller.parallelRequests = 1
-        branchObjects['change_source'].append(hg_all_locales_poller)
+        hg_locales_poller = HgFilteredLocalesPoller(
+            hgURL=config['hgurl'],
+            repositoryIndex=config['l10n_repo_path'],
+            pollInterval=l10nPollInterval,
+            locale_list=all_locales,
+            parallelRequests=1)
+        branchObjects['change_source'].append(hg_locales_poller)
 
     # schedulers
     # this one gets triggered by the HG Poller
