@@ -4131,12 +4131,14 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         ))
 
         if self.mozillaSrcDir:
-            useConfigDir = '%s/config' % self.baseWorkDir
+            useConfigDir = '%s/%s/config' % (self.baseWorkDir,
+                                             self.branchName)
         else:
             useConfigDir = '%s/config' % self.absMozillaSrcDir
 
         self.addStep(SetProperty(
-            command=['python', '%s/printconfigsetting.py' % useConfigDir,
+            command=['python',
+                     '%s/printconfigsetting.py' % useConfigDir,
                      WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'BuildID'],
             property='buildid',
@@ -4147,7 +4149,8 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         if self.l10nNightlyUpdate:
             # We need the appVersion to create snippets
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                command=['python',
+                         '%s/printconfigsetting.py' % useConfigDir,
                          WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                          'App', 'Version'],
                 property='appVersion',
