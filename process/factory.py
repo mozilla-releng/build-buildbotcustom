@@ -4106,6 +4106,7 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
                                     '/%s/%s/%s' % (self.baseWorkDir,
                                                    self.origSrcDir,
                                                    self.objdir))
+        self.configure()
         self.addStep(MockCommand(
          name='repack_installers',
          description=['repack', 'installers'],
