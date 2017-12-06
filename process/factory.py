@@ -2481,12 +2481,16 @@ class NightlyBuildFactory(MercurialBuildFactory):
         else:
             useConfigDir = '%s/config' % self.absMozillaSrcDir
 
+        p_setting = WithProperties('%(basedir)s' +
+                                   '/%s/%s/printconfigsetting.py' % (
+                                       self.absSrcDir, useConfigDir))
+
         self.addStep(SetProperty(
             name='set_previous_buildid',
             description=['set', 'previous', 'buildid'],
             doStepIf = self.previousMarExists,
             command=['python',
-                     '%s/printconfigsetting.py' % useConfigDir,
+                     p_setting,
                      WithProperties(self.absMozillaObjDir + '/%(previous_inipath)s'),
                      'App', 'BuildID'],
             property='previous_buildid',
@@ -4135,19 +4139,24 @@ class NightlyRepackFactory(BaseRepackFactory, NightlyBuildFactory):
         else:
             useConfigDir = '%s/config' % self.absMozillaSrcDir
 
+        p_setting = WithProperties('%(basedir)s' +
+                                   '/%s/%s/printconfigsetting.py' % (
+                                       self.absSrcDir, useConfigDir))
         self.addStep(SetProperty(
-            command=['python', '%s/printconfigsetting.py' % useConfigDir,
+            command=['python',
+                     p_setting,
                      WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                      'App', 'BuildID'],
             property='buildid',
             name='get_build_id',
-            workdir='.',
+            workdir=,
             env=self.env,
         ))
         if self.l10nNightlyUpdate:
             # We need the appVersion to create snippets
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                command=['python',
+                         p_setting,
                          WithProperties('%s/' % self.absMozillaObjDir + '%(inipath)s'),
                          'App', 'Version'],
                 property='appVersion',
