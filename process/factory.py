@@ -1480,19 +1480,26 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 useConfigDir = '%s/config' % self.baseWorkDir
             else:
                 useConfigDir = '%s/config' % self.absMozillaSrcDir
+
+            p_setting = WithProperties('%(basedir)s' +
+                                       '/%s/%s/printconfigsetting.py' %
+                                        (self.absMozillaSrcDir,
+                                         self.useConfigDir))
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
-                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-                'App', 'BuildID'],
+                command=['python',
+                         p_setting,
+                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                         'App', 'BuildID'],
                 property='buildid',
                 workdir='.',
                 description=['getting', 'buildid'],
                 descriptionDone=['got', 'buildid'],
             ))
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
-                'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
-                'App', 'SourceStamp'],
+                command=['python',
+                         p_setting,
+                         'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
+                         'App', 'SourceStamp'],
                 property='sourcestamp',
                 workdir='.',
                 description=['getting', 'sourcestamp'],
@@ -1757,9 +1764,15 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
         else:
             useConfigDir = '%s/config' % self.absMozillaSrcDir
 
+        p_setting = WithProperties('%(basedir)s' +
+                                   '/%s/../%s/printconfigsetting.py' %
+                                    (self.absMozillaSrcDir,
+                                     useConfigDir))
+
         if self.productName == 'xulrunner':
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                command=['python',
+                         p_setting,
                          'build/%s/dist/bin/platform.ini' % self.mozillaObjdir,
                          'Build', 'BuildID'],
                 property='buildid',
@@ -1768,7 +1781,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
             ))
         else:
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                command=['python',
+                         p_setting,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                          'App', 'BuildID'],
                 property='buildid',
@@ -1776,7 +1790,8 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 name='get_build_id',
             ))
             self.addStep(SetProperty(
-                command=['python', '%s/printconfigsetting.py' % useConfigDir,
+                command=['python',
+                         p_setting,
                          'build/%s/dist/bin/application.ini' % self.mozillaObjdir,
                          'App', 'Version'],
                 property='appVersion',
