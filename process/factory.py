@@ -3445,7 +3445,6 @@ class BaseRepackFactory(MozillaBuildFactory, TooltoolMixin):
             self.addGetTokenSteps()
         self.doRepack()
         self.doUpload()
-        self.submitBalrogUpdates(type_=self.balrog_submit_type)
         if self.testPrettyNames:
             self.doTestPrettyNames()
 
@@ -4215,6 +4214,8 @@ class CCNightlyRepackFactory(CCBaseRepackFactory, NightlyRepackFactory):
                                       tooltool_script=tooltool_script,
                                       tooltool_token=tooltool_token,
                                       objdir=self.objdir, **kwargs)
+
+        self.submitBalrogUpdates(type_=self.balrog_submit_type)
 
     # it sucks to override all of updateEnUS but we need to do it that way
     # this is basically mirroring what mobile does
