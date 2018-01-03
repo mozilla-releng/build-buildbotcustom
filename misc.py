@@ -489,6 +489,12 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
                     totalChunks=totalChunks,
                     thisChunk=i+1,
+                    pip_server=config.get('pip_server', ''),
+                    tooltool_manifest_src=pf.get('test_tooltool_manifest_src', None),
+                    tooltool_script=pf.get('tooltool_script', None),
+                    tooltool_url_list=config.get('tooltool_url_list', []),
+                    tooltool_bootstrap='setup.sh',
+                    tooltool_token=pf.get('tooltool_token', None),
                     chunkByDir=suites.get('chunkByDir'),
                     env=pf.get('unittest-env', {}),
                     downloadSymbols=pf.get('download_symbols', True),
@@ -497,6 +503,7 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                     use_mock=pf.get('use_mock', False),
                     mock_target=pf.get('mock_target', None),
                     mock_packages=pf.get('mock_packages', None),
+                    mock_copyin_files=pf.get('mock_copyin_files'),
                 )
                 builder = {
                     'name': '%s %s-%i/%i' % (name_prefix, suites_name, i+1, totalChunks),
@@ -524,12 +531,19 @@ def generateTestBuilder(config, branch_name, platform, name_prefix,
                 buildSpace=1.0,
                 buildsBeforeReboot=config['platforms'][platform]['builds_before_reboot'],
                 downloadSymbols=pf.get('download_symbols', True),
+                pip_server=config.get('pip_server', ''),
+                tooltool_manifest_src=pf.get('test_tooltool_manifest_src', None),
+                tooltool_script=pf.get('tooltool_script', None),
+                tooltool_url_list=config.get('tooltool_url_list', []),
+                tooltool_bootstrap='setup.sh',
+                tooltool_token=pf.get('tooltool_token', None),
                 env=pf.get('unittest-env', {}),
                 resetHwClock=resetHwClock,
                 stackwalk_cgi=config.get('stackwalk_cgi'),
                 use_mock=pf.get('use_mock', False),
                 mock_target=pf.get('mock_target', None),
                 mock_packages=pf.get('mock_packages', None),
+                mock_copyin_files=pf.get('mock_copyin_files'),
             )
             builder = {
                 'name': '%s %s' % (name_prefix, suites_name),
@@ -1098,7 +1112,12 @@ def generateBranchObjects(config, name, secrets=None):
                         "%s-%s-unittest" % (name, platform),
                         suites_name, suites, mochitestLeakThreshold,
                         crashtestLeakThreshold, stagePlatform=stage_platform,
-                        stageProduct=pf['stage_product']))
+                        stageProduct=pf['stage_product']),
+                        use_mock=pf.get('use_mock', None),
+                        mock_target=pf.get('mock_target', None),
+                        mock_packages=pf.get('mock_packages', []),
+                        mock_copyin_files=pf.get('mock_copyin_files', []),
+                        )
             if not pf.has_key('enable_nightly'):
                 continue
 
@@ -1535,6 +1554,10 @@ def generateBranchObjects(config, name, secrets=None):
                 unittestMasters=config['unittest_masters'],
                 unittestBranch="%s-%s-unittest" % (name, platform),
                 uploadPackages=True,
+                use_mock=pf.get('use_mock', None),
+                mock_target=pf.get('mock_target, None'),
+                mock_packages=pf.get('mock_packages', []),
+                mock_copyin_files=pf.get('mock_copyin_files', []),
                 **extra_args
             )
             unittest_builder = {

@@ -491,6 +491,99 @@ class DownloadFile(ShellCommand):
             return FAILURE
         return SUCCESS
 
+
+class DownloadFiles(ShellCommand):
+    haltOnFailure = True
+    name = "download"
+    description = ["download"]
+
+    def __init__(self, url_fn=None, url=None, url_property=None,
+                 filename_property=None, ignore_certs=False,
+                 wget_args=None, **kwargs):
+        self.url = url
+        self.url_fn = url_fn
+        self.url_property = url_property
+        self.filename_property = filename_property
+        self.ignore_certs = ignore_certs
+        assert bool(self.url) ^ bool(self.url_fn), \
+                "One of url_fn or url must be set, not both (%s %s)"
+        if wget_args:
+            self.wget_args = wget_args
+        else:
+            self.wget_args = ['--progress=dot:mega']
+        self.super_class = ShellCommand
+        self.super_class.__init__(self, **kwargs)
+        self.addFactoryArguments(url_fn=url_fn, url=url,
+                                 url_property=url_property,
+                                 filename_property=filename_property,
+                                 ignore_certs=ignore_certs,
+                                 wget_args=wget_args)
+
+    def _norm(self, in_url, in_prop):
+        retval = in_prop
+        if isinstance(in_url, list) and not isinstance(in_prop, list):
+            retval = [in_prop]
+        return retval
+
+    def start(self):
+        def do_work(in_url, in_filename, in_url_property):
+            renderedUrl = self.build.getProperties().render(in_url)
+            # renderedUrl = os.path.dirname(renderedUrl)
+
+            self.setProperty('in_url_property', in_url_property)
+            self.setProperty('in_filename', in_filename)
+            self.setProperty('in_url', in_url)
+            self.setProperty('rendered_url', renderedUrl)
+            if in_url_property:
+                self.setProperty(in_url_property, renderedUrl, "DownloadFiles")
+            if in_filename:
+                self.setProperty(in_filename,
+                                 os.path.basename(renderedUrl),
+                                 "DownloadFiles")
+
+            if self.ignore_certs:
+                self.setCommand(["wget"] + self.wget_args + ["-N", "--no-check-certificate", in_url])
+            else:
+                self.setCommand(["wget"] + self.wget_args + ["-N", in_url])
+            self.super_class.start(self)
+
+        try:
+            if self.url_fn:
+                url = self.url_fn(self.build)
+            else:
+                url = self.url
+        except Exception, e:
+            self.addCompleteLog("errors", "Automation Error: %s" % str(e))
+            return self.finished(FAILURE)
+
+        if isinstance(url, list):
+            file_prop = self._norm(url, self.filename_property)
+            url_prop = self._norm(url, self.url_property)
+            url_path = self.setProperty("main_list_url_path", url)
+            if len(url) != len(file_prop) and len(url) != len(url_prop):
+                self.addCompleteLog("errors", "Length of url list and file_prop and url_prop are different")
+                return self.finished(FAILURE)
+
+            for i in range(len(url)):
+                do_work(url[i], file_prop[i], url_prop[i])
+        else:
+            url_path = self.setProperty("main_non_list_url_path", url)
+            if isinstance(self.filename_property, list):
+                url = [url]
+                for i in range(len(self.filename_property)):
+                    do_work(url[0], self.filename_property[i], self.url_property[i])
+            else:
+                do_work(url, self.filename_property, self.url_property)
+
+    def evaluateCommand(self, cmd):
+        superResult = self.super_class.evaluateCommand(self, cmd)
+        if SUCCESS != superResult:
+            return superResult
+        if None != re.search('ERROR', cmd.logs['stdio'].getText()):
+            return FAILURE
+        return SUCCESS
+
+
 class UnpackFile(ShellCommand):
     description = ["unpack"]
 
@@ -531,7 +624,7 @@ class UnpackFile(ShellCommand):
 class UnpackTest(ShellCommand):
     description = ["unpack", "tests"]
 
-    def __init__(self, filename, testtype, scripts_dir=".", **kwargs):
+    def __init__(self, filename, testtype=None, scripts_dir=".", **kwargs):
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
         self.filename = filename
@@ -541,20 +634,21 @@ class UnpackTest(ShellCommand):
 
     def start(self):
         filename = self.build.getProperties().render(self.filename)
+        testtype = self.build.getProperties().render(self.testtype)
         self.filename = filename
         if filename.endswith(".zip"):
-            args = ['unzip', '-oq', filename, 'mozbase*', 'bin*', 'certs*', 'modules*']
+            args = ['unzip', '-oq', filename]
             # modify the commands to extract only the files we need - the test directory and bin/ and certs/
-            if self.testtype == "mochitest":
+            if testtype == "mochitest":
                 args.append('mochitest*')
-            elif self.testtype == "xpcshell":
+            elif testtype == "xpcshell":
                 args.append('xpcshell*')
-            elif self.testtype == "jsreftest":
+            elif testtype == "jsreftest":
                 # jsreftest needs both jsreftest/ and reftest/ in addition to bin/ and certs/
                 args.append('jsreftest*', 'reftest*')
-            elif self.testtype == "reftest":
+            elif testtype == "reftest":
                 args.append('reftest*')
-            elif self.testtype == "jetpack":
+            elif testtype == "jetpack":
                 args.append('jetpack*')
             else:
                 # If it all fails, we extract the whole shebang

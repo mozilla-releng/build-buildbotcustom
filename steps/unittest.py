@@ -609,7 +609,7 @@ class MozillaClobberWin(ShellCommandReportTimeout):
 class MozillaCheck(ShellCommandReportTimeout):
     warnOnFailure = True
 
-    def __init__(self, test_name, makeCmd=["make"], **kwargs):
+    def __init__(self, test_name, makeCmd=["make"], env={}, prefs=[], **kwargs):
         self.name = test_name
         if test_name == "check":
             # Target executing recursively in all (sub)directories.
@@ -618,6 +618,7 @@ class MozillaCheck(ShellCommandReportTimeout):
         else:
             # Target calling a python script.
             self.command = makeCmd + [test_name]
+        self.env = env
         self.description = [test_name + " test"]
         self.descriptionDone = [self.description[0] + " complete"]
         self.super_class = ShellCommandReportTimeout
@@ -749,11 +750,14 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
     warnOnWarnings = True
     name = "xpcshell"
 
-    def __init__(self, platform, symbols_path=None, **kwargs):
+    def __init__(self, platform, symbols_path=None,
+                 prefs=[], **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
-        self.addFactoryArguments(platform=platform, symbols_path=symbols_path)
+        self.addFactoryArguments(platform=platform,
+                                 prefs=prefs,
+                                 symbols_path=symbols_path)
 
         bin_extension = ""
         if platform.startswith('win'):
@@ -798,10 +802,12 @@ class MozillaPackagedXPCShellTests(ShellCommandReportTimeout):
 # MochitestMixin overrides some methods that BuildStep calls
 # In order to make sure its are called, instead of ShellCommandReportTimeout's,
 # it needs to be listed first
-class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandReportTimeout):
-    def __init__(self, variant='plain', symbols_path=None, leakThreshold=None,
-            chunkByDir=None, totalChunks=None, thisChunk=None, testPath=None,
-            **kwargs):
+class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin,
+                                ShellCommandReportTimeout):
+    def __init__(self, variant='plain', symbols_path=None,
+                 leakThreshold=None, chunkByDir=None, totalChunks=None,
+                 thisChunk=None, testPath=None, enable_e10s=False,
+                 env={}, prefs=[], **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
@@ -810,20 +816,24 @@ class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandRepor
 
         self.addFactoryArguments(variant=variant, symbols_path=symbols_path,
                 leakThreshold=leakThreshold, chunkByDir=chunkByDir,
-                totalChunks=totalChunks, thisChunk=thisChunk, testPath=testPath)
+                totalChunks=totalChunks, thisChunk=thisChunk, testPath=testPath,
+                env=env, prefs=prefs)
 
         if totalChunks:
             self.name = 'mochitest-%s-%i' % (variant, thisChunk)
         else:
             self.name = 'mochitest-%s' % variant
 
-        env_os = kwargs.get('env', {})
-        pythonCmd = pythonWithJson(env_os['OS'])
-        self.command = [pythonCmd, 'mochitest/runtests.py',
-                WithProperties('--appname=%(exepath)s'), '--utility-path=bin',
-                WithProperties('--extra-profile-file=bin/plugins'),
-                '--certificate-path=certs', '--autorun', '--close-when-done',
-                '--console-level=INFO']
+        pythonCmd = WithProperties('%(basedir)s/build/venv/bin/python')
+        self.command = [pythonCmd, 'mochitest/runtests.py']
+
+        if not enable_e10s:
+            self.command.append('--disable-e10s')
+
+        self.command.extend(
+            [WithProperties('--appname=%(exepath)s'), '--utility-path=bin',
+             WithProperties('--extra-profile-file=bin/plugins'),
+             '--certificate-path=certs', '--console-level=INFO'])
         if testPath:
             self.command.append("--test-path=%s" % testPath)
 
@@ -837,21 +847,37 @@ class MozillaPackagedMochitests(MochitestMixin, ChunkingMixin, ShellCommandRepor
                                                     chunkByDir))
         self.command.extend(self.getVariantOptions(variant))
 
+        if prefs:
+            tmp = []
+            for pref_item in prefs:
+                tmp.extend(['--setpref',
+                            pref_item])
+            self.command.extend(tmp)
+
+        if env:
+            if 'LD_LIBRARY_PATH' in env:
+                k = 'LD_LIBRARY_PATH'
+                v = env.get(k, None)
+                tmp = ['--setenv',
+                       WithProperties('%s=%s' % (k, v))]
+                self.command.extend(tmp)
+
 
 class MozillaPackagedReftests(ReftestMixin, ShellCommandReportTimeout):
     def __init__(self, suite, symbols_path=None, leakThreshold=None,
-            **kwargs):
+                 enable_e10s=False, env={}, prefs=[], **kwargs):
         self.super_class = ShellCommandReportTimeout
         ShellCommandReportTimeout.__init__(self, **kwargs)
 
         self.addFactoryArguments(suite=suite,
                 symbols_path=symbols_path, leakThreshold=leakThreshold)
         self.name = suite
-        self.command = ['python', 'reftest/runreftest.py',
-                WithProperties('--appname=%(exepath)s'),
-                '--utility-path=bin',
-                '--extra-profile-file=bin/plugins',
-                ]
+        pythonCmd = WithProperties('%(basedir)s/build/venv/bin/python')
+
+        self.command = [pythonCmd, 'reftest/runreftest.py',
+                        WithProperties('--appname=%(exepath)s'),
+                        '--utility-path=bin',
+                        '--extra-profile-file=bin/plugins', ]
         if symbols_path:
             self.command.append(WithProperties("--symbols-path=%s" % symbols_path))
         if leakThreshold:

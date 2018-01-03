@@ -211,9 +211,13 @@ def addMockCommand(obj):
       def __init__(self, mock=False, mock_login='mock_mozilla',
                    mock_workdir_mutator=lambda x: x, target=None,
                    mock_args=['--unpriv'],
-                   mock_workdir_prefix='%(basedir)s/', **kwargs):
+                   mock_workdir_prefix='%(basedir)s/',
+                   env={},
+                   prefs=[],
+                   **kwargs):
           self.super_class = obj
           self.mock = mock
+          self.env = env
           self.timeout = kwargs.get('timeout', 1200)
           self.mock_login = kwargs.get('mock_login', 'mock_mozilla')
           self.target = target
@@ -225,12 +229,13 @@ def addMockCommand(obj):
                                                  lambda x: x)
           assert 'workdir' in kwargs.keys(), "You *must* specify workdir"
 
-          self.super_class.__init__(self, **kwargs)
+          self.super_class.__init__(self, env=env, prefs=prefs, **kwargs)
 
           self.properties_rendered = False
 
           self.addFactoryArguments(
               command=self.command,
+              env=env,
               mock=mock,
               mock_login=mock_login,
               target=self.target,
@@ -268,8 +273,11 @@ def addMockCommand(obj):
           if self.mock_workdir_prefix is not None:
               mock_workdir = self.mock_workdir_prefix + mock_workdir
 
-          if 'env' in self.remote_kwargs:
-             pre_render_env = self.remote_kwargs['env']
+          if 'env' in self.remote_kwargs or self.env:
+             if self.env:
+                 pre_render_env = self.env
+             else:
+                 pre_render_env = self.remote_kwargs['env']
              properties = self.build.getProperties()
              rendered_env = properties.render(pre_render_env)
              environment = ' '.join('%s="%s"' % (k, rendered_env[k])
