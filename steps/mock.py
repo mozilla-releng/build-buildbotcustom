@@ -218,6 +218,7 @@ def addMockCommand(obj):
           self.super_class = obj
           self.mock = mock
           self.env = env
+          self.prefs = prefs
           self.timeout = kwargs.get('timeout', 1200)
           self.mock_login = kwargs.get('mock_login', 'mock_mozilla')
           self.target = target

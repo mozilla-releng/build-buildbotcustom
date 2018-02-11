@@ -7,9 +7,10 @@ from buildbotcustom.steps.base import ShellCommand
 from buildbotcustom.steps.misc import TinderboxShellCommand
 
 class UpdateVerify(ShellCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, prefs=[], **kwargs):
         self.super_class = ShellCommand
         self.super_class.__init__(self, **kwargs)
+        self.prefs = prefs
 
     def evaluateCommand(self, cmd):
         worst = self.super_class.evaluateCommand(self, cmd)

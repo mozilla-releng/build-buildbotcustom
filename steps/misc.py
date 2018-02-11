@@ -247,11 +247,12 @@ class TinderboxShellCommand(ShellCommand):
        only exit codes listed in it will be ignored. If ignoreCodes is not
        passed, all exit codes will be ignored.
     """
-    def __init__(self, ignoreCodes=None, **kwargs):
+    def __init__(self, ignoreCodes=None, prefs=[], **kwargs):
        self.super_class = ShellCommand
        self.super_class.__init__(self, **kwargs)
        self.addFactoryArguments(ignoreCodes=ignoreCodes)
        self.ignoreCodes = ignoreCodes
+       self.prefs = prefs
 
     def evaluateCommand(self, cmd):
        # Ignore all return codes

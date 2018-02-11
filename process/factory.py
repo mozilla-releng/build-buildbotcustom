@@ -5835,6 +5835,7 @@ class ReleaseUpdatesFactory(ReleaseFactory):
          ignoreCodes=[0,1],
          workdir='tools/release/updates',
          env=self.env,
+         prefs=[],
          mock=self.use_mock,
          target=self.mock_target,
         ))
