@@ -2250,6 +2250,8 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
             co_command.append('--inspector-rev=%s' % self.buildRevision)
             co_command.append('--venkman-rev=%s' % self.buildRevision)
             co_command.append('--chatzilla-rev=%s' % self.buildRevision)
+        if self.platform.startswith("macosx"):
+            co_command.append('--fix-rust-vendoring-bug-1424825')
         # execute the checkout
         self.addStep(ShellCommand(
          command=co_command,
