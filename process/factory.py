@@ -306,12 +306,25 @@ class MockMixin(object):
 
 class TooltoolMixin(object):
 
-    def addTooltoolStep(self, **kwargs):
+    def addTooltoolStep(self, manifest_url=None, **kwargs):
+        manifest_file = self.tooltool_manifest_src
+        if manifest_url:
+            manifest_file = os.path.basename(manifest_url)
+            cmd = ['wget', '-O', manifest_file, manifest_url]
+            self.addStep(
+                MockCommand(
+                    name='get tooltool manifest',
+                    command=cmd,
+                    env=self.env,
+                    haltOnFailure=True,
+                    mock=self.use_mock,
+                    target=self.mock_target,
+                    workdir="build"))
         cmd= [
             'sh',
             WithProperties(
                 '%(toolsdir)s/scripts/tooltool/tooltool_wrapper.sh'),
-            self.tooltool_manifest_src,
+            manifest_file,
             self.tooltool_url_list[0],
             self.tooltool_bootstrap,
         ]
@@ -6354,10 +6367,17 @@ class MajorUpdateFactory(ReleaseUpdatesFactory):
                                             self.buildNumber)
 
 
-class UpdateVerifyFactory(ReleaseFactory):
+class UpdateVerifyFactory(ReleaseFactory, TooltoolMixin):
     def __init__(self, verifyConfig, buildSpace=.3, useOldUpdater=False,
                  use_mock=False, mock_target=None, mock_packages=None,
-                 mock_copyin_files=None, env={}, **kwargs):
+                 mock_copyin_files=None, env={},
+                 tooltool_manifest_src=None,
+                 tooltool_url_list=[],
+                 tooltool_script=None,
+                 tooltool_token=None,
+                 manifest_url=None,
+                 platform=None,
+                 **kwargs):
         self.use_mock = use_mock
         self.mock_target = mock_target
         self.mock_packages = mock_packages
@@ -6370,14 +6390,30 @@ class UpdateVerifyFactory(ReleaseFactory):
                                 mock_target=self.mock_target,
                                 mock_packages=self.mock_packages,
                                 mock_copyin_files=self.mock_copyin_files,
-                                env=self.env, **kwargs)
+                                env=self.env,
+                                **kwargs)
+        self.tooltool_manifest_src = tooltool_manifest_src
+        self.tooltool_url_list = tooltool_url_list
+        self.tooltool_script = tooltool_script
+        self.tooltool_token = tooltool_token
+        self.platform = platform
+
         modVerifyConfig = 'verification/%s' % verifyConfig
         modVerifySh = 'verification/verify.sh'
         command=['bash', modVerifySh, '-c', modVerifyConfig]
+        if platform and platform.startswith("linux"):
+            self.addTooltoolStep(manifest_url=manifest_url,
+                                 workdir='build')
+            if "LD_LIBRARY_PATH" in self.env:
+                lib_env = WithProperties('%(basedir)s/build/gtk3/usr/local/lib:' + self.env["LD_LIBRARY_PATH"])
+            else:
+                lib_env = WithProperties('%(basedir)s/build/gtk3/usr/local/lib')
+            self.env.update({"LD_LIBRARY_PATH": lib_env})
         if useOldUpdater:
             command.append('--old-updater')
         self.addStep(UpdateMockVerify(
          command=command,
+         env=self.env,
          workdir='tools/release/updates',
          description=['./verify.sh', modVerifyConfig],
          mock=self.use_mock,
