@@ -2267,6 +2267,7 @@ class CCMercurialBuildFactory(MercurialBuildFactory):
         if self.platform.startswith('macosx') and self.branchName in ['comm-central-trunk', 'comm-beta']:
             # Bug 1438089 - workaround for bug 1424825
             # only for OSX64 version 2.56 and higher.
+            # once ESR becomes 60, the branchName condition can be removed.
             co_command.append('--fixup-rust-vendoring-bug-1424825')
         # execute the checkout
         self.addStep(ShellCommand(
