@@ -1202,9 +1202,6 @@ class MercurialBuildFactory(MozillaBuildFactory, MockMixin):
                 workdir='/',
             ))
 
-        if self.use_mock:
-            self.addMockSteps()
-
         if self.enable_ccache:
             self.addStep(ShellCommand(command=['ccache', '-z'],
                      name="clear_ccache_stats", warnOnFailure=False,
