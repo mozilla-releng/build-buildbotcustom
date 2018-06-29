@@ -25,12 +25,12 @@ script:
 after_script:
   - tox -e py27-coveralls
 
-# The channel name "irc.mozilla.org#releng" is encrypted against mozilla/build-buildbotcustom to prevent IRC spam of forks
-# Generated with: travis encrypt --repo mozilla/build-buildbotcustom  --skip-version-check irc.mozilla.org#releng
+# The channel name "irc.mozilla.org#releng-bots" is encrypted against mozilla/build-buildbotcustom to prevent IRC spam of forks
+# Generated with: travis encrypt --repo mozilla/build-buildbotcustom --skip-version-check irc.mozilla.org#releng-bots
 notifications:
   irc:
     channels:
-      - secure: "IZKaFWxMsbk1bMYNXSKXclQkFS4dqXyfjS8a4+YyFbe/hLfa0hlAHhNOPhOL2CFFv8TU2mTCWQlWLa5N6kWzrr3z+VY8cAPqTbxuHJVudVBHFBtyVn3me6NM0i0dlU9e/McEiOwCnYndABvt6sM2LYzGMeG0h6UbmK8Q7efb1FI="
+      - secure: iAb391tjzcGDmeUiVprwTFJJ7ZYbMoQ/y1rWtSjRPMJghQ+4F+aVQ9O2nJIpTKZAEiauYF/a92wE9/dCK6u++cnCQ5/tvVQn03yxkRlRoQjQULbfyIiGkNvWAxXvdzuMMiOPROUy6OHKSeBk7ZJsHemXncNzuOHqvx64IOSsgFE=
     on_success: always
     on_failure: always
     template:
